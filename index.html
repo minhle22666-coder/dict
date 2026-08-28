@@ -7,8 +7,8 @@
 
 <!-- PWA / iOS home-screen -->
 <link rel="manifest" href="./manifest.json" />
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F5F6FA" />
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14161C" />
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F5F4FC" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#15141F" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,25 +17,27 @@
 
 <style>
   :root{
-    --bg:#F5F6FA; --surface:#FFFFFF; --surface-2:#EEF0F6;
-    --text:#14161C; --muted:#6B7180; --muted-2:#A2A7B5; --line:#E2E5EE;
-    --mint:#1FA279; --mint-bg:#E4F7EF;
-    --amber:#C9821A; --amber-bg:#FCF0DC;
-    --blue:#3E64C8; --blue-bg:#E7EDFB;
-    --coral:#D4483A; --coral-bg:#FBE7E4;
+    --bg:#F5F4FC; --surface:#FFFFFF; --surface-2:#F1EFFB;
+    --text:#221E3B; --muted:#6E6B8C; --muted-2:#A6A2C4; --line:#E7E3F8;
+    --primary:#6C5CE7; --primary-2:#4F8EF7; --primary-bg:#EDEAFC;
+    --amber:#F0A020; --amber-bg:#FDEEDA;
+    --mint:#22B57F; --mint-bg:#DFF7EC;
+    --coral:#FF5C7A; --coral-bg:#FFE4EA;
+    --pink:#FF6FA5; --pink-bg:#FFE6F0;
     --r:20px; --r-sm:14px;
     --safe-b:env(safe-area-inset-bottom,0px);
-    --shadow:0 2px 14px rgba(20,22,28,.06);
+    --shadow:0 8px 22px rgba(108,92,231,.10);
   }
   @media(prefers-color-scheme:dark){
     :root{
-      --bg:#14161C; --surface:#1C1F27; --surface-2:#242833;
-      --text:#EDEEF2; --muted:#9297A6; --muted-2:#5E6472; --line:#2C303B;
-      --mint:#3FD9A4; --mint-bg:rgba(63,217,164,.12);
-      --amber:#EFB157; --amber-bg:rgba(239,177,87,.12);
-      --blue:#7C9BF0; --blue-bg:rgba(124,155,240,.12);
-      --coral:#F0776A; --coral-bg:rgba(240,119,106,.12);
-      --shadow:0 2px 14px rgba(0,0,0,.35);
+      --bg:#15141F; --surface:#1E1D2C; --surface-2:#262536;
+      --text:#EDEBF7; --muted:#9C99B8; --muted-2:#635F7D; --line:#322F45;
+      --primary:#8B7CFA; --primary-2:#6FA8FF; --primary-bg:rgba(139,124,250,.16);
+      --amber:#F0B45B; --amber-bg:rgba(240,180,91,.16);
+      --mint:#3FD9A4; --mint-bg:rgba(63,217,164,.14);
+      --coral:#F0776A; --coral-bg:rgba(240,119,106,.14);
+      --pink:#FF8FBB; --pink-bg:rgba(255,143,187,.14);
+      --shadow:0 8px 22px rgba(0,0,0,.35);
     }
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -49,17 +51,34 @@
   }
   button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:none}
   input{font-family:inherit}
-  .serif{font-family:Georgia,"Iowan Old Style","Palatino Linotype","Book Antiqua",serif}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 
-  /* ---- fold-corner "index card" signature ---- */
-  .card-fold{position:relative;overflow:hidden}
-  .card-fold::after{
-    content:'';position:absolute;top:0;right:0;width:0;height:0;
-    border-style:solid;border-width:0 22px 22px 0;
-    border-color:transparent var(--bg) transparent transparent;
-    filter:drop-shadow(-1px 1px 1px rgba(20,22,28,.10));
-  }
+  /* ---- colored icon tiles (reused everywhere: sections, stats, insights) ---- */
+  .tile{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+  .tile-sm{width:24px;height:24px;border-radius:8px;font-size:12px}
+  .tile.violet{background:var(--primary-bg);color:var(--primary)}
+  .tile.blue{background:var(--primary-bg);color:var(--primary-2)}
+  .tile.mint{background:var(--mint-bg);color:var(--mint)}
+  .tile.amber{background:var(--amber-bg);color:var(--amber)}
+  .tile.coral{background:var(--coral-bg);color:var(--coral)}
+  .tile.pink{background:var(--pink-bg);color:var(--pink)}
+
+  /* ---- gradient hero (greeting on Search tab; streak on Thống kê) ---- */
+  .hero{background:linear-gradient(135deg,var(--primary),var(--primary-2));border-radius:24px;
+    padding:22px 20px;color:#fff;position:relative;overflow:hidden;box-shadow:0 12px 28px rgba(108,92,231,.28)}
+  .hero::before{content:'';position:absolute;width:170px;height:170px;border-radius:50%;background:rgba(255,255,255,.13);top:-70px;right:-50px}
+  .hero::after{content:'';position:absolute;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.08);bottom:-50px;left:-30px}
+  .hero-top{display:flex;gap:14px;align-items:center;position:relative;z-index:1}
+  .hero-mascot{width:52px;height:52px;flex:none}
+  .hero-greet{font-size:18px;font-weight:800}
+  .hero-sub{font-size:13.5px;opacity:.92;margin-top:3px;line-height:1.45}
+  .hero-streak{margin-top:14px;display:none;align-items:center;gap:6px;background:rgba(255,255,255,.2);
+    padding:6px 12px;border-radius:99px;font-size:12.5px;font-weight:700;position:relative;z-index:1}
+  .hero-tip{color:var(--muted);font-size:13px;text-align:center;margin:14px 4px 0;line-height:1.6}
+  .hero-compact{text-align:center;padding:26px 20px;margin-bottom:16px}
+  .hero-compact .streak-n{font-size:42px;font-weight:800;line-height:1;position:relative;z-index:1}
+  .hero-compact .streak-l{opacity:.9;font-size:13px;margin-top:4px;font-weight:600;position:relative;z-index:1}
+  .hero-compact .streak-warn{margin-top:10px;background:rgba(255,255,255,.2);border-radius:99px;padding:6px 12px;
+    font-size:12px;display:inline-block;position:relative;z-index:1}
 
   /* ---- Top bar ---- */
   .topbar{
@@ -68,16 +87,14 @@
   }
   .brand{display:flex;align-items:center;gap:9px;margin-bottom:12px}
   .brand img{width:26px;height:26px;border-radius:7px;flex:none}
-  .brand h1{font-size:18px;font-weight:800;letter-spacing:-.01em;margin:0;font-family:Georgia,serif}
-  .brand .dot{color:var(--mint)}
-  .streak-chip{margin-left:auto;display:none;align-items:center;background:var(--amber-bg);color:var(--amber);
-    font-size:13px;font-weight:700;padding:5px 10px;border-radius:99px}
+  .brand h1{font-size:18px;font-weight:800;letter-spacing:-.01em;margin:0}
+  .brand .dot{color:var(--primary)}
   .searchrow{display:flex;gap:8px}
   .searchbox{
     flex:1;display:flex;align-items:center;gap:9px;background:var(--surface-2);
     border:1px solid var(--line);border-radius:var(--r-sm);padding:0 12px;
   }
-  .searchbox:focus-within{border-color:var(--mint)}
+  .searchbox:focus-within{border-color:var(--primary)}
   .searchbox svg{flex:none;width:18px;height:18px;stroke:var(--muted)}
   .searchbox input{
     flex:1;background:none;border:none;outline:none;color:var(--text);
@@ -91,36 +108,35 @@
   .view{display:none}
   .view.active{display:block}
   .status{color:var(--muted);font-size:14px;text-align:center;padding:14px}
-  .spinner{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--mint);border-radius:50%;animation:spin .7s linear infinite;margin:26px auto}
+  .spinner{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;margin:26px auto}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  .empty{text-align:center;color:var(--muted);padding:52px 20px}
-  .empty .big{font-size:34px;margin-bottom:10px}
-  .empty h3{color:var(--text);font-size:17px;margin:0 0 6px;font-weight:700;font-family:Georgia,serif}
+  .empty{text-align:center;color:var(--muted);padding:44px 20px}
+  .empty .big{width:64px;height:64px;border-radius:20px;background:var(--primary-bg);display:flex;
+    align-items:center;justify-content:center;font-size:30px;margin:0 auto 14px}
+  .empty h3{color:var(--text);font-size:17px;margin:0 0 6px;font-weight:800}
   .empty p{margin:0;font-size:14px;line-height:1.6}
 
-  /* ---- Entry card (dictionary headword) ---- */
-  .entry{animation:rise .22s ease;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 6px;box-shadow:var(--shadow)}
+  /* ---- Entry card ---- */
+  .entry{animation:rise .22s ease;background:var(--surface);border-radius:var(--r);padding:18px 18px 6px;box-shadow:var(--shadow)}
   @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
-  .headword{font-size:32px;font-weight:800;letter-spacing:-.01em;line-height:1.1;font-family:Georgia,serif}
+  .headword{font-size:30px;font-weight:800;letter-spacing:-.01em;line-height:1.15}
   .phon{color:var(--muted);font-size:14px;margin-top:3px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   .star{font-size:26px;line-height:1;padding:6px;color:var(--muted-2);flex:none}
   .star.on{color:var(--amber)}
   .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.03em;
     text-transform:uppercase;padding:3px 8px;border-radius:99px;margin-top:8px}
   .badge.off{background:var(--mint-bg);color:var(--mint)}
-  .badge.ai{background:var(--amber-bg);color:var(--amber)}
+  .badge.ai{background:var(--primary-bg);color:var(--primary)}
   .corrected{font-size:12.5px;color:var(--amber);background:var(--amber-bg);
     border-radius:9px;padding:8px 12px;margin-bottom:12px}
 
-  /* ---- "feel" margin note (sticky-tag signature) ---- */
-  .feel{position:relative;background:var(--surface-2);border:1px dashed var(--line);
-    border-radius:var(--r-sm);padding:14px 16px 14px 34px;margin:14px 2px 16px;transform:rotate(-.6deg)}
-  .feel .pin{position:absolute;left:10px;top:13px;font-size:15px;transform:rotate(-18deg)}
-  .feel .eq{font-size:19px;font-weight:700;letter-spacing:-.01em;font-family:Georgia,serif}
-  .feel .eq b{color:var(--mint)}
-  .feel .note{color:var(--muted);font-size:13.5px;margin-top:5px;line-height:1.55}
+  /* ---- "feel" callout ---- */
+  .feel{display:flex;gap:12px;align-items:flex-start;background:var(--primary-bg);border-radius:var(--r-sm);padding:14px 16px;margin:14px 0}
+  .feel .eq{font-size:17px;font-weight:700;letter-spacing:-.01em}
+  .feel .eq b{color:var(--primary)}
+  .feel .note{color:var(--muted);font-size:13.5px;margin-top:4px;line-height:1.55}
 
   .forms{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
   .form{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:7px 11px;flex:1;min-width:78px;text-align:center}
@@ -128,15 +144,16 @@
   .form .v{font-size:15px;font-weight:600;margin-top:2px}
 
   .sec{margin-top:22px}
-  .sec-h{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin-bottom:10px}
+  .sec-h{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
 
-  .sense{border-left:2px solid var(--line);padding:2px 0 2px 13px;margin-bottom:15px;position:relative}
+  .sense{padding:2px 0 2px 0;margin-bottom:15px}
   .sense-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-  .senseno{font-size:12px;font-weight:800;color:var(--muted-2);font-family:Georgia,serif}
-  .pos{font-size:11px;font-weight:700;font-style:italic;color:var(--mint);background:var(--mint-bg);padding:2px 7px;border-radius:6px}
+  .senseno{width:20px;height:20px;border-radius:7px;background:var(--surface-2);color:var(--muted);
+    font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+  .pos{font-size:11px;font-weight:700;color:var(--mint);background:var(--mint-bg);padding:2px 7px;border-radius:6px}
   .rank{color:var(--amber);font-size:12px;letter-spacing:1px}
   .rank .off{color:var(--muted-2)}
-  .sense .vi{font-size:18px;font-weight:700;margin:5px 0 2px;font-family:Georgia,serif}
+  .sense .vi{font-size:17px;font-weight:700;margin:6px 0 2px}
   .sense .gloss{color:var(--muted);font-size:14px}
   .sense .ex{margin-top:7px;font-size:14px;color:var(--text);opacity:.85}
   .sense .ex .evi{color:var(--muted);display:block;margin-top:1px}
@@ -153,24 +170,24 @@
   .chip.ant{color:var(--coral);border-color:var(--coral)}
 
   /* ---- Saved / history ---- */
-  .grp-h{font-size:13px;font-weight:700;color:var(--mint);margin:20px 0 8px;letter-spacing:.02em}
+  .grp-h{font-size:13px;font-weight:700;color:var(--primary);margin:20px 0 8px;letter-spacing:.02em}
   .grp-h:first-child{margin-top:4px}
-  .row{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);
+  .row{display:flex;align-items:center;gap:12px;background:var(--surface);
     border-radius:var(--r-sm);padding:13px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
   .row:active{background:var(--surface-2)}
-  .row .w{font-weight:700;font-size:16px;font-family:Georgia,serif}
+  .row .w{font-weight:700;font-size:16px}
   .row .e{color:var(--muted);font-size:14px;margin-left:auto;text-align:right;flex:none;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .row .rm{color:var(--amber);font-size:20px;padding:2px 4px;flex:none}
 
   /* ---- Review (typing) ---- */
   .rev-progress{color:var(--muted);font-size:13px;text-align:center;margin-bottom:12px;font-weight:600}
-  .rev-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:26px 20px;text-align:center;margin-top:8px;box-shadow:var(--shadow)}
+  .rev-card{background:var(--surface);border-radius:var(--r);padding:26px 20px;text-align:center;margin-top:8px;box-shadow:var(--shadow)}
   .rev-card .prompt{color:var(--muted-2);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;font-weight:700}
-  .rev-card .q{font-size:24px;font-weight:800;letter-spacing:-.01em;font-family:Georgia,serif}
+  .rev-card .q{font-size:23px;font-weight:800;letter-spacing:-.01em}
   .rev-card .q-note{color:var(--muted);font-size:13.5px;margin-top:8px;line-height:1.5}
   .type-input{width:100%;margin-top:18px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
     padding:13px 14px;font-size:17px;text-align:center;color:var(--text);outline:none}
-  .type-input:focus{border-color:var(--mint)}
+  .type-input:focus{border-color:var(--primary)}
   .type-input.shake{animation:shake .35s}
   @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
   .rev-fb{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);text-align:left;font-size:15px;font-weight:600}
@@ -182,35 +199,27 @@
   .rev-fb .ex .evi{display:block;margin-top:1px}
 
   /* ---- buttons ---- */
-  .btn{display:block;width:100%;background:var(--mint);color:#06231A;font-weight:700;font-size:16px;
-    padding:15px;border-radius:var(--r-sm);text-align:center;margin-top:12px}
+  .btn{display:block;width:100%;background:linear-gradient(135deg,var(--primary),var(--primary-2));
+    color:#fff;font-weight:700;font-size:16px;padding:15px;border-radius:var(--r-sm);text-align:center;margin-top:12px}
   .btn:active{opacity:.85}
   .btn.ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--line)}
   .btn.sm{padding:11px;font-size:14px}
   .btn-row{display:flex;gap:9px}
   .btn-row .btn{margin-top:0}
 
-  /* ---- Insights (Thống kê) ---- */
-  .streak-hero{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px 20px;text-align:center;box-shadow:var(--shadow);margin-bottom:16px}
-  .streak-n{font-size:44px;font-weight:800;color:var(--amber);font-family:Georgia,serif;line-height:1}
-  .streak-l{color:var(--muted);font-size:13px;margin-top:4px;font-weight:600}
-  .streak-warn{color:var(--muted);font-size:12.5px;margin-top:10px;background:var(--surface-2);border-radius:99px;padding:6px 12px;display:inline-block}
+  /* ---- Thống kê ---- */
   .stat-grid{display:flex;gap:9px;margin-bottom:20px}
-  .stat{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:13px;text-align:center;box-shadow:var(--shadow)}
-  .stat .n{font-size:22px;font-weight:800;color:var(--mint);font-family:Georgia,serif}
-  .stat .l{font-size:11px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;margin-top:2px;font-weight:700}
-  .bars{display:flex;gap:8px;align-items:flex-end;height:100px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px;box-shadow:var(--shadow)}
+  .stat{flex:1;display:flex;align-items:center;gap:10px;background:var(--surface);
+    border-radius:var(--r-sm);padding:12px;box-shadow:var(--shadow)}
+  .stat .n{font-size:19px;font-weight:800}
+  .stat .l{font-size:10.5px;color:var(--muted-2);letter-spacing:.02em;margin-top:1px;font-weight:700;line-height:1.3}
+  .bars{display:flex;gap:8px;align-items:flex-end;height:100px;background:var(--surface);border-radius:var(--r-sm);padding:12px;box-shadow:var(--shadow)}
   .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px}
   .bar-track{width:100%;flex:1;display:flex;align-items:flex-end}
-  .bar-fill{width:100%;background:var(--mint);border-radius:5px 5px 2px 2px;min-height:4px}
+  .bar-fill{width:100%;background:linear-gradient(180deg,var(--primary-2),var(--primary));border-radius:5px 5px 2px 2px;min-height:4px}
   .bar-lbl{font-size:10px;color:var(--muted-2);font-weight:700}
-  .ins-card{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);
-    padding:14px 15px;margin-bottom:10px;box-shadow:var(--shadow);border-left:4px solid var(--line)}
-  .ins-card.ins-mint{border-left-color:var(--mint)}
-  .ins-card.ins-amber{border-left-color:var(--amber)}
-  .ins-card.ins-blue{border-left-color:var(--blue)}
-  .ins-card.ins-coral{border-left-color:var(--coral)}
-  .ins-icon{font-size:20px;flex:none;line-height:1.3}
+  .ins-card{display:flex;gap:12px;align-items:flex-start;background:var(--surface);
+    border-radius:var(--r-sm);padding:14px 15px;margin-bottom:10px;box-shadow:var(--shadow)}
   .ins-title{font-weight:700;font-size:14.5px}
   .ins-body{color:var(--muted);font-size:13.5px;margin-top:2px;line-height:1.5}
 
@@ -220,16 +229,18 @@
   .field input[type=text],.field input[type=password]{
     width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
     color:var(--text);padding:13px 14px;font-size:15px;outline:none}
-  .field input:focus{border-color:var(--mint)}
+  .field input:focus{border-color:var(--primary)}
   .field .hint{font-size:12px;color:var(--muted-2);margin-top:6px;line-height:1.5}
   .saved-flash{color:var(--mint);font-size:13px;text-align:center;height:16px;font-weight:600}
 
   /* ---- Bottom tab bar ---- */
   .tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;
     background:var(--surface);border-top:1px solid var(--line);padding-bottom:var(--safe-b)}
-  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 7px;color:var(--muted-2);font-size:10px;font-weight:600}
-  .tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9}
-  .tab.active{color:var(--mint)}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 7px;color:var(--muted-2);font-size:10px;font-weight:600}
+  .tab-ico{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center}
+  .tab svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.9}
+  .tab.active{color:var(--primary)}
+  .tab.active .tab-ico{background:var(--primary-bg)}
   .toast{position:fixed;left:50%;bottom:calc(88px + var(--safe-b));transform:translateX(-50%);
     background:var(--text);border:1px solid var(--line);color:var(--bg);padding:10px 16px;
     border-radius:99px;font-size:14px;z-index:50;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap}
@@ -243,7 +254,6 @@
   <div class="brand">
     <img src="./icon-192.png" alt="" />
     <h1>Smart<span class="dot">.</span>Dict</h1>
-    <span class="streak-chip" id="streak-chip"></span>
   </div>
   <div class="searchrow">
     <div class="searchbox">
@@ -259,10 +269,28 @@
   <!-- SEARCH -->
   <section class="view active" id="v-search">
     <div id="result"></div>
-    <div class="empty" id="search-empty">
-      <div class="big">🔍</div>
-      <h3>Gõ một từ để bắt đầu</h3>
-      <p>Từ có sẵn trong máy hiện tức thì.<br/>Từ lạ sẽ nhờ AI tra rồi lưu lại để lần sau offline.</p>
+    <div id="search-empty">
+      <div class="hero" id="hero">
+        <div class="hero-top">
+          <div class="hero-mascot">
+            <svg viewBox="0 0 64 64" width="100%" height="100%">
+              <defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset="1" stop-color="#ffffff" stop-opacity=".75"/></linearGradient></defs>
+              <path d="M32 15 C25 9 13 9 7 13 V45 C13 41 25 41 32 47 C39 41 51 41 57 45 V13 C51 9 39 9 32 15 Z" fill="url(#mg)"/>
+              <path d="M32 15 V47" stroke="rgba(108,92,231,.35)" stroke-width="2"/>
+              <circle cx="23" cy="26" r="3" fill="#4B3FBF"/>
+              <circle cx="41" cy="26" r="3" fill="#4B3FBF"/>
+              <path d="M24 34 Q32 40 40 34" stroke="#4B3FBF" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <rect x="26" y="1" width="14" height="5" rx="2.5" fill="#F0A020" transform="rotate(-18 33 3)"/>
+            </svg>
+          </div>
+          <div>
+            <div class="hero-greet" id="hero-greet">Chào em 👋</div>
+            <div class="hero-sub" id="hero-sub">Bắt đầu ngày mới với vài từ tiếng Anh nhé.</div>
+          </div>
+        </div>
+        <div class="hero-streak" id="hero-streak"></div>
+      </div>
+      <p class="hero-tip">Từ có sẵn trong máy hiện tức thì. Từ lạ sẽ nhờ AI tra rồi lưu lại để lần sau offline.</p>
     </div>
   </section>
 
@@ -284,8 +312,8 @@
   <!-- SETTINGS -->
   <section class="view" id="v-settings">
     <div class="stat-grid">
-      <div class="stat"><div class="n" id="st-total">0</div><div class="l">từ trong máy</div></div>
-      <div class="stat"><div class="n" id="st-saved">0</div><div class="l">đã lưu ⭐</div></div>
+      <div class="stat"><div class="tile violet">📖</div><div><div class="n" id="st-total">0</div><div class="l">từ trong máy</div></div></div>
+      <div class="stat"><div class="tile amber">⭐</div><div><div class="n" id="st-saved">0</div><div class="l">đã lưu</div></div></div>
     </div>
 
     <div class="field">
@@ -302,21 +330,21 @@
     <div class="saved-flash" id="settings-flash"></div>
 
     <div class="sec">
-      <div class="sec-h">Nạp bộ từ điển (seed)</div>
+      <div class="sec-h"><span class="tile tile-sm violet">⬇︎</span>Nạp bộ từ điển (seed)</div>
       <div class="hint" style="margin-bottom:10px">Sau này khi em generate bộ ~5000 từ bằng Gemini, xuất ra JSON rồi nạp ở đây — không cần deploy lại app.</div>
       <input id="import-file" type="file" accept="application/json,.json" style="display:none"/>
       <button class="btn ghost sm" id="import-btn">Chọn file JSON để nạp</button>
     </div>
 
     <div class="sec">
-      <div class="sec-h">Dữ liệu &amp; quyền riêng tư</div>
+      <div class="sec-h"><span class="tile tile-sm coral">🔒</span>Dữ liệu &amp; quyền riêng tư</div>
       <div class="hint" style="margin-bottom:10px">Tab Thống kê chỉ đọc lại hoạt động đã lưu trên máy em (không gửi đi đâu). Muốn xoá lịch sử đó (giữ nguyên từ đã lưu) thì bấm nút dưới.</div>
       <button class="btn ghost sm" id="clear-log-btn">Xoá lịch sử hoạt động</button>
       <div class="saved-flash" id="clearlog-flash" style="margin-top:8px"></div>
     </div>
 
     <div class="sec">
-      <div class="sec-h">Khác</div>
+      <div class="sec-h"><span class="tile tile-sm mint">⚙︎</span>Khác</div>
       <button class="btn ghost sm" id="persist-btn">Xin iOS giữ dữ liệu (không tự xoá)</button>
       <div class="saved-flash" id="persist-flash" style="margin-top:8px"></div>
     </div>
@@ -327,15 +355,15 @@
 <!-- Bottom nav -->
 <nav class="tabs">
   <button class="tab active" data-view="search">
-    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Tra từ</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>Tra từ</button>
   <button class="tab" data-view="saved">
-    <svg viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg>Đã lưu</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg></span>Đã lưu</button>
   <button class="tab" data-view="review">
-    <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Ôn tập</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>Ôn tập</button>
   <button class="tab" data-view="insights">
-    <svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-6"/></svg>Thống kê</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-6"/></svg></span>Thống kê</button>
   <button class="tab" data-view="settings">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3.9a7 7 0 0 0-1.7-1L14.5 2h-5l-.4 2.5a7 7 0 0 0-1.7 1l-2.3-.9-2 3.4L3.1 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 1.7 1l.4 2.5h5l.4-2.5a7 7 0 0 0 1.7-1l2.3.9 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg>Cài đặt</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3.9a7 7 0 0 0-1.7-1L14.5 2h-5l-.4 2.5a7 7 0 0 0-1.7 1l-2.3-.9-2 3.4L3.1 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 1.7 1l.4 2.5h5l.4-2.5a7 7 0 0 0 1.7-1l2.3.9 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span>Cài đặt</button>
 </nav>
 
 <div class="toast" id="toast"></div>

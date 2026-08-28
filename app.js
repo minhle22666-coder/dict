@@ -61,7 +61,7 @@ async function logEvent(type, word){
   try{
     await logAdd({ts:now(), type, word:word||null});
     const c=await logCount(); if(c>3000) logTrim();
-    updateStreakChip();
+    renderHero();
   }catch(e){ /* logging is best-effort, never blocks the app */ }
 }
 
@@ -257,7 +257,7 @@ function renderEntry(rec, queriedAs){
     ? '<span class="badge ai">✦ AI · đã lưu offline</span>'
     : '<span class="badge off">◆ offline</span>';
 
-  let h='<div class="entry card-fold">';
+  let h='<div class="entry">';
   if(queriedAs){
     h+='<div class="corrected">Đã tự sửa từ “'+esc(queriedAs)+'”'+(d.query_note?' · '+esc(d.query_note):'')+'</div>';
   }
@@ -270,9 +270,9 @@ function renderEntry(rec, queriedAs){
   h+='</div>';
 
   if(d.vi_equivalent){
-    h+='<div class="feel"><span class="pin">📌</span><div class="eq">'+esc(d.word||w)+' ≈ <b>'+esc(d.vi_equivalent)+'</b></div>';
+    h+='<div class="feel"><div class="tile violet">≈</div><div><div class="eq">'+esc(d.word||w)+' ≈ <b>'+esc(d.vi_equivalent)+'</b></div>';
     if(d.vi_note) h+='<div class="note">'+esc(d.vi_note)+'</div>';
-    h+='</div>';
+    h+='</div></div>';
   }
 
   // verb forms
@@ -287,7 +287,7 @@ function renderEntry(rec, queriedAs){
   // senses
   if(Array.isArray(d.senses)&&d.senses.length){
     const ss=[...d.senses].sort((a,b)=>(b.rank||0)-(a.rank||0));
-    h+='<div class="sec"><div class="sec-h">Nghĩa · phổ biến nhất trước</div>';
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm violet">📘</span>Nghĩa · phổ biến nhất trước</div>';
     ss.forEach((s,i)=>{
       h+='<div class="sense"><div class="sense-top"><span class="senseno">'+(i+1)+'</span>';
       if(s.pos) h+='<span class="pos">'+esc(posLabel(s.pos))+'</span>';
@@ -303,7 +303,7 @@ function renderEntry(rec, queriedAs){
   // expressions
   if(Array.isArray(d.expressions)&&d.expressions.length){
     const es=[...d.expressions].sort((a,b)=>(b.rank||0)-(a.rank||0));
-    h+='<div class="sec"><div class="sec-h">Cách dùng thường gặp</div>';
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm blue">🔗</span>Cách dùng thường gặp</div>';
     for(const e of es){
       h+='<div class="expr"><span class="rank">'+dots(e.rank)+'</span><span class="t">'+esc(e.text)+'</span>';
       if(e.vi) h+='<span class="ev">'+esc(e.vi)+'</span>';
@@ -314,14 +314,14 @@ function renderEntry(rec, queriedAs){
 
   // family
   if(Array.isArray(d.family)&&d.family.length){
-    h+='<div class="sec"><div class="sec-h">Gia đình từ</div><div class="chips">';
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm mint">🌱</span>Gia đình từ</div><div class="chips">';
     for(const fm of d.family){ const fw=esc(fm.word||''); h+='<button class="chip tap" onclick="jump(\''+fw+'\')">'+fw+(fm.pos?' <span style="color:var(--muted-2)">·'+esc(fm.pos)+'</span>':'')+'</button>'; }
     h+='</div></div>';
   }
 
   // syn / ant
   if((d.synonyms&&d.synonyms.length)||(d.antonyms&&d.antonyms.length)){
-    h+='<div class="sec"><div class="sec-h">Đồng nghĩa · trái nghĩa</div><div class="chips">';
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm pink">⇄</span>Đồng nghĩa · trái nghĩa</div><div class="chips">';
     (d.synonyms||[]).forEach(x=>h+='<button class="chip tap" onclick="jump(\''+esc(x)+'\')">'+esc(x)+'</button>');
     (d.antonyms||[]).forEach(x=>h+='<button class="chip ant tap" onclick="jump(\''+esc(x)+'\')">'+esc(x)+'</button>');
     h+='</div></div>';
@@ -405,7 +405,7 @@ function renderReview(){
   const r=revQueue[revIdx], d=r.data||{};
   const prompt=reviewPrompt(d);
   let h='<div class="rev-progress">'+(revIdx+1)+' / '+revQueue.length+'</div>';
-  h+='<div class="rev-card card-fold">';
+  h+='<div class="rev-card">';
   h+='<div class="prompt">Từ tiếng Anh nào có nghĩa này?</div>';
   h+='<div class="q">'+esc(prompt)+'</div>';
   if(d.vi_note && !revState) h+='<div class="q-note">'+esc(d.vi_note)+'</div>';
@@ -515,7 +515,7 @@ async function computeInsights(){
 }
 
 function insightCard(color, icon, title, body){
-  return '<div class="ins-card ins-'+color+'"><div class="ins-icon">'+icon+'</div><div><div class="ins-title">'+title+'</div><div class="ins-body">'+body+'</div></div></div>';
+  return '<div class="ins-card"><div class="tile '+color+'">'+icon+'</div><div><div class="ins-title">'+title+'</div><div class="ins-body">'+body+'</div></div></div>';
 }
 async function renderInsights(){
   const area=$('#insights-area');
@@ -528,7 +528,7 @@ async function renderInsights(){
 
   let h='';
   // hero streak card
-  h+='<div class="streak-hero card-fold">';
+  h+='<div class="hero hero-compact">';
   h+='<div class="streak-n">'+s.streak+'</div>';
   h+='<div class="streak-l">ngày liên tiếp có hoạt động</div>';
   if(!s.hasToday && s.streak>0) h+='<div class="streak-warn">Hôm nay chưa có gì — tra hoặc ôn một từ để giữ chuỗi nhé.</div>';
@@ -536,9 +536,9 @@ async function renderInsights(){
 
   // stat tiles
   h+='<div class="stat-grid">';
-  h+='<div class="stat"><div class="n">'+s.totalWords+'</div><div class="l">từ trong máy</div></div>';
-  h+='<div class="stat"><div class="n">'+s.savedCount+'</div><div class="l">đã lưu</div></div>';
-  h+='<div class="stat"><div class="n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</div><div class="l">độ chính xác ôn tập</div></div>';
+  h+='<div class="stat"><div class="tile violet">📖</div><div><div class="n">'+s.totalWords+'</div><div class="l">từ trong máy</div></div></div>';
+  h+='<div class="stat"><div class="tile amber">⭐</div><div><div class="n">'+s.savedCount+'</div><div class="l">đã lưu</div></div></div>';
+  h+='<div class="stat"><div class="tile mint">🎯</div><div><div class="n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</div><div class="l">độ chính xác</div></div></div>';
   h+='</div>';
 
   // 7-day bars
@@ -573,14 +573,33 @@ async function renderInsights(){
 
   area.innerHTML=h;
 }
-async function updateStreakChip(){
+/* ---------- greeting hero (Search tab) ---------- */
+function greetingText(){
+  const h=new Date().getHours();
+  if(h<5) return {greet:'Khuya rồi đó 🌙', sub:'Tranh thủ tra vài từ trước khi ngủ nhé.'};
+  if(h<11) return {greet:'Chào buổi sáng 👋', sub:'Bắt đầu ngày mới với vài từ tiếng Anh nhé.'};
+  if(h<13) return {greet:'Chào buổi trưa 👋', sub:'Giải lao chút, tra vài từ mới nào.'};
+  if(h<18) return {greet:'Chào buổi chiều 👋', sub:'Tranh thủ giờ làm việc, học thêm chút vốn từ.'};
+  return {greet:'Chào buổi tối 👋', sub:'Cuối ngày, ôn lại vài từ đã lưu nhé.'};
+}
+async function renderHero(){
+  const greetEl=$('#hero-greet'), subEl=$('#hero-sub'), streakEl=$('#hero-streak');
+  if(!greetEl) return;
+  const g=greetingText();
+  greetEl.textContent=g.greet;
   try{
     const logs=await logAll();
     const daySet=new Set(logs.map(l=>dayStart(l.ts)));
-    const {streak}=computeStreak(daySet);
-    const el=$('#streak-chip'); if(el) el.textContent = streak>0 ? '🔥 '+streak : '';
-    if(el) el.style.display = streak>0 ? 'inline-flex' : 'none';
-  }catch(e){}
+    const {streak, hasToday}=computeStreak(daySet);
+    if(streak>0){
+      streakEl.style.display='inline-flex';
+      streakEl.innerHTML='🔥 <b>'+streak+'</b> ngày'+(hasToday?'':' — tra 1 từ để giữ chuỗi!');
+      subEl.textContent = hasToday ? g.sub : 'Hôm nay chưa tra từ nào — giữ chuỗi '+streak+' ngày nhé!';
+    } else {
+      streakEl.style.display='none';
+      subEl.textContent=g.sub;
+    }
+  }catch(e){ subEl.textContent=g.sub; }
 }
 
 /* ============================================================
@@ -613,6 +632,7 @@ function showView(v){
   $('#v-'+v).classList.add('active');
   document.querySelector('.tab[data-view="'+v+'"]').classList.add('active');
   window.scrollTo(0,0);
+  if(v==='search') renderHero();
   if(v==='saved') renderSaved();
   if(v==='review') startReview();
   if(v==='insights') renderInsights();
@@ -645,7 +665,7 @@ function wire(){
   $('#clear-log-btn').addEventListener('click',async()=>{
     await logClearAll();
     const f=$('#clearlog-flash'); f.textContent='Đã xoá lịch sử hoạt động ✓'; setTimeout(()=>f.textContent='',1800);
-    updateStreakChip();
+    renderHero();
   });
 }
 
@@ -657,6 +677,7 @@ if('serviceWorker' in navigator){
 /* ---------- boot ---------- */
 (async function init(){
   wire();
+  renderHero();
   await loadSeedOnce();
   refreshStats();
   logEvent('open', null);
