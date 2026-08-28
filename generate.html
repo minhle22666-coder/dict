@@ -168,7 +168,7 @@
     <h2>Sau khi tải seed.json</h2>
     <ol>
       <li>Thay file <b>seed.json</b> mẫu trong repo bằng file vừa tải (Add file → Upload, commit đè).</li>
-      <li>Mở <b>sw.js</b>, đổi <code>smartdict-v1</code> → <code>-v2</code> rồi commit (để iPhone lấy bản mới).</li>
+      <li>Mở <b>sw.js</b>, tăng số ở dòng <code>const CACHE = 'smartdict-vN'</code> lên 1 (vd v4 → v5) rồi commit (để iPhone lấy bản mới).</li>
       <li>Trên iPhone: xoá icon app cũ, mở lại link bằng Safari → Add to Home Screen. Xong — 5000 từ nằm sẵn, offline hoàn toàn.</li>
     </ol>
   </div>
@@ -179,11 +179,16 @@
 const $=s=>document.querySelector(s);
 const now=()=>Date.now();
 const KEY_LS='sd_key',MODEL_LS='sd_model';
-const DB_NAME='smartdict',DB_VER=1,STORE='entries';
+const DB_NAME='smartdict',DB_VER=2,STORE='entries',LOG='log';
+// DB_VER must always match app.js — they share the same on-device database.
+// If app.js bumps this again later, bump it here too, in the same onupgradeneeded shape.
 let _db;
 function db(){if(_db)return Promise.resolve(_db);return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,DB_VER);
-  r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(STORE)){const s=d.createObjectStore(STORE,{keyPath:'word'});s.createIndex('savedAt','savedAt');s.createIndex('saved','saved');}};
-  r.onsuccess=()=>{_db=r.result;res(_db)};r.onerror=()=>rej(r.error);});}
+  r.onupgradeneeded=()=>{const d=r.result;
+    if(!d.objectStoreNames.contains(STORE)){const s=d.createObjectStore(STORE,{keyPath:'word'});s.createIndex('savedAt','savedAt');s.createIndex('saved','saved');}
+    if(!d.objectStoreNames.contains(LOG)){const l=d.createObjectStore(LOG,{keyPath:'id',autoIncrement:true});l.createIndex('ts','ts');l.createIndex('type','type');}
+  };
+  r.onsuccess=()=>{_db=r.result;res(_db)};r.onerror=()=>rej(r.error);r.onblocked=()=>rej(new Error('DB_BLOCKED'));});}
 function txs(m){return db().then(d=>d.transaction(STORE,m).objectStore(STORE));}
 function idbGet(w){return txs('readonly').then(s=>new Promise((res,rej)=>{const r=s.get(w);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)}));}
 function idbPut(o){return txs('readwrite').then(s=>new Promise((res,rej)=>{const r=s.put(o);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)}));}
@@ -347,9 +352,14 @@ $('#model').addEventListener('change',()=>localStorage.setItem(MODEL_LS,$('#mode
 $('#go').addEventListener('click',async()=>{
   if(!$('#key').value.trim()){ alert('Dán Gemini API key trước đã (mục 1).'); return; }
   localStorage.setItem(KEY_LS,$('#key').value.trim());
-  const q=await buildQueue();
-  if(!q.length){ alert('Không còn từ nào để sinh trong phạm vi này (có thể đã sinh hết rồi).'); return; }
-  run(q);
+  try{
+    const q=await buildQueue();
+    if(!q.length){ alert('Không còn từ nào để sinh trong phạm vi này (có thể đã sinh hết rồi).'); return; }
+    run(q);
+  }catch(e){
+    console.error(e);
+    alert('Không mở được kho từ trên máy (lỗi: '+(e&&e.message?e.message:e)+'). Thử đóng hết các tab khác đang mở trang Smart.Dict rồi tải lại trang này.');
+  }
 });
 $('#pause').addEventListener('click',()=>{ paused=!paused; $('#pause').textContent=paused?'Tiếp tục':'Tạm dừng'; });
 $('#stop').addEventListener('click',()=>{ stopped=true; paused=false; log('■ đã yêu cầu dừng…','warn'); });
