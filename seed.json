@@ -1,0 +1,142 @@
+[
+  {
+    "word": "step",
+    "phonetic": "/stɛp/",
+    "vi_equivalent": "bước",
+    "vi_note": "Cảm giác 'một động tác chân' hoặc 'một nấc tiến tới' trong một quá trình.",
+    "forms": { "v1": "step", "v2": "stepped", "v3": "stepped", "ving": "stepping" },
+    "senses": [
+      { "pos": "noun", "vi": "bước (chân)", "gloss": "a single movement of the foot", "rank": 5, "example": "She took a step forward.", "example_vi": "Cô ấy bước tới một bước." },
+      { "pos": "noun", "vi": "bước (trong quá trình)", "gloss": "a stage in a process", "rank": 5, "example": "This is the first step.", "example_vi": "Đây là bước đầu tiên." },
+      { "pos": "verb", "vi": "bước, đặt chân", "gloss": "to move by lifting the foot", "rank": 4, "example": "Step into the room.", "example_vi": "Bước vào phòng đi." }
+    ],
+    "expressions": [
+      { "text": "step up", "vi": "xắn tay vào, tăng cường", "rank": 5, "example": "He stepped up when the team needed him." },
+      { "text": "step into", "vi": "bước vào / đảm nhận (vai trò)", "rank": 4, "example": "She stepped into a new role." },
+      { "text": "step back", "vi": "lùi lại, nhìn từ xa", "rank": 4, "example": "Let's step back and rethink this." },
+      { "text": "step by step", "vi": "từng bước một", "rank": 5, "example": "I'll explain it step by step." }
+    ],
+    "family": [ { "word": "step", "pos": "noun" }, { "word": "step", "pos": "verb" }, { "word": "footstep", "pos": "noun" } ],
+    "synonyms": ["pace", "stride", "stage"],
+    "antonyms": []
+  },
+  {
+    "word": "run",
+    "phonetic": "/rʌn/",
+    "vi_equivalent": "chạy",
+    "vi_note": "Nghĩa gốc là 'chạy', nhưng rất hay dùng theo nghĩa 'vận hành / điều hành'.",
+    "forms": { "v1": "run", "v2": "ran", "v3": "run", "ving": "running" },
+    "senses": [
+      { "pos": "verb", "vi": "chạy", "gloss": "move fast on foot", "rank": 5, "example": "I run every morning.", "example_vi": "Sáng nào tôi cũng chạy bộ." },
+      { "pos": "verb", "vi": "vận hành, hoạt động", "gloss": "operate / function", "rank": 4, "example": "The engine runs smoothly.", "example_vi": "Máy chạy êm." },
+      { "pos": "verb", "vi": "điều hành, quản lý", "gloss": "manage a business", "rank": 4, "example": "She runs a small shop.", "example_vi": "Cô ấy điều hành một cửa tiệm nhỏ." },
+      { "pos": "verb", "vi": "kéo dài, diễn ra", "gloss": "continue for a period", "rank": 3, "example": "The show runs for two hours.", "example_vi": "Buổi diễn kéo dài hai tiếng." },
+      { "pos": "verb", "vi": "tranh cử", "gloss": "compete in an election", "rank": 2, "example": "He's running for mayor.", "example_vi": "Ông ấy đang tranh cử thị trưởng." }
+    ],
+    "expressions": [
+      { "text": "run out of", "vi": "hết (cạn) thứ gì", "rank": 5, "example": "We ran out of milk." },
+      { "text": "run into", "vi": "tình cờ gặp; gặp phải (vấn đề)", "rank": 4, "example": "I ran into an old friend." },
+      { "text": "in the long run", "vi": "về lâu về dài", "rank": 4, "example": "It's cheaper in the long run." }
+    ],
+    "family": [ { "word": "run", "pos": "verb" }, { "word": "runner", "pos": "noun" }, { "word": "running", "pos": "noun" } ],
+    "synonyms": ["operate", "manage", "sprint"],
+    "antonyms": ["walk", "stop"]
+  },
+  {
+    "word": "whether",
+    "phonetic": "/ˈwɛðər/",
+    "vi_equivalent": "liệu",
+    "vi_note": "Diễn tả sự không chắc chắn hoặc lựa chọn giữa các khả năng — trong đầu cứ nhớ whether ≈ liệu.",
+    "senses": [
+      { "pos": "conjunction", "vi": "liệu (có... không)", "gloss": "expressing a doubt or choice", "rank": 5, "example": "I don't know whether she'll come.", "example_vi": "Tôi không biết liệu cô ấy có đến không." },
+      { "pos": "conjunction", "vi": "dù... hay", "gloss": "expressing two alternatives", "rank": 4, "example": "Whether you like it or not, it's true.", "example_vi": "Dù bạn thích hay không thì nó vẫn đúng." }
+    ],
+    "expressions": [
+      { "text": "whether or not", "vi": "dù có... hay không", "rank": 5, "example": "Whether or not it rains, we'll go." }
+    ],
+    "family": [],
+    "synonyms": ["if"],
+    "antonyms": []
+  },
+  {
+    "word": "go",
+    "phonetic": "/ɡoʊ/",
+    "vi_equivalent": "đi",
+    "vi_note": "Động từ bất quy tắc cực phổ biến, nghĩa gốc là 'đi/di chuyển khỏi đây'.",
+    "forms": { "v1": "go", "v2": "went", "v3": "gone", "ving": "going" },
+    "senses": [
+      { "pos": "verb", "vi": "đi", "gloss": "move or travel", "rank": 5, "example": "I go to work by bus.", "example_vi": "Tôi đi làm bằng xe buýt." },
+      { "pos": "verb", "vi": "trở nên (theo hướng xấu)", "gloss": "become (usually negative)", "rank": 3, "example": "The milk went bad.", "example_vi": "Sữa bị hỏng rồi." },
+      { "pos": "verb", "vi": "diễn ra, tiến triển", "gloss": "proceed / turn out", "rank": 3, "example": "How did the interview go?", "example_vi": "Buổi phỏng vấn thế nào?" }
+    ],
+    "expressions": [
+      { "text": "go through", "vi": "trải qua; xem xét kỹ", "rank": 5, "example": "She went through a hard time." },
+      { "text": "go on", "vi": "tiếp tục; xảy ra", "rank": 5, "example": "Go on, I'm listening." },
+      { "text": "go over", "vi": "xem lại, rà lại", "rank": 4, "example": "Let's go over the plan." }
+    ],
+    "family": [ { "word": "go", "pos": "verb" }, { "word": "goer", "pos": "noun" } ],
+    "synonyms": ["move", "travel", "proceed"],
+    "antonyms": ["stay", "come"]
+  },
+  {
+    "word": "beauty",
+    "phonetic": "/ˈbjuːti/",
+    "vi_equivalent": "vẻ đẹp",
+    "vi_note": "Danh từ gốc của cả một họ từ: beautiful, beautify, beautifully.",
+    "senses": [
+      { "pos": "noun", "vi": "vẻ đẹp, cái đẹp", "gloss": "the quality of being pleasing to look at", "rank": 5, "example": "The beauty of the sunset amazed us.", "example_vi": "Vẻ đẹp của hoàng hôn làm chúng tôi kinh ngạc." },
+      { "pos": "noun", "vi": "điểm hay, điểm lợi", "gloss": "an especially good feature", "rank": 3, "example": "The beauty of this plan is its simplicity.", "example_vi": "Cái hay của kế hoạch này là sự đơn giản." }
+    ],
+    "expressions": [],
+    "family": [
+      { "word": "beauty", "pos": "noun" },
+      { "word": "beautiful", "pos": "adjective" },
+      { "word": "beautify", "pos": "verb" },
+      { "word": "beautifully", "pos": "adverb" }
+    ],
+    "synonyms": ["charm", "elegance"],
+    "antonyms": ["ugliness"]
+  },
+  {
+    "word": "eventually",
+    "phonetic": "/ɪˈvɛntʃuəli/",
+    "vi_equivalent": "cuối cùng thì",
+    "vi_note": "'Rốt cuộc / sau một thời gian rồi cũng' — nhấn vào việc đến sau một quá trình, KHÔNG phải 'có thể' (đừng lẫn với 'eventual' của tiếng Pháp).",
+    "senses": [
+      { "pos": "adverb", "vi": "cuối cùng (rồi cũng)", "gloss": "in the end, after some time", "rank": 5, "example": "He eventually agreed.", "example_vi": "Cuối cùng anh ấy cũng đồng ý." }
+    ],
+    "expressions": [],
+    "family": [ { "word": "eventual", "pos": "adjective" }, { "word": "eventually", "pos": "adverb" } ],
+    "synonyms": ["finally", "in the end", "ultimately"],
+    "antonyms": ["immediately"]
+  },
+  {
+    "word": "pull through",
+    "phonetic": "/pʊl θruː/",
+    "vi_equivalent": "vượt qua (được)",
+    "vi_note": "Thường dùng khi ai đó qua khỏi cơn bệnh nặng hoặc giai đoạn khó khăn.",
+    "senses": [
+      { "pos": "phrasal verb", "vi": "qua khỏi, vượt qua", "gloss": "recover from a serious illness or difficulty", "rank": 5, "example": "The doctors think she'll pull through.", "example_vi": "Bác sĩ nghĩ cô ấy sẽ qua khỏi." }
+    ],
+    "expressions": [],
+    "family": [],
+    "synonyms": ["recover", "survive", "make it"],
+    "antonyms": []
+  },
+  {
+    "word": "though",
+    "phonetic": "/ðoʊ/",
+    "vi_equivalent": "mặc dù / (nhưng) mà",
+    "vi_note": "Đầu câu nghĩa 'mặc dù'; đứng CUỐI câu (spoken) nghĩa 'tuy vậy, mà' — nét rất đời thường.",
+    "senses": [
+      { "pos": "conjunction", "vi": "mặc dù", "gloss": "despite the fact that", "rank": 5, "example": "Though it was late, she kept working.", "example_vi": "Mặc dù đã muộn, cô ấy vẫn làm." },
+      { "pos": "adverb", "vi": "(nhưng) mà, tuy vậy", "gloss": "however (end of sentence, informal)", "rank": 4, "example": "It's expensive. I like it, though.", "example_vi": "Đắt đấy. Mà tôi thích nó." }
+    ],
+    "expressions": [
+      { "text": "as though", "vi": "như thể là", "rank": 4, "example": "He acts as though he owns the place." }
+    ],
+    "family": [ { "word": "although", "pos": "conjunction" } ],
+    "synonyms": ["although", "even if"],
+    "antonyms": []
+  }
+]

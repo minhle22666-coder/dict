@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Smart.Dict — Generator</title>
+<style>
+  :root{
+    --bg:#0F1419; --surface:#1A222B; --surface-2:#222E39; --line:#2C3A47;
+    --text:#E6EDF3; --muted:#8B98A5; --muted-2:#5E6B78;
+    --accent:#46C39A; --accent-dim:#2E7A62; --amber:#F5B841; --danger:#E5715A;
+    --r:18px; --r-sm:12px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(70,195,154,.08), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(245,184,65,.05), transparent 55%),
+      var(--bg);
+    color:var(--text);min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
+    line-height:1.55;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:none}
+  input{font-family:inherit}
+  .wrap{max-width:680px;margin:0 auto;padding:40px 20px 80px}
+
+  header{margin-bottom:28px}
+  .kicker{font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  h1{font-size:30px;font-weight:800;letter-spacing:-.025em;margin:6px 0 4px}
+  h1 span{color:var(--muted-2)}
+  .sub{color:var(--muted);font-size:15px;max-width:52ch}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:16px}
+  .card h2{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin:0 0 14px;display:flex;align-items:center;gap:8px}
+  .card h2 .num{width:20px;height:20px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:var(--accent)}
+
+  label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:7px}
+  input[type=text],input[type=password],input[type=number]{
+    width:100%;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);
+    color:var(--text);padding:13px 14px;font-size:15px;outline:none}
+  input:focus{border-color:var(--accent-dim)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .hint{font-size:12px;color:var(--muted-2);margin-top:7px;line-height:1.5}
+  .row-check{display:flex;align-items:center;gap:10px;margin-top:4px}
+  .row-check input{width:19px;height:19px;accent-color:var(--accent)}
+  .row-check label{margin:0;color:var(--text);font-weight:500;font-size:14px}
+
+  .btn{display:block;width:100%;background:var(--accent);color:#08120E;font-weight:800;font-size:16px;
+    padding:16px;border-radius:var(--r-sm);text-align:center;letter-spacing:.01em;transition:opacity .15s}
+  .btn:active{opacity:.85}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--line)}
+  .btn.amber{background:var(--amber);color:#241a03}
+  .btn-row{display:flex;gap:10px}
+  .btn-row .btn{margin:0}
+
+  /* progress */
+  .prog-wrap{display:none}
+  .prog-wrap.on{display:block}
+  .bar{height:14px;background:var(--bg);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin:4px 0 6px}
+  .bar > i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent-dim),var(--accent));border-radius:99px;transition:width .25s ease}
+  .pct{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);font-weight:600}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}
+  .stat{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 8px;text-align:center}
+  .stat .n{font-size:20px;font-weight:800}
+  .stat .n.ok{color:var(--accent)} .stat .n.bad{color:var(--danger)} .stat .n.cost{color:var(--amber)}
+  .stat .l{font-size:10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-top:3px}
+  .current{font-size:14px;color:var(--muted);min-height:20px;margin-bottom:14px}
+  .current b{color:var(--accent);font-weight:700}
+
+  .log{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 14px;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;line-height:1.7;max-height:190px;
+    overflow-y:auto;color:var(--muted)}
+  .log .ok{color:var(--accent)} .log .bad{color:var(--danger)} .log .warn{color:var(--amber)}
+
+  .done-banner{display:none;background:linear-gradient(135deg,var(--surface-2),var(--surface));
+    border:1px solid var(--accent-dim);border-radius:var(--r);padding:20px;text-align:center;margin-bottom:16px}
+  .done-banner.on{display:block}
+  .done-banner .big{font-size:32px}
+  .done-banner h3{margin:6px 0 4px;font-size:18px}
+  .done-banner p{margin:0;color:var(--muted);font-size:14px}
+
+  .steps{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-top:20px}
+  .steps h2{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin:0 0 12px}
+  .steps ol{margin:0;padding-left:20px;color:var(--muted);font-size:14px}
+  .steps li{margin-bottom:8px}
+  .steps b{color:var(--text)}
+  a{color:var(--accent)}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Smart.Dict</div>
+    <h1>Generator <span>· xây kho từ offline</span></h1>
+    <p class="sub">Sinh sẵn nghĩa cho 5000 từ phổ biến nhất bằng Gemini, rồi xuất ra <code>seed.json</code> để nhét vào app. Chạy 1 lần, dùng offline mãi.</p>
+  </header>
+
+  <!-- 1. setup -->
+  <div class="card">
+    <h2><span class="num">1</span> Kết nối Gemini</h2>
+    <div class="field">
+      <label for="key">API key</label>
+      <input id="key" type="password" placeholder="AIza…" autocapitalize="none" autocorrect="off" spellcheck="false"/>
+      <div class="hint">Dùng chung với key đã lưu trong app (nếu cùng địa chỉ). Lấy free tại <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>.</div>
+    </div>
+    <div class="field">
+      <label for="model">Model</label>
+      <input id="model" type="text" placeholder="gemini-2.5-flash" autocapitalize="none" autocorrect="off" spellcheck="false"/>
+    </div>
+  </div>
+
+  <!-- 2. range -->
+  <div class="card">
+    <h2><span class="num">2</span> Phạm vi</h2>
+    <div id="list-status" class="hint" style="margin-bottom:14px">Đang tải danh sách từ…</div>
+    <div class="grid2">
+      <div class="field"><label for="start">Bắt đầu từ số</label><input id="start" type="number" min="1" value="1"/></div>
+      <div class="field"><label for="count">Số từ lần này</label><input id="count" type="number" min="1" value="5000"/></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label for="conc">Chạy song song</label><input id="conc" type="number" min="1" max="10" value="3"/></div>
+      <div class="field"><label for="delay">Giãn cách (ms)</label><input id="delay" type="number" min="0" value="200"/></div>
+    </div>
+    <div class="row-check"><input id="skip" type="checkbox" checked/><label for="skip">Bỏ qua từ đã sinh rồi (để chạy tiếp nhiều đợt)</label></div>
+    <div class="hint" style="margin-top:12px">Free tier có giới hạn/ngày → cứ chạy nhiều đợt, tick ô trên để nó tự nối tiếp. Trả phí thì để nguyên 5000, chạy 1 lèo.</div>
+  </div>
+
+  <button class="btn" id="go">Bắt đầu sinh từ</button>
+
+  <!-- progress -->
+  <div class="prog-wrap" id="prog">
+    <div class="card" style="margin-top:16px">
+      <h2>Đang chạy</h2>
+      <div class="pct"><span id="pct-l">0%</span><span id="pct-r">0 / 0</span></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="stats">
+        <div class="stat"><div class="n ok" id="s-ok">0</div><div class="l">thành công</div></div>
+        <div class="stat"><div class="n bad" id="s-bad">0</div><div class="l">lỗi</div></div>
+        <div class="stat"><div class="n" id="s-time">0s</div><div class="l">thời gian</div></div>
+        <div class="stat"><div class="n cost" id="s-cost">$0</div><div class="l">ước tính</div></div>
+      </div>
+      <div class="current" id="current"></div>
+      <div class="btn-row" style="margin-bottom:16px">
+        <button class="btn ghost" id="pause">Tạm dừng</button>
+        <button class="btn ghost" id="stop">Dừng hẳn</button>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <!-- done -->
+  <div class="done-banner" id="done">
+    <div class="big">✅</div>
+    <h3 id="done-h">Xong!</h3>
+    <p id="done-p"></p>
+  </div>
+
+  <div class="btn-row" id="post" style="display:none;margin-top:16px">
+    <button class="btn amber" id="download">Tải seed.json</button>
+    <button class="btn ghost" id="usage">Tải usage.csv</button>
+    <button class="btn ghost" id="retry" style="display:none">Thử lại từ lỗi</button>
+  </div>
+
+  <div class="steps">
+    <h2>Sau khi tải seed.json</h2>
+    <ol>
+      <li>Thay file <b>seed.json</b> mẫu trong repo bằng file vừa tải (Add file → Upload, commit đè).</li>
+      <li>Mở <b>sw.js</b>, đổi <code>smartdict-v1</code> → <code>-v2</code> rồi commit (để iPhone lấy bản mới).</li>
+      <li>Trên iPhone: xoá icon app cũ, mở lại link bằng Safari → Add to Home Screen. Xong — 5000 từ nằm sẵn, offline hoàn toàn.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+/* ---------- shared with app: same IndexedDB + prompt ---------- */
+const $=s=>document.querySelector(s);
+const now=()=>Date.now();
+const KEY_LS='sd_key',MODEL_LS='sd_model';
+const DB_NAME='smartdict',DB_VER=1,STORE='entries';
+let _db;
+function db(){if(_db)return Promise.resolve(_db);return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,DB_VER);
+  r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(STORE)){const s=d.createObjectStore(STORE,{keyPath:'word'});s.createIndex('savedAt','savedAt');s.createIndex('saved','saved');}};
+  r.onsuccess=()=>{_db=r.result;res(_db)};r.onerror=()=>rej(r.error);});}
+function txs(m){return db().then(d=>d.transaction(STORE,m).objectStore(STORE));}
+function idbGet(w){return txs('readonly').then(s=>new Promise((res,rej)=>{const r=s.get(w);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)}));}
+function idbPut(o){return txs('readwrite').then(s=>new Promise((res,rej)=>{const r=s.put(o);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)}));}
+function idbAll(){return txs('readonly').then(s=>new Promise((res,rej)=>{const r=s.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)}));}
+
+function buildPrompt(word){
+return `You are a bilingual English→Vietnamese lexicographer. For the English word "${word}", return a single JSON object (no markdown, no commentary) with EXACTLY this shape:
+
+{
+  "word": "${word}",
+  "phonetic": "IPA, e.g. /stɛp/",
+  "vi_equivalent": "the ONE closest natural Vietnamese word/feeling",
+  "vi_note": "1 short Vietnamese sentence explaining the core feeling/usage",
+  "forms": { "v1":"", "v2":"", "v3":"", "ving":"" },
+  "senses": [
+    { "pos":"noun|verb|adjective|adverb|...", "vi":"Vietnamese equivalent for THIS sense",
+      "gloss":"short English meaning", "rank":5,
+      "example":"one natural English sentence", "example_vi":"bản dịch tiếng Việt tự nhiên" }
+  ],
+  "expressions": [
+    { "text":"phrasal verb / collocation", "vi":"nghĩa tiếng Việt", "rank":5, "example":"short sentence" }
+  ],
+  "family": [ { "word":"related form", "pos":"noun|verb|adjective|adverb" } ],
+  "synonyms": ["useful common ones only"],
+  "antonyms": ["useful common ones only"]
+}
+
+RULES — prioritize USEFULNESS over completeness:
+- senses: MOST COMMON meaning first. rank = how often you meet it in real life (5=very common … 1=rare). Max 5 senses.
+- expressions: only genuinely common spoken/written ones, ranked. Max 6. Skip if none.
+- synonyms/antonyms: max 5 each, common & distinguishable.
+- forms: fill only if it's a verb (put "" for the rest). Omit forms object entirely if not a verb.
+- Vietnamese must sound natural, not word-by-word translation.
+- Return ONLY the JSON object.`;}
+
+/* ---------- pricing (per 1M tokens: [input,output]) ---------- */
+const RATES={'gemini-2.5-flash-lite':[.10,.40],'gemini-2.5-flash':[.30,2.50],'gemini-2.5-pro':[1.25,10],
+  'gemini-3.1-flash-lite':[.25,1.5],'gemini-3-flash':[.50,3.0]};
+function rateFor(m){ for(const k in RATES) if(m.indexOf(k)===0) return RATES[k]; return [.30,2.50]; }
+
+/* ---------- state ---------- */
+let WORDS=[], running=false, paused=false, stopped=false;
+let done=0,ok=0,bad=0,tokIn=0,tokOut=0,started=0,failedWords=[],target=0;
+
+async function loadList(){
+  try{ const r=await fetch('./words-5000.txt'); const t=await r.text();
+    WORDS=t.split(/\r?\n/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+    $('#list-status').innerHTML='Đã tải <b style="color:var(--text)">'+WORDS.length+'</b> từ. '
+      +'Có thể chọn khoảng bất kỳ bên dưới.';
+    $('#count').value=WORDS.length;
+  }catch(e){ $('#list-status').innerHTML='<span style="color:var(--danger)">Không tải được words-5000.txt — đảm bảo file nằm cùng thư mục.</span>'; }
+}
+
+function log(msg,cls){ const l=$('#log'); const d=document.createElement('div'); if(cls)d.className=cls; d.textContent=msg; l.appendChild(d); l.scrollTop=l.scrollHeight; while(l.children.length>120)l.removeChild(l.firstChild); }
+function fmtTime(ms){ const s=Math.floor(ms/1000); if(s<60)return s+'s'; const m=Math.floor(s/60); return m+'m'+(s%60)+'s'; }
+function updateUI(){
+  const pct = target? Math.round(done/target*100):0;
+  $('#bar').style.width=pct+'%'; $('#pct-l').textContent=pct+'%'; $('#pct-r').textContent=done+' / '+target;
+  $('#s-ok').textContent=ok; $('#s-bad').textContent=bad;
+  $('#s-time').textContent=fmtTime(now()-started);
+  const [ri,ro]=rateFor($('#model').value.trim()||'gemini-2.5-flash');
+  const cost=tokIn/1e6*ri + tokOut/1e6*ro;
+  $('#s-cost').textContent='$'+cost.toFixed(cost<1?3:2);
+}
+
+async function callOne(word,attempt){
+  const key=$('#key').value.trim(), model=$('#model').value.trim()||'gemini-2.5-flash';
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const body={contents:[{parts:[{text:buildPrompt(word)}]}],generationConfig:{temperature:0.3,responseMimeType:"application/json"}};
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(res.status===429||res.status>=500){
+    if(attempt<4){ const wait=800*Math.pow(2,attempt); log('⏳ '+word+' bị giới hạn, đợi '+(wait/1000)+'s…','warn'); await sleep(wait); return callOne(word,attempt+1); }
+    throw new Error('rate/limit');
+  }
+  if(!res.ok){ let m=res.status; try{const e=await res.json();m=(e.error&&e.error.message)||m;}catch(_){}
+    throw new Error(String(m).slice(0,80)); }
+  const data=await res.json();
+  const u=data.usageMetadata||{};
+  const tin=u.promptTokenCount||0, tout=(u.candidatesTokenCount||0)+(u.thoughtsTokenCount||0);
+  let text=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
+  text=text.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  const obj=JSON.parse(text); obj.word=obj.word||word; return {obj,tin,tout};
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function worker(queue){
+  const delay=Math.max(0,+$('#delay').value||0);
+  while(!stopped){
+    while(paused){ await sleep(300); }
+    const word=queue.shift(); if(word===undefined) return;
+    $('#current').innerHTML='Đang xử lý: <b>'+word+'</b>';
+    try{
+      const {obj:data,tin,tout}=await callOne(word,0);
+      tokIn+=tin; tokOut+=tout;
+      const ex=await idbGet(word);
+      await idbPut({word,data,source:'seed',firstSeen:ex?ex.firstSeen:now(),saved:ex?ex.saved:0,savedAt:ex?ex.savedAt:0,tin,tout});
+      ok++; log('✓ '+word,'ok');
+    }catch(e){ bad++; failedWords.push(word); log('✗ '+word+' — '+e.message,'bad'); }
+    done++; updateUI();
+    if(delay) await sleep(delay);
+  }
+}
+
+async function run(wordList){
+  running=true; paused=false; stopped=false;
+  done=0;ok=0;bad=0;tokIn=0;tokOut=0;failedWords=[]; started=now(); target=wordList.length;
+  $('#go').disabled=true; $('#prog').classList.add('on'); $('#done').classList.remove('on'); $('#post').style.display='none';
+  $('#log').innerHTML=''; updateUI();
+  const timer=setInterval(updateUI,1000);
+  const queue=[...wordList];
+  const n=Math.max(1,Math.min(10,+$('#conc').value||3));
+  const workers=[]; for(let i=0;i<n;i++) workers.push(worker(queue));
+  await Promise.all(workers);
+  clearInterval(timer); updateUI(); running=false;
+  $('#go').disabled=false; $('#current').textContent='';
+  $('#done').classList.add('on'); $('#post').style.display='flex';
+  const total=await idbAll();
+  $('#done-h').textContent = stopped?'Đã dừng':'Hoàn tất đợt này';
+  $('#done-p').innerHTML='Đã sinh <b style="color:var(--accent)">'+ok+'</b> từ đợt này · lỗi '+bad
+    +' · tổng trong máy: <b style="color:var(--accent)">'+total.length+'</b>. Tải seed.json ở dưới.';
+  $('#retry').style.display = failedWords.length? 'block':'none';
+}
+
+async function buildQueue(){
+  const start=Math.max(1,+$('#start').value||1);
+  const count=Math.max(1,+$('#count').value||WORDS.length);
+  let slice=WORDS.slice(start-1,start-1+count);
+  if($('#skip').checked){
+    const have=new Set((await idbAll()).map(r=>r.word));
+    const before=slice.length;
+    slice=slice.filter(w=>!have.has(w));
+    if(before-slice.length>0) log('↷ bỏ qua '+(before-slice.length)+' từ đã có','warn');
+  }
+  return slice;
+}
+
+/* ---------- download ---------- */
+async function download(){
+  const all=await idbAll();
+  const arr=all.map(r=>r.data).filter(Boolean);
+  const blob=new Blob([JSON.stringify(arr,null,1)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='seed.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+async function downloadUsage(){
+  const all=await idbAll();
+  const rows=all.filter(r=>r.tin!=null).map(r=>[r.word,r.tin,r.tout==null?0:r.tout]);
+  let csv='word,input_tokens,output_tokens\n'+rows.map(r=>r.join(',')).join('\n')+'\n';
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='usage.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+/* ---------- wire ---------- */
+$('#key').value=localStorage.getItem(KEY_LS)||'';
+$('#model').value=localStorage.getItem(MODEL_LS)||'gemini-2.5-flash-lite';
+$('#key').addEventListener('change',()=>localStorage.setItem(KEY_LS,$('#key').value.trim()));
+$('#model').addEventListener('change',()=>localStorage.setItem(MODEL_LS,$('#model').value.trim()||'gemini-2.5-flash-lite'));
+
+$('#go').addEventListener('click',async()=>{
+  if(!$('#key').value.trim()){ alert('Dán Gemini API key trước đã (mục 1).'); return; }
+  localStorage.setItem(KEY_LS,$('#key').value.trim());
+  const q=await buildQueue();
+  if(!q.length){ alert('Không còn từ nào để sinh trong phạm vi này (có thể đã sinh hết rồi).'); return; }
+  run(q);
+});
+$('#pause').addEventListener('click',()=>{ paused=!paused; $('#pause').textContent=paused?'Tiếp tục':'Tạm dừng'; });
+$('#stop').addEventListener('click',()=>{ stopped=true; paused=false; log('■ đã yêu cầu dừng…','warn'); });
+$('#download').addEventListener('click',download);
+$('#usage').addEventListener('click',downloadUsage);
+$('#retry').addEventListener('click',()=>{ if(failedWords.length) run([...failedWords]); });
+
+loadList();
+</script>
+</body>
+</html>
