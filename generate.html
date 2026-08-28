@@ -118,17 +118,18 @@
     <div id="list-status" class="hint" style="margin-bottom:14px">Đang tải danh sách từ…</div>
     <div class="grid2">
       <div class="field"><label for="start">Bắt đầu từ số</label><input id="start" type="number" min="1" value="1"/></div>
-      <div class="field"><label for="count">Số từ lần này</label><input id="count" type="number" min="1" value="5000"/></div>
+      <div class="field"><label for="count">Số từ MỚI cần sinh</label><input id="count" type="number" min="1" value="5000"/></div>
     </div>
     <div class="grid2">
       <div class="field"><label for="conc">Chạy song song</label><input id="conc" type="number" min="1" max="10" value="3"/></div>
       <div class="field"><label for="delay">Giãn cách (ms)</label><input id="delay" type="number" min="0" value="200"/></div>
     </div>
     <div class="row-check"><input id="skip" type="checkbox" checked/><label for="skip">Bỏ qua từ đã sinh rồi (để chạy tiếp nhiều đợt)</label></div>
-    <div class="hint" style="margin-top:12px">Free tier có giới hạn/ngày → cứ chạy nhiều đợt, tick ô trên để nó tự nối tiếp. Trả phí thì để nguyên 5000, chạy 1 lèo.</div>
+    <div class="hint" style="margin-top:12px">Khi tick ô trên, app sẽ tự quét từ vị trí "Bắt đầu từ số" trở đi, bỏ qua từ đã có, và dừng khi đủ đúng số ở ô "Số từ MỚI cần sinh" — không cần tự tính khoảng còn thiếu. Free tier có giới hạn/ngày → chạy nhiều đợt là bình thường.</div>
   </div>
 
   <button class="btn" id="go">Bắt đầu sinh từ</button>
+  <div class="hint" id="go-msg" style="text-align:center;margin-top:10px"></div>
 
   <!-- progress -->
   <div class="prog-wrap" id="prog">
@@ -314,15 +315,20 @@ async function run(wordList){
 
 async function buildQueue(){
   const start=Math.max(1,+$('#start').value||1);
-  const count=Math.max(1,+$('#count').value||WORDS.length);
-  let slice=WORDS.slice(start-1,start-1+count);
+  const wantCount=Math.max(1,+$('#count').value||WORDS.length);
+  const pool=WORDS.slice(start-1); // scan forward from "start" to the end of the list
   if($('#skip').checked){
     const have=new Set((await idbAll()).map(r=>r.word));
-    const before=slice.length;
-    slice=slice.filter(w=>!have.has(w));
-    if(before-slice.length>0) log('↷ bỏ qua '+(before-slice.length)+' từ đã có','warn');
+    const picked=[]; let skipped=0;
+    for(const w of pool){
+      if(have.has(w)){ skipped++; continue; }
+      picked.push(w);
+      if(picked.length>=wantCount) break;
+    }
+    if(skipped) log('↷ bỏ qua '+skipped+' từ đã có, đang chọn '+picked.length+' từ mới','warn');
+    return picked;
   }
-  return slice;
+  return pool.slice(0, wantCount);
 }
 
 /* ---------- download ---------- */
@@ -350,15 +356,17 @@ $('#key').addEventListener('change',()=>localStorage.setItem(KEY_LS,$('#key').va
 $('#model').addEventListener('change',()=>localStorage.setItem(MODEL_LS,$('#model').value.trim()||'gemini-2.5-flash-lite'));
 
 $('#go').addEventListener('click',async()=>{
-  if(!$('#key').value.trim()){ alert('Dán Gemini API key trước đã (mục 1).'); return; }
+  const msg=$('#go-msg'); msg.textContent=''; msg.style.color='';
+  if(!$('#key').value.trim()){ msg.style.color='var(--danger)'; msg.textContent='Dán Gemini API key trước đã (mục 1).'; return; }
   localStorage.setItem(KEY_LS,$('#key').value.trim());
   try{
     const q=await buildQueue();
-    if(!q.length){ alert('Không còn từ nào để sinh trong phạm vi này (có thể đã sinh hết rồi).'); return; }
+    if(!q.length){ msg.style.color='var(--danger)'; msg.textContent='Không còn từ nào để sinh trong phạm vi này — có thể đã sinh hết đoạn này rồi, thử tăng "Bắt đầu từ số" hoặc "Số từ lần này".'; return; }
     run(q);
   }catch(e){
     console.error(e);
-    alert('Không mở được kho từ trên máy (lỗi: '+(e&&e.message?e.message:e)+'). Thử đóng hết các tab khác đang mở trang Smart.Dict rồi tải lại trang này.');
+    msg.style.color='var(--danger)';
+    msg.textContent='Không mở được kho từ trên máy (lỗi: '+(e&&e.message?e.message:e)+'). Thử đóng hết các tab khác đang mở trang Smart.Dict rồi tải lại trang này.';
   }
 });
 $('#pause').addEventListener('click',()=>{ paused=!paused; $('#pause').textContent=paused?'Tiếp tục':'Tạm dừng'; });

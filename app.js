@@ -70,6 +70,105 @@ const KEY_LS='sd_key', MODEL_LS='sd_model', SEED_FLAG='sd_seed_loaded';
 const getKey=()=>localStorage.getItem(KEY_LS)||'';
 const getModel=()=>localStorage.getItem(MODEL_LS)||'gemini-2.5-flash-lite';
 
+/* ---------- XP / level / daily goal (all local, no server) ---------- */
+const XP_LS='sd_xp', XP_DAILY_LS='sd_xp_daily', GOAL_LS='sd_daily_goal', ACH_LS='sd_achievements',
+      GOALHIT_LS='sd_goal_hit_date', PERFECT_LS='sd_perfect_session';
+const getXP=()=>(+localStorage.getItem(XP_LS))||0;
+const levelFromXP=(xp)=>Math.floor(xp/100)+1;
+const getDailyGoal=()=>(+localStorage.getItem(GOAL_LS))||20;
+const setDailyGoal=(n)=>localStorage.setItem(GOAL_LS,String(Math.max(5,n||20)));
+function todayStr(){ return new Date().toDateString(); }
+function getDailyXP(){
+  try{ const d=JSON.parse(localStorage.getItem(XP_DAILY_LS)||'null'); if(d&&d.date===todayStr()) return d.xp; }catch(e){}
+  return 0;
+}
+function setDailyXP(v){ localStorage.setItem(XP_DAILY_LS, JSON.stringify({date:todayStr(), xp:v})); }
+
+function addXP(n){
+  if(!n) return;
+  const before=getXP(), after=before+n;
+  localStorage.setItem(XP_LS, String(after));
+  const lvlBefore=levelFromXP(before), lvlAfter=levelFromXP(after);
+  const dailyBefore=getDailyXP(), dailyAfter=dailyBefore+n; setDailyXP(dailyAfter);
+  const goal=getDailyGoal();
+  if(lvlAfter>lvlBefore){
+    celebrate('🎉 Lên cấp '+lvlAfter+'!', 'Tổng cộng '+after+' XP');
+  } else if(dailyBefore<goal && dailyAfter>=goal && localStorage.getItem(GOALHIT_LS)!==todayStr()){
+    localStorage.setItem(GOALHIT_LS, todayStr());
+    celebrate('🎯 Đạt mục tiêu hôm nay!', dailyAfter+' / '+goal+' XP');
+  }
+  renderHero();
+  checkAchievements();
+}
+
+/* ---------- lightweight confetti + celebration overlay ---------- */
+function confettiBurst(originEl, count){
+  count=count||24;
+  let cx=window.innerWidth/2, cy=window.innerHeight/3;
+  if(originEl){ const rect=originEl.getBoundingClientRect(); cx=rect.left+rect.width/2; cy=rect.top+rect.height/2; }
+  const colors=['#6C5CE7','#4F8EF7','#F0A020','#22B57F','#FF6FA5','#FF5C7A'];
+  for(let i=0;i<count;i++){
+    const el=document.createElement('div');
+    el.className='confetti-piece';
+    const angle=Math.random()*Math.PI*2, dist=60+Math.random()*100;
+    const dx=Math.cos(angle)*dist, dy=Math.sin(angle)*dist-30;
+    el.style.left=cx+'px'; el.style.top=cy+'px';
+    el.style.setProperty('--dx',dx+'px'); el.style.setProperty('--dy',dy+'px');
+    el.style.background=colors[i%colors.length];
+    el.style.transform='rotate('+Math.round(Math.random()*360)+'deg)';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),900);
+  }
+}
+function celebrate(title, sub){
+  const ov=document.createElement('div'); ov.className='celebrate-ov';
+  ov.innerHTML='<div class="celebrate-card"><div class="celebrate-title">'+title+'</div>'+(sub?'<div class="celebrate-sub">'+esc(sub)+'</div>':'')+'</div>';
+  document.body.appendChild(ov);
+  confettiBurst(null,36);
+  requestAnimationFrame(()=>ov.classList.add('show'));
+  const dismiss=()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),300); };
+  setTimeout(dismiss,1800);
+  ov.addEventListener('click',dismiss);
+}
+
+/* ---------- achievements ---------- */
+const ACHIEVEMENTS=[
+  {id:'first_word',icon:'📖',title:'Từ đầu tiên',test:s=>s.totalWords>=1},
+  {id:'ten_words',icon:'📚',title:'10 từ',test:s=>s.totalWords>=10},
+  {id:'hundred_words',icon:'🏛️',title:'100 từ',test:s=>s.totalWords>=100},
+  {id:'first_save',icon:'⭐',title:'Lưu đầu tiên',test:s=>s.savedCount>=1},
+  {id:'saver_10',icon:'🌟',title:'Lưu 10 từ',test:s=>s.savedCount>=10},
+  {id:'streak_3',icon:'🔥',title:'Chuỗi 3 ngày',test:s=>s.streak>=3},
+  {id:'streak_7',icon:'🔥',title:'Chuỗi 7 ngày',test:s=>s.streak>=7},
+  {id:'streak_30',icon:'🔥',title:'Chuỗi 30 ngày',test:s=>s.streak>=30},
+  {id:'accurate',icon:'🎯',title:'Chính xác 80%',test:s=>s.totalReview>=10 && s.accuracy!=null && s.accuracy>=80},
+  {id:'perfect',icon:'💯',title:'Ôn hoàn hảo',test:()=>localStorage.getItem(PERFECT_LS)==='1'},
+  {id:'level_5',icon:'🏅',title:'Cấp 5',test:()=>levelFromXP(getXP())>=5},
+  {id:'level_10',icon:'🏆',title:'Cấp 10',test:()=>levelFromXP(getXP())>=10},
+];
+async function checkAchievements(){
+  try{
+    const stats=await computeInsights();
+    let unlocked; try{ unlocked=JSON.parse(localStorage.getItem(ACH_LS)||'[]'); }catch(e){ unlocked=[]; }
+    const set=new Set(unlocked); const newly=[];
+    for(const a of ACHIEVEMENTS){ if(!set.has(a.id) && a.test(stats)){ set.add(a.id); newly.push(a); } }
+    if(newly.length){
+      localStorage.setItem(ACH_LS, JSON.stringify([...set]));
+      newly.forEach((a,i)=>setTimeout(()=>toast('🏅 Mở khoá: '+a.title), i*900));
+    }
+    return {list:ACHIEVEMENTS, unlocked:set};
+  }catch(e){ return {list:ACHIEVEMENTS, unlocked:new Set()}; }
+}
+function renderBadges(list, unlocked){
+  let h='<div class="sec"><div class="sec-h"><span class="tile tile-sm amber">🏅</span>Huy hiệu</div><div class="badge-grid">';
+  for(const a of list){
+    const on=unlocked.has(a.id);
+    h+='<div class="badge-item '+(on?'unlocked':'locked')+'"><div class="ico">'+(on?a.icon:'🔒')+'</div><div class="t">'+a.title+'</div></div>';
+  }
+  h+='</div></div>';
+  return h;
+}
+
 /* ---------- one-time seed load ---------- */
 async function loadSeedOnce(){
   if(localStorage.getItem(SEED_FLAG)) return;
@@ -199,9 +298,9 @@ async function search(rawWord, forceAI){
     const local=await idbGet(word);
     if(local && local.alias){
       const canon=await idbGet(local.alias);
-      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); logEvent('search',canon.word); return; }
+      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); logEvent('search',canon.word); addXP(2); return; }
     }
-    if(local){ currentWord=word; box.innerHTML=renderEntry(local); logEvent('search',word); return; }
+    if(local){ currentWord=word; box.innerHTML=renderEntry(local); logEvent('search',word); addXP(2); return; }
 
     const guess=await fuzzyLocalSearch(word);
     if(guess){ box.innerHTML=suggestState(word, guess); return; }
@@ -224,6 +323,7 @@ async function search(rawWord, forceAI){
     currentWord=canon;
     box.innerHTML=renderEntry(rec, canon!==word?word:null);
     logEvent('search',canon);
+    addXP(2);
     refreshStats();
   }catch(err){
     box.innerHTML=errorState(word,err.message||'');
@@ -240,6 +340,7 @@ async function toggleSave(word){
   if(currentWord===word){ const b=$('#result'); if(b) b.innerHTML=renderEntry(rec); }
   toast(rec.saved?'Đã lưu ⭐':'Đã bỏ lưu');
   logEvent(rec.saved?'save':'unsave', word);
+  if(rec.saved) addXP(1);
   refreshStats();
 }
 
@@ -380,7 +481,7 @@ async function renderSaved(){
 /* ============================================================
    REVIEW — type the English word from its Vietnamese meaning.
    ============================================================ */
-let revQueue=[], revIdx=0, revState=null; // revState: null | {correct:bool, close:bool}
+let revQueue=[], revIdx=0, revState=null, revResults=[], revCorrectCount=0, revSessionAwarded=false;
 
 function reviewPrompt(d){
   if(d.vi_equivalent) return d.vi_equivalent;
@@ -394,17 +495,32 @@ async function startReview(){
   const area=$('#review-area');
   if(saved.length<1){ area.innerHTML='<div class="empty"><div class="big">✏️</div><h3>Chưa có gì để ôn</h3><p>Lưu vài từ trước đã, rồi quay lại đây gõ lại bằng tiếng Anh nhé.</p></div>'; return; }
   revQueue=saved.sort(()=>Math.random()-0.5).slice(0,10); revIdx=0; revState=null;
+  revResults=new Array(revQueue.length).fill(null); revCorrectCount=0; revSessionAwarded=false;
   renderReview();
 }
 function renderReview(){
   const area=$('#review-area');
   if(revIdx>=revQueue.length){
-    area.innerHTML='<div class="empty"><div class="big">✅</div><h3>Xong '+revQueue.length+' từ!</h3><p>Vào tab Thống kê để xem độ chính xác của em.</p></div>'
-      +'<button class="btn" onclick="startReview()">Ôn lượt mới</button>'; return;
+    if(!revSessionAwarded && revQueue.length){
+      revSessionAwarded=true;
+      addXP(10);
+      if(revCorrectCount===revQueue.length) localStorage.setItem(PERFECT_LS,'1');
+      checkAchievements();
+    }
+    area.innerHTML='<div class="empty"><div class="big">✅</div><h3>Xong '+revQueue.length+' từ!</h3><p>Đúng '+revCorrectCount+'/'+revQueue.length+' · +10 XP hoàn thành lượt. Vào tab Thống kê để xem chi tiết.</p></div>'
+      +'<button class="btn" onclick="startReview()">Ôn lượt mới</button>';
+    confettiBurst(area);
+    return;
   }
   const r=revQueue[revIdx], d=r.data||{};
   const prompt=reviewPrompt(d);
-  let h='<div class="rev-progress">'+(revIdx+1)+' / '+revQueue.length+'</div>';
+  let h='<div class="rev-dots">';
+  for(let i=0;i<revQueue.length;i++){
+    let cls='todo'; if(revResults[i]==='correct') cls='done'; else if(revResults[i]==='wrong') cls='wrong'; else if(i===revIdx) cls='current';
+    h+='<div class="rev-dot '+cls+'"></div>';
+  }
+  h+='</div>';
+  h+='<div class="rev-progress">Từ '+(revIdx+1)+' / '+revQueue.length+'</div>';
   h+='<div class="rev-card">';
   h+='<div class="prompt">Từ tiếng Anh nào có nghĩa này?</div>';
   h+='<div class="q">'+esc(prompt)+'</div>';
@@ -447,11 +563,15 @@ async function checkReview(){
   const close=!exact && target.length>=4 && dist<=1;
   const correct=exact||close;
   await gradeAndLog(r, correct);
+  revResults[revIdx]=correct?'correct':'wrong';
+  if(correct) revCorrectCount++;
+  addXP(correct?(close?2:3):0);
   revState={correct, close}; renderReview();
 }
 async function skipReview(){
   const r=revQueue[revIdx];
   await gradeAndLog(r, false);
+  revResults[revIdx]='wrong';
   revState={correct:false, close:false}; renderReview();
 }
 function nextReview(){ revIdx++; revState=null; renderReview(); }
@@ -571,6 +691,9 @@ async function renderInsights(){
   }
   h+='</div>';
 
+  const {list, unlocked}=await checkAchievements();
+  h+=renderBadges(list, unlocked);
+
   area.innerHTML=h;
 }
 /* ---------- greeting hero (Search tab) ---------- */
@@ -600,6 +723,13 @@ async function renderHero(){
       subEl.textContent=g.sub;
     }
   }catch(e){ subEl.textContent=g.sub; }
+
+  const xp=getXP(), lvl=levelFromXP(xp);
+  const lvlEl=$('#hero-level'); if(lvlEl) lvlEl.innerHTML='⚡ Cấp '+lvl;
+  const goal=getDailyGoal(), daily=getDailyXP();
+  const pct=Math.max(0,Math.min(100, Math.round(daily/goal*100)));
+  const bar=$('#hero-goal-bar'); if(bar) bar.style.width=pct+'%';
+  const lbl=$('#hero-goal-lbl'); if(lbl) lbl.textContent='🎯 '+Math.min(daily,goal)+(daily>goal?'+':'')+'/'+goal+' XP hôm nay';
 }
 
 /* ============================================================
@@ -649,10 +779,12 @@ function wire(){
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>showView(t.dataset.view)));
 
   // settings prefill + save
-  $('#key').value=getKey(); $('#model').value=getModel();
+  $('#key').value=getKey(); $('#model').value=getModel(); $('#goal').value=getDailyGoal();
   $('#save-settings').addEventListener('click',()=>{
     localStorage.setItem(KEY_LS,$('#key').value.trim());
     localStorage.setItem(MODEL_LS,($('#model').value.trim()||'gemini-2.5-flash'));
+    setDailyGoal(+$('#goal').value||20);
+    renderHero();
     const f=$('#settings-flash'); f.textContent='Đã lưu ✓'; setTimeout(()=>f.textContent='',1800);
   });
   $('#import-btn').addEventListener('click',()=>$('#import-file').click());
