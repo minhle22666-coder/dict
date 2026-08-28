@@ -7,10 +7,12 @@
 const $ = (s) => document.querySelector(s);
 const norm = (w) => w.trim().toLowerCase();
 const now = () => Date.now();
+const DAY = 864e5;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1900); }
+function dayStart(ts){ const d=new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
 
 /* ---------- IndexedDB (one small promise wrapper) ---------- */
-const DB_NAME='smartdict', DB_VER=1, STORE='entries';
+const DB_NAME='smartdict', DB_VER=2, STORE='entries', LOG='log';
 let _db;
 function db(){
   if(_db) return Promise.resolve(_db);
@@ -22,6 +24,11 @@ function db(){
         s.createIndex('savedAt','savedAt');
         s.createIndex('saved','saved');
       }
+      if(!d.objectStoreNames.contains(LOG)){
+        const l=d.createObjectStore(LOG,{keyPath:'id',autoIncrement:true});
+        l.createIndex('ts','ts');
+        l.createIndex('type','type');
+      }
     };
     r.onsuccess=()=>{_db=r.result;res(_db)};
     r.onerror=()=>rej(r.error);
@@ -32,6 +39,31 @@ function idbGet(word){ return tx('readonly').then(s=>new Promise((res,rej)=>{con
 function idbPut(obj){ return tx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.put(obj);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})); }
 function idbAll(){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})); }
 function idbCount(){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.count();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})); }
+
+/* ---------- behavior log (for the Thống kê tab) ---------- */
+function logTx(mode){ return db().then(d=>d.transaction(LOG,mode).objectStore(LOG)); }
+function logAdd(rec){ return logTx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.add(rec);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})); }
+function logAll(){ return logTx('readonly').then(s=>new Promise((res,rej)=>{const r=s.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})); }
+function logCount(){ return logTx('readonly').then(s=>new Promise((res,rej)=>{const r=s.count();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})); }
+function logClearAll(){ return logTx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.clear();r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})); }
+function logTrim(){
+  return logTx('readwrite').then(s=>new Promise((res)=>{
+    const idx=s.index('ts'); const req=idx.openCursor(); let toDelete=[];
+    req.onsuccess=(e)=>{ const c=e.target.result; if(c){ toDelete.push(c.primaryKey); c.continue(); } else { res(toDelete); } };
+    req.onerror=()=>res([]);
+  })).then(ids=>{
+    if(ids.length<=2500) return;
+    const drop=ids.slice(0, ids.length-2500);
+    return logTx('readwrite').then(s=>Promise.all(drop.map(id=>new Promise(res=>{const r=s.delete(id);r.onsuccess=()=>res();r.onerror=()=>res();}))));
+  });
+}
+async function logEvent(type, word){
+  try{
+    await logAdd({ts:now(), type, word:word||null});
+    const c=await logCount(); if(c>3000) logTrim();
+    updateStreakChip();
+  }catch(e){ /* logging is best-effort, never blocks the app */ }
+}
 
 /* ---------- settings (localStorage) ---------- */
 const KEY_LS='sd_key', MODEL_LS='sd_model', SEED_FLAG='sd_seed_loaded';
@@ -60,29 +92,32 @@ function buildPrompt(word){
   return `You are a bilingual English→Vietnamese lexicographer. For the English word "${word}", return a single JSON object (no markdown, no commentary) with EXACTLY this shape:
 
 {
-  "word": "${word}",
-  "phonetic": "IPA, e.g. /stɛp/",
+  "word": "corrected/canonical form — fix typos, complete a partial idiom, or normalize slang spelling",
+  "query_note": "if you corrected/completed the input, one short Vietnamese phrase like 'Ý bạn là: rain cats and dogs'; else empty string",
+  "phonetic": "IPA, e.g. /stɛp/ — omit for multi-word phrases/idioms",
   "vi_equivalent": "the ONE closest natural Vietnamese word/feeling",
   "vi_note": "1 short Vietnamese sentence explaining the core feeling/usage",
   "forms": { "v1":"", "v2":"", "v3":"", "ving":"" },
   "senses": [
-    { "pos":"noun|verb|adjective|adverb|...", "vi":"Vietnamese equivalent for THIS sense",
+    { "pos":"noun|verb|adjective|adverb|idiom|slang|...", "vi":"Vietnamese equivalent for THIS sense",
       "gloss":"short English meaning", "rank":5,
       "example":"one natural English sentence", "example_vi":"bản dịch tiếng Việt tự nhiên" }
   ],
   "expressions": [
-    { "text":"phrasal verb / collocation", "vi":"nghĩa tiếng Việt", "rank":5, "example":"short sentence" }
+    { "text":"phrase", "type":"phrasal verb|collocation|preposition|idiom", "vi":"nghĩa tiếng Việt", "rank":5, "example":"short sentence" }
   ],
   "family": [ { "word":"related form", "pos":"noun|verb|adjective|adverb" } ],
   "synonyms": ["useful common ones only"],
   "antonyms": ["useful common ones only"]
 }
 
+INPUT MAY BE MESSY: a typo, a partial/incomplete idiom (e.g. "rain dogs" → "it's raining cats and dogs"), or casual slang spelling. Silently resolve it to the real, common English word/idiom/slang term and put THAT corrected form in "word". Fill "query_note" only when you actually corrected something.
+
 RULES — prioritize USEFULNESS over completeness:
-- senses: MOST COMMON meaning first. rank = how often you meet it in real life (5=very common … 1=rare). Max 5 senses.
-- expressions: only genuinely common spoken/written ones, ranked. Max 6. Skip if none.
+- senses: MOST COMMON meaning first. rank = how often you meet it in real life (5=very common … 1=rare). Max 5 senses. For an idiom/slang entry, pos can be "idiom" or "slang".
+- expressions: cover a MIX of types when they exist for this word — phrasal verbs (step up), collocations (take a step), fixed prepositions (step INTO, afraid OF), and idioms (step on someone's toes). Only genuinely common ones. Max 8, ranked. Skip a type entirely if nothing common exists for it — don't force one.
 - synonyms/antonyms: max 5 each, common & distinguishable. Skip rare/literary words.
-- forms: fill only if it's a verb (put "" for the rest). Omit forms object entirely if not a verb.
+- forms: fill only if it's a single-word verb (put "" for the rest). Omit entirely if not a verb or if multi-word.
 - Vietnamese must sound natural, not word-by-word translation.
 - Return ONLY the JSON object.`;
 }
@@ -111,34 +146,90 @@ async function askGemini(word){
 }
 
 /* ============================================================
+   FUZZY LOCAL MATCH — offline "did you mean", no AI call needed.
+   Catches typos (Levenshtein) AND partial/reordered phrases like
+   "rain dogs" -> "it's raining cats and dogs" (token overlap).
+   ============================================================ */
+function lev(a,b){
+  const m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+  let prev=new Array(n+1); for(let j=0;j<=n;j++) prev[j]=j;
+  for(let i=1;i<=m;i++){ let cur=[i];
+    for(let j=1;j<=n;j++){ const cost=a[i-1]===b[j-1]?0:1;
+      cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+cost); }
+    prev=cur; }
+  return prev[n];
+}
+function tokenOverlap(q,c){
+  const qt=q.split(/\s+/).filter(Boolean), ct=c.split(/\s+/).filter(Boolean);
+  if(!qt.length) return 0; let hit=0;
+  for(const qw of qt){ if(ct.some(cw=>cw===qw||(qw.length>=3&&cw.length>=3&&(cw.startsWith(qw)||qw.startsWith(cw))))) hit++; }
+  return hit/qt.length;
+}
+function matchScore(query,cand){
+  const a=norm(query), b=norm(cand); if(!a||!b) return 0;
+  const levSim=1-lev(a,b)/Math.max(a.length,b.length);
+  return Math.max(levSim, tokenOverlap(a,b));
+}
+async function fuzzyLocalSearch(query){
+  if(query.length<3) return null;
+  const all=await idbAll(); let best=null,bestScore=0.6; // threshold
+  for(const r of all){
+    if(r.alias) continue;
+    const s=matchScore(query,r.word);
+    if(s>bestScore){ bestScore=s; best={type:'word',target:r.word,label:r.word}; }
+    const exs=(r.data&&r.data.expressions)||[];
+    for(const e of exs){ if(!e.text) continue;
+      const s2=matchScore(query,e.text);
+      if(s2>bestScore){ bestScore=s2; best={type:'expr',target:r.word,label:e.text}; } }
+  }
+  return best;
+}
+
+/* ============================================================
    SEARCH FLOW:  local/seed  →  AI fallback  →  cache back
    ============================================================ */
 let currentWord=null;
-async function search(rawWord){
+async function search(rawWord, forceAI){
   const word=norm(rawWord||'');
   if(!word) return;
   $('#search-empty').style.display='none';
   const box=$('#result');
 
-  const local=await idbGet(word);
-  if(local){ currentWord=word; box.innerHTML=renderEntry(local); return; }
+  if(!forceAI){
+    const local=await idbGet(word);
+    if(local && local.alias){
+      const canon=await idbGet(local.alias);
+      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); logEvent('search',canon.word); return; }
+    }
+    if(local){ currentWord=word; box.innerHTML=renderEntry(local); logEvent('search',word); return; }
 
-  // not in device — need AI
+    const guess=await fuzzyLocalSearch(word);
+    if(guess){ box.innerHTML=suggestState(word, guess); return; }
+  }
+
+  // nothing close locally — need AI
   if(!getKey()){ box.innerHTML=needKeyState(word); return; }
   if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
 
   box.innerHTML='<div class="spinner"></div><div class="status">AI đang tra “'+esc(word)+'”…</div>';
   try{
     const data=await askGemini(word);
-    const rec={word, data, source:'ai', firstSeen:now(), saved:0, savedAt:0};
+    const canon=norm(data.word||word);
+    const rec={word:canon, data, source:'ai', firstSeen:now(), saved:0, savedAt:0};
     await idbPut(rec);
-    currentWord=word;
-    box.innerHTML=renderEntry(rec);
+    if(canon!==word){
+      // remember this typo/partial phrase — next time it's an instant offline hit
+      await idbPut({word, alias:canon, firstSeen:now(), saved:0, savedAt:0});
+    }
+    currentWord=canon;
+    box.innerHTML=renderEntry(rec, canon!==word?word:null);
+    logEvent('search',canon);
     refreshStats();
   }catch(err){
     box.innerHTML=errorState(word,err.message||'');
   }
 }
+function forceAI(word){ search(word,true); }
 
 /* ---------- toggle save ---------- */
 async function toggleSave(word){
@@ -148,6 +239,7 @@ async function toggleSave(word){
   await idbPut(rec);
   if(currentWord===word){ const b=$('#result'); if(b) b.innerHTML=renderEntry(rec); }
   toast(rec.saved?'Đã lưu ⭐':'Đã bỏ lưu');
+  logEvent(rec.saved?'save':'unsave', word);
   refreshStats();
 }
 
@@ -156,14 +248,19 @@ async function toggleSave(word){
    ============================================================ */
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function dots(rank){ const n=Math.max(0,Math.min(5,rank|0)); let o=''; for(let i=0;i<5;i++) o+= i<n?'●':'<span class="off">○</span>'; return o; }
+const POS_ABBR={noun:'n.',verb:'v.',adjective:'adj.',adverb:'adv.',preposition:'prep.',conjunction:'conj.',pronoun:'pron.',interjection:'interj.',idiom:'idiom',slang:'slang',article:'art.'};
+function posLabel(p){ if(!p) return ''; return POS_ABBR[String(p).toLowerCase()]||p; }
 
-function renderEntry(rec){
+function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
   const badge = rec.source==='ai'
     ? '<span class="badge ai">✦ AI · đã lưu offline</span>'
     : '<span class="badge off">◆ offline</span>';
 
-  let h='<div class="entry">';
+  let h='<div class="entry card-fold">';
+  if(queriedAs){
+    h+='<div class="corrected">Đã tự sửa từ “'+esc(queriedAs)+'”'+(d.query_note?' · '+esc(d.query_note):'')+'</div>';
+  }
   h+='<div class="head"><div>';
   h+='<div class="headword">'+esc(d.word||w)+'</div>';
   if(d.phonetic) h+='<div class="phon">'+esc(d.phonetic)+'</div>';
@@ -173,7 +270,7 @@ function renderEntry(rec){
   h+='</div>';
 
   if(d.vi_equivalent){
-    h+='<div class="feel"><div class="eq">'+esc(d.word||w)+' ≈ <b>'+esc(d.vi_equivalent)+'</b></div>';
+    h+='<div class="feel"><span class="pin">📌</span><div class="eq">'+esc(d.word||w)+' ≈ <b>'+esc(d.vi_equivalent)+'</b></div>';
     if(d.vi_note) h+='<div class="note">'+esc(d.vi_note)+'</div>';
     h+='</div>';
   }
@@ -191,15 +288,15 @@ function renderEntry(rec){
   if(Array.isArray(d.senses)&&d.senses.length){
     const ss=[...d.senses].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h">Nghĩa · phổ biến nhất trước</div>';
-    for(const s of ss){
-      h+='<div class="sense"><div class="sense-top">';
-      if(s.pos) h+='<span class="pos">'+esc(s.pos)+'</span>';
+    ss.forEach((s,i)=>{
+      h+='<div class="sense"><div class="sense-top"><span class="senseno">'+(i+1)+'</span>';
+      if(s.pos) h+='<span class="pos">'+esc(posLabel(s.pos))+'</span>';
       h+='<span class="rank">'+dots(s.rank)+'</span></div>';
       if(s.vi) h+='<div class="vi">'+esc(s.vi)+'</div>';
       if(s.gloss) h+='<div class="gloss">'+esc(s.gloss)+'</div>';
       if(s.example){ h+='<div class="ex">“'+esc(s.example)+'”'; if(s.example_vi) h+='<span class="evi">→ '+esc(s.example_vi)+'</span>'; h+='</div>'; }
       h+='</div>';
-    }
+    });
     h+='</div>';
   }
 
@@ -238,6 +335,15 @@ function formCell(k,v){ return '<div class="form"><div class="k">'+k+'</div><div
 function jump(w){ $('#q').value=w; search(w); window.scrollTo({top:0,behavior:'smooth'}); }
 
 /* ---------- empty / error states ---------- */
+function suggestState(query,guess){
+  const label=esc(guess.label), target=guess.target, safeT=target.replace(/'/g,"\\'"), safeQ=query.replace(/'/g,"\\'");
+  const kind = guess.type==='expr' ? ' <span style="color:var(--muted-2)">(trong “'+esc(target)+'”)</span>' : '';
+  let h='<div class="empty"><div class="big">🤔</div><h3>Không có sẵn “'+esc(query)+'”</h3>';
+  h+='<p>Có phải ý bạn là <b style="color:var(--text)">“'+label+'”</b>'+kind+'?</p></div>';
+  h+='<button class="btn" onclick="jump(\''+safeT+'\')">Xem “'+esc(target)+'”</button>';
+  h+='<button class="btn ghost sm" style="margin-top:8px" onclick="forceAI(\''+safeQ+'\')">Không — cứ tra nguyên văn bằng AI</button>';
+  return h;
+}
 function needKeyState(w){ return '<div class="empty"><div class="big">🔑</div><h3>“'+esc(w)+'” chưa có trong máy</h3><p>Vào <b>Cài đặt</b> dán Gemini API key để AI tra giúp em, rồi từ đó lưu lại xài offline.</p></div>'; }
 function offlineState(w){ return '<div class="empty"><div class="big">📴</div><h3>“'+esc(w)+'” chưa có sẵn</h3><p>Đang offline nên không nhờ AI được. Có mạng lại thử nhé — mấy từ đã tra rồi vẫn tra được offline.</p></div>'; }
 function errorState(w,msg){
@@ -252,12 +358,11 @@ function errorState(w,msg){
 /* ============================================================
    SAVED / HISTORY
    ============================================================ */
-function dayStart(ts){ const d=new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
 async function renderSaved(){
   const all=(await idbAll()).filter(r=>r.saved).sort((a,b)=>b.savedAt-a.savedAt);
   const box=$('#saved-list');
   if(!all.length){ box.innerHTML='<div class="empty"><div class="big">⭐</div><h3>Chưa lưu từ nào</h3><p>Bấm ngôi sao ☆ ở một từ để lưu vào đây.</p></div>'; return; }
-  const t=dayStart(now()), wk=t-6*864e5, mo=dayStart(now()-29*864e5);
+  const t=dayStart(now()), wk=t-6*DAY, mo=dayStart(now()-29*DAY);
   const groups={'Hôm nay':[],'7 ngày qua':[],'30 ngày qua':[],'Cũ hơn':[]};
   for(const r of all){ const s=dayStart(r.savedAt);
     if(s>=t)groups['Hôm nay'].push(r); else if(s>=wk)groups['7 ngày qua'].push(r);
@@ -273,40 +378,210 @@ async function renderSaved(){
 }
 
 /* ============================================================
-   REVIEW  (random from saved; reveal answer; self-grade)
+   REVIEW — type the English word from its Vietnamese meaning.
    ============================================================ */
-let revQueue=[], revIdx=0, revShown=false;
+let revQueue=[], revIdx=0, revState=null; // revState: null | {correct:bool, close:bool}
+
+function reviewPrompt(d){
+  if(d.vi_equivalent) return d.vi_equivalent;
+  const s0=(d.senses||[])[0];
+  if(s0&&s0.vi) return s0.vi;
+  if(s0&&s0.gloss) return s0.gloss;
+  return '(chưa có nghĩa lưu sẵn)';
+}
 async function startReview(){
   const saved=(await idbAll()).filter(r=>r.saved);
   const area=$('#review-area');
-  if(saved.length<1){ area.innerHTML='<div class="empty"><div class="big">🔁</div><h3>Chưa có gì để ôn</h3><p>Lưu vài từ trước đã, rồi quay lại đây random cho em nhớ.</p></div>'; return; }
-  revQueue=saved.sort(()=>Math.random()-0.5).slice(0,10); revIdx=0; revShown=false;
+  if(saved.length<1){ area.innerHTML='<div class="empty"><div class="big">✏️</div><h3>Chưa có gì để ôn</h3><p>Lưu vài từ trước đã, rồi quay lại đây gõ lại bằng tiếng Anh nhé.</p></div>'; return; }
+  revQueue=saved.sort(()=>Math.random()-0.5).slice(0,10); revIdx=0; revState=null;
   renderReview();
 }
 function renderReview(){
   const area=$('#review-area');
   if(revIdx>=revQueue.length){
-    area.innerHTML='<div class="empty"><div class="big">✅</div><h3>Xong '+revQueue.length+' từ!</h3></div>'
+    area.innerHTML='<div class="empty"><div class="big">✅</div><h3>Xong '+revQueue.length+' từ!</h3><p>Vào tab Thống kê để xem độ chính xác của em.</p></div>'
       +'<button class="btn" onclick="startReview()">Ôn lượt mới</button>'; return;
   }
   const r=revQueue[revIdx], d=r.data||{};
-  let ans='';
-  if(revShown){
-    ans='<div class="rev-ans show">';
-    if(d.vi_equivalent) ans+='<div class="eq" style="font-size:20px;font-weight:700;margin-bottom:6px">≈ <b style="color:var(--accent)">'+esc(d.vi_equivalent)+'</b></div>';
-    if(d.vi_note) ans+='<div class="gloss" style="color:var(--muted);font-size:14px">'+esc(d.vi_note)+'</div>';
-    const s0=(d.senses||[])[0];
-    if(s0&&s0.example) ans+='<div class="ex" style="margin-top:10px;font-size:14px">“'+esc(s0.example)+'”'+(s0.example_vi?'<span class="evi" style="color:var(--muted);display:block">→ '+esc(s0.example_vi)+'</span>':'')+'</div>';
-    ans+='</div>';
-  }
+  const prompt=reviewPrompt(d);
   let h='<div class="rev-progress">'+(revIdx+1)+' / '+revQueue.length+'</div>';
-  h+='<div class="rev-card"><div class="prompt">Nghĩa của từ này?</div><div class="q">'+esc(r.word)+'</div>'+ans+'</div>';
-  if(!revShown){ h+='<button class="btn" onclick="revealReview()">Xem nghĩa</button>'; }
-  else{ h+='<div class="btn-row" style="margin-top:12px"><button class="btn ghost" onclick="nextReview()">😐 Chưa chắc</button><button class="btn" onclick="nextReview()">👍 Nhớ rồi</button></div>'; }
+  h+='<div class="rev-card card-fold">';
+  h+='<div class="prompt">Từ tiếng Anh nào có nghĩa này?</div>';
+  h+='<div class="q">'+esc(prompt)+'</div>';
+  if(d.vi_note && !revState) h+='<div class="q-note">'+esc(d.vi_note)+'</div>';
+
+  if(!revState){
+    h+='<input id="rev-input" class="type-input" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Gõ từ tiếng Anh…"/>';
+  } else {
+    const cls = revState.correct ? (revState.close?'fb-close':'fb-correct') : 'fb-wrong';
+    const icon = revState.correct ? (revState.close?'〰️':'✓') : '✕';
+    const label = revState.correct ? (revState.close?'Gần đúng — chính tả đúng là:':'Chính xác!') : 'Đáp án đúng:';
+    h+='<div class="rev-fb '+cls+'"><span class="fb-icon">'+icon+'</span> '+label+(revState.close||!revState.correct?' <b>'+esc(r.word)+'</b>':'')+'</div>';
+    const s0=(d.senses||[])[0];
+    if(s0&&s0.example) h+='<div class="ex" style="margin-top:10px">“'+esc(s0.example)+'”'+(s0.example_vi?'<span class="evi">→ '+esc(s0.example_vi)+'</span>':'')+'</div>';
+  }
+  h+='</div>';
+
+  if(!revState){
+    h+='<div class="btn-row" style="margin-top:12px"><button class="btn ghost" onclick="skipReview()">Không biết</button><button class="btn" onclick="checkReview()">Kiểm tra</button></div>';
+  } else {
+    h+='<button class="btn" onclick="nextReview()">Từ tiếp theo →</button>';
+  }
+  area.innerHTML=h;
+  const inp=$('#rev-input'); if(inp){ inp.focus(); inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); checkReview(); } }); }
+}
+async function gradeAndLog(r, correct){
+  r.reviewCorrect=(r.reviewCorrect||0)+(correct?1:0);
+  r.reviewWrong=(r.reviewWrong||0)+(correct?0:1);
+  r.lastReviewedAt=now();
+  await idbPut(r);
+  await logEvent(correct?'review_correct':'review_wrong', r.word);
+}
+async function checkReview(){
+  const inp=$('#rev-input'); if(!inp) return;
+  const guess=norm(inp.value||'');
+  if(!guess){ inp.classList.add('shake'); setTimeout(()=>inp.classList.remove('shake'),400); return; }
+  const r=revQueue[revIdx], target=norm(r.word);
+  const exact=guess===target;
+  const dist=lev(guess,target);
+  const close=!exact && target.length>=4 && dist<=1;
+  const correct=exact||close;
+  await gradeAndLog(r, correct);
+  revState={correct, close}; renderReview();
+}
+async function skipReview(){
+  const r=revQueue[revIdx];
+  await gradeAndLog(r, false);
+  revState={correct:false, close:false}; renderReview();
+}
+function nextReview(){ revIdx++; revState=null; renderReview(); }
+
+/* ============================================================
+   THỐNG KÊ — usage patterns & gentle, specific encouragement.
+   Everything below is computed from the on-device log; nothing
+   is ever sent anywhere.
+   ============================================================ */
+const TIME_RANGES=[
+  {name:'đêm khuya (0h–5h)', from:0, to:5},
+  {name:'sáng sớm (5h–8h)', from:5, to:8},
+  {name:'buổi sáng (8h–11h)', from:8, to:11},
+  {name:'buổi trưa (11h–13h)', from:11, to:13},
+  {name:'buổi chiều (13h–18h)', from:13, to:18},
+  {name:'buổi tối (18h–22h)', from:18, to:22},
+  {name:'đêm khuya (22h–24h)', from:22, to:24},
+];
+const WD=['CN','T2','T3','T4','T5','T6','T7'];
+
+function computeStreak(daySet){
+  const today=dayStart(now());
+  const hasToday=daySet.has(today);
+  let d=hasToday?today:today-DAY, streak=0;
+  while(daySet.has(d)){ streak++; d-=DAY; }
+  return {streak, hasToday};
+}
+async function computeInsights(){
+  const [logs, entries] = await Promise.all([logAll(), idbAll()]);
+  const today=dayStart(now());
+  const daySet=new Set(logs.map(l=>dayStart(l.ts)));
+  const {streak, hasToday}=computeStreak(daySet);
+
+  const week=[]; for(let i=6;i>=0;i--){ const dd=today-i*DAY; const cnt=logs.filter(l=>dayStart(l.ts)===dd).length; week.push({dd,count:cnt}); }
+  const maxWeek=Math.max(1,...week.map(w=>w.count));
+
+  const hourBuckets=new Array(24).fill(0);
+  logs.forEach(l=>hourBuckets[new Date(l.ts).getHours()]++);
+  const totalHourEvents=hourBuckets.reduce((a,b)=>a+b,0);
+  let peakRange=null, peakCount=-1;
+  for(const rg of TIME_RANGES){ let c=0; for(let h=rg.from;h<rg.to;h++) c+=hourBuckets[h]; if(c>peakCount){peakCount=c;peakRange=rg;} }
+  const peakPct = totalHourEvents ? Math.round(peakCount/totalHourEvents*100) : 0;
+
+  const correct=logs.filter(l=>l.type==='review_correct').length;
+  const wrong=logs.filter(l=>l.type==='review_wrong').length;
+  const totalReview=correct+wrong;
+  const accuracy = totalReview ? Math.round(correct/totalReview*100) : null;
+
+  const forgetful=entries.filter(e=>(e.reviewWrong||0)>=2).sort((a,b)=>(b.reviewWrong||0)-(a.reviewWrong||0)).slice(0,3);
+
+  const weekAgo=today-6*DAY, twoWeeksAgo=today-13*DAY;
+  const thisWeekSearches=logs.filter(l=>l.type==='search'&&dayStart(l.ts)>=weekAgo).length;
+  const lastWeekSearches=logs.filter(l=>l.type==='search'&&dayStart(l.ts)>=twoWeeksAgo&&dayStart(l.ts)<weekAgo).length;
+
+  const savedCount=entries.filter(e=>e.saved).length;
+  const savedNotReviewed=entries.filter(e=>e.saved&&!e.lastReviewedAt).length;
+
+  return {streak, hasToday, week, maxWeek, peakRange, peakPct, totalHourEvents,
+    accuracy, totalReview, forgetful, thisWeekSearches, lastWeekSearches,
+    totalWords:entries.length, savedCount, savedNotReviewed};
+}
+
+function insightCard(color, icon, title, body){
+  return '<div class="ins-card ins-'+color+'"><div class="ins-icon">'+icon+'</div><div><div class="ins-title">'+title+'</div><div class="ins-body">'+body+'</div></div></div>';
+}
+async function renderInsights(){
+  const area=$('#insights-area');
+  const s=await computeInsights();
+
+  if(!s.totalHourEvents){
+    area.innerHTML='<div class="empty"><div class="big">📓</div><h3>Chưa đủ dữ liệu</h3><p>Tra và ôn thêm vài từ để em thấy thói quen học của mình ở đây.</p></div>';
+    return;
+  }
+
+  let h='';
+  // hero streak card
+  h+='<div class="streak-hero card-fold">';
+  h+='<div class="streak-n">'+s.streak+'</div>';
+  h+='<div class="streak-l">ngày liên tiếp có hoạt động</div>';
+  if(!s.hasToday && s.streak>0) h+='<div class="streak-warn">Hôm nay chưa có gì — tra hoặc ôn một từ để giữ chuỗi nhé.</div>';
+  h+='</div>';
+
+  // stat tiles
+  h+='<div class="stat-grid">';
+  h+='<div class="stat"><div class="n">'+s.totalWords+'</div><div class="l">từ trong máy</div></div>';
+  h+='<div class="stat"><div class="n">'+s.savedCount+'</div><div class="l">đã lưu</div></div>';
+  h+='<div class="stat"><div class="n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</div><div class="l">độ chính xác ôn tập</div></div>';
+  h+='</div>';
+
+  // 7-day bars
+  h+='<div class="sec"><div class="sec-h">7 ngày gần đây</div><div class="bars">';
+  s.week.forEach(w=>{ const pct=Math.round(w.count/s.maxWeek*100); const wd=WD[new Date(w.dd).getDay()];
+    h+='<div class="bar-col"><div class="bar-track"><div class="bar-fill" style="height:'+Math.max(4,pct)+'%"></div></div><div class="bar-lbl">'+wd+'</div></div>'; });
+  h+='</div></div>';
+
+  // insight cards — the "things you didn't know about yourself" section
+  h+='<div class="sec"><div class="sec-h">Nhận ra gì về thói quen học</div>';
+  if(s.peakRange && s.peakPct>=20){
+    h+=insightCard('blue','🕒','Em học nhiều nhất vào '+s.peakRange.name,'Chiếm khoảng '+s.peakPct+'% số lần tra/ôn từ trước giờ.');
+  }
+  if(s.totalReview>=5 && s.accuracy!=null){
+    const tone = s.accuracy>=80 ? 'Rất chắc tay!' : s.accuracy>=50 ? 'Ổn, còn có thể chắc hơn.' : 'Ôn thêm sẽ lên nhanh thôi.';
+    h+=insightCard('mint','🎯','Độ chính xác khi ôn tập: '+s.accuracy+'%', tone+' ('+s.totalReview+' lượt trả lời)');
+  }
+  if(s.forgetful.length){
+    const list=s.forgetful.map(f=>'<b>'+esc(f.word)+'</b> (sai '+f.reviewWrong+' lần)').join(', ');
+    h+=insightCard('coral','🧠','Từ hay quên nhất', list);
+  }
+  if(s.lastWeekSearches>0){
+    const diff=s.thisWeekSearches-s.lastWeekSearches;
+    const pct=Math.round(Math.abs(diff)/s.lastWeekSearches*100);
+    if(diff>0) h+=insightCard('amber','📈','Tuần này em tra nhiều hơn '+pct+'%', s.thisWeekSearches+' từ tuần này so với '+s.lastWeekSearches+' tuần trước.');
+    else if(diff<0) h+=insightCard('amber','📉','Tuần này em tra ít hơn '+pct+'%', s.thisWeekSearches+' từ tuần này so với '+s.lastWeekSearches+' tuần trước — tra thêm vài từ nhé.');
+  }
+  if(s.savedNotReviewed>0){
+    h+=insightCard('blue','📌','Còn '+s.savedNotReviewed+' từ đã lưu chưa ôn lần nào','Ghé tab Ôn tập để bắt đầu với mấy từ này.');
+  }
+  h+='</div>';
+
   area.innerHTML=h;
 }
-function revealReview(){ revShown=true; renderReview(); }
-function nextReview(){ revIdx++; revShown=false; renderReview(); }
+async function updateStreakChip(){
+  try{
+    const logs=await logAll();
+    const daySet=new Set(logs.map(l=>dayStart(l.ts)));
+    const {streak}=computeStreak(daySet);
+    const el=$('#streak-chip'); if(el) el.textContent = streak>0 ? '🔥 '+streak : '';
+    if(el) el.style.display = streak>0 ? 'inline-flex' : 'none';
+  }catch(e){}
+}
 
 /* ============================================================
    SETTINGS actions
@@ -340,6 +615,7 @@ function showView(v){
   window.scrollTo(0,0);
   if(v==='saved') renderSaved();
   if(v==='review') startReview();
+  if(v==='insights') renderInsights();
   if(v==='settings') refreshStats();
 }
 
@@ -366,6 +642,11 @@ function wire(){
     if(navigator.storage&&navigator.storage.persist){ const ok=await navigator.storage.persist(); f.textContent=ok?'Đã bật — dữ liệu được giữ ✓':'iOS chưa cho, nhưng thêm app vào Home Screen sẽ giúp giữ dữ liệu.'; }
     else f.textContent='Trình duyệt không hỗ trợ (vẫn ổn khi thêm vào Home Screen).';
   });
+  $('#clear-log-btn').addEventListener('click',async()=>{
+    await logClearAll();
+    const f=$('#clearlog-flash'); f.textContent='Đã xoá lịch sử hoạt động ✓'; setTimeout(()=>f.textContent='',1800);
+    updateStreakChip();
+  });
 }
 
 /* ---------- service worker (offline) ---------- */
@@ -378,8 +659,9 @@ if('serviceWorker' in navigator){
   wire();
   await loadSeedOnce();
   refreshStats();
+  logEvent('open', null);
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
   $('#q').focus();
 })();
-window.toggleSave=toggleSave; window.jump=jump;
-window.revealReview=revealReview; window.nextReview=nextReview; window.startReview=startReview;
+window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI;
+window.startReview=startReview; window.checkReview=checkReview; window.skipReview=skipReview; window.nextReview=nextReview;
