@@ -1,12 +1,13 @@
 /* Smart.Dict service worker — offline app shell.
    Bump CACHE version whenever you change any file below, to force an update. */
-const CACHE = 'smartdict-v6';
+const CACHE = 'smartdict-v7';
 const SHELL = [
   './',
   './index.html',
   './app.js',
   './manifest.json',
   './seed.json',
+  './seed-files.txt',
   './icon-180.png',
   './icon-192.png',
   './icon-512.png'

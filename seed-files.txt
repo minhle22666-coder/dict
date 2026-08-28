@@ -1,0 +1,7 @@
+# Smart.Dict — danh sách các file seed.json app sẽ tự nạp khi mở lên.
+# Mỗi dòng 1 tên file JSON (đặt cùng thư mục với index.html).
+# Thêm 1 batch mới do generate.html xuất ra: upload file đó lên repo,
+# rồi thêm tên file đó vào 1 dòng mới bên dưới, commit — xong, app tự
+# nạp từ mới ở lần mở kế tiếp, không cần vào Cài đặt import tay.
+# Dòng bắt đầu bằng # bị bỏ qua.
+seed.json

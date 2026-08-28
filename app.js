@@ -66,7 +66,7 @@ async function logEvent(type, word){
 }
 
 /* ---------- settings (localStorage) ---------- */
-const KEY_LS='sd_key', MODEL_LS='sd_model', SEED_FLAG='sd_seed_loaded';
+const KEY_LS='sd_key', MODEL_LS='sd_model', SEEDFILES_LS='sd_merged_seeds';
 const getKey=()=>localStorage.getItem(KEY_LS)||'';
 const getModel=()=>localStorage.getItem(MODEL_LS)||'gemini-2.5-flash-lite';
 
@@ -170,25 +170,43 @@ function renderBadges(list, unlocked){
 }
 
 /* ---------- one-time seed load ---------- */
-async function loadSeedOnce(){
-  if(localStorage.getItem(SEED_FLAG)) return;
+/* ---------- seed sync: auto-merges any seed file listed in seed-files.txt ----------
+   Add a new line to seed-files.txt whenever you upload another generator export
+   (e.g. from a different browser/device) and this runs automatically on next open —
+   no manual "Chọn file JSON để nạp" needed. Each file is only ever merged once
+   (tracked by filename), and only NEW words are added — nothing already saved or
+   edited locally is overwritten. */
+async function syncSeedFiles(){
   try{
-    const res=await fetch('./seed.json'); if(!res.ok) throw 0;
-    const list=await res.json();
-    for(const data of list){
-      const w=norm(data.word);
-      const existing=await idbGet(w);
-      if(!existing) await idbPut({word:w, data, source:'seed', firstSeen:now(), saved:0, savedAt:0});
+    const res=await fetch('./seed-files.txt'); if(!res.ok) return;
+    const text=await res.text();
+    const files=text.split(/\r?\n/).map(x=>x.trim()).filter(x=>x && !x.startsWith('#'));
+    let merged; try{ merged=JSON.parse(localStorage.getItem(SEEDFILES_LS)||'[]'); }catch(e){ merged=[]; }
+    const mergedSet=new Set(merged);
+    let changed=false;
+    for(const fname of files){
+      if(mergedSet.has(fname)) continue;
+      try{
+        const r2=await fetch('./'+fname); if(!r2.ok) continue;
+        const list=await r2.json();
+        for(const data of list){
+          if(!data||!data.word) continue;
+          const w=norm(data.word);
+          const existing=await idbGet(w);
+          if(!existing) await idbPut({word:w, data, source:'seed', firstSeen:now(), saved:0, savedAt:0});
+        }
+        mergedSet.add(fname); changed=true;
+      }catch(e){ /* this file failed — leave it untracked so we retry next time */ }
     }
-    localStorage.setItem(SEED_FLAG,'1');
-  }catch(e){ /* no seed file yet — fine, AI fallback covers everything */ }
+    if(changed){ localStorage.setItem(SEEDFILES_LS, JSON.stringify([...mergedSet])); refreshStats(); }
+  }catch(e){ /* seed-files.txt not present — nothing to sync, totally fine */ }
 }
 
 /* ============================================================
    GEMINI FALLBACK  (also the extraction prompt = your "step 1")
    ============================================================ */
 function buildPrompt(word){
-  return `You are a bilingual English→Vietnamese lexicographer. For the English word "${word}", return a single JSON object (no markdown, no commentary) with EXACTLY this shape:
+  return `You are a bilingual English→Vietnamese lexicographer building a rich, practical dictionary entry. For the English word or phrase "${word}", return a single JSON object (no markdown, no commentary) with EXACTLY this shape:
 
 {
   "word": "corrected/canonical form — fix typos, complete a partial idiom, or normalize slang spelling",
@@ -202,22 +220,40 @@ function buildPrompt(word){
       "gloss":"short English meaning", "rank":5,
       "example":"one natural English sentence", "example_vi":"bản dịch tiếng Việt tự nhiên" }
   ],
-  "expressions": [
-    { "text":"phrase", "type":"phrasal verb|collocation|preposition|idiom", "vi":"nghĩa tiếng Việt", "rank":5, "example":"short sentence" }
+  "collocations": [
+    { "text":"natural word-partnership using this word, e.g. 'make a decision', 'heavy rain', 'strongly agree'",
+      "vi":"nghĩa cụm này", "rank":5, "example":"short natural sentence", "example_vi":"bản dịch" }
+  ],
+  "phrasal_verbs": [
+    { "text":"phrasal verb built on this word, e.g. 'step up', 'step down', 'step in'",
+      "vi":"nghĩa", "rank":5, "example":"short sentence", "example_vi":"bản dịch" }
+  ],
+  "idioms": [
+    { "text":"fixed idiom/proverb containing this word, e.g. 'step on someone's toes'",
+      "vi":"nghĩa idiom", "rank":4, "example":"short sentence", "example_vi":"bản dịch" }
+  ],
+  "prepositions": [
+    { "prep":"preposition that regularly follows/precedes this word, e.g. 'into', 'of', 'for'",
+      "meaning_vi":"nghĩa/sắc thái khi đi kèm giới từ này (khác gì so với nghĩa gốc)",
+      "example":"short phrase/sentence showing it, e.g. 'step into a new role'", "example_vi":"bản dịch" }
   ],
   "family": [ { "word":"related form", "pos":"noun|verb|adjective|adverb" } ],
-  "synonyms": ["useful common ones only"],
+  "synonyms": ["useful common ones, ordered most-to-least interchangeable"],
   "antonyms": ["useful common ones only"]
 }
 
 INPUT MAY BE MESSY: a typo, a partial/incomplete idiom (e.g. "rain dogs" → "it's raining cats and dogs"), or casual slang spelling. Silently resolve it to the real, common English word/idiom/slang term and put THAT corrected form in "word". Fill "query_note" only when you actually corrected something.
 
-RULES — prioritize USEFULNESS over completeness:
-- senses: MOST COMMON meaning first. rank = how often you meet it in real life (5=very common … 1=rare). Max 5 senses. For an idiom/slang entry, pos can be "idiom" or "slang".
-- expressions: cover a MIX of types when they exist for this word — phrasal verbs (step up), collocations (take a step), fixed prepositions (step INTO, afraid OF), and idioms (step on someone's toes). Only genuinely common ones. Max 8, ranked. Skip a type entirely if nothing common exists for it — don't force one.
-- synonyms/antonyms: max 5 each, common & distinguishable. Skip rare/literary words.
+GOAL: extract AS MUCH genuinely common, real-world usage as you know for this word — a learner should almost never need to look elsewhere. Prioritize BREADTH across every category below over padding just one of them:
+- senses: MOST COMMON meaning first. rank = how often you meet it in real life (5=very common … 1=rare). Up to 5 senses. For an idiom/slang entry, pos can be "idiom" or "slang".
+- collocations: the natural word-partnerships a native speaker reaches for — verb+noun, adjective+noun, adverb+adjective, noun+noun, fixed comparisons, whatever fits this word's part of speech. This is usually the BIGGEST category — up to 10, ranked. Dig for real ones, don't stop at 1–2.
+- phrasal_verbs: ONLY if this word is a verb that genuinely forms phrasal verbs. Up to 6, ranked. Leave the array empty if none exist — never invent one.
+- idioms: genuine fixed idioms/proverbs containing this word. Up to 6, ranked. Leave empty if none exist.
+- prepositions: the specific preposition(s) where the CHOICE of preposition changes or fixes the meaning (e.g. "afraid OF" vs "afraid FOR", "depend ON", "look UP TO" vs "look DOWN ON"). Up to 5. Leave empty if this word has no meaningful fixed-preposition pattern.
+- synonyms/antonyms: up to 8 synonyms and 5 antonyms, common & genuinely distinguishable — skip rare/literary words.
 - forms: fill only if it's a single-word verb (put "" for the rest). Omit entirely if not a verb or if multi-word.
 - Vietnamese must sound natural, not word-by-word translation.
+- Every "text"/"prep" entry must be something a fluent English speaker would actually say — no filler entries just to fill a slot.
 - Return ONLY the JSON object.`;
 }
 
@@ -401,7 +437,7 @@ function renderEntry(rec, queriedAs){
     h+='</div>';
   }
 
-  // expressions
+  // expressions (legacy field — older cached entries only; new entries use the split fields below)
   if(Array.isArray(d.expressions)&&d.expressions.length){
     const es=[...d.expressions].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm blue">🔗</span>Cách dùng thường gặp</div>';
@@ -413,16 +449,64 @@ function renderEntry(rec, queriedAs){
     h+='</div>';
   }
 
+  // collocations
+  if(Array.isArray(d.collocations)&&d.collocations.length){
+    const cs=[...d.collocations].sort((a,b)=>(b.rank||0)-(a.rank||0));
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm blue">🔗</span>Cụm từ hay đi cùng</div>';
+    for(const c of cs){
+      h+='<div class="expr"><span class="rank">'+dots(c.rank)+'</span><span class="t">'+esc(c.text)+'</span>';
+      if(c.vi) h+='<span class="ev">'+esc(c.vi)+'</span>';
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+
+  // phrasal verbs
+  if(Array.isArray(d.phrasal_verbs)&&d.phrasal_verbs.length){
+    const ps=[...d.phrasal_verbs].sort((a,b)=>(b.rank||0)-(a.rank||0));
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm mint">🧩</span>Cụm động từ (phrasal verb)</div>';
+    for(const p of ps){
+      h+='<div class="expr"><span class="rank">'+dots(p.rank)+'</span><span class="t">'+esc(p.text)+'</span>';
+      if(p.vi) h+='<span class="ev">'+esc(p.vi)+'</span>';
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+
+  // idioms
+  if(Array.isArray(d.idioms)&&d.idioms.length){
+    const is_=[...d.idioms].sort((a,b)=>(b.rank||0)-(a.rank||0));
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm coral">💬</span>Thành ngữ</div>';
+    for(const it of is_){
+      h+='<div class="expr"><span class="rank">'+dots(it.rank)+'</span><span class="t">'+esc(it.text)+'</span>';
+      if(it.vi) h+='<span class="ev">'+esc(it.vi)+'</span>';
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+
+  // dependent prepositions
+  if(Array.isArray(d.prepositions)&&d.prepositions.length){
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm amber">🧭</span>Giới từ đi kèm</div>';
+    for(const p of d.prepositions){
+      h+='<div class="prep-item"><div class="prep-w">'+esc(d.word||w)+' <b style="color:var(--amber)">'+esc(p.prep)+'</b></div>';
+      if(p.meaning_vi) h+='<div class="prep-m">'+esc(p.meaning_vi)+'</div>';
+      if(p.example){ h+='<div class="ex">"'+esc(p.example)+'"'; if(p.example_vi) h+='<span class="evi">→ '+esc(p.example_vi)+'</span>'; h+='</div>'; }
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+
   // family
   if(Array.isArray(d.family)&&d.family.length){
-    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm mint">🌱</span>Gia đình từ</div><div class="chips">';
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm pink">🌱</span>Gia đình từ</div><div class="chips">';
     for(const fm of d.family){ const fw=esc(fm.word||''); h+='<button class="chip tap" onclick="jump(\''+fw+'\')">'+fw+(fm.pos?' <span style="color:var(--muted-2)">·'+esc(fm.pos)+'</span>':'')+'</button>'; }
     h+='</div></div>';
   }
 
   // syn / ant
   if((d.synonyms&&d.synonyms.length)||(d.antonyms&&d.antonyms.length)){
-    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm pink">⇄</span>Đồng nghĩa · trái nghĩa</div><div class="chips">';
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm violet">⇄</span>Đồng nghĩa · trái nghĩa</div><div class="chips">';
     (d.synonyms||[]).forEach(x=>h+='<button class="chip tap" onclick="jump(\''+esc(x)+'\')">'+esc(x)+'</button>');
     (d.antonyms||[]).forEach(x=>h+='<button class="chip ant tap" onclick="jump(\''+esc(x)+'\')">'+esc(x)+'</button>');
     h+='</div></div>';
@@ -810,7 +894,7 @@ if('serviceWorker' in navigator){
 (async function init(){
   wire();
   renderHero();
-  await loadSeedOnce();
+  await syncSeedFiles();
   refreshStats();
   logEvent('open', null);
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});

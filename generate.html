@@ -34,10 +34,11 @@
   .card h2 .num{width:20px;height:20px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:var(--accent)}
 
   label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:7px}
-  input[type=text],input[type=password],input[type=number]{
+  input[type=text],input[type=password],input[type=number],select{
     width:100%;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);
     color:var(--text);padding:13px 14px;font-size:15px;outline:none}
-  input:focus{border-color:var(--accent-dim)}
+  select{-webkit-appearance:none;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%238B98A5" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>');background-repeat:no-repeat;background-position:right 14px center}
+  input:focus,select:focus{border-color:var(--accent-dim)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .field{margin-bottom:14px}
   .field:last-child{margin-bottom:0}
@@ -115,6 +116,17 @@
   <!-- 2. range -->
   <div class="card">
     <h2><span class="num">2</span> Phạm vi</h2>
+    <div class="field">
+      <label for="source">Nguồn danh sách</label>
+      <select id="source">
+        <option value="words-5000.txt">5000 từ phổ biến nhất (words-5000.txt)</option>
+        <option value="idioms-300.txt">300 idiom thông dụng (idioms-300.txt)</option>
+        <option value="slangs-300.txt">300 slang thông dụng (slangs-300.txt)</option>
+        <option value="idioms-slang.txt">Idiom &amp; slang bản cũ (idioms-slang.txt, ~212 mục)</option>
+        <option value="__custom__">File khác… (tự chọn file .txt)</option>
+      </select>
+      <input id="custom-file" type="file" accept=".txt,text/plain" style="display:none;margin-top:10px"/>
+    </div>
     <div id="list-status" class="hint" style="margin-bottom:14px">Đang tải danh sách từ…</div>
     <div class="grid2">
       <div class="field"><label for="start">Bắt đầu từ số</label><input id="start" type="number" min="1" value="1"/></div>
@@ -168,9 +180,10 @@
   <div class="steps">
     <h2>Sau khi tải seed.json</h2>
     <ol>
-      <li>Thay file <b>seed.json</b> mẫu trong repo bằng file vừa tải (Add file → Upload, commit đè).</li>
-      <li>Mở <b>sw.js</b>, tăng số ở dòng <code>const CACHE = 'smartdict-vN'</code> lên 1 (vd v4 → v5) rồi commit (để iPhone lấy bản mới).</li>
-      <li>Trên iPhone: xoá icon app cũ, mở lại link bằng Safari → Add to Home Screen. Xong — 5000 từ nằm sẵn, offline hoàn toàn.</li>
+      <li><b>Nếu đang tiếp tục trên cùng máy/trình duyệt này</b> (chạy nhiều đợt, nhiều nguồn khác nhau): file tải về đã CỘNG DỒN mọi thứ đang có trong máy — cứ ghi đè lên <b>seed.json</b> trong repo (Add file → Upload, commit đè) là đủ, không cần đụng gì thêm.</li>
+      <li><b>Nếu đây là dữ liệu sinh trên máy/trình duyệt KHÁC</b> (không có sẵn dữ liệu cũ): đừng ghi đè <b>seed.json</b> — upload file này với tên riêng, vd <code>seed-idioms.json</code>, rồi mở <b>seed-files.txt</b> trong repo, thêm tên file đó vào 1 dòng mới, commit. App sẽ tự nạp thêm từ mới ở lần mở kế tiếp, không cần vào Cài đặt import tay.</li>
+      <li>Mở <b>sw.js</b>, tăng số ở dòng <code>const CACHE = 'smartdict-vN'</code> lên 1 (vd v6 → v7) rồi commit — bắt buộc mỗi lần đổi file, để app lấy bản mới.</li>
+      <li>Mở lại app trên iPhone (đóng hẳn rồi mở lại, không cần xoá icon trừ khi vừa đổi icon/tên app). Từ mới sẽ tự có sẵn, offline hoàn toàn.</li>
     </ol>
   </div>
 </div>
@@ -196,33 +209,54 @@ function idbPut(o){return txs('readwrite').then(s=>new Promise((res,rej)=>{const
 function idbAll(){return txs('readonly').then(s=>new Promise((res,rej)=>{const r=s.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)}));}
 
 function buildPrompt(word){
-return `You are a bilingual English→Vietnamese lexicographer. For the English word "${word}", return a single JSON object (no markdown, no commentary) with EXACTLY this shape:
+return `You are a bilingual English→Vietnamese lexicographer building a rich, practical dictionary entry. For the English word or phrase "${word}", return a single JSON object (no markdown, no commentary) with EXACTLY this shape:
 
 {
-  "word": "${word}",
-  "phonetic": "IPA, e.g. /stɛp/",
+  "word": "corrected/canonical form — fix typos, complete a partial idiom, or normalize slang spelling",
+  "query_note": "if you corrected/completed the input, one short Vietnamese phrase like 'Ý bạn là: rain cats and dogs'; else empty string",
+  "phonetic": "IPA, e.g. /stɛp/ — omit for multi-word phrases/idioms",
   "vi_equivalent": "the ONE closest natural Vietnamese word/feeling",
   "vi_note": "1 short Vietnamese sentence explaining the core feeling/usage",
   "forms": { "v1":"", "v2":"", "v3":"", "ving":"" },
   "senses": [
-    { "pos":"noun|verb|adjective|adverb|...", "vi":"Vietnamese equivalent for THIS sense",
+    { "pos":"noun|verb|adjective|adverb|idiom|slang|...", "vi":"Vietnamese equivalent for THIS sense",
       "gloss":"short English meaning", "rank":5,
       "example":"one natural English sentence", "example_vi":"bản dịch tiếng Việt tự nhiên" }
   ],
-  "expressions": [
-    { "text":"phrasal verb / collocation", "vi":"nghĩa tiếng Việt", "rank":5, "example":"short sentence" }
+  "collocations": [
+    { "text":"natural word-partnership using this word, e.g. 'make a decision', 'heavy rain', 'strongly agree'",
+      "vi":"nghĩa cụm này", "rank":5, "example":"short natural sentence", "example_vi":"bản dịch" }
+  ],
+  "phrasal_verbs": [
+    { "text":"phrasal verb built on this word, e.g. 'step up', 'step down', 'step in'",
+      "vi":"nghĩa", "rank":5, "example":"short sentence", "example_vi":"bản dịch" }
+  ],
+  "idioms": [
+    { "text":"fixed idiom/proverb containing this word, e.g. 'step on someone's toes'",
+      "vi":"nghĩa idiom", "rank":4, "example":"short sentence", "example_vi":"bản dịch" }
+  ],
+  "prepositions": [
+    { "prep":"preposition that regularly follows/precedes this word, e.g. 'into', 'of', 'for'",
+      "meaning_vi":"nghĩa/sắc thái khi đi kèm giới từ này (khác gì so với nghĩa gốc)",
+      "example":"short phrase/sentence showing it, e.g. 'step into a new role'", "example_vi":"bản dịch" }
   ],
   "family": [ { "word":"related form", "pos":"noun|verb|adjective|adverb" } ],
-  "synonyms": ["useful common ones only"],
+  "synonyms": ["useful common ones, ordered most-to-least interchangeable"],
   "antonyms": ["useful common ones only"]
 }
 
-RULES — prioritize USEFULNESS over completeness:
-- senses: MOST COMMON meaning first. rank = how often you meet it in real life (5=very common … 1=rare). Max 5 senses.
-- expressions: only genuinely common spoken/written ones, ranked. Max 6. Skip if none.
-- synonyms/antonyms: max 5 each, common & distinguishable.
-- forms: fill only if it's a verb (put "" for the rest). Omit forms object entirely if not a verb.
+INPUT MAY BE MESSY: a typo, a partial/incomplete idiom (e.g. "rain dogs" → "it's raining cats and dogs"), or casual slang spelling. Silently resolve it to the real, common English word/idiom/slang term and put THAT corrected form in "word". Fill "query_note" only when you actually corrected something.
+
+GOAL: extract AS MUCH genuinely common, real-world usage as you know for this word — a learner should almost never need to look elsewhere. Prioritize BREADTH across every category below over padding just one of them:
+- senses: MOST COMMON meaning first. rank = how often you meet it in real life (5=very common … 1=rare). Up to 5 senses. For an idiom/slang entry, pos can be "idiom" or "slang".
+- collocations: the natural word-partnerships a native speaker reaches for — verb+noun, adjective+noun, adverb+adjective, noun+noun, fixed comparisons, whatever fits this word's part of speech. This is usually the BIGGEST category — up to 10, ranked. Dig for real ones, don't stop at 1–2.
+- phrasal_verbs: ONLY if this word is a verb that genuinely forms phrasal verbs. Up to 6, ranked. Leave the array empty if none exist — never invent one.
+- idioms: genuine fixed idioms/proverbs containing this word. Up to 6, ranked. Leave empty if none exist.
+- prepositions: the specific preposition(s) where the CHOICE of preposition changes or fixes the meaning (e.g. "afraid OF" vs "afraid FOR", "depend ON", "look UP TO" vs "look DOWN ON"). Up to 5. Leave empty if this word has no meaningful fixed-preposition pattern.
+- synonyms/antonyms: up to 8 synonyms and 5 antonyms, common & genuinely distinguishable — skip rare/literary words.
+- forms: fill only if it's a single-word verb (put "" for the rest). Omit entirely if not a verb or if multi-word.
 - Vietnamese must sound natural, not word-by-word translation.
+- Every "text"/"prep" entry must be something a fluent English speaker would actually say — no filler entries just to fill a slot.
 - Return ONLY the JSON object.`;}
 
 /* ---------- pricing (per 1M tokens: [input,output]) ---------- */
@@ -234,14 +268,25 @@ function rateFor(m){ for(const k in RATES) if(m.indexOf(k)===0) return RATES[k];
 let WORDS=[], running=false, paused=false, stopped=false;
 let done=0,ok=0,bad=0,tokIn=0,tokOut=0,started=0,failedWords=[],target=0;
 
-async function loadList(){
-  try{ const r=await fetch('./words-5000.txt'); const t=await r.text();
-    WORDS=t.split(/\r?\n/).map(x=>x.trim().toLowerCase()).filter(Boolean);
-    $('#list-status').innerHTML='Đã tải <b style="color:var(--text)">'+WORDS.length+'</b> từ. '
-      +'Có thể chọn khoảng bất kỳ bên dưới.';
-    $('#count').value=WORDS.length;
-  }catch(e){ $('#list-status').innerHTML='<span style="color:var(--danger)">Không tải được words-5000.txt — đảm bảo file nằm cùng thư mục.</span>'; }
+async function loadList(source, customText){
+  try{
+    let text;
+    if(source==='__custom__'){
+      if(!customText) throw new Error('NO_FILE');
+      text=customText;
+    } else {
+      const r=await fetch('./'+source); if(!r.ok) throw new Error('HTTP_'+r.status);
+      text=await r.text();
+    }
+    WORDS=text.split(/\r?\n/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+    $('#list-status').innerHTML='Đã tải <b style="color:var(--text)">'+WORDS.length+'</b> mục từ <b style="color:var(--text)">'+(source==='__custom__'?'file em chọn':source)+'</b>. Có thể chọn khoảng bất kỳ bên dưới.';
+    $('#count').value=WORDS.length; $('#start').value=1;
+  }catch(e){
+    WORDS=[];
+    $('#list-status').innerHTML='<span style="color:var(--danger)">Không tải được "'+esc(source)+'" — đảm bảo file này đã có trong repo, cùng thư mục với generate.html.</span>';
+  }
 }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function log(msg,cls){ const l=$('#log'); const d=document.createElement('div'); if(cls)d.className=cls; d.textContent=msg; l.appendChild(d); l.scrollTop=l.scrollHeight; while(l.children.length>120)l.removeChild(l.firstChild); }
 function fmtTime(ms){ const s=Math.floor(ms/1000); if(s<60)return s+'s'; const m=Math.floor(s/60); return m+'m'+(s%60)+'s'; }
@@ -375,7 +420,22 @@ $('#download').addEventListener('click',download);
 $('#usage').addEventListener('click',downloadUsage);
 $('#retry').addEventListener('click',()=>{ if(failedWords.length) run([...failedWords]); });
 
-loadList();
+$('#source').addEventListener('change',()=>{
+  const v=$('#source').value;
+  $('#custom-file').style.display = v==='__custom__' ? 'block' : 'none';
+  if(v==='__custom__'){
+    $('#list-status').innerHTML='Chọn 1 file .txt (mỗi dòng 1 từ/cụm) ở trên.';
+    WORDS=[];
+  } else {
+    loadList(v);
+  }
+});
+$('#custom-file').addEventListener('change', async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const text=await f.text();
+  await loadList('__custom__', text);
+});
+loadList($('#source').value);
 </script>
 </body>
 </html>
