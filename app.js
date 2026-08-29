@@ -410,6 +410,8 @@ async function search(rawWord, forceAI){
   if(!word) return;
   word=normalizeSpelling(word);
   hideSuggest();
+  // A search always takes you to the word page, no matter which tab you were on.
+  if(!$('#v-home').classList.contains('active')) showView('home');
   $('#dashboard').style.display='none';
   const box=$('#result');
 
@@ -749,28 +751,61 @@ async function renderHistory(){
   if(!recent.length){ box.innerHTML='<div class="empty" style="padding:20px 10px"><img class="ill" style="width:110px" src="./mascot-explore.webp" alt=""/><h3>No discoveries yet</h3><p>Search a word above — Focci will chart it on the map.</p></div>'; return; }
   const recs=await Promise.all(recent.map(w=>idbGet(w)));
   let h='';
-  for(const r of recs){ if(!r) continue; const d=r.data||{};
-    h+='<div class="row hist-row" onclick="jump(\''+esc(r.word).replace(/'/g,"\\'")+'\')">'
-      +'<img class="row-ico" src="./decor-magnifying-glass.webp" alt=""/>'
-      +'<div class="mid"><span class="w">'+esc(r.word)+'</span> <span class="phon">'+esc(d.phonetic||'')+'</span>'
+  for(const r of recs){ if(!r) continue; const d=r.data||{}; const w=esc(r.word);
+    h+='<div class="hist-item" onclick="jump(\''+w.replace(/'/g,"\\'")+'\')">'
+      +'<img class="hist-ico" src="./decor-magnifying-glass.webp" alt=""/>'
+      +'<div class="hist-mid"><div class="hist-top"><span class="w">'+w+'</span>'
+      +(d.phonetic?'<span class="phon">'+esc(d.phonetic)+'</span>':'')+'</div>'
       +(d.vi_equivalent?'<div class="e">'+esc(d.vi_equivalent)+'</div>':'')+'</div>'
-      +'<span class="row-go">→</span>'
+      +'<button class="hist-star'+(r.saved?' on':'')+'" onclick="event.stopPropagation();toggleSaveFromList(\''+w.replace(/'/g,"\\'")+'\',this)">'
+      +(r.saved?'★':'☆')+'</button>'
       +'</div>';
   }
   box.innerHTML=h;
 }
+let _statCache={learned:0,avg:0,mins:0,activeDays:0,todayNew:0,bestDay:0};
+
+/* Star a word straight from a list without leaving the page. */
+async function toggleSaveFromList(word, btn){
+  const rec=await idbGet(word); if(!rec) return;
+  rec.saved=rec.saved?0:1; rec.savedAt=rec.saved?now():0;
+  await idbPut(rec);
+  if(btn){ btn.textContent=rec.saved?'★':'☆'; btn.classList.toggle('on',!!rec.saved); }
+  toast(rec.saved?'Saved ⭐':'Removed from saved');
+  logEvent(rec.saved?'save':'unsave', word);
+  if(rec.saved) addXP(1);
+  refreshStats();
+}
+window.toggleSaveFromList=toggleSaveFromList;
+
 async function renderDashboardStats(){
   const [entries, logs] = await Promise.all([idbAll(), logAll()]);
-  const total=entries.length;
-  const daySet=new Set(logs.map(l=>dayStart(l.ts)));
-  const days=Math.max(1,daySet.size);
-  $('#d-total').textContent=total;
-  $('#d-avg').textContent=Math.round(total/days);
+  // "Words learned" = words YOU actually looked up, not the pre-seeded library.
+  const searches=logs.filter(l=>l.type==='search'&&l.word);
+  const learnedSet=new Set(searches.map(l=>l.word));
+  const learned=learnedSet.size;
+  // Active days = days with at least one search (not merely opening the app).
+  const searchDays=new Set(searches.map(l=>dayStart(l.ts)));
+  const activeDays=Math.max(1,searchDays.size);
+  // Average NEW words per active day: each word counts only on the day first seen.
+  const firstSeenDay=new Map();
+  for(const l of searches){ const d=dayStart(l.ts);
+    if(!firstSeenDay.has(l.word)||d<firstSeenDay.get(l.word)) firstSeenDay.set(l.word,d); }
+  const perDay=new Map();
+  for(const [,d] of firstSeenDay) perDay.set(d,(perDay.get(d)||0)+1);
+  const avg=Math.round(learned/activeDays);
+  const today=dayStart(now());
+  const todayNew=perDay.get(today)||0;
+  const bestDay=Math.max(0,...perDay.values());
+
   const ms=(+localStorage.getItem(TIME_LS))||0;
   const mins=Math.round(ms/60000);
-  $('#d-time').textContent = mins<60 ? mins+'m' : Math.floor(mins/60)+'h'+(mins%60)+'m';
+  _statCache={learned,avg,mins,activeDays,todayNew,bestDay,library:entries.length};
 
-  const today=dayStart(now());
+  $('#d-total').textContent=learned.toLocaleString();
+  $('#d-avg').textContent=avg;
+  $('#d-time').textContent = mins<60 ? mins+'m' : Math.floor(mins/60)+'h '+(mins%60)+'m';
+
   const week=[]; for(let i=6;i>=0;i--){ const dd=today-i*DAY; const cnt=logs.filter(l=>dayStart(l.ts)===dd && l.type==='search').length; week.push({dd,count:cnt}); }
   const maxWeek=Math.max(1,...week.map(w=>w.count));
   const WD=['S','M','T','W','T','F','S'];
@@ -779,6 +814,40 @@ async function renderDashboardStats(){
     h+='<div class="bar-col"><div class="bar-track"><div class="bar-fill" style="height:'+Math.max(4,pct)+'%"></div></div><div class="bar-lbl">'+wd+'</div></div>'; });
   $('#week-bars').innerHTML=h;
 }
+
+/* Tap a stat tile → Focci explains what the number actually means. */
+function statInsight(which){
+  const s=_statCache;
+  let img='mascot-read_map', title='', body='';
+  if(which==='learned'){
+    img='mascot-take_note'; title=s.learned.toLocaleString()+' words explored';
+    body = s.learned===0 ? "Search your first word and Focci will start the map."
+      : "That's how many different words you've personally looked up. Your offline library holds "
+        +(s.library||0).toLocaleString()+" ready for you.";
+  } else if(which==='avg'){
+    img='mascot-run'; title=s.avg+' new words per active day';
+    body = s.activeDays<=1 ? "Come back tomorrow and this becomes a real trend."
+      : "Averaged over "+s.activeDays+" active days. Your best day was "+s.bestDay
+        +" new words — today you're at "+s.todayNew+".";
+  } else {
+    img='mascot-drink_tea_cup'; title=(s.mins<60? s.mins+' minutes':(Math.floor(s.mins/60)+'h '+(s.mins%60)+'m'))+' with Focci';
+    body = s.mins<5 ? "Barely a tea break so far — plenty of trail left!"
+      : "Total time the app has been open. Roughly "+Math.max(1,Math.round(s.mins/Math.max(1,s.activeDays)))
+        +" minutes per active day.";
+  }
+  showInfoCard(img,title,body);
+}
+function showInfoCard(img,title,body){
+  const ov=document.createElement('div'); ov.className='info-ov';
+  ov.innerHTML='<div class="info-card"><img src="./'+img+'.webp" alt=""/>'
+    +'<div class="info-t">'+esc(title)+'</div><div class="info-b">'+esc(body)+'</div>'
+    +'<div class="info-tap">tap to close</div></div>';
+  document.body.appendChild(ov);
+  requestAnimationFrame(()=>ov.classList.add('show'));
+  ov.addEventListener('click',()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),260); });
+}
+window.statInsight=statInsight;
+
 async function renderDashboard(){
   renderJar();
   renderGoalCard();
@@ -819,7 +888,7 @@ async function shakeTree(){
   for(let i=0;i<n;i++){
     const f=document.createElement('img');
     f.className='fruit';
-    f.src = Math.random()<0.6 ? './decor-apple-green.webp' : './decor-orange.webp';
+    f.src = Math.random()<0.6 ? './fruit-apple.png' : './fruit-orange.png';
     f.style.left=(24+Math.random()*52)+'%';
     f.style.animationDelay=(Math.random()*0.25)+'s';
     wrap.appendChild(f);
@@ -838,10 +907,10 @@ async function shakeTree(){
         const r=pool[Math.floor(Math.random()*pool.length)];
         const eq=r.data?.vi_equivalent||'';
         const card=$('#tree-word');
-        card.innerHTML='<span class="tw-w">'+esc(r.word)+'</span>'+(eq?'<span class="tw-e">'+esc(eq)+'</span>':'')
-          +'<span class="tw-go">tap to open →</span>';
-        card.onclick=()=>jump(r.word);
+        card.innerHTML='<span class="tw-w">'+esc(r.word)+'</span>'+(eq?'<span class="tw-e">'+esc(eq)+'</span>':'');
+        card.onclick=(ev)=>{ ev.stopPropagation(); jump(r.word); };
         card.classList.add('show');
+        clearTimeout(card._t); card._t=setTimeout(()=>card.classList.remove('show'),4200);
       }
     }catch(e){}
   }
@@ -870,29 +939,18 @@ window.shakeTree=shakeTree; window.tapFocci=tapFocci;
    SAVED
    ============================================================ */
 let savedSort='newest';
-const SORT_CYCLE=['newest','oldest','az'];
-const SORT_LABEL={newest:'Newest',oldest:'Oldest',az:'A–Z'};
+const SORT_CYCLE=['newest','oldest','az','za'];
+const SORT_LABEL={newest:'Newest',oldest:'Oldest',az:'A–Z',za:'Z–A'};
 const BOOKMARK_COLORS=['yellow','orange','red','blue','green'];
 async function renderSaved(){
   let all=(await idbAll()).filter(r=>r.saved);
   const box=$('#saved-list');
   $('#saved-count').innerHTML='<img class="hdr-ico" src="./decor-earth.webp" alt=""/>'
     +all.length+' word'+(all.length===1?'':'s')+' collected';
-  // territory banner — the land grows greener as the collection grows
-  const banner=$('#saved-banner');
-  if(banner){
-    const tiers=[[0,'desert','Barren lands… collect words to grow them.'],
-                 [10,'morning','Green shoots! Your territory is waking up.'],
-                 [40,'afternoon','Rolling hills — a proper explorer\'s map.'],
-                 [100,'evening','Vast country. Focci is impressed.']];
-    let t=tiers[0]; for(const x of tiers) if(all.length>=x[0]) t=x;
-    banner.style.backgroundImage="url('./bg-"+t[1]+".webp')";
-    banner.innerHTML='<div class="sb-scrim"></div>'
-      +'<img class="sb-char" src="./mascot-'+(all.length>=40?'badass':'explore')+'.webp" alt=""/>'
-      +'<div class="sb-txt"><div class="sb-t">Your Territory</div><div class="sb-s">'+esc(t[2])+'</div></div>';
-  }
+  renderTerritory(all.length);
   if(!all.length){ box.innerHTML='<div class="empty"><img class="ill" src="./mascot-explore.webp" alt=""/><h3>No saved words yet</h3><p>Tap the star ☆ on any word to save it here.</p></div>'; return; }
   if(savedSort==='az') all.sort((a,b)=>a.word.localeCompare(b.word));
+  else if(savedSort==='za') all.sort((a,b)=>b.word.localeCompare(a.word));
   else if(savedSort==='oldest') all.sort((a,b)=>a.savedAt-b.savedAt);
   else all.sort((a,b)=>b.savedAt-a.savedAt);
   let h='';
@@ -905,6 +963,64 @@ async function renderSaved(){
   box.innerHTML=h;
 }
 
+
+/* ============================================================
+   TERRITORY — the lands Focci has claimed, and the ones still
+   locked ahead. Tapping a region tells you what it takes.
+   ============================================================ */
+const REGIONS=[
+  {at:0,   bg:'desert',    name:'Dusty Flats',    char:'explore', line:"Where every explorer starts. Dry, but full of promise."},
+  {at:10,  bg:'morning',   name:'Green Meadows',  char:'run',     line:"Grass at last! Your first real foothold."},
+  {at:40,  bg:'afternoon', name:'Rolling Hills',  char:'read_map',line:"Wide country. Focci needed a bigger map for this."},
+  {at:100, bg:'evening',   name:'Golden Valley',  char:'badass',  line:"Sunset over land you earned word by word."},
+  {at:250, bg:'night',     name:'Starlit Peaks',  char:'champion',line:"The summit. Very few explorers make it here."},
+];
+function renderTerritory(count){
+  const banner=$('#saved-banner'); if(!banner) return;
+  let cur=REGIONS[0], next=null;
+  for(let i=0;i<REGIONS.length;i++){
+    if(count>=REGIONS[i].at) cur=REGIONS[i];
+    else { next=REGIONS[i]; break; }
+  }
+  banner.style.backgroundImage="url('./bg-"+cur.bg+".webp')";
+  let h='<div class="sb-scrim"></div>';
+  h+='<img class="sb-char" src="./mascot-'+cur.char+'.webp" alt=""/>';
+  h+='<div class="sb-txt"><div class="sb-t">'+esc(cur.name)+'</div>';
+  h+='<div class="sb-s">'+esc(cur.line)+'</div>';
+  if(next){
+    const need=next.at-count;
+    h+='<div class="sb-next">🔒 '+need+' more to unlock <b>'+esc(next.name)+'</b></div>';
+    h+='<div class="sb-bar"><i style="width:'+Math.round((count-cur.at)/(next.at-cur.at)*100)+'%"></i></div>';
+  } else {
+    h+='<div class="sb-next">🏆 Every land claimed. Legendary.</div>';
+  }
+  h+='</div>';
+  banner.innerHTML=h;
+
+  // the region strip — locked lands are visible but dimmed
+  const strip=$('#region-strip');
+  if(strip){
+    let s='';
+    REGIONS.forEach((r,i)=>{
+      const unlocked=count>=r.at;
+      s+='<div class="region'+(unlocked?' on':'')+(r===cur?' cur':'')+'" onclick="regionInfo('+i+','+count+')">'
+        +'<div class="region-img" style="background-image:url(./bg-'+r.bg+'.webp)"></div>'
+        +'<div class="region-lock">'+(unlocked?'✓':'🔒')+'</div>'
+        +'<div class="region-n">'+esc(r.name)+'</div>'
+        +'<div class="region-a">'+(unlocked?'claimed':r.at+' words')+'</div>'
+        +'</div>';
+    });
+    strip.innerHTML=s;
+  }
+}
+function regionInfo(i,count){
+  const r=REGIONS[i], unlocked=count>=r.at;
+  showInfoCard('mascot-'+(unlocked?r.char:'wonder'),
+    (unlocked?'':'🔒 ')+r.name,
+    unlocked ? r.line : 'Locked. Save '+(r.at-count)+' more word'+((r.at-count)===1?'':'s')+' and this land is yours. '+r.line);
+}
+window.regionInfo=regionInfo;
+
 /* ============================================================
    PRACTICE (typing review)
    ============================================================ */
@@ -916,14 +1032,130 @@ function reviewPrompt(d){
   if(s0&&s0.gloss) return s0.gloss;
   return '(no meaning saved yet)';
 }
+let practiceMode='type';   // 'type' | 'match'
+function practiceTabs(){
+  return '<div class="mode-tabs">'
+    +'<button class="mode-tab'+(practiceMode==='type'?' on':'')+'" onclick="setPracticeMode(\'type\')">✍️ Type it</button>'
+    +'<button class="mode-tab'+(practiceMode==='match'?' on':'')+'" onclick="setPracticeMode(\'match\')">🎯 Match it</button>'
+    +'</div>';
+}
+function setPracticeMode(m){ practiceMode=m; startReview(); }
+window.setPracticeMode=setPracticeMode;
+
 async function startReview(){
+  if(practiceMode==='match') return startMatch();
   const saved=(await idbAll()).filter(r=>r.saved);
   const area=$('#review-area');
-  if(saved.length<1){ area.innerHTML='<div class="empty"><img class="ill" src="./mascot-drink_tea_cup.webp" alt=""/><h3>Nothing to practice yet</h3><p>Save a few words first, then come back here to type them out from memory.</p></div>'; return; }
+  if(saved.length<1){ area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-drink_tea_cup.webp" alt=""/><h3>Nothing to type yet</h3><p>Save a few words with the ☆ first — then Focci will quiz you from memory.</p><p style="margin-top:10px">Or try <b>Match it</b> above: it works with your whole library.</p></div>'; return; }
   revQueue=saved.sort(()=>Math.random()-0.5).slice(0,10); revIdx=0; revState=null;
   revResults=new Array(revQueue.length).fill(null); revCorrectCount=0; revSessionAwarded=false;
   renderReview();
 }
+
+/* ============================================================
+   MATCH IT — six words from the whole library, one Vietnamese
+   meaning. Works even with nothing saved, so a big seeded
+   dictionary finally becomes something you can play with.
+   ============================================================ */
+let matchRounds=[], matchIdx=0, matchHits=0, matchPicked=null, matchAwarded=false;
+const MATCH_TOTAL=8;
+async function startMatch(){
+  const area=$('#review-area');
+  area.innerHTML=practiceTabs()+'<div class="spinner"></div>';
+  const all=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || (r.data.senses||[])[0]?.vi));
+  if(all.length<8){
+    area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Not enough words yet</h3><p>Focci needs at least 8 words in the library to build a round.</p></div>';
+    return;
+  }
+  const meaningOf=(r)=>r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi || '';
+  matchRounds=[]; matchIdx=0; matchHits=0; matchPicked=null; matchAwarded=false;
+  const used=new Set();
+  for(let i=0;i<MATCH_TOTAL;i++){
+    let answer=null, guard=0;
+    while(guard++<60){ const c=all[Math.floor(Math.random()*all.length)];
+      if(!used.has(c.word) && meaningOf(c)){ answer=c; used.add(c.word); break; } }
+    if(!answer) break;
+    const opts=[answer];
+    let g2=0;
+    while(opts.length<6 && g2++<200){
+      const c=all[Math.floor(Math.random()*all.length)];
+      if(c.word!==answer.word && !opts.some(o=>o.word===c.word)) opts.push(c);
+    }
+    matchRounds.push({answer, meaning:meaningOf(answer), opts:opts.sort(()=>Math.random()-0.5)});
+  }
+  renderMatch();
+}
+function renderMatch(){
+  const area=$('#review-area');
+  if(matchIdx>=matchRounds.length){
+    if(!matchAwarded && matchRounds.length){
+      matchAwarded=true; addXP(8);
+      if(matchHits===matchRounds.length) localStorage.setItem(PERFECT_LS,'1');
+      checkAchievements();
+    }
+    const perfect=matchHits===matchRounds.length;
+    const pose=perfect?'champion':(matchHits>=matchRounds.length/2?'jump':'run_and_think');
+    const say=perfect?"Perfect run! Not one wrong turn."
+      :(matchHits>=matchRounds.length/2?"Solid work out there, explorer.":"Rough trail today — but we mapped it.");
+    area.innerHTML=practiceTabs()
+      +'<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt=""/>'
+      +'<div class="speech big">'+esc(say)+'</div>'
+      +'<div class="rd-score">'+matchHits+' / '+matchRounds.length+'</div>'
+      +'<div class="rd-sub">correct · +8 XP</div></div>'
+      +'<button class="btn" onclick="startMatch()">Play again</button>';
+    confettiBurst(area);
+    return;
+  }
+  const r=matchRounds[matchIdx];
+  let h=practiceTabs();
+  h+='<div class="rev-dots">';
+  for(let i=0;i<matchRounds.length;i++){
+    let cls='todo';
+    if(i<matchIdx) cls = matchRounds[i]._ok ? 'done':'wrong';
+    else if(i===matchIdx) cls='current';
+    h+='<div class="rev-dot '+cls+'"></div>';
+  }
+  h+='</div>';
+  h+='<div class="rev-progress">Round '+(matchIdx+1)+' / '+matchRounds.length+'</div>';
+
+  let pose='investigate', bubble="Which word means this?";
+  if(matchPicked){
+    if(matchPicked.ok){ pose='thumbsup'; bubble=pick(["Spot on!","That's the one!","Sharp eye!"]); }
+    else { pose='tired'; bubble="Not quite — here's the right one."; }
+  }
+  h+='<div class="rev-hero"><img class="rev-mascot" src="./mascot-'+pose+'.webp" alt=""/>'
+    +'<div class="speech">'+esc(bubble)+'</div></div>';
+
+  h+='<div class="match-meaning">'+esc(r.meaning)+'</div>';
+  h+='<div class="match-grid">';
+  r.opts.forEach((o,i)=>{
+    let cls='match-opt';
+    if(matchPicked){
+      if(o.word===r.answer.word) cls+=' right';
+      else if(o.word===matchPicked.word) cls+=' wrong';
+      else cls+=' dim';
+    }
+    h+='<button class="'+cls+'" onclick="pickMatch('+i+')">'+esc(o.word)+'</button>';
+  });
+  h+='</div>';
+  if(matchPicked) h+='<button class="btn" onclick="nextMatch()">Next →</button>';
+  area.innerHTML=h;
+}
+async function pickMatch(i){
+  if(matchPicked) return;
+  const r=matchRounds[matchIdx], choice=r.opts[i];
+  const ok=choice.word===r.answer.word;
+  r._ok=ok;
+  matchPicked={word:choice.word, ok};
+  if(ok){ matchHits++; addXP(3); } 
+  await logEvent(ok?'review_correct':'review_wrong', r.answer.word);
+  try{ const rec=await idbGet(r.answer.word);
+    if(rec){ rec.reviewCorrect=(rec.reviewCorrect||0)+(ok?1:0); rec.reviewWrong=(rec.reviewWrong||0)+(ok?0:1);
+      rec.lastReviewedAt=now(); await idbPut(rec); } }catch(e){}
+  renderMatch();
+}
+function nextMatch(){ matchIdx++; matchPicked=null; renderMatch(); }
+window.startMatch=startMatch; window.pickMatch=pickMatch; window.nextMatch=nextMatch;
 function renderReview(){
   const area=$('#review-area');
   if(revIdx>=revQueue.length){
@@ -938,7 +1170,7 @@ function renderReview(){
     const say=perfect?'A flawless expedition! Every single one.'
       :(revCorrectCount>=revQueue.length/2?'Good haul! The map is filling in.'
       :'Every explorer stumbles. Tomorrow we go again.');
-    area.innerHTML='<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt=""/>'
+    area.innerHTML=practiceTabs()+'<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt=""/>'
       +'<div class="speech big">'+esc(say)+'</div>'
       +'<div class="rd-score">'+revCorrectCount+' / '+revQueue.length+'</div>'
       +'<div class="rd-sub">correct · +10 XP for finishing</div></div>'
@@ -948,7 +1180,8 @@ function renderReview(){
   }
   const r=revQueue[revIdx], d=r.data||{};
   const prompt=reviewPrompt(d);
-  let h='<div class="rev-dots">';
+  let h=practiceTabs();
+  h+='<div class="rev-dots">';
   for(let i=0;i<revQueue.length;i++){
     let cls='todo'; if(revResults[i]==='correct') cls='done'; else if(revResults[i]==='wrong') cls='wrong'; else if(i===revIdx) cls='current';
     h+='<div class="rev-dot '+cls+'"></div>';
@@ -1180,10 +1413,11 @@ async function renderHero(){
   const spooky = isSpookySeason() && (timeOfDay()==='evening' || timeOfDay()==='night');
   $('#hero-char').src='./mascot-'+(spooky?'halloween':t.char)+'.webp';
   $('#hero-sky').src='./'+t.sky+'.webp';
+  // Foliage only on daylight scenes — at night it just covered the greeting.
   const foliage=$('#hero-foliage');
   if(foliage){
-    foliage.src = (t.bg==='night') ? './decor-bush.webp' : './decor-tree.webp';
-    foliage.style.display='block';
+    if(t.bg==='night'){ foliage.style.display='none'; }
+    else { foliage.src='./decor-tree.webp'; foliage.style.display='block'; }
   }
   $('#hero-greet').textContent=t.greet+(name?', '+name:'')+'!';
 
@@ -1692,7 +1926,12 @@ function showView(v){
   $('#v-'+v).classList.add('active');
   document.querySelector('.tab[data-view="'+v+'"]').classList.add('active');
   window.scrollTo(0,0);
-  if(v==='home'){ renderHero(); if(!currentWord) renderDashboard(); }
+  if(v==='home'){
+    renderHero();
+    // keep an open word visible; only rebuild the dashboard when none is open
+    if(currentWord && $('#result').innerHTML.trim()){ $('#dashboard').style.display='none'; }
+    else { $('#dashboard').style.display='block'; renderDashboard(); }
+  }
   if(v==='saved') renderSaved();
   if(v==='review') startReview();
   if(v==='stats') renderInsights();
