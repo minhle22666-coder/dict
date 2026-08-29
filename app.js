@@ -130,10 +130,10 @@ function addXP(n){
   const dailyBefore=getDailyXP(), dailyAfter=dailyBefore+n; setDailyXP(dailyAfter);
   const goal=getDailyGoal();
   if(lvlAfter>lvlBefore){
-    celebrate('./assets/mascot/champion.webp', 'Level '+lvlAfter+'!', 'Total '+after+' XP');
+    celebrate('./mascot-champion.webp', 'Level '+lvlAfter+'!', 'Total '+after+' XP', 'level');
   } else if(dailyBefore<goal && dailyAfter>=goal && localStorage.getItem(GOALHIT_LS)!==todayStr()){
     localStorage.setItem(GOALHIT_LS, todayStr());
-    celebrate('./assets/mascot/good.webp', 'Daily goal reached!', dailyAfter+' / '+goal+' XP');
+    celebrate('./mascot-good.webp', 'Daily goal reached!', dailyAfter+' / '+goal+' XP', 'goal');
   }
   renderHero();
   renderGoalCard();
@@ -172,16 +172,26 @@ function confettiBurst(originEl, count){
     setTimeout(()=>el.remove(),900);
   }
 }
-function celebrate(img, title, sub){
+let _celebrateQueue=[], _celebrating=false;
+function celebrate(img, title, sub, kind){
+  _celebrateQueue.push({img,title,sub,kind:kind||'gold'});
+  if(!_celebrating) processCelebrateQueue();
+}
+function processCelebrateQueue(){
+  if(!_celebrateQueue.length){ _celebrating=false; return; }
+  _celebrating=true;
+  const {img,title,sub,kind}=_celebrateQueue.shift();
   const ov=document.createElement('div'); ov.className='celebrate-ov';
-  ov.innerHTML='<div class="celebrate-card">'+(img?'<img src="'+img+'" alt=""/>':'')+
-    '<div class="celebrate-title">'+esc(title)+'</div>'+(sub?'<div class="celebrate-sub">'+esc(sub)+'</div>':'')+'</div>';
+  ov.innerHTML='<div class="celebrate-card kind-'+kind+'"><div class="celebrate-rays"></div>'
+    +(img?'<img class="celebrate-img" src="'+img+'" alt=""/>':'')
+    +'<div class="celebrate-title">'+esc(title)+'</div>'+(sub?'<div class="celebrate-sub">'+esc(sub)+'</div>':'')
+    +'<div class="celebrate-tap">Tap anywhere to continue</div></div>';
   document.body.appendChild(ov);
-  confettiBurst(null,36);
+  confettiBurst(null,42);
   requestAnimationFrame(()=>ov.classList.add('show'));
-  const dismiss=()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),300); };
-  setTimeout(dismiss,2000);
-  ov.addEventListener('click',dismiss);
+  const dismiss=()=>{ ov.classList.remove('show'); setTimeout(()=>{ov.remove(); processCelebrateQueue();},280); };
+  const t=setTimeout(dismiss,2400);
+  ov.addEventListener('click',()=>{ clearTimeout(t); dismiss(); });
 }
 
 /* ---------- achievements (rendered with real trophy/medal art) ---------- */
@@ -207,7 +217,7 @@ async function checkAchievements(){
     for(const a of ACHIEVEMENTS){ if(!set.has(a.id) && a.test(stats)){ set.add(a.id); newly.push(a); } }
     if(newly.length){
       localStorage.setItem(ACH_LS, JSON.stringify([...set]));
-      newly.forEach((a,i)=>setTimeout(()=>toast('🏅 Unlocked: '+a.title), i*900));
+      newly.forEach(a=>celebrate('./'+a.img+'.webp', a.title, '🏅 Achievement unlocked!', 'gold'));
     }
     return {list:ACHIEVEMENTS, unlocked:set};
   }catch(e){ return {list:ACHIEVEMENTS, unlocked:new Set()}; }
@@ -216,7 +226,7 @@ function renderBadges(list, unlocked){
   let h='<div class="sec"><div class="sec-h"><span class="tile tile-sm amber">🏅</span>Achievements</div><div class="badge-grid">';
   for(const a of list){
     const on=unlocked.has(a.id);
-    h+='<div class="badge-item '+(on?'unlocked':'locked')+'"><img src="./assets/rewards/'+a.img+'.webp" alt=""/><div class="t">'+esc(a.title)+'</div></div>';
+    h+='<div class="badge-item '+(on?'unlocked':'locked')+'"><img src="./'+a.img+'.webp" alt=""/><div class="t">'+esc(a.title)+'</div></div>';
   }
   h+='</div></div>';
   return h;
@@ -461,6 +471,14 @@ function renderEntry(rec, queriedAs){
   h+='<button class="star '+(rec.saved?'on':'')+'" onclick="toggleSave(\''+esc(w)+'\')" aria-label="Save">'+(rec.saved?'★':'☆')+'</button>';
   h+='</div>';
 
+  if(Array.isArray(d.family)&&d.family.length){
+    h+='<div class="family-scroll">';
+    for(const fm of d.family){ const fw=esc(fm.word||''); const c=POS_COLOR[String(fm.pos||'').toLowerCase()]||'blue';
+      h+='<button class="family-chip" style="background:var(--'+c+'-bg);color:var(--'+c+')" onclick="jump(\''+fw.replace(/'/g,"\\'")+'\')">'
+        +'<span class="fc-pos">'+esc((fm.pos||'').slice(0,3))+'</span>'+fw+'</button>'; }
+    h+='</div>';
+  }
+
   if(d.vi_equivalent){
     h+='<div class="feel"><div class="tile primary">≈</div><div><div class="eq">'+esc(d.word||w)+' ≈ <b>'+esc(d.vi_equivalent)+'</b></div>';
     if(d.vi_note) h+='<div class="note">'+esc(d.vi_note)+'</div>';
@@ -533,12 +551,6 @@ function renderEntry(rec, queriedAs){
     h+='</div>';
   }
 
-  if(Array.isArray(d.family)&&d.family.length){
-    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm pink">🌱</span>Word Family</div><div class="chips">';
-    for(const fm of d.family){ const fw=esc(fm.word||''); h+='<button class="chip tap" onclick="jump(\''+fw+'\')">'+fw+(fm.pos?' <span style="color:var(--muted-2)">·'+esc(fm.pos)+'</span>':'')+'</button>'; }
-    h+='</div></div>';
-  }
-
   if((d.synonyms&&d.synonyms.length)||(d.antonyms&&d.antonyms.length)){
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm mint">⇄</span>Synonyms &amp; Antonyms</div><div class="syn-ant">';
     if(d.synonyms&&d.synonyms.length){ h+='<div class="syn-ant-row syn"><div class="lbl">✓ Similar</div><div class="chips">';
@@ -559,27 +571,27 @@ function suggestState(query,guess){
   const label=esc(guess.label), target=guess.target, safeT=target.replace(/'/g,"\\'"), safeQ=query.replace(/'/g,"\\'");
   const kind = guess.type==='expr' ? ' <span style="color:var(--muted-2)">(inside “'+esc(target)+'”)</span>' : '';
   let h='<div class="back-row" onclick="backToHome()">← Home</div>';
-  h+='<div class="empty"><img class="ill" src="./assets/mascot/wonder.webp" alt=""/><h3>We don\'t have “'+esc(query)+'” yet</h3>';
+  h+='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>We don\'t have “'+esc(query)+'” yet</h3>';
   h+='<p>Did you mean <b style="color:var(--text)">“'+label+'”</b>'+kind+'?</p></div>';
   h+='<button class="btn" onclick="jump(\''+safeT+'\')">Show “'+esc(target)+'”</button>';
   h+='<button class="btn ghost sm" style="margin-top:8px" onclick="forceAI(\''+safeQ+'\')">No — look it up as typed</button>';
   return h;
 }
-function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./assets/mascot/think.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can look up new words for you.</p></div>'; }
-function offlineState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./assets/mascot/think.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
+function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can look up new words for you.</p></div>'; }
+function offlineState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
 function errorState(w,msg){
   let m='Something went wrong reaching the AI.';
   if(msg.startsWith('BAD_KEY')) m='Your API key looks wrong or isn\'t enabled. Check it in Settings.';
   else if(msg.startsWith('API')) m='Google returned an error: '+esc(msg.slice(4,120));
   else if(msg==='PARSE') m='The AI reply wasn\'t in the right format. Try again.';
   else if(msg==='OFFLINE') return offlineState(w);
-  return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./assets/mascot/think.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
+  return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
 }
 function questScene(word){
-  return '<div class="quest-scene" style="background-image:url(./assets/backgrounds/desert.webp)">'
+  return '<div class="quest-scene" style="background-image:url(./bg-desert.webp)">'
     +'<div class="quest-caption"><div class="l1">DON\'T GIVE UP…</div><div class="l2">Focci is looking up “'+esc(word)+'” for you</div></div>'
-    +'<img class="tumbleweed" src="./assets/decor/tumbleweed.webp" alt=""/>'
-    +'<img class="fighter" src="./assets/mascot/fighting.webp" alt=""/>'
+    +'<img class="tumbleweed" src="./decor-tumbleweed.webp" alt=""/>'
+    +'<img class="fighter" src="./mascot-fighting.webp" alt=""/>'
     +'</div>';
 }
 
@@ -678,19 +690,24 @@ function renderGoalCard(){
    SAVED
    ============================================================ */
 let savedSort='newest';
+const SORT_CYCLE=['newest','oldest','az'];
+const SORT_LABEL={newest:'Newest',oldest:'Oldest',az:'A–Z'};
+const BOOKMARK_COLORS=['yellow','orange','red','blue','green'];
 async function renderSaved(){
   let all=(await idbAll()).filter(r=>r.saved);
   const box=$('#saved-list');
-  if(!all.length){ box.innerHTML='<div class="empty"><img class="ill" src="./assets/mascot/wonder.webp" alt=""/><h3>No saved words yet</h3><p>Tap the star ☆ on any word to save it here.</p></div>'; return; }
+  $('#saved-count').textContent=all.length+' word'+(all.length===1?'':'s')+' saved';
+  if(!all.length){ box.innerHTML='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>No saved words yet</h3><p>Tap the star ☆ on any word to save it here.</p></div>'; return; }
   if(savedSort==='az') all.sort((a,b)=>a.word.localeCompare(b.word));
   else if(savedSort==='oldest') all.sort((a,b)=>a.savedAt-b.savedAt);
   else all.sort((a,b)=>b.savedAt-a.savedAt);
   let h='';
-  for(const r of all){ const eq=r.data?.vi_equivalent||''; const w=esc(r.word);
-    h+='<div class="row" onclick="jump(\''+w+'\')"><div class="mid"><span class="w">'+w+'</span>'
+  all.forEach((r,i)=>{ const eq=r.data?.vi_equivalent||''; const w=esc(r.word); const bm=BOOKMARK_COLORS[i%BOOKMARK_COLORS.length];
+    h+='<div class="row" onclick="jump(\''+w+'\')"><img class="bookmark-tag" src="./decor-bookmark-'+bm+'.webp" alt=""/>'
+     +'<div class="mid"><span class="w">'+w+'</span>'
      +(eq?'<div class="e">'+esc(eq)+'</div>':'')+'</div>'
      +'<button class="rm" onclick="event.stopPropagation();toggleSave(\''+w+'\')">★</button></div>';
-  }
+  });
   box.innerHTML=h;
 }
 
@@ -708,7 +725,7 @@ function reviewPrompt(d){
 async function startReview(){
   const saved=(await idbAll()).filter(r=>r.saved);
   const area=$('#review-area');
-  if(saved.length<1){ area.innerHTML='<div class="empty"><img class="ill" src="./assets/mascot/think.webp" alt=""/><h3>Nothing to practice yet</h3><p>Save a few words first, then come back here to type them out from memory.</p></div>'; return; }
+  if(saved.length<1){ area.innerHTML='<div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>Nothing to practice yet</h3><p>Save a few words first, then come back here to type them out from memory.</p></div>'; return; }
   revQueue=saved.sort(()=>Math.random()-0.5).slice(0,10); revIdx=0; revState=null;
   revResults=new Array(revQueue.length).fill(null); revCorrectCount=0; revSessionAwarded=false;
   renderReview();
@@ -722,7 +739,7 @@ function renderReview(){
       if(revCorrectCount===revQueue.length) localStorage.setItem(PERFECT_LS,'1');
       checkAchievements();
     }
-    area.innerHTML='<div class="empty"><img class="ill" src="./assets/mascot/champion.webp" alt=""/><h3>Round complete!</h3><p>'+revCorrectCount+' / '+revQueue.length+' correct · +10 XP for finishing. Check Progress for details.</p></div>'
+    area.innerHTML='<div class="empty"><img class="ill" src="./mascot-champion.webp" alt=""/><h3>Round complete!</h3><p>'+revCorrectCount+' / '+revQueue.length+' correct · +10 XP for finishing. Check Progress for details.</p></div>'
       +'<button class="btn" onclick="startReview()">Practice Again</button>';
     confettiBurst(area);
     return;
@@ -736,7 +753,7 @@ function renderReview(){
   }
   h+='</div>';
   h+='<div class="rev-progress">Word '+(revIdx+1)+' / '+revQueue.length+'</div>';
-  h+='<img class="rev-mascot" src="./assets/mascot/think.webp" alt=""/>';
+  h+='<img class="rev-mascot" src="./mascot-think.webp" alt=""/>';
   h+='<div class="rev-card">';
   h+='<div class="prompt">What\'s the English word for…</div>';
   h+='<div class="q">'+esc(prompt)+'</div>';
@@ -846,11 +863,12 @@ async function renderInsights(){
   const area=$('#insights-area');
   const s=await computeInsights();
   if(!s.totalHourEvents){
-    area.innerHTML='<div class="empty"><img class="ill" src="./assets/mascot/wonder.webp" alt=""/><h3>Not enough data yet</h3><p>Search and practice a few more words to see your habits here.</p></div>';
+    area.innerHTML='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Not enough data yet</h3><p>Search and practice a few more words to see your habits here.</p></div>';
     return;
   }
   let h='';
   h+='<div class="hero-compact">';
+  h+='<img class="progress-deco" src="./decor-load-of-book.webp" alt=""/>';
   h+='<div class="streak-n">'+s.streak+'</div><div class="streak-l">day streak</div>';
   if(!s.hasToday && s.streak>0) h+='<div class="streak-warn">No activity yet today — explore a word to keep it going!</div>';
   h+='</div>';
@@ -903,8 +921,9 @@ async function renderHero(){
   const heroEl=$('#hero'); if(!heroEl) return;
   const t=TIME_CONTENT[timeOfDay()];
   const name=getName();
-  heroEl.style.backgroundImage="url('./assets/backgrounds/"+t.bg+".webp')";
-  $('#hero-char').src='./assets/mascot/'+t.char+'.webp';
+  heroEl.style.backgroundImage="url('./bg-"+t.bg+".webp')";
+  $('#hero-char').src='./mascot-'+t.char+'.webp';
+  $('#hero-sky').src = (t.bg==='night') ? './decor-moon.webp' : './decor-shiny-sun.webp';
   $('#hero-greet').textContent=t.greet+(name?', '+name:'')+'!';
 
   const streakEl=$('#hero-streak'), subEl=$('#hero-sub'), levelEl=$('#hero-level');
@@ -1010,10 +1029,12 @@ function wire(){
   clearx.addEventListener('click',()=>{ q.value=''; clearx.style.display='none'; hideSuggest(); backToHome(); });
 
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>showView(t.dataset.view)));
-  document.querySelectorAll('.sort-btn').forEach(b=>b.addEventListener('click',()=>{
-    document.querySelectorAll('.sort-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
-    savedSort=b.dataset.sort; renderSaved();
-  }));
+  $('#sort-cycle').addEventListener('click',()=>{
+    const idx=SORT_CYCLE.indexOf(savedSort);
+    savedSort=SORT_CYCLE[(idx+1)%SORT_CYCLE.length];
+    $('#sort-label').textContent=SORT_LABEL[savedSort];
+    renderSaved();
+  });
   document.querySelectorAll('#theme-seg button').forEach(b=>b.addEventListener('click',()=>{
     localStorage.setItem(THEME_LS, b.dataset.theme); applyTheme(b.dataset.theme);
   }));
