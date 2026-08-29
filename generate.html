@@ -143,6 +143,46 @@
     <div class="hint" style="margin-top:12px">Khi tick ô trên, app sẽ tự quét từ vị trí "Bắt đầu từ số" trở đi, bỏ qua từ đã có, và dừng khi đủ đúng số ở ô "Số từ MỚI cần sinh" — không cần tự tính khoảng còn thiếu. Free tier có giới hạn/ngày → chạy nhiều đợt là bình thường.</div>
   </div>
 
+  <div class="card">
+    <h2>Quét từ dởm</h2>
+    <div class="hint" style="margin-bottom:12px">Quét toàn bộ kho từ đang có trên máy này bằng luật cục bộ — <b>không gọi API, không tốn token, không tốn tiền</b>. Trả về danh sách từ nghi ngờ kém chất lượng để em nạp lại ở mục trên và sinh lại.</div>
+    <div class="grid2">
+      <div class="field"><label for="au-th">Ngưỡng điểm nghi ngờ</label><input id="au-th" type="number" min="1" max="20" value="5"/></div>
+      <div class="field"><label for="au-max">Giới hạn số từ xuất ra</label><input id="au-max" type="number" min="1" value="2000"/></div>
+    </div>
+    <div class="hint" style="margin-bottom:14px">Ngưỡng thấp = quét rộng, ra nhiều từ. Ngưỡng cao = chỉ lấy từ hỏng nặng. Bắt đầu với 5 (≈25% kho từ).</div>
+    <button class="btn ghost" id="audit">Quét kho từ trên máy</button>
+    <div id="au-out" style="display:none;margin-top:14px">
+      <div class="log" id="au-log" style="max-height:260px"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn amber" id="au-dl">Tải suspects.txt</button>
+        <button class="btn ghost" id="au-csv">Tải audit.csv</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Quét bằng AI (nghĩa sai / nghèo)</h2>
+    <div class="hint" style="margin-bottom:12px">Bắt loại lỗi mà quét cục bộ không thấy: dịch <b>sai sắc thái</b> (whimsical → “kỳ quặc”), dịch máy móc, thiếu nghĩa phổ biến. Chỉ gửi lên tên từ + các nghĩa tiếng Việt (~35 token/từ), gộp 40 từ/lượt, và <b>chỉ trả về từ bị lỗi</b> — nên rất rẻ.</div>
+    <div id="ai-state" class="hint" style="margin-bottom:12px"></div>
+    <div class="grid2">
+      <div class="field"><label for="ai-count">Số từ quét lần này</label><input id="ai-count" type="number" min="1" value="500"/></div>
+      <div class="field"><label for="ai-batch">Số từ mỗi lượt gọi</label><input id="ai-batch" type="number" min="10" max="80" value="40"/></div>
+    </div>
+    <div class="hint" style="margin-bottom:14px">Kết quả được <b>lưu lại trên máy</b>. Đóng trang rồi mở lại vẫn nhớ đã quét tới đâu — lần sau bấm tiếp là chạy tiếp phần chưa quét, không quét lại từ đầu. Đo trên chính kho từ của em: quét trọn 7.797 từ = ~266k token vào + ~31k ra ≈ <b>$0.16</b> với gemini-2.5-flash.</div>
+    <button class="btn ghost" id="ai-go">Quét tiếp</button>
+    <div id="ai-out" style="display:none;margin-top:14px">
+      <div class="pct"><span id="ai-pct-l">0%</span><span id="ai-pct-r">0 / 0</span></div>
+      <div class="bar"><i id="ai-bar"></i></div>
+      <div class="log" id="ai-log" style="max-height:260px;margin-top:12px"></div>
+    </div>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn amber" id="ai-dl">Tải ai-suspects.txt</button>
+      <button class="btn ghost" id="ai-csv">Tải ai-audit.csv</button>
+    </div>
+    <button class="btn ghost" id="ai-reset" style="margin-top:10px">Xoá kết quả quét, làm lại từ đầu</button>
+  </div>
+
   <button class="btn" id="go">Bắt đầu sinh từ</button>
   <div class="hint" id="go-msg" style="text-align:center;margin-top:10px"></div>
 
@@ -218,11 +258,16 @@ return `You are a bilingual English→Vietnamese lexicographer building a rich, 
   "word": "corrected/canonical form — fix typos, complete a partial idiom, or normalize slang spelling",
   "query_note": "if you corrected/completed the input, one short Vietnamese phrase like 'Ý bạn là: rain cats and dogs'; else empty string",
   "phonetic": "IPA, e.g. /stɛp/ — omit for multi-word phrases/idioms",
-  "vi_equivalent": "the ONE closest natural Vietnamese word/feeling",
+  "vi_equivalent": "1–3 từ tiếng Việt gần nhất, cách nhau bằng ', '. Nếu tiếng Việt KHÔNG có từ nào thật sự khớp, để chuỗi rỗng \"\" — tuyệt đối không đưa một từ gần đúng cho có.",
   "vi_note": "1 short Vietnamese sentence explaining the core feeling/usage",
+  "vi_feel": "1–2 câu tiếng Việt tả HÌNH ẢNH / TÌNH HUỐNG dùng từ này: người bản xứ nói từ này khi nào, cảnh tượng trông ra sao, cảm giác gì. KHÔNG phải định nghĩa từ điển.",
+  "vi_not": "từ tiếng Việt hay bị dịch nhầm cho từ này + tại sao SAI. Để \"\" nếu không có nhầm lẫn phổ biến.",
+  "register": "trang trọng|trung tính|thân mật|lóng · khen|trung tính|chê",
   "forms": { "v1":"", "v2":"", "v3":"", "ving":"" },
   "senses": [
-    { "pos":"noun|verb|adjective|adverb|idiom|slang|...", "vi":"Vietnamese equivalent for THIS sense",
+    { "pos":"noun|verb|adjective|adverb|idiom|slang|...",
+      "vi":"nghĩa tiếng Việt của RIÊNG nghĩa này, ĐÚNG SẮC THÁI. Nếu từ tiếng Việt gần nhất lệch sắc thái (khen↔chê) thì KHÔNG được dùng nó — chọn cách diễn đạt dài hơn nhưng đúng cảm giác, hoặc để \"\" và mô tả trong \"vi_hint\".",
+      "vi_hint":"chỉ điền khi \"vi\" không tải hết được nghĩa: 1 câu ngắn tiếng Việt tả cảm giác/tình huống của riêng nghĩa này. Ngược lại để \"\".",
       "gloss":"short English meaning", "rank":5,
       "example":"one natural English sentence", "example_vi":"bản dịch tiếng Việt tự nhiên" }
   ],
@@ -251,7 +296,12 @@ return `You are a bilingual English→Vietnamese lexicographer building a rich, 
 INPUT MAY BE MESSY: a typo, a partial/incomplete idiom (e.g. "rain dogs" → "it's raining cats and dogs"), or casual slang spelling. Silently resolve it to the real, common English word/idiom/slang term and put THAT corrected form in "word". Fill "query_note" only when you actually corrected something.
 
 GOAL: extract AS MUCH genuinely common, real-world usage as you know for this word — a learner should almost never need to look elsewhere. Prioritize BREADTH across every category below over padding just one of them:
-- senses: MOST COMMON meaning first. rank = how often you meet it in real life (5=very common … 1=rare). Up to 5 senses. For an idiom/slang entry, pos can be "idiom" or "slang".
+- senses: up to 8. For an idiom/slang entry, pos can be "idiom" or "slang". Four HARD rules:
+  (1) NEVER spend two slots on the same core meaning. Merge near-identical shades into ONE sense (e.g. for "fly": flying with wings, flying a plane, an arrow flying, a flag flying are ALL one "move through the air" sense — do NOT list them separately). Wasting slots on shades of one meaning is the single worst failure here.
+  (2) EVERY part of speech in common use gets at least one sense. A common NOUN meaning must never be dropped just because a verb meaning is more frequent. Concrete/physical-object meanings especially: fly = the zip on trousers; temple = side of the head; palm = inside of the hand; nail = fingernail AND metal nail. Sweep for these before you finish.
+  (3) Include informal, figurative and slang senses a learner actually meets online, even if a formal dictionary ranks them low.
+  (4) SẮC THÁI của từng "vi" quan trọng hơn độ ngắn gọn. Trước khi chốt mỗi "vi", tự hỏi: từ tiếng Việt này khen hay chê? Từ tiếng Anh gốc khen hay chê? Lệch nhau là SAI, phải đổi. Thà viết "vui tươi, giàu tưởng tượng theo kiểu ngộ nghĩnh" (dài mà đúng) còn hơn "kỳ quặc" (ngắn mà sai sắc thái).
+  (5) rank = how often you meet this sense in real life (5 = very common … 1 = rare), exactly as before. Order the array by rank, highest first, so the everyday meaning stays at the top and a rare-but-real meaning like "fly = the zip on trousers" simply sits at the bottom of the list. Rule (2) is about the sense EXISTING at all — it never promotes a rare sense above a common one.
 - collocations: the natural word-partnerships a native speaker reaches for — verb+noun, adjective+noun, adverb+adjective, noun+noun, fixed comparisons, whatever fits this word's part of speech. This is usually the BIGGEST category — up to 10, ranked. Dig for real ones, don't stop at 1–2.
 - phrasal_verbs: ONLY if this word is a verb that genuinely forms phrasal verbs. Up to 6, ranked. Leave the array empty if none exist — never invent one.
 - idioms: genuine fixed idioms/proverbs containing this word. Up to 6, ranked. Leave empty if none exist.
@@ -259,6 +309,14 @@ GOAL: extract AS MUCH genuinely common, real-world usage as you know for this wo
 - synonyms/antonyms: up to 8 synonyms and 5 antonyms, common & genuinely distinguishable — skip rare/literary words.
 - forms: fill only if it's a single-word verb (put "" for the rest). If a past tense/participle genuinely has two accepted spellings (e.g. "burned"/"burnt", "learned"/"learnt", "dreamed"/"dreamt"), put BOTH separated by " / " in that one field. Omit entirely if not a verb or if multi-word.
 - Vietnamese must sound natural, not word-by-word translation.
+- NUANCE IS THE WHOLE POINT. A confident but wrong Vietnamese equivalent is the worst possible output — worse than admitting none exists. If no Vietnamese word carries the feeling, leave "vi_equivalent" empty and carry the meaning in "vi_feel" instead.
+
+WORKED EXAMPLE of the quality bar (for "assertive") — match this DEPTH and this CARE ABOUT CONNOTATION; do not copy the content:
+  "vi_equivalent": "quyết đoán, dám nói thẳng ý mình"
+  "vi_feel": "Cảm giác của người biết rõ mình muốn gì và nói ra thẳng thắn, không vòng vo cũng không lấn át ai. Ví dụ trong cuộc họp, người assertive là người dám nêu ý kiến trái chiều một cách bình tĩnh."
+  "vi_not": "KHÔNG phải 'hung hăng', 'áp đặt' hay 'lấn lướt' — mấy từ đó mang sắc thái chê và ứng với 'aggressive', còn assertive gần như luôn là lời khen."
+  "register": "trung tính · khen"
+  senses[0].vi: "quyết đoán, dám bày tỏ chính kiến"   ← chú ý: KHÔNG rút gọn thành "mạnh mẽ" hay "cứng rắn" cho ngắn
 - Every "text"/"prep" entry must be something a fluent English speaker would actually say — no filler entries just to fill a slot.
 - Return ONLY the JSON object.`;}
 
@@ -397,6 +455,194 @@ async function downloadUsage(){
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 
+/* ============================================================
+   AUDIT — local quality scan, no API calls
+   ============================================================ */
+let AUDIT=[];
+const norm=x=>String(x||'').trim().toLowerCase();
+
+function auditEntry(d){
+  const R=[]; let sc=0;
+  const senses=Array.isArray(d.senses)?d.senses:[];
+  const add=(pts,tag)=>{sc+=pts; R.push(tag);};
+
+  if(!senses.length){ add(6,'0-nghia'); }
+  else {
+    // hit the old 5-sense ceiling → meanings were very likely truncated
+    if(senses.length>=5) add(3,'cham-tran-5');
+    // several slots spent on the same Vietnamese meaning (the "fly" bug)
+    const vis=senses.map(s=>norm(s.vi)).filter(Boolean);
+    const dup=vis.length-new Set(vis).size;
+    if(dup>0) add(Math.min(4,dup*2),'trung-nghia-x'+dup);
+    // first word of each vi identical = same core meaning reworded
+    const heads=senses.map(s=>norm(s.vi).split(/[ ,(]/)[0]).filter(Boolean);
+    const dupH=heads.length-new Set(heads).size;
+    if(dupH>dup) add(2,'cung-goc-nghia');
+    // senses with no example sentence
+    const noEx=senses.filter(s=>!s.example).length;
+    if(noEx) add(Math.min(2,noEx),'thieu-vi-du-x'+noEx);
+    // only one POS covered although family says the word has more
+    const posS=new Set(senses.map(s=>norm(s.pos)).filter(Boolean));
+    const posF=new Set((d.family||[]).map(f=>norm(f.pos)).filter(Boolean));
+    if(posS.size===1&&posF.size>1) add(2,'thieu-tu-loai');
+  }
+
+  if(!String(d.vi_equivalent||'').trim()) add(3,'thieu-vi-equivalent');
+  if(!String(d.vi_note||'').trim()) add(1,'thieu-vi-note');
+  if(!d.vi_feel) add(1,'chua-co-vi-feel');       // new field → old entries all lack it
+  if(!(d.collocations||[]).length) add(2,'0-collocation');
+  if(!(d.synonyms||[]).length) add(1,'0-synonym');
+  if(!String(d.phonetic||'').trim()) add(1,'thieu-phonetic');
+
+  return {score:sc,reasons:R};
+}
+
+async function runAudit(){
+  const th=Math.max(1,+$('#au-th').value||3), cap=Math.max(1,+$('#au-max').value||2000);
+  const L=$('#au-log'); L.innerHTML=''; $('#au-out').style.display='block';
+  const alog=(m,c)=>{const d=document.createElement('div'); if(c)d.className=c; d.textContent=m; L.appendChild(d); L.scrollTop=L.scrollHeight;};
+
+  alog('Đang đọc kho từ trên máy…');
+  const all=await idbAll();
+  if(!all.length){ alog('Kho trống — chưa có từ nào trên trình duyệt này.','warn'); return; }
+
+  const rows=[];
+  for(const rec of all){
+    const d=rec.data||{}; const a=auditEntry(d);
+    rows.push({word:rec.word,score:a.score,senses:(d.senses||[]).length,reasons:a.reasons});
+  }
+  rows.sort((a,b)=>b.score-a.score||a.word.localeCompare(b.word));
+  AUDIT=rows.filter(r=>r.score>=th).slice(0,cap);
+
+  const tally={};
+  for(const r of AUDIT) for(const t of r.reasons) tally[t]=(tally[t]||0)+1;
+
+  alog('Tổng số từ trong kho: '+all.length);
+  alog('Nghi ngờ (điểm ≥ '+th+'): '+AUDIT.length+'  ('+(100*AUDIT.length/all.length).toFixed(1)+'%)','ok');
+  alog('');
+  alog('— Lý do bị gắn cờ —');
+  Object.entries(tally).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>alog('  '+String(v).padStart(5)+'  '+k));
+  alog('');
+  alog('— 25 từ hỏng nặng nhất —');
+  AUDIT.slice(0,25).forEach(r=>alog('  '+String(r.score).padStart(2)+'đ  '+r.word+'  ['+r.reasons.join(', ')+']'));
+}
+
+/* ============================================================
+   AI AUDIT — resumable, stored on device, minimal tokens
+   ============================================================ */
+const AI_LS='sd_ai_audit';
+let aiStop=false, aiRunning=false;
+
+function aiLoad(){ try{ return JSON.parse(localStorage.getItem(AI_LS)||'{}'); }catch(_){ return {}; } }
+function aiSave(m){ try{ localStorage.setItem(AI_LS,JSON.stringify(m)); }catch(e){ log('⚠ không lưu được kết quả quét: '+e.message,'warn'); } }
+
+/* one compact line per word — this IS the token budget, keep it tight */
+function aiLine(rec){
+  const d=rec.data||{};
+  const subs=(d.senses||[]).map(s=>String(s.vi||'').trim()).filter(Boolean).join('; ');
+  return rec.word+' | '+(d.vi_equivalent||'∅')+' | '+(subs||'∅');
+}
+
+function aiPrompt(lines){
+  return `Bạn là chuyên gia từ vựng Anh–Việt. Dưới đây là các mục trong một từ điển Anh–Việt.
+Mỗi dòng: TỪ TIẾNG ANH | nghĩa tiếng Việt chính | các nghĩa con.
+
+Chỉ ra những mục có bản dịch tiếng Việt KÉM, theo 4 lỗi sau:
+- sai sắc thái (vd: "whimsical" dịch là "kỳ quặc" — sai, vì kỳ quặc mang nghĩa chê, còn whimsical là lời khen)
+- dịch máy móc word-by-word, người Việt đọc không hình dung được
+- thiếu hẳn một nghĩa phổ biến mà từ đó chắc chắn có
+- nghĩa quá chung chung/nghèo, không phân biệt được với từ khác
+
+Mục nào ỔN thì BỎ QUA hoàn toàn, đừng nhắc tới.
+Chỉ trả JSON, không giải thích gì thêm:
+{"bad":[{"w":"từ","r":"lý do tối đa 8 chữ"}]}
+Nếu tất cả đều ổn: {"bad":[]}
+
+${lines.join('\n')}`;
+}
+
+async function aiCall(lines,attempt){
+  const key=$('#key').value.trim(), model=$('#model').value.trim()||'gemini-2.5-flash';
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const body={contents:[{parts:[{text:aiPrompt(lines)}]}],
+    generationConfig:{temperature:0.1,responseMimeType:"application/json",thinkingConfig:{thinkingBudget:0}}};
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(res.status===429||res.status>=500){
+    if(attempt<4){ const wait=800*Math.pow(2,attempt); await sleep(wait); return aiCall(lines,attempt+1); }
+    throw new Error('rate/limit');
+  }
+  if(!res.ok){ let m=res.status; try{const e=await res.json();m=(e.error&&e.error.message)||m;}catch(_){} throw new Error(String(m).slice(0,80)); }
+  const data=await res.json(); const u=data.usageMetadata||{};
+  let t=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
+  t=t.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  return {obj:JSON.parse(t), tin:u.promptTokenCount||0, tout:(u.candidatesTokenCount||0)+(u.thoughtsTokenCount||0)};
+}
+
+async function aiRefreshState(){
+  const m=aiLoad(); const all=await idbAll();
+  const done=all.filter(r=>m[r.word]).length;
+  const bad=Object.values(m).filter(v=>v&&v.r).length;
+  $('#ai-state').innerHTML='Đã quét <b style="color:var(--text)">'+done+'</b> / '+all.length+' từ · '
+    +'gắn cờ <b style="color:var(--amber)">'+bad+'</b> từ · còn lại <b style="color:var(--text)">'+(all.length-done)+'</b>.';
+  return {all,m,done};
+}
+
+async function aiRun(){
+  if(aiRunning) return; 
+  if(!$('#key').value.trim()){ alert('Dán Gemini API key ở mục 1 trước đã.'); return; }
+  aiRunning=true; aiStop=false;
+  const L=$('#ai-log'); L.innerHTML=''; $('#ai-out').style.display='block';
+  const alog=(m,c)=>{const d=document.createElement('div'); if(c)d.className=c; d.textContent=m; L.appendChild(d); L.scrollTop=L.scrollHeight; while(L.children.length>150)L.removeChild(L.firstChild);};
+
+  const {all,m}=await aiRefreshState();
+  const todo=all.filter(r=>!m[r.word]).slice(0,Math.max(1,+$('#ai-count').value||500));
+  if(!todo.length){ alog('Đã quét hết kho từ rồi — không còn từ nào chưa quét.','ok'); aiRunning=false; $('#ai-go').textContent='Quét tiếp'; return; }
+
+  const B=Math.max(10,Math.min(80,+$('#ai-batch').value||40));
+  const batches=[]; for(let i=0;i<todo.length;i+=B) batches.push(todo.slice(i,i+B));
+  alog('Quét '+todo.length+' từ trong '+batches.length+' lượt gọi (mỗi lượt '+B+' từ).');
+
+  let n=0,flagged=0,tin=0,tout=0;
+  $('#ai-go').textContent='Dừng quét';
+  for(const b of batches){
+    if(aiStop){ alog('■ đã dừng theo yêu cầu.','warn'); break; }
+    try{
+      const r=await aiCall(b.map(aiLine),0);
+      tin+=r.tin; tout+=r.tout;
+      const bad=new Map((r.obj.bad||[]).map(x=>[String(x.w||'').trim().toLowerCase(),String(x.r||'kém').slice(0,40)]));
+      for(const rec of b){
+        const hit=bad.get(rec.word.toLowerCase());
+        m[rec.word]= hit ? {r:hit} : {r:''};
+        if(hit){ flagged++; alog('⚑ '+rec.word+' — '+hit,'warn'); }
+      }
+      aiSave(m);
+    }catch(e){
+      alog('✕ lượt lỗi: '+(e.message||e)+' (sẽ quét lại lần sau)','bad');
+    }
+    n+=b.length;
+    const pct=Math.round(n/todo.length*100);
+    $('#ai-bar').style.width=pct+'%'; $('#ai-pct-l').textContent=pct+'%'; $('#ai-pct-r').textContent=n+' / '+todo.length;
+    await sleep(Math.max(0,+$('#delay').value||0));
+  }
+  const [ri,ro]=rateFor($('#model').value.trim()||'gemini-2.5-flash');
+  alog('');
+  alog('Xong lượt này: '+n+' từ, gắn cờ '+flagged+'. Token: '+tin+' vào / '+tout+' ra ≈ $'+((tin/1e6*ri+tout/1e6*ro).toFixed(4)),'ok');
+  await aiRefreshState();
+  aiRunning=false; $('#ai-go').textContent='Quét tiếp';
+}
+
+function aiFlaggedRows(){
+  const m=aiLoad();
+  return Object.entries(m).filter(([w,v])=>v&&v.r).map(([w,v])=>({word:w,reason:v.r}))
+    .sort((a,b)=>a.word.localeCompare(b.word));
+}
+
+function dlBlob(text,name,mime){
+  const b=new Blob([text],{type:mime}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
 /* ---------- wire ---------- */
 $('#key').value=localStorage.getItem(KEY_LS)||'';
 $('#model').value=localStorage.getItem(MODEL_LS)||'gemini-2.5-flash-lite';
@@ -421,6 +667,39 @@ $('#pause').addEventListener('click',()=>{ paused=!paused; $('#pause').textConte
 $('#stop').addEventListener('click',()=>{ stopped=true; paused=false; log('■ đã yêu cầu dừng…','warn'); });
 $('#download').addEventListener('click',download);
 $('#usage').addEventListener('click',downloadUsage);
+$('#audit').addEventListener('click',()=>{ runAudit().catch(e=>{ $('#au-out').style.display='block'; $('#au-log').textContent='Lỗi khi quét: '+(e&&e.message||e); }); });
+$('#au-dl').addEventListener('click',()=>{
+  if(!AUDIT.length) return;
+  dlBlob(AUDIT.map(r=>r.word).join('\n')+'\n','suspects.txt','text/plain');
+});
+$('#ai-go').addEventListener('click',()=>{
+  if(aiRunning){ aiStop=true; $('#ai-go').textContent='Đang dừng…'; return; }
+  aiRun().catch(e=>{ aiRunning=false; $('#ai-go').textContent='Quét tiếp'; $('#ai-out').style.display='block'; $('#ai-log').textContent='Lỗi: '+(e&&e.message||e); });
+});
+$('#ai-dl').addEventListener('click',()=>{
+  const rows=aiFlaggedRows();
+  if(!rows.length){ alert('Chưa có từ nào bị gắn cờ.'); return; }
+  dlBlob(rows.map(r=>r.word).join('\n')+'\n','ai-suspects.txt','text/plain');
+});
+$('#ai-csv').addEventListener('click',()=>{
+  const rows=aiFlaggedRows();
+  if(!rows.length){ alert('Chưa có từ nào bị gắn cờ.'); return; }
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  dlBlob(['word,reason'].concat(rows.map(r=>[q(r.word),q(r.reason)].join(','))).join('\n'),'ai-audit.csv','text/csv');
+});
+$('#ai-reset').addEventListener('click',()=>{
+  if(!confirm('Xoá toàn bộ kết quả quét AI? Lần sau sẽ phải quét lại từ đầu và tốn token lại.')) return;
+  localStorage.removeItem(AI_LS); aiRefreshState(); $('#ai-out').style.display='none';
+});
+aiRefreshState().catch(()=>{});
+
+$('#au-csv').addEventListener('click',()=>{
+  if(!AUDIT.length) return;
+  const esc2=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const csv=['word,score,senses,reasons'].concat(
+    AUDIT.map(r=>[esc2(r.word),r.score,r.senses,esc2(r.reasons.join(' '))].join(','))).join('\n');
+  dlBlob(csv,'audit.csv','text/csv');
+});
 $('#retry').addEventListener('click',()=>{ if(failedWords.length) run([...failedWords]); });
 
 $('#source').addEventListener('change',()=>{

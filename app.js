@@ -410,12 +410,8 @@ async function search(rawWord, forceAI){
   if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
 
   box.innerHTML=questScene(word);
-  const questStart=now();
   try{
     const data=await askGemini(word);
-    // keep the desert scene on screen long enough to actually be seen/enjoyed
-    const elapsed=now()-questStart;
-    if(elapsed<2600) await new Promise(r=>setTimeout(r,2600-elapsed));
     const canon=norm(data.word||word);
     const rec={word:canon, data, source:'ai', firstSeen:now(), saved:0, savedAt:0};
     await idbPut(rec);
@@ -454,7 +450,7 @@ function dots(rank){ const n=Math.max(0,Math.min(5,rank|0)); let o=''; for(let i
 const POS_COLOR={noun:'blue',verb:'mint',adjective:'amber',adverb:'pink',preposition:'primary',
   conjunction:'blue',pronoun:'blue',interjection:'coral',article:'blue',idiom:'coral',slang:'pink'};
 function posChip(p){ if(!p) return ''; const c=POS_COLOR[String(p).toLowerCase()]||'blue';
-  return '<span class="pos-chip" style="background:var(--'+c+'-bg);color:var(--'+c+')">'+esc(p)+'</span>'; }
+  return '<span class="pos-chip tile-sm '+c+'" style="background:var(--'+c+'-bg);color:var(--'+c+')">'+esc(p)+'</span>'; }
 
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
@@ -483,9 +479,15 @@ function renderEntry(rec, queriedAs){
     h+='</div>';
   }
 
-  if(d.vi_equivalent){
-    h+='<div class="feel"><div class="tile primary">≈</div><div><div class="eq">'+esc(d.word||w)+' ≈ <b>'+esc(d.vi_equivalent)+'</b></div>';
+  if(d.vi_equivalent||d.vi_feel||d.vi_not){
+    h+='<div class="feel"><div class="tile primary">≈</div><div>';
+    h+='<div class="eq">'+esc(d.word||w)+' ≈ <b>'
+      +(d.vi_equivalent?esc(d.vi_equivalent):'<i style="font-weight:600;opacity:.75">không có từ tiếng Việt tương đương</i>')+'</b>';
+    if(d.register) h+='<span class="reg">'+esc(d.register)+'</span>';
+    h+='</div>';
     if(d.vi_note) h+='<div class="note">'+esc(d.vi_note)+'</div>';
+    if(d.vi_feel) h+='<div class="note feel-img">'+esc(d.vi_feel)+'</div>';
+    if(d.vi_not)  h+='<div class="note vi-not">⚠︎ '+esc(d.vi_not)+'</div>';
     h+='</div></div>';
   }
 
@@ -498,17 +500,37 @@ function renderEntry(rec, queriedAs){
   }
 
   if(Array.isArray(d.senses)&&d.senses.length){
-    const ss=[...d.senses].sort((a,b)=>(b.rank||0)-(a.rank||0));
-    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm primary">📘</span>Meanings</div>';
-    ss.forEach((s,i)=>{
-      h+='<div class="sense"><div class="sense-top"><span class="senseno">'+(i+1)+'</span>';
-      if(s.pos) h+=posChip(s.pos);
-      h+='<span class="rank">'+dots(s.rank)+'</span></div>';
-      if(s.vi) h+='<div class="vi">'+esc(s.vi)+'</div>';
-      if(s.gloss) h+='<div class="gloss">'+esc(s.gloss)+'</div>';
-      if(s.example){ h+='<div class="ex">“'+esc(s.example)+'”'; if(s.example_vi) h+='<span class="evi">→ '+esc(s.example_vi)+'</span>'; h+='</div>'; }
-      h+='</div>';
+    // group every sense under its part of speech, so all verb meanings sit
+    // together, all noun meanings together, etc. — instead of one flat list.
+    const groups=new Map();
+    for(const s of d.senses){
+      const key=String(s.pos||'other').toLowerCase();
+      if(!groups.has(key)) groups.set(key,[]);
+      groups.get(key).push(s);
+    }
+    // group order: the part of speech holding the strongest meaning comes first
+    const order=[...groups.entries()].sort((a,b)=>{
+      const ma=Math.max(...a[1].map(x=>x.rank||0)), mb=Math.max(...b[1].map(x=>x.rank||0));
+      return mb-ma || b[1].length-a[1].length;
     });
+    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm primary">📘</span>Meanings</div>';
+    for(const [pos,list] of order){
+      list.sort((a,b)=>(b.rank||0)-(a.rank||0));
+      const c=POS_COLOR[pos]||'blue';
+      h+='<div class="pos-group" style="border-left-color:var(--'+c+')">';
+      h+='<div class="pos-group-h">'+posChip(pos)
+        +'<span class="pos-count">'+list.length+(list.length>1?' nghĩa':' nghĩa')+'</span></div>';
+      list.forEach((s,i)=>{
+        h+='<div class="sense"><div class="sense-top"><span class="senseno">'+(i+1)+'</span>';
+        h+='<span class="rank">'+dots(s.rank)+'</span></div>';
+        if(s.vi) h+='<div class="vi">'+esc(s.vi)+'</div>';
+        if(s.vi_hint) h+='<div class="vi-hint">'+esc(s.vi_hint)+'</div>';
+        if(s.gloss) h+='<div class="gloss">'+esc(s.gloss)+'</div>';
+        if(s.example){ h+='<div class="ex">“'+esc(s.example)+'”'; if(s.example_vi) h+='<span class="evi">→ '+esc(s.example_vi)+'</span>'; h+='</div>'; }
+        h+='</div>';
+      });
+      h+='</div>';
+    }
     h+='</div>';
   }
 
@@ -573,18 +595,15 @@ function jump(w){ $('#q').value=w; search(w); window.scrollTo({top:0,behavior:'s
 /* ---------- empty / error / loading states ---------- */
 function suggestState(query,guess){
   const label=esc(guess.label), target=guess.target, safeT=target.replace(/'/g,"\\'"), safeQ=query.replace(/'/g,"\\'");
-  const kind = guess.type==='expr' ? ' <span style="opacity:.7">(inside “'+esc(target)+'”)</span>' : '';
+  const kind = guess.type==='expr' ? ' <span style="color:var(--muted-2)">(inside “'+esc(target)+'”)</span>' : '';
   let h='<div class="back-row" onclick="backToHome()">← Home</div>';
-  h+='<div class="ask-ai-card" onclick="forceAI(\''+safeQ+'\')">'
-    +'<img src="./mascot-map.webp" alt=""/>'
-    +'<div class="ask-ai-txt"><div class="ask-ai-t">Ask Focci to explore “'+esc(query)+'”</div>'
-    +'<div class="ask-ai-s">Focci will look it up with AI and save it forever</div></div>'
-    +'<div class="ask-ai-go">→</div></div>';
-  h+='<div class="near-miss"><div class="near-miss-h">Or did you mean…</div>'
-    +'<div class="near-miss-row" onclick="jump(\''+safeT+'\')"><span class="nm-w">'+label+'</span>'+kind+'<span class="nm-go">→</span></div></div>';
+  h+='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>We don\'t have “'+esc(query)+'” yet</h3>';
+  h+='<p>Did you mean <b style="color:var(--text)">“'+label+'”</b>'+kind+'?</p></div>';
+  h+='<button class="btn" onclick="jump(\''+safeT+'\')">Show “'+esc(target)+'”</button>';
+  h+='<button class="btn ghost sm" style="margin-top:8px" onclick="forceAI(\''+safeQ+'\')">No — look it up as typed</button>';
   return h;
 }
-function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can explore new words for you.</p></div><button class="btn" onclick="showView(\'settings\')">Open Settings</button>'; }
+function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can look up new words for you.</p></div>'; }
 function offlineState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
 function errorState(w,msg){
   let m='Something went wrong reaching the AI.';
@@ -1080,25 +1099,9 @@ function wire(){
   });
 }
 
-/* ---------- service worker + auto-update ----------
-   When a new version is deployed, the new service worker installs in the
-   background. Instead of leaving the user on a stale version until they
-   manually clear things, we detect the new worker taking over and reload
-   once, automatically. */
+/* ---------- service worker ---------- */
 if('serviceWorker' in navigator){
-  let reloadedForUpdate=false;
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(reloadedForUpdate) return;
-    reloadedForUpdate=true;
-    window.location.reload();
-  });
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js').then(reg=>{
-      // actively check for a new version on every launch
-      reg.update().catch(()=>{});
-      setInterval(()=>reg.update().catch(()=>{}), 60*60*1000);
-    }).catch(()=>{});
-  });
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
 
 /* ---------- seed sync (auto-merges files listed in seed-files.txt) ---------- */
@@ -1154,4 +1157,3 @@ function wireOnboarding(){
 })();
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;
 window.startReview=startReview; window.checkReview=checkReview; window.skipReview=skipReview; window.nextReview=nextReview;
-window.showView=showView;
