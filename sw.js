@@ -1,6 +1,6 @@
 /* Smart.Dict service worker — offline app shell.
    Bump CACHE version whenever you change any file below, to force an update. */
-const CACHE = 'smartdict-v8';
+const CACHE = 'smartdict-v9';
 const SHELL = [
   './',
   './index.html',
