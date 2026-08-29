@@ -5,3 +5,4 @@
 # nạp từ mới ở lần mở kế tiếp, không cần vào Cài đặt import tay.
 # Dòng bắt đầu bằng # bị bỏ qua.
 seed.json
+seed-7000.json
