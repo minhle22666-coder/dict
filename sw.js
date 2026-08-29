@@ -1,6 +1,11 @@
-/* Smart.Dict service worker — offline app shell.
-   Bump CACHE version whenever you change any file below, to force an update. */
-const CACHE = 'smartdict-v9';
+/* Focci service worker — offline app shell.
+   Bump CACHE version whenever you change ANY file, to force an update.
+   Only small, essential files are precached on install (so a typo in one
+   of the many illustration paths can never break the whole install) —
+   every image is cached automatically the first time it's fetched
+   successfully, which happens naturally the first time you open the
+   app online. */
+const CACHE = 'focci-v1';
 const SHELL = [
   './',
   './index.html',
@@ -8,9 +13,9 @@ const SHELL = [
   './manifest.json',
   './seed.json',
   './seed-files.txt',
-  './icon-180.png',
-  './icon-192.png',
-  './icon-512.png'
+  './assets/icon-180.png',
+  './assets/icon-192.png',
+  './assets/icon-512.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -36,9 +41,12 @@ self.addEventListener('fetch', (e) => {
     caches.match(req).then((hit) => {
       if (hit) return hit;
       return fetch(req).then((res) => {
-        // cache new same-origin GETs (e.g. after an update)
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        // cache new same-origin GETs (this is how the illustration
+        // library becomes available offline after first successful load)
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
         return res;
       }).catch(() =>
         // offline navigation → fall back to the app shell

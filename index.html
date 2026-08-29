@@ -1,44 +1,56 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-<title>Smart.Dict</title>
+<title>Focci — Explore English</title>
 
-<!-- PWA / iOS home-screen -->
 <link rel="manifest" href="./manifest.json" />
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F5F4FC" />
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#15141F" />
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#FFF8F0" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1B1712" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="Smart.Dict" />
-<link rel="apple-touch-icon" href="./icon-180.png" />
+<meta name="apple-mobile-web-app-title" content="Focci" />
+<link rel="apple-touch-icon" href="./assets/icon-180.png" />
 
 <style>
   :root{
-    --bg:#F5F4FC; --surface:#FFFFFF; --surface-2:#F1EFFB;
-    --text:#221E3B; --muted:#6E6B8C; --muted-2:#A6A2C4; --line:#E7E3F8;
-    --primary:#6C5CE7; --primary-2:#4F8EF7; --primary-bg:#EDEAFC;
-    --amber:#F0A020; --amber-bg:#FDEEDA;
-    --mint:#22B57F; --mint-bg:#DFF7EC;
-    --coral:#FF5C7A; --coral-bg:#FFE4EA;
-    --pink:#FF6FA5; --pink-bg:#FFE6F0;
-    --r:20px; --r-sm:14px;
+    --bg:#FFF8F0; --surface:#FFFFFF; --surface-2:#FBF1E4;
+    --text:#3A2A1A; --muted:#8A7860; --muted-2:#C4B6A2; --line:#F0E2CE;
+    --primary:#FF7A33; --primary-2:#FFB238; --primary-bg:#FFEADA;
+    --mint:#3FAE6A; --mint-bg:#E1F5E9;
+    --amber:#F0A93C; --amber-bg:#FDF0DA;
+    --coral:#EF5B4E; --coral-bg:#FCE4E1;
+    --blue:#4FA3E3; --blue-bg:#E6F2FC;
+    --pink:#FF6FA0; --pink-bg:#FFE6EF;
+    --r:22px; --r-sm:14px;
     --safe-b:env(safe-area-inset-bottom,0px);
-    --shadow:0 8px 22px rgba(108,92,231,.10);
+    --shadow:0 8px 22px rgba(58,42,26,.08);
   }
   @media(prefers-color-scheme:dark){
-    :root{
-      --bg:#15141F; --surface:#1E1D2C; --surface-2:#262536;
-      --text:#EDEBF7; --muted:#9C99B8; --muted-2:#635F7D; --line:#322F45;
-      --primary:#8B7CFA; --primary-2:#6FA8FF; --primary-bg:rgba(139,124,250,.16);
-      --amber:#F0B45B; --amber-bg:rgba(240,180,91,.16);
-      --mint:#3FD9A4; --mint-bg:rgba(63,217,164,.14);
-      --coral:#F0776A; --coral-bg:rgba(240,119,106,.14);
-      --pink:#FF8FBB; --pink-bg:rgba(255,143,187,.14);
-      --shadow:0 8px 22px rgba(0,0,0,.35);
+    :root:not([data-theme="light"]){
+      --bg:#1B1712; --surface:#26201A; --surface-2:#302821;
+      --text:#F5ECDF; --muted:#B3A38C; --muted-2:#6B5D4A; --line:#3A3025;
+      --primary:#FF8F4D; --primary-2:#FFC168; --primary-bg:rgba(255,143,77,.16);
+      --mint:#4FC97C; --mint-bg:rgba(79,201,124,.14);
+      --amber:#F5BE5E; --amber-bg:rgba(245,190,94,.16);
+      --coral:#F27D71; --coral-bg:rgba(242,125,113,.14);
+      --blue:#6FB4EE; --blue-bg:rgba(111,180,238,.14);
+      --pink:#FF8FB8; --pink-bg:rgba(255,143,184,.14);
+      --shadow:0 8px 22px rgba(0,0,0,.4);
     }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1B1712; --surface:#26201A; --surface-2:#302821;
+    --text:#F5ECDF; --muted:#B3A38C; --muted-2:#6B5D4A; --line:#3A3025;
+    --primary:#FF8F4D; --primary-2:#FFC168; --primary-bg:rgba(255,143,77,.16);
+    --mint:#4FC97C; --mint-bg:rgba(79,201,124,.14);
+    --amber:#F5BE5E; --amber-bg:rgba(245,190,94,.16);
+    --coral:#F27D71; --coral-bg:rgba(242,125,113,.14);
+    --blue:#6FB4EE; --blue-bg:rgba(111,180,238,.14);
+    --pink:#FF8FB8; --pink-bg:rgba(255,143,184,.14);
+    --shadow:0 8px 22px rgba(0,0,0,.4);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
@@ -46,71 +58,59 @@
     background:var(--bg); color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
     font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
-    padding-bottom:calc(78px + var(--safe-b));
+    padding-bottom:calc(80px + var(--safe-b));
     overscroll-behavior-y:none;
   }
   button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:none}
-  input{font-family:inherit}
+  input,textarea{font-family:inherit}
+  img{display:block}
 
-  /* ---- colored icon tiles (reused everywhere: sections, stats, insights) ---- */
+  /* ---- onboarding ---- */
+  .onboarding{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;padding:30px;text-align:center}
+  .onboarding img{width:180px;margin-bottom:6px}
+  .onboarding h1{font-size:24px;font-weight:800;margin:6px 0 4px}
+  .onboarding p{color:var(--muted);font-size:14.5px;max-width:280px;margin:0 0 22px;line-height:1.5}
+  .onboarding input{width:100%;max-width:300px;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:14px 16px;font-size:16px;text-align:center;color:var(--text);outline:none;margin-bottom:14px}
+  .onboarding input:focus{border-color:var(--primary)}
+  .onboarding .btn{max-width:300px}
+
+  /* ---- tiles ---- */
   .tile{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
   .tile-sm{width:24px;height:24px;border-radius:8px;font-size:12px}
-  .tile.violet{background:var(--primary-bg);color:var(--primary)}
-  .tile.blue{background:var(--primary-bg);color:var(--primary-2)}
+  .tile.violet,.tile.primary{background:var(--primary-bg);color:var(--primary)}
   .tile.mint{background:var(--mint-bg);color:var(--mint)}
   .tile.amber{background:var(--amber-bg);color:var(--amber)}
   .tile.coral{background:var(--coral-bg);color:var(--coral)}
+  .tile.blue{background:var(--blue-bg);color:var(--blue)}
   .tile.pink{background:var(--pink-bg);color:var(--pink)}
 
-  /* ---- gradient hero (greeting on Search tab; streak on Thống kê) ---- */
-  .hero{background:linear-gradient(135deg,var(--primary),var(--primary-2));border-radius:24px;
-    padding:22px 20px;color:#fff;position:relative;overflow:hidden;box-shadow:0 12px 28px rgba(108,92,231,.28)}
-  .hero::before{content:'';position:absolute;width:170px;height:170px;border-radius:50%;background:rgba(255,255,255,.13);top:-70px;right:-50px}
-  .hero::after{content:'';position:absolute;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.08);bottom:-50px;left:-30px}
-  .hero-top{display:flex;gap:14px;align-items:center;position:relative;z-index:1}
-  .hero-mascot{width:52px;height:52px;flex:none}
-  .hero-greet{font-size:18px;font-weight:800}
-  .hero-sub{font-size:13.5px;opacity:.92;margin-top:3px;line-height:1.45}
-  .hero-streak{display:none;align-items:center;gap:6px;background:rgba(255,255,255,.2);
-    padding:6px 12px;border-radius:99px;font-size:12.5px;font-weight:700}
-  .hero-chips{display:flex;gap:8px;margin-top:14px;position:relative;z-index:1;flex-wrap:wrap}
-  .hero-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);
-    padding:6px 12px;border-radius:99px;font-size:12.5px;font-weight:700;position:relative;z-index:1}
-  .hero-goal{margin-top:12px;position:relative;z-index:1}
-  .hero-goal-top{font-size:12px;font-weight:700;opacity:.95;margin-bottom:6px}
-  .hero-goal-track{height:8px;background:rgba(255,255,255,.25);border-radius:99px;overflow:hidden}
-  .hero-goal-fill{height:100%;background:#fff;border-radius:99px;transition:width .5s ease}
-  .hero-tip{color:var(--muted);font-size:13px;text-align:center;margin:14px 4px 0;line-height:1.6}
-  .hero-compact{text-align:center;padding:26px 20px;margin-bottom:16px}
-  .hero-compact .streak-n{font-size:42px;font-weight:800;line-height:1;position:relative;z-index:1}
-  .hero-compact .streak-l{opacity:.9;font-size:13px;margin-top:4px;font-weight:600;position:relative;z-index:1}
-  .hero-compact .streak-warn{margin-top:10px;background:rgba(255,255,255,.2);border-radius:99px;padding:6px 12px;
-    font-size:12px;display:inline-block;position:relative;z-index:1}
-
-  /* ---- Top bar ---- */
-  .topbar{
-    position:sticky; top:0; z-index:20; background:var(--surface);
-    padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 14px; border-bottom:1px solid var(--line);
-  }
-  .brand{display:flex;align-items:center;gap:9px;margin-bottom:12px}
-  .brand img{width:26px;height:26px;border-radius:7px;flex:none}
-  .brand h1{font-size:18px;font-weight:800;letter-spacing:-.01em;margin:0}
-  .brand .dot{color:var(--primary)}
-  .searchrow{display:flex;gap:8px}
-  .searchbox{
-    flex:1;display:flex;align-items:center;gap:9px;background:var(--surface-2);
-    border:1px solid var(--line);border-radius:var(--r-sm);padding:0 12px;
-  }
+  /* ---- top bar (sticky) ---- */
+  .topbar{position:sticky;top:0;z-index:40;background:var(--surface);
+    padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 12px;border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .brand img{width:26px;height:26px;border-radius:7px}
+  .brand h1{font-size:17px;font-weight:800;margin:0;letter-spacing:-.01em}
+  .searchwrap{position:relative}
+  .searchbox{display:flex;align-items:center;gap:9px;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:0 12px}
   .searchbox:focus-within{border-color:var(--primary)}
   .searchbox svg{flex:none;width:18px;height:18px;stroke:var(--muted)}
-  .searchbox input{
-    flex:1;background:none;border:none;outline:none;color:var(--text);
-    font-size:17px;padding:12px 0;min-width:0;
-  }
+  .searchbox input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:16px;padding:12px 0;min-width:0}
   .searchbox input::placeholder{color:var(--muted-2)}
   .clearx{color:var(--muted);font-size:18px;padding:4px;display:none}
+  .suggest-drop{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--r-sm);box-shadow:var(--shadow);max-height:340px;
+    overflow-y:auto;display:none;z-index:50}
+  .suggest-drop.show{display:block}
+  .suggest-lbl{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);padding:10px 14px 4px}
+  .suggest-item{display:flex;align-items:center;gap:10px;padding:11px 14px;font-size:15px}
+  .suggest-item:active{background:var(--surface-2)}
+  .suggest-item .w{font-weight:700}
+  .suggest-item .e{color:var(--muted);font-size:13px;margin-left:auto;text-align:right;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .suggest-item svg{width:15px;height:15px;stroke:var(--muted-2);flex:none}
 
-  /* ---- generic ---- */
   main{padding:16px}
   .view{display:none}
   .view.active{display:block}
@@ -118,29 +118,88 @@
   .spinner{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;margin:26px auto}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  .empty{text-align:center;color:var(--muted);padding:44px 20px}
+  .empty{text-align:center;color:var(--muted);padding:40px 20px}
+  .empty img.ill{width:150px;margin:0 auto 12px}
   .empty .big{width:64px;height:64px;border-radius:20px;background:var(--primary-bg);display:flex;
     align-items:center;justify-content:center;font-size:30px;margin:0 auto 14px}
   .empty h3{color:var(--text);font-size:17px;margin:0 0 6px;font-weight:800}
   .empty p{margin:0;font-size:14px;line-height:1.6}
 
-  /* ---- Entry card ---- */
+  /* ---- hero (dashboard greeting) ---- */
+  .hero{position:relative;border-radius:var(--r);overflow:hidden;height:230px;margin-bottom:14px;
+    box-shadow:var(--shadow);background-size:cover;background-position:center}
+  .hero-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,.38) 100%)}
+  .hero-text{position:absolute;left:16px;top:16px;right:16px;color:#fff;z-index:2}
+  .hero-greet{font-size:19px;font-weight:800;text-shadow:0 2px 6px rgba(0,0,0,.25)}
+  .hero-sub{font-size:13px;opacity:.95;margin-top:4px;max-width:70%;line-height:1.4;text-shadow:0 1px 4px rgba(0,0,0,.25)}
+  .hero-char{position:absolute;right:6px;bottom:0;height:88%;z-index:1;filter:drop-shadow(0 8px 10px rgba(0,0,0,.18))}
+  .hero-chips{position:absolute;left:16px;bottom:14px;display:flex;gap:8px;z-index:2}
+  .hero-chip{background:rgba(255,255,255,.85);color:var(--text);font-size:12px;font-weight:800;
+    padding:5px 11px;border-radius:99px;display:flex;align-items:center;gap:5px}
+
+  /* ---- jar widget ---- */
+  .jar-card{display:flex;align-items:center;gap:14px;background:var(--surface);border-radius:var(--r);
+    padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .jar-svg{width:56px;height:64px;flex:none}
+  .jar-info{flex:1}
+  .jar-title{font-size:13.5px;font-weight:800}
+  .jar-sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .jar-tap{font-size:11px;color:var(--primary);font-weight:700;margin-top:3px}
+  .jar-card.shaking .jar-svg{animation:jarshake .5s ease}
+  @keyframes jarshake{0%,100%{transform:rotate(0)}20%{transform:rotate(-8deg)}40%{transform:rotate(7deg)}60%{transform:rotate(-5deg)}80%{transform:rotate(4deg)}}
+
+  /* ---- stat grid / chart ---- */
+  .stat-grid{display:flex;gap:9px;margin-bottom:14px}
+  .stat{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:var(--surface);
+    border-radius:var(--r-sm);padding:12px;box-shadow:var(--shadow)}
+  .stat .n{font-size:18px;font-weight:800}
+  .stat .l{font-size:10px;color:var(--muted-2);letter-spacing:.02em;font-weight:700;line-height:1.3}
+  .bars{display:flex;gap:8px;align-items:flex-end;height:90px;background:var(--surface);border-radius:var(--r-sm);
+    padding:12px;box-shadow:var(--shadow);margin-bottom:16px}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px}
+  .bar-track{width:100%;flex:1;display:flex;align-items:flex-end}
+  .bar-fill{width:100%;background:linear-gradient(180deg,var(--primary-2),var(--primary));border-radius:5px 5px 2px 2px;min-height:4px}
+  .bar-lbl{font-size:9.5px;color:var(--muted-2);font-weight:700}
+
+  .sec{margin-top:20px}
+  .sec-h{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  .sec-h .more{margin-left:auto;font-size:11px;color:var(--primary);text-transform:none;letter-spacing:0}
+
+  /* ---- history / saved rows ---- */
+  .row{display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:var(--r-sm);
+    padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
+  .row:active{background:var(--surface-2)}
+  .row .w{font-weight:700;font-size:15.5px}
+  .row .phon{color:var(--muted-2);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .row .mid{flex:1;min-width:0}
+  .row .e{color:var(--muted);font-size:13px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .rm{color:var(--amber);font-size:19px;padding:2px 4px;flex:none}
+  .grp-h{font-size:12.5px;font-weight:800;color:var(--primary);margin:16px 0 8px;letter-spacing:.02em;text-transform:uppercase}
+  .grp-h:first-child{margin-top:2px}
+  .sort-row{display:flex;gap:8px;margin-bottom:14px}
+  .sort-btn{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:9px;
+    font-size:12.5px;font-weight:700;color:var(--muted);text-align:center}
+  .sort-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+  /* ---- entry (word detail) card ---- */
   .entry{animation:rise .22s ease;background:var(--surface);border-radius:var(--r);padding:18px 18px 6px;box-shadow:var(--shadow)}
   @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
-  .headword{font-size:30px;font-weight:800;letter-spacing:-.01em;line-height:1.15}
+  .back-row{display:flex;align-items:center;gap:6px;color:var(--primary);font-weight:700;font-size:14px;margin-bottom:12px}
+  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
+  .headword{font-size:29px;font-weight:800;letter-spacing:-.01em;line-height:1.15}
   .phon{color:var(--muted);font-size:14px;margin-top:3px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   .star{font-size:26px;line-height:1;padding:6px;color:var(--muted-2);flex:none}
   .star.on{color:var(--amber);animation:pop .35s ease}
   @keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.4)}100%{transform:scale(1)}}
+  .pos-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+  .pos-chip{font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px;text-transform:lowercase}
   .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.03em;
     text-transform:uppercase;padding:3px 8px;border-radius:99px;margin-top:8px}
   .badge.off{background:var(--mint-bg);color:var(--mint)}
   .badge.ai{background:var(--primary-bg);color:var(--primary)}
-  .corrected{font-size:12.5px;color:var(--amber);background:var(--amber-bg);
-    border-radius:9px;padding:8px 12px;margin-bottom:12px}
+  .corrected{font-size:12.5px;color:var(--amber);background:var(--amber-bg);border-radius:9px;padding:8px 12px;margin-bottom:12px}
 
-  /* ---- "feel" callout ---- */
   .feel{display:flex;gap:12px;align-items:flex-start;background:var(--primary-bg);border-radius:var(--r-sm);padding:14px 16px;margin:14px 0}
   .feel .eq{font-size:17px;font-weight:700;letter-spacing:-.01em}
   .feel .eq b{color:var(--primary)}
@@ -149,16 +208,12 @@
   .forms{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
   .form{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:7px 11px;flex:1;min-width:78px;text-align:center}
   .form .k{font-size:10px;color:var(--muted-2);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-  .form .v{font-size:15px;font-weight:600;margin-top:2px}
+  .form .v{font-size:14px;font-weight:600;margin-top:2px;line-height:1.35}
 
-  .sec{margin-top:22px}
-  .sec-h{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
-
-  .sense{padding:2px 0 2px 0;margin-bottom:15px}
+  .sense{margin-bottom:15px}
   .sense-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   .senseno{width:20px;height:20px;border-radius:7px;background:var(--surface-2);color:var(--muted);
     font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
-  .pos{font-size:11px;font-weight:700;color:var(--mint);background:var(--mint-bg);padding:2px 7px;border-radius:6px}
   .rank{color:var(--amber);font-size:12px;letter-spacing:1px}
   .rank .off{color:var(--muted-2)}
   .sense .vi{font-size:17px;font-weight:700;margin:6px 0 2px}
@@ -182,19 +237,14 @@
   .chips{display:flex;flex-wrap:wrap;gap:7px}
   .chip{background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:14px}
   .chip.tap:active{background:var(--line)}
-  .chip.ant{color:var(--coral);border-color:var(--coral)}
+  .syn-ant{display:flex;flex-direction:column;gap:10px}
+  .syn-ant-row .lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .syn-ant-row.syn .lbl{color:var(--mint)}
+  .syn-ant-row.ant .lbl{color:var(--coral)}
+  .chip.syn{background:var(--mint-bg);color:var(--mint);border-color:transparent;font-weight:600}
+  .chip.ant{background:var(--coral-bg);color:var(--coral);border-color:transparent;font-weight:600}
 
-  /* ---- Saved / history ---- */
-  .grp-h{font-size:13px;font-weight:700;color:var(--primary);margin:20px 0 8px;letter-spacing:.02em}
-  .grp-h:first-child{margin-top:4px}
-  .row{display:flex;align-items:center;gap:12px;background:var(--surface);
-    border-radius:var(--r-sm);padding:13px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
-  .row:active{background:var(--surface-2)}
-  .row .w{font-weight:700;font-size:16px}
-  .row .e{color:var(--muted);font-size:14px;margin-left:auto;text-align:right;flex:none;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .row .rm{color:var(--amber);font-size:20px;padding:2px 4px;flex:none}
-
-  /* ---- Review (typing) ---- */
+  /* ---- practice (review) ---- */
   .rev-dots{display:flex;gap:5px;margin-bottom:10px}
   .rev-dot{flex:1;height:7px;border-radius:4px;background:var(--surface-2)}
   .rev-dot.done{background:var(--mint)}
@@ -202,15 +252,16 @@
   .rev-dot.current{background:var(--primary);animation:pulse-dot 1.1s ease-in-out infinite}
   @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.45}}
   .rev-progress{color:var(--muted);font-size:13px;text-align:center;margin-bottom:12px;font-weight:600}
-  .rev-card{background:var(--surface);border-radius:var(--r);padding:26px 20px;text-align:center;margin-top:8px;box-shadow:var(--shadow)}
+  .rev-mascot{width:110px;margin:0 auto 8px;display:block}
+  .rev-card{background:var(--surface);border-radius:var(--r);padding:22px 20px 26px;text-align:center;box-shadow:var(--shadow)}
   .rev-card .prompt{color:var(--muted-2);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;font-weight:700}
-  .rev-card .q{font-size:23px;font-weight:800;letter-spacing:-.01em}
+  .rev-card .q{font-size:22px;font-weight:800;letter-spacing:-.01em}
   .rev-card .q-note{color:var(--muted);font-size:13.5px;margin-top:8px;line-height:1.5}
   .type-input{width:100%;margin-top:18px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
     padding:13px 14px;font-size:17px;text-align:center;color:var(--text);outline:none}
   .type-input:focus{border-color:var(--primary)}
-  .type-input.shake{animation:shake .35s}
-  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+  .type-input.shake{animation:inputshake .35s}
+  @keyframes inputshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
   .rev-fb{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);text-align:left;font-size:15px;font-weight:600}
   .rev-fb.fb-correct{color:var(--mint)}
   .rev-fb.fb-close{color:var(--amber)}
@@ -228,58 +279,74 @@
   .btn-row{display:flex;gap:9px}
   .btn-row .btn{margin-top:0}
 
-  /* ---- Thống kê ---- */
-  .stat-grid{display:flex;gap:9px;margin-bottom:20px}
-  .stat{flex:1;display:flex;align-items:center;gap:10px;background:var(--surface);
-    border-radius:var(--r-sm);padding:12px;box-shadow:var(--shadow)}
-  .stat .n{font-size:19px;font-weight:800}
-  .stat .l{font-size:10.5px;color:var(--muted-2);letter-spacing:.02em;margin-top:1px;font-weight:700;line-height:1.3}
-  .bars{display:flex;gap:8px;align-items:flex-end;height:100px;background:var(--surface);border-radius:var(--r-sm);padding:12px;box-shadow:var(--shadow)}
-  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px}
-  .bar-track{width:100%;flex:1;display:flex;align-items:flex-end}
-  .bar-fill{width:100%;background:linear-gradient(180deg,var(--primary-2),var(--primary));border-radius:5px 5px 2px 2px;min-height:4px}
-  .bar-lbl{font-size:10px;color:var(--muted-2);font-weight:700}
-  .ins-card{display:flex;gap:12px;align-items:flex-start;background:var(--surface);
-    border-radius:var(--r-sm);padding:14px 15px;margin-bottom:10px;box-shadow:var(--shadow)}
+  /* ---- progress / achievements ---- */
+  .hero-compact{position:relative;border-radius:var(--r);overflow:hidden;padding:24px 20px;text-align:center;
+    margin-bottom:14px;color:#fff;background:linear-gradient(135deg,var(--primary),var(--primary-2));box-shadow:var(--shadow)}
+  .hero-compact::before{content:'';position:absolute;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.14);top:-60px;right:-40px}
+  .streak-n{font-size:40px;font-weight:800;line-height:1;position:relative;z-index:1}
+  .streak-l{opacity:.92;font-size:13px;margin-top:4px;font-weight:600;position:relative;z-index:1}
+  .streak-warn{margin-top:10px;background:rgba(255,255,255,.2);border-radius:99px;padding:6px 12px;font-size:12px;display:inline-block;position:relative;z-index:1}
+  .ins-card{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border-radius:var(--r-sm);
+    padding:14px 15px;margin-bottom:10px;box-shadow:var(--shadow)}
   .ins-title{font-weight:700;font-size:14.5px}
   .ins-body{color:var(--muted);font-size:13.5px;margin-top:2px;line-height:1.5}
-
-  /* ---- Huy hiệu ---- */
   .badge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .badge-item{background:var(--surface);border-radius:var(--r-sm);padding:14px 6px;text-align:center;box-shadow:var(--shadow)}
-  .badge-item .ico{width:44px;height:44px;border-radius:14px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:21px}
-  .badge-item.locked .ico{background:var(--surface-2);color:var(--muted-2)}
-  .badge-item.unlocked .ico{background:var(--amber-bg);color:var(--amber)}
+  .badge-item{background:var(--surface);border-radius:var(--r-sm);padding:12px 6px 10px;text-align:center;box-shadow:var(--shadow)}
+  .badge-item img{width:52px;height:52px;object-fit:contain;margin:0 auto 6px}
+  .badge-item.locked img{filter:grayscale(1) opacity(.35)}
   .badge-item .t{font-size:10.5px;font-weight:700;color:var(--text);line-height:1.3}
   .badge-item.locked .t{color:var(--muted-2)}
 
-  /* ---- confetti + celebration ---- */
-  .confetti-piece{position:fixed;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:999;
-    animation:confetti-fly .85s ease-out forwards}
-  @keyframes confetti-fly{to{transform:translate(var(--dx),var(--dy)) rotate(360deg);opacity:0}}
-  .celebrate-ov{position:fixed;inset:0;background:rgba(20,18,30,.4);display:flex;align-items:center;justify-content:center;
-    z-index:998;opacity:0;transition:opacity .25s;pointer-events:none}
-  .celebrate-ov.show{opacity:1;pointer-events:auto}
-  .celebrate-card{background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;border-radius:24px;
-    padding:28px 34px;text-align:center;transform:scale(.85);transition:transform .25s;box-shadow:0 20px 50px rgba(0,0,0,.35);max-width:80vw}
-  .celebrate-ov.show .celebrate-card{transform:scale(1)}
-  .celebrate-title{font-size:22px;font-weight:800}
-  .celebrate-sub{font-size:14px;opacity:.9;margin-top:6px}
-
-  /* ---- Settings ---- */
+  /* ---- settings ---- */
   .field{margin-bottom:18px}
   .field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:7px}
-  .field input[type=text],.field input[type=password]{
+  .field input[type=text],.field input[type=password],.field input[type=number],.field textarea{
     width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
-    color:var(--text);padding:13px 14px;font-size:15px;outline:none}
-  .field input:focus{border-color:var(--primary)}
+    color:var(--text);padding:13px 14px;font-size:15px;outline:none;font-family:inherit}
+  .field textarea{min-height:90px;resize:vertical;line-height:1.5}
+  .field input:focus,.field textarea:focus{border-color:var(--primary)}
   .field .hint{font-size:12px;color:var(--muted-2);margin-top:6px;line-height:1.5}
   .saved-flash{color:var(--mint);font-size:13px;text-align:center;height:16px;font-weight:600}
+  .seg{display:flex;background:var(--surface-2);border-radius:99px;padding:4px;gap:4px}
+  .seg button{flex:1;padding:9px;border-radius:99px;font-size:13px;font-weight:700;color:var(--muted)}
+  .seg button.active{background:var(--surface);color:var(--primary);box-shadow:var(--shadow)}
+  .gen-progress{font-size:13px;color:var(--muted);margin-top:10px;text-align:center}
 
-  /* ---- Bottom tab bar ---- */
+  /* ---- desert AI-lookup scene ---- */
+  .quest-scene{position:relative;border-radius:var(--r);overflow:hidden;height:280px;background-size:cover;
+    background-position:center;box-shadow:var(--shadow);display:flex;align-items:flex-end;justify-content:center}
+  .quest-scene .tumbleweed{position:absolute;bottom:36px;width:52px;left:-60px;animation:tumble 3.2s linear infinite}
+  @keyframes tumble{to{left:110%;transform:rotate(720deg)}}
+  .quest-scene .fighter{position:relative;height:78%;z-index:1;filter:drop-shadow(0 8px 10px rgba(0,0,0,.2))}
+  .quest-caption{position:absolute;top:16px;left:16px;right:16px;text-align:center;z-index:2}
+  .quest-caption .l1{font-weight:800;color:#fff;font-size:15px;text-shadow:0 2px 6px rgba(0,0,0,.35);letter-spacing:.02em}
+  .quest-caption .l2{color:#fff;font-size:13px;margin-top:4px;text-shadow:0 2px 6px rgba(0,0,0,.35);opacity:.95}
+
+  /* ---- confetti + celebration (reused across app) ---- */
+  .confetti-piece{position:fixed;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:999;animation:confetti-fly .85s ease-out forwards}
+  @keyframes confetti-fly{to{transform:translate(var(--dx),var(--dy)) rotate(360deg);opacity:0}}
+  .celebrate-ov{position:fixed;inset:0;background:rgba(30,20,10,.42);display:flex;align-items:center;justify-content:center;
+    z-index:998;opacity:0;transition:opacity .25s;pointer-events:none}
+  .celebrate-ov.show{opacity:1;pointer-events:auto}
+  .celebrate-card{background:var(--surface);color:var(--text);border-radius:24px;padding:26px 30px;text-align:center;
+    transform:scale(.85);transition:transform .25s;box-shadow:0 20px 50px rgba(0,0,0,.35);max-width:82vw}
+  .celebrate-ov.show .celebrate-card{transform:scale(1)}
+  .celebrate-card img{width:100px;margin:0 auto 10px}
+  .celebrate-title{font-size:20px;font-weight:800}
+  .celebrate-sub{font-size:13.5px;color:var(--muted);margin-top:6px}
+  .jar-reveal{position:fixed;inset:0;background:rgba(30,20,10,.42);display:flex;align-items:center;justify-content:center;
+    z-index:998;opacity:0;transition:opacity .25s;pointer-events:none}
+  .jar-reveal.show{opacity:1;pointer-events:auto}
+  .jar-reveal-card{background:var(--surface);border-radius:24px;padding:26px 32px;text-align:center;transform:scale(.85);
+    transition:transform .25s;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .jar-reveal.show .jar-reveal-card{transform:scale(1)}
+  .jar-reveal-n{font-size:38px;font-weight:800;color:var(--primary)}
+  .jar-reveal-l{font-size:13px;color:var(--muted);margin-top:4px}
+
+  /* ---- bottom tab bar ---- */
   .tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;
     background:var(--surface);border-top:1px solid var(--line);padding-bottom:var(--safe-b)}
-  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 7px;color:var(--muted-2);font-size:10px;font-weight:600}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 7px;color:var(--muted-2);font-size:10px;font-weight:700}
   .tab-ico{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center}
   .tab svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.9}
   .tab.active{color:var(--primary)}
@@ -293,132 +360,194 @@
 </head>
 <body>
 
+<!-- ONBOARDING (first run only) -->
+<div class="onboarding" id="onboarding" style="display:none">
+  <img src="./assets/mascot/avatar.webp" alt="" />
+  <h1>Welcome to Focci!</h1>
+  <p>Focci is a fox explorer on a mission to conquer new lands of English vocabulary — one word a day. Let's go together.</p>
+  <input id="ob-name" type="text" placeholder="What should Focci call you?" autocapitalize="words" autocomplete="off" />
+  <button class="btn" id="ob-start">Let's start exploring!</button>
+</div>
+
+<!-- STICKY SEARCH HEADER -->
 <div class="topbar">
-  <div class="brand">
-    <img src="./icon-192.png" alt="" />
-    <h1>Smart<span class="dot">.</span>Dict</h1>
-  </div>
-  <div class="searchrow">
+  <div class="brand"><img src="./assets/icon-192.png" alt="" /><h1>Focci</h1></div>
+  <div class="searchwrap">
     <div class="searchbox">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="q" type="search" inputmode="search" autocapitalize="none" autocorrect="off" spellcheck="false"
-             enterkeyhint="search" placeholder="Tra một từ tiếng Anh…" />
-      <button class="clearx" id="clearx" aria-label="Xoá">✕</button>
+             enterkeyhint="search" placeholder="Search a word…" />
+      <button class="clearx" id="clearx" aria-label="Clear">✕</button>
     </div>
+    <div class="suggest-drop" id="suggest"></div>
   </div>
 </div>
 
 <main>
-  <!-- SEARCH -->
-  <section class="view active" id="v-search">
+  <!-- HOME -->
+  <section class="view active" id="v-home">
     <div id="result"></div>
-    <div id="search-empty">
+    <div id="dashboard">
       <div class="hero" id="hero">
-        <div class="hero-top">
-          <div class="hero-mascot">
-            <svg viewBox="0 0 64 64" width="100%" height="100%">
-              <defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset="1" stop-color="#ffffff" stop-opacity=".75"/></linearGradient></defs>
-              <path d="M32 15 C25 9 13 9 7 13 V45 C13 41 25 41 32 47 C39 41 51 41 57 45 V13 C51 9 39 9 32 15 Z" fill="url(#mg)"/>
-              <path d="M32 15 V47" stroke="rgba(108,92,231,.35)" stroke-width="2"/>
-              <circle cx="23" cy="26" r="3" fill="#4B3FBF"/>
-              <circle cx="41" cy="26" r="3" fill="#4B3FBF"/>
-              <path d="M24 34 Q32 40 40 34" stroke="#4B3FBF" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-              <rect x="26" y="1" width="14" height="5" rx="2.5" fill="#F0A020" transform="rotate(-18 33 3)"/>
-            </svg>
-          </div>
-          <div>
-            <div class="hero-greet" id="hero-greet">Chào em 👋</div>
-            <div class="hero-sub" id="hero-sub">Bắt đầu ngày mới với vài từ tiếng Anh nhé.</div>
-          </div>
+        <div class="hero-scrim"></div>
+        <img class="hero-char" id="hero-char" src="./assets/mascot/avatar.webp" alt="" />
+        <div class="hero-text">
+          <div class="hero-greet" id="hero-greet">Good morning!</div>
+          <div class="hero-sub" id="hero-sub">Ready to discover new words today?</div>
         </div>
         <div class="hero-chips">
-          <span class="hero-chip" id="hero-streak"></span>
-          <span class="hero-chip" id="hero-level">⚡ Cấp 1</span>
-        </div>
-        <div class="hero-goal">
-          <div class="hero-goal-top" id="hero-goal-lbl">🎯 0/20 XP hôm nay</div>
-          <div class="hero-goal-track"><div class="hero-goal-fill" id="hero-goal-bar" style="width:0%"></div></div>
+          <span class="hero-chip" id="hero-streak" style="display:none"></span>
+          <span class="hero-chip" id="hero-level">⚡ Level 1</span>
         </div>
       </div>
-      <p class="hero-tip">Từ có sẵn trong máy hiện tức thì. Từ lạ sẽ nhờ AI tra rồi lưu lại để lần sau offline.</p>
+
+      <div class="jar-card" id="jar-card">
+        <svg class="jar-svg" id="jar-svg" viewBox="0 0 60 68">
+          <defs><clipPath id="jarClip"><path d="M14 20 h32 v34 a16 16 0 0 1 -32 0 Z"/></clipPath></defs>
+          <path d="M14 20 h32 v34 a16 16 0 0 1 -32 0 Z" fill="var(--surface-2)" stroke="var(--line)" stroke-width="2"/>
+          <rect id="jar-fill" x="14" y="54" width="32" height="0" fill="var(--primary)" clip-path="url(#jarClip)"/>
+          <rect x="20" y="10" width="20" height="10" rx="3" fill="var(--muted-2)"/>
+        </svg>
+        <div class="jar-info">
+          <div class="jar-title" id="jar-title">0 words today</div>
+          <div class="jar-sub">Every word you explore fills the jar.</div>
+          <div class="jar-tap">✨ Tap to reveal your total!</div>
+        </div>
+      </div>
+
+      <div class="jar-card" id="goal-card">
+        <img src="./assets/decor/goal.webp" alt="" style="width:44px;height:44px;object-fit:contain;flex:none"/>
+        <div class="jar-info">
+          <div class="jar-title" id="goal-title">0 / 20 XP today</div>
+          <div style="height:7px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-top:6px">
+            <div id="goal-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--primary),var(--primary-2));border-radius:99px;transition:width .4s"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat"><div class="tile primary">📖</div><div class="n" id="d-total">0</div><div class="l">WORDS LEARNED</div></div>
+        <div class="stat"><div class="tile mint">📊</div><div class="n" id="d-avg">0</div><div class="l">DAILY AVERAGE</div></div>
+        <div class="stat"><div class="tile blue">⏱️</div><div class="n" id="d-time">0m</div><div class="l">TIME STUDIED</div></div>
+      </div>
+
+      <div class="sec-h">This Week</div>
+      <div class="bars" id="week-bars"></div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="tile tile-sm primary">🕘</span>Recent Searches</div>
+        <div id="history-list"></div>
+      </div>
     </div>
   </section>
 
   <!-- SAVED -->
   <section class="view" id="v-saved">
+    <div class="sort-row">
+      <button class="sort-btn active" data-sort="newest">Newest</button>
+      <button class="sort-btn" data-sort="oldest">Oldest</button>
+      <button class="sort-btn" data-sort="az">A–Z</button>
+    </div>
     <div id="saved-list"></div>
   </section>
 
-  <!-- REVIEW -->
+  <!-- PRACTICE (review) -->
   <section class="view" id="v-review">
     <div id="review-area"></div>
   </section>
 
-  <!-- INSIGHTS -->
-  <section class="view" id="v-insights">
+  <!-- PROGRESS -->
+  <section class="view" id="v-stats">
     <div id="insights-area"></div>
   </section>
 
   <!-- SETTINGS -->
   <section class="view" id="v-settings">
     <div class="stat-grid">
-      <div class="stat"><div class="tile violet">📖</div><div><div class="n" id="st-total">0</div><div class="l">từ trong máy</div></div></div>
-      <div class="stat"><div class="tile amber">⭐</div><div><div class="n" id="st-saved">0</div><div class="l">đã lưu</div></div></div>
+      <div class="stat"><div class="tile primary">📖</div><div class="n" id="st-total">0</div><div class="l">WORDS IN LIBRARY</div></div>
+      <div class="stat"><div class="tile amber">⭐</div><div class="n" id="st-saved">0</div><div class="l">SAVED</div></div>
     </div>
-
-    <div class="field">
-      <label for="key">Gemini API key</label>
-      <input id="key" type="password" placeholder="AIza… (dán vào đây)" autocapitalize="none" autocorrect="off" spellcheck="false"/>
-      <div class="hint">Lưu <b>chỉ trên máy này</b>, không gửi đi đâu ngoài Google khi tra từ. Lấy key free tại aistudio.google.com → Get API key.</div>
-    </div>
-    <div class="field">
-      <label for="model">Model</label>
-      <input id="model" type="text" placeholder="gemini-2.5-flash-lite" autocapitalize="none" autocorrect="off" spellcheck="false"/>
-      <div class="hint">Đổi được khi model cũ bị khai tử (vd 2.5-flash retire 16/10/2026 → đổi sang gemini-3-flash hoặc bản mới).</div>
-    </div>
-    <div class="field">
-      <label for="goal">Mục tiêu XP mỗi ngày</label>
-      <input id="goal" type="number" min="5" step="5" placeholder="20"/>
-      <div class="hint">Tra 1 từ +2 XP, lưu +1 XP, ôn đúng +2–3 XP, xong 1 lượt ôn +10 XP. Đạt mục tiêu ngày sẽ có màn ăn mừng 🎉.</div>
-    </div>
-    <button class="btn" id="save-settings">Lưu cài đặt</button>
-    <div class="saved-flash" id="settings-flash"></div>
 
     <div class="sec">
-      <div class="sec-h"><span class="tile tile-sm violet">⬇︎</span>Nạp bộ từ điển (seed)</div>
-      <div class="hint" style="margin-bottom:10px">Sau này khi em generate bộ ~5000 từ bằng Gemini, xuất ra JSON rồi nạp ở đây — không cần deploy lại app.</div>
+      <div class="sec-h"><span class="tile tile-sm blue">🎨</span>Appearance</div>
+      <div class="seg" id="theme-seg">
+        <button data-theme="auto" class="active">Auto</button>
+        <button data-theme="light">Light</button>
+        <button data-theme="dark">Dark</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span class="tile tile-sm primary">🔌</span>AI Connection</div>
+      <div class="field">
+        <label for="key">Gemini API key</label>
+        <input id="key" type="password" placeholder="AIza…" autocapitalize="none" autocorrect="off" spellcheck="false"/>
+        <div class="hint">Stored <b>only on this device</b>, never sent anywhere except Google when Focci looks up a word. Get a free key at aistudio.google.com → Get API key.</div>
+      </div>
+      <div class="field">
+        <label for="model">Model</label>
+        <input id="model" type="text" placeholder="gemini-2.5-flash-lite" autocapitalize="none" autocorrect="off" spellcheck="false"/>
+      </div>
+      <button class="btn" id="save-settings">Save Settings</button>
+      <div class="saved-flash" id="settings-flash"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span class="tile tile-sm mint">🎯</span>Daily Goal</div>
+      <div class="field">
+        <label for="goal">XP goal per day</label>
+        <input id="goal" type="number" min="5" step="5" placeholder="20"/>
+        <div class="hint">Searching +2 XP, saving +1 XP, correct answers +2–3 XP, finishing a practice round +10 XP.</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span class="tile tile-sm coral">➕</span>Add Vocabulary</div>
+      <div class="hint" style="margin-bottom:10px">Paste a list of words (one per line, or comma-separated) or upload a .txt file — Focci will look each one up with AI and save it to your library. For big batches (hundreds+), use the separate generator tool instead.</div>
+      <textarea id="gen-text" placeholder="e.g. resilient, mitigate, plausible…"></textarea>
+      <input id="gen-file" type="file" accept=".txt,text/plain" style="display:none"/>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn ghost sm" id="gen-upload-btn">Upload .txt</button>
+        <button class="btn sm" id="gen-run-btn" style="margin-top:0">Generate</button>
+      </div>
+      <div class="gen-progress" id="gen-progress"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span class="tile tile-sm blue">⬇︎</span>Import Seed Data</div>
+      <div class="hint" style="margin-bottom:10px">Load a seed.json file exported from the generator tool.</div>
       <input id="import-file" type="file" accept="application/json,.json" style="display:none"/>
-      <button class="btn ghost sm" id="import-btn">Chọn file JSON để nạp</button>
+      <button class="btn ghost sm" id="import-btn">Choose JSON file</button>
     </div>
 
     <div class="sec">
-      <div class="sec-h"><span class="tile tile-sm coral">🔒</span>Dữ liệu &amp; quyền riêng tư</div>
-      <div class="hint" style="margin-bottom:10px">Tab Thống kê chỉ đọc lại hoạt động đã lưu trên máy em (không gửi đi đâu). Muốn xoá lịch sử đó (giữ nguyên từ đã lưu) thì bấm nút dưới.</div>
-      <button class="btn ghost sm" id="clear-log-btn">Xoá lịch sử hoạt động</button>
+      <div class="sec-h"><span class="tile tile-sm coral">🔒</span>Data &amp; Privacy</div>
+      <div class="hint" style="margin-bottom:10px">Everything lives on this device only. Clear your activity log (keeps saved words) if you'd like a fresh start for stats.</div>
+      <button class="btn ghost sm" id="clear-log-btn">Clear Activity Log</button>
       <div class="saved-flash" id="clearlog-flash" style="margin-top:8px"></div>
     </div>
 
     <div class="sec">
-      <div class="sec-h"><span class="tile tile-sm mint">⚙︎</span>Khác</div>
-      <button class="btn ghost sm" id="persist-btn">Xin iOS giữ dữ liệu (không tự xoá)</button>
+      <div class="sec-h"><span class="tile tile-sm mint">⚙︎</span>Other</div>
+      <button class="btn ghost sm" id="persist-btn">Ask iOS to keep app data</button>
       <div class="saved-flash" id="persist-flash" style="margin-top:8px"></div>
     </div>
-    <p class="status" style="margin-top:26px">Smart.Dict · chạy 100% trên máy em</p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device</p>
   </section>
 </main>
 
 <!-- Bottom nav -->
 <nav class="tabs">
-  <button class="tab active" data-view="search">
-    <span class="tab-ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>Tra từ</button>
+  <button class="tab active" data-view="home">
+    <span class="tab-ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>Home</button>
   <button class="tab" data-view="saved">
-    <span class="tab-ico"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg></span>Đã lưu</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg></span>Saved</button>
   <button class="tab" data-view="review">
-    <span class="tab-ico"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>Ôn tập</button>
-  <button class="tab" data-view="insights">
-    <span class="tab-ico"><svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-6"/></svg></span>Thống kê</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>Practice</button>
+  <button class="tab" data-view="stats">
+    <span class="tab-ico"><svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-6"/></svg></span>Progress</button>
   <button class="tab" data-view="settings">
-    <span class="tab-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3.9a7 7 0 0 0-1.7-1L14.5 2h-5l-.4 2.5a7 7 0 0 0-1.7 1l-2.3-.9-2 3.4L3.1 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 1.7 1l.4 2.5h5l.4-2.5a7 7 0 0 0 1.7-1l2.3.9 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span>Cài đặt</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3.9a7 7 0 0 0-1.7-1L14.5 2h-5l-.4 2.5a7 7 0 0 0-1.7 1l-2.3-.9-2 3.4L3.1 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 1.7 1l.4 2.5h5l.4-2.5a7 7 0 0 0 1.7-1l2.3.9 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span>Settings</button>
 </nav>
 
 <div class="toast" id="toast"></div>
