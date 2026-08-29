@@ -270,17 +270,22 @@ function wireJar(){
    GEMINI PROMPT (kept in sync with generate.html)
    ============================================================ */
 function buildPrompt(word){
-  return `You are a bilingual English→Vietnamese lexicographer building a rich, practical dictionary entry. For the English word or phrase "${word}", return a single JSON object (no markdown, no commentary) with EXACTLY this shape:
+return `You are a bilingual English→Vietnamese lexicographer building a rich, practical dictionary entry. For the English word or phrase "${word}", return a single JSON object (no markdown, no commentary) with EXACTLY this shape:
 
 {
   "word": "corrected/canonical form — fix typos, complete a partial idiom, or normalize slang spelling",
   "query_note": "if you corrected/completed the input, one short Vietnamese phrase like 'Ý bạn là: rain cats and dogs'; else empty string",
   "phonetic": "IPA, e.g. /stɛp/ — omit for multi-word phrases/idioms",
-  "vi_equivalent": "the ONE closest natural Vietnamese word/feeling",
+  "vi_equivalent": "1–3 từ tiếng Việt gần nhất, cách nhau bằng ', '. Nếu tiếng Việt KHÔNG có từ nào thật sự khớp, để chuỗi rỗng \"\" — tuyệt đối không đưa một từ gần đúng cho có.",
   "vi_note": "1 short Vietnamese sentence explaining the core feeling/usage",
+  "vi_feel": "1–2 câu tiếng Việt tả HÌNH ẢNH / TÌNH HUỐNG dùng từ này: người bản xứ nói từ này khi nào, cảnh tượng trông ra sao, cảm giác gì. KHÔNG phải định nghĩa từ điển.",
+  "vi_not": "từ tiếng Việt hay bị dịch nhầm cho từ này + tại sao SAI. Để \"\" nếu không có nhầm lẫn phổ biến.",
+  "register": "trang trọng|trung tính|thân mật|lóng · khen|trung tính|chê",
   "forms": { "v1":"", "v2":"", "v3":"", "ving":"" },
   "senses": [
-    { "pos":"noun|verb|adjective|adverb|idiom|slang|...", "vi":"Vietnamese equivalent for THIS sense",
+    { "pos":"noun|verb|adjective|adverb|idiom|slang|...",
+      "vi":"nghĩa tiếng Việt của RIÊNG nghĩa này, ĐÚNG SẮC THÁI. Nếu từ tiếng Việt gần nhất lệch sắc thái (khen↔chê) thì KHÔNG được dùng nó — chọn cách diễn đạt dài hơn nhưng đúng cảm giác, hoặc để \"\" và mô tả trong \"vi_hint\".",
+      "vi_hint":"chỉ điền khi \"vi\" không tải hết được nghĩa: 1 câu ngắn tiếng Việt tả cảm giác/tình huống của riêng nghĩa này. Ngược lại để \"\".",
       "gloss":"short English meaning", "rank":5,
       "example":"one natural English sentence", "example_vi":"bản dịch tiếng Việt tự nhiên" }
   ],
@@ -309,17 +314,29 @@ function buildPrompt(word){
 INPUT MAY BE MESSY: a typo, a partial/incomplete idiom (e.g. "rain dogs" → "it's raining cats and dogs"), or casual slang spelling. Silently resolve it to the real, common English word/idiom/slang term and put THAT corrected form in "word". Fill "query_note" only when you actually corrected something.
 
 GOAL: extract AS MUCH genuinely common, real-world usage as you know for this word — a learner should almost never need to look elsewhere. Prioritize BREADTH across every category below over padding just one of them:
-- senses: MOST COMMON meaning first. rank = how often you meet it in real life (5=very common … 1=rare). Up to 5 senses. For an idiom/slang entry, pos can be "idiom" or "slang".
+- senses: up to 8. For an idiom/slang entry, pos can be "idiom" or "slang". Four HARD rules:
+  (1) NEVER spend two slots on the same core meaning. Merge near-identical shades into ONE sense (e.g. for "fly": flying with wings, flying a plane, an arrow flying, a flag flying are ALL one "move through the air" sense — do NOT list them separately). Wasting slots on shades of one meaning is the single worst failure here.
+  (2) EVERY part of speech in common use gets at least one sense. A common NOUN meaning must never be dropped just because a verb meaning is more frequent. Concrete/physical-object meanings especially: fly = the zip on trousers; temple = side of the head; palm = inside of the hand; nail = fingernail AND metal nail. Sweep for these before you finish.
+  (3) Include informal, figurative and slang senses a learner actually meets online, even if a formal dictionary ranks them low.
+  (4) SẮC THÁI của từng "vi" quan trọng hơn độ ngắn gọn. Trước khi chốt mỗi "vi", tự hỏi: từ tiếng Việt này khen hay chê? Từ tiếng Anh gốc khen hay chê? Lệch nhau là SAI, phải đổi. Thà viết "vui tươi, giàu tưởng tượng theo kiểu ngộ nghĩnh" (dài mà đúng) còn hơn "kỳ quặc" (ngắn mà sai sắc thái).
+  (5) rank = how often you meet this sense in real life (5 = very common … 1 = rare), exactly as before. Order the array by rank, highest first, so the everyday meaning stays at the top and a rare-but-real meaning like "fly = the zip on trousers" simply sits at the bottom of the list. Rule (2) is about the sense EXISTING at all — it never promotes a rare sense above a common one.
 - collocations: the natural word-partnerships a native speaker reaches for — verb+noun, adjective+noun, adverb+adjective, noun+noun, fixed comparisons, whatever fits this word's part of speech. This is usually the BIGGEST category — up to 10, ranked. Dig for real ones, don't stop at 1–2.
 - phrasal_verbs: ONLY if this word is a verb that genuinely forms phrasal verbs. Up to 6, ranked. Leave the array empty if none exist — never invent one.
 - idioms: genuine fixed idioms/proverbs containing this word. Up to 6, ranked. Leave empty if none exist.
 - prepositions: the specific preposition(s) where the CHOICE of preposition changes or fixes the meaning (e.g. "afraid OF" vs "afraid FOR", "depend ON", "look UP TO" vs "look DOWN ON"). Up to 5. Leave empty if this word has no meaningful fixed-preposition pattern.
 - synonyms/antonyms: up to 8 synonyms and 5 antonyms, common & genuinely distinguishable — skip rare/literary words.
-- forms: fill only if it's a single-word verb (put "" for the rest). If a past tense/participle genuinely has two accepted spellings (e.g. "burned"/"burnt", "learned"/"learnt", "dreamed"/"dreamt"), put BOTH separated by " / " in that one field. Omit the whole forms object if not a verb or if multi-word.
+- forms: fill only if it's a single-word verb (put "" for the rest). If a past tense/participle genuinely has two accepted spellings (e.g. "burned"/"burnt", "learned"/"learnt", "dreamed"/"dreamt"), put BOTH separated by " / " in that one field. Omit entirely if not a verb or if multi-word.
 - Vietnamese must sound natural, not word-by-word translation.
+- NUANCE IS THE WHOLE POINT. A confident but wrong Vietnamese equivalent is the worst possible output — worse than admitting none exists. If no Vietnamese word carries the feeling, leave "vi_equivalent" empty and carry the meaning in "vi_feel" instead.
+
+WORKED EXAMPLE of the quality bar (for "assertive") — match this DEPTH and this CARE ABOUT CONNOTATION; do not copy the content:
+  "vi_equivalent": "quyết đoán, dám nói thẳng ý mình"
+  "vi_feel": "Cảm giác của người biết rõ mình muốn gì và nói ra thẳng thắn, không vòng vo cũng không lấn át ai. Ví dụ trong cuộc họp, người assertive là người dám nêu ý kiến trái chiều một cách bình tĩnh."
+  "vi_not": "KHÔNG phải 'hung hăng', 'áp đặt' hay 'lấn lướt' — mấy từ đó mang sắc thái chê và ứng với 'aggressive', còn assertive gần như luôn là lời khen."
+  "register": "trung tính · khen"
+  senses[0].vi: "quyết đoán, dám bày tỏ chính kiến"   ← chú ý: KHÔNG rút gọn thành "mạnh mẽ" hay "cứng rắn" cho ngắn
 - Every "text"/"prep" entry must be something a fluent English speaker would actually say — no filler entries just to fill a slot.
-- Return ONLY the JSON object.`;
-}
+- Return ONLY the JSON object.`;}
 
 async function askGemini(word){
   const key=getKey(); if(!key) throw new Error('NO_KEY');
@@ -1025,6 +1042,335 @@ function applyTheme(theme){
   document.querySelectorAll('#theme-seg button').forEach(b=>b.classList.toggle('active', b.dataset.theme===theme));
 }
 
+
+/* ============================================================
+   DICTIONARY MAINTENANCE
+   Quality scan · meaning refresh · export · missing-word top-up
+   All state lives on this device; every step is resumable.
+   ============================================================ */
+const SCAN_LS='fc_scan';      // { word: {r:"reason"|""} }  "" = judged fine
+const MISS_LS='fc_missing';   // { list:[...], at:timestamp }
+let maintBusy=false;
+
+function scanLoad(){ try{ return JSON.parse(localStorage.getItem(SCAN_LS)||'{}'); }catch(_){ return {}; } }
+function scanSave(m){ try{ localStorage.setItem(SCAN_LS,JSON.stringify(m)); return true; }
+  catch(e){ toast('Device storage is full — export your dictionary'); return false; } }
+function missLoad(){ try{ return JSON.parse(localStorage.getItem(MISS_LS)||'{"list":[]}'); }catch(_){ return {list:[]}; } }
+function missSave(o){ try{ localStorage.setItem(MISS_LS,JSON.stringify(o)); }catch(e){} }
+const flaggedWords=()=>Object.entries(scanLoad()).filter(([w,v])=>v&&v.r).map(([w])=>w).sort();
+
+function mLog(id,msg,cls){
+  const el=$(id); if(!el) return;
+  const d=document.createElement('div'); if(cls) d.className=cls; d.textContent=msg;
+  el.appendChild(d); el.scrollTop=el.scrollHeight;
+  while(el.children.length>120) el.removeChild(el.firstChild);
+}
+
+/* ---------- generic batched Gemini call returning JSON ---------- */
+async function askJSON(prompt,attempt){
+  const key=getKey(); if(!key) throw new Error('NO_KEY');
+  if(!navigator.onLine) throw new Error('OFFLINE');
+  const model=getModel();
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const body={contents:[{parts:[{text:prompt}]}],
+    generationConfig:{temperature:0.1,responseMimeType:"application/json",thinkingConfig:{thinkingBudget:0}}};
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if((res.status===429||res.status>=500)&&attempt<4){
+    await new Promise(r=>setTimeout(r,900*Math.pow(2,attempt)));
+    return askJSON(prompt,attempt+1);
+  }
+  if(!res.ok){ let m=res.status; try{const e=await res.json();m=(e.error&&e.error.message)||m;}catch(_){}
+    throw new Error(String(m).slice(0,90)); }
+  const data=await res.json();
+  let t=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
+  t=t.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  return JSON.parse(t);
+}
+
+/* ============================================================
+   1 · QUALITY SCAN — flag entries whose Vietnamese is weak
+   Sends only word + Vietnamese meanings (~35 tokens/word),
+   40 per call, and only bad ones come back. Resumable.
+   ============================================================ */
+async function scanRefreshState(){
+  const m=scanLoad(); const all=await idbAll();
+  const done=all.filter(r=>m[r.word]).length;
+  const bad=flaggedWords().length;
+  const el=$('#scan-state');
+  if(el) el.innerHTML='Scanned <b>'+done.toLocaleString()+'</b> of '+all.length.toLocaleString()
+    +' · <b style="color:var(--amber)">'+bad.toLocaleString()+'</b> flagged as weak · '
+    +(all.length-done).toLocaleString()+' left to scan.';
+  const rb=$('#refresh-state');
+  if(rb) rb.innerHTML='<b style="color:var(--amber)">'+bad.toLocaleString()+'</b> words are waiting to have their meanings rewritten.';
+  return {all,m,done,bad};
+}
+
+function scanPrompt(lines){
+  return `You are an expert English–Vietnamese lexicographer reviewing entries in a Vietnamese learner's dictionary.
+Each line is: ENGLISH WORD | main Vietnamese meaning | sub-meanings.
+
+Flag ONLY entries whose Vietnamese is genuinely poor, for one of these reasons:
+- wrong connotation (e.g. "whimsical" rendered as "kỳ quặc" — wrong, because "kỳ quặc" is derogatory while "whimsical" is a compliment)
+- literal word-by-word translation a Vietnamese reader cannot picture
+- a common meaning of the word is missing entirely
+- so vague it does not distinguish the word from its near-synonyms
+
+If an entry is fine, SAY NOTHING about it. Be strict: most entries are fine.
+Return JSON only:
+{"bad":[{"w":"word","r":"reason, max 8 Vietnamese words"}]}
+If all are fine: {"bad":[]}
+
+${lines.join('\n')}`;
+}
+
+function scanLine(rec){
+  const d=rec.data||{};
+  const subs=(d.senses||[]).map(s=>String(s.vi||'').trim()).filter(Boolean).slice(0,6).join('; ');
+  return rec.word+' | '+(d.vi_equivalent||'∅')+' | '+(subs||'∅');
+}
+
+async function runScan(){
+  if(maintBusy){ maintBusy=false; return; }
+  if(!getKey()){ toast('Add your API key first'); return; }
+  maintBusy=true; $('#scan-btn').textContent='Stop scanning';
+  $('#scan-log').style.display='block';
+
+  const {all,m}=await scanRefreshState();
+  const todo=all.filter(r=>!m[r.word]).slice(0,Math.max(1,+$('#scan-count').value||500));
+  if(!todo.length){ mLog('#scan-log','Everything has been scanned already.','ok'); maintBusy=false; $('#scan-btn').textContent='Scan for weak meanings'; return; }
+
+  const B=40, batches=[];
+  for(let i=0;i<todo.length;i+=B) batches.push(todo.slice(i,i+B));
+  mLog('#scan-log','Scanning '+todo.length+' words in '+batches.length+' calls…');
+
+  let n=0,flagged=0;
+  for(const b of batches){
+    if(!maintBusy){ mLog('#scan-log','Stopped. Progress is saved.','warn'); break; }
+    try{
+      const r=await askJSON(scanPrompt(b.map(scanLine)),0);
+      const bad=new Map((r.bad||[]).map(x=>[String(x.w||'').trim().toLowerCase(),String(x.r||'weak').slice(0,48)]));
+      for(const rec of b){
+        const hit=bad.get(rec.word.toLowerCase());
+        m[rec.word]=hit?{r:hit}:{r:''};
+        if(hit){ flagged++; mLog('#scan-log','⚑ '+rec.word+' — '+hit,'warn'); }
+      }
+      if(!scanSave(m)) break;
+    }catch(e){ mLog('#scan-log','✕ batch failed: '+(e.message||e)+' — will retry next time','bad'); }
+    n+=b.length;
+    $('#scan-bar').style.width=Math.round(n/todo.length*100)+'%';
+    await new Promise(r=>setTimeout(r,150));
+  }
+  mLog('#scan-log','Done: '+n+' scanned, '+flagged+' flagged.','ok');
+  await scanRefreshState();
+  maintBusy=false; $('#scan-btn').textContent='Scan for weak meanings';
+}
+
+/* ============================================================
+   2 · REFRESH MEANINGS — rewrite ONLY the Vietnamese fields
+   Collocations, idioms, phonetics etc. are kept untouched, so
+   output is ~400 tokens per word instead of ~1800.
+   Writes straight back into the library — no download needed.
+   ============================================================ */
+function refreshPrompt(word,d){
+  const cur=(d.senses||[]).map((s,i)=>(i+1)+'. ['+(s.pos||'?')+'] '+(s.vi||'∅')+' — '+(s.gloss||'')).join('\n');
+  return `You are an expert English–Vietnamese lexicographer. Rewrite ONLY the Vietnamese side of this dictionary entry for "${word}".
+
+Its current Vietnamese is weak. Existing senses (keep the same senses and the same order, just fix the Vietnamese):
+${cur||'(none — supply the senses yourself, most common first)'}
+
+RULES:
+- Connotation matters more than brevity. Before finalising each Vietnamese meaning, ask: is the English word praising or criticising? Is the Vietnamese word praising or criticising? If they differ, it is WRONG — pick a longer phrasing that carries the right feeling instead. "vui tươi, giàu tưởng tượng theo kiểu ngộ nghĩnh" (long but right) beats "kỳ quặc" (short but wrong).
+- If NO Vietnamese word truly matches, leave "vi_equivalent" as "" and carry the meaning in "vi_feel". A confident but wrong equivalent is the worst possible answer.
+- rank = how often this sense appears in real life (5 very common … 1 rare). Keep the common meaning on top; a rare-but-real sense simply sits at the bottom.
+
+Return ONLY this JSON:
+{
+  "vi_equivalent": "1–3 từ tiếng Việt gần nhất, cách nhau bằng ', '. Rỗng nếu không có từ nào khớp.",
+  "vi_note": "1 câu ngắn tiếng Việt về cảm giác/cách dùng cốt lõi",
+  "vi_feel": "1–2 câu tiếng Việt tả HÌNH ẢNH / TÌNH HUỐNG dùng từ này, không phải định nghĩa từ điển",
+  "vi_not": "từ tiếng Việt hay bị dịch nhầm + tại sao sai. Rỗng nếu không có.",
+  "register": "trang trọng|trung tính|thân mật|lóng · khen|trung tính|chê",
+  "senses": [ { "pos":"...", "vi":"nghĩa tiếng Việt đúng sắc thái", "vi_hint":"1 câu tả cảm giác nếu 'vi' chưa đủ, ngược lại rỗng", "gloss":"short English meaning", "rank":5, "example":"natural English sentence", "example_vi":"bản dịch tự nhiên" } ]
+}`;
+}
+
+async function runRefresh(){
+  if(maintBusy){ maintBusy=false; return; }
+  if(!getKey()){ toast('Add your API key first'); return; }
+  const queue=flaggedWords().slice(0,Math.max(1,+$('#refresh-count').value||50));
+  if(!queue.length){ toast('Nothing is flagged — run the scan first'); return; }
+
+  maintBusy=true; $('#refresh-btn').textContent='Stop';
+  $('#refresh-log').style.display='block';
+  mLog('#refresh-log','Rewriting meanings for '+queue.length+' words…');
+
+  const m=scanLoad(); let ok=0,bad=0;
+  for(let i=0;i<queue.length;i++){
+    if(!maintBusy){ mLog('#refresh-log','Stopped. Finished words are already saved.','warn'); break; }
+    const w=queue[i];
+    try{
+      const rec=await idbGet(w);
+      if(!rec||!rec.data){ delete m[w]; continue; }
+      const fresh=await askJSON(refreshPrompt(w,rec.data),0);
+      // MERGE: replace only the Vietnamese side, keep everything else
+      const d=rec.data;
+      ['vi_equivalent','vi_note','vi_feel','vi_not','register'].forEach(k=>{ if(fresh[k]!==undefined) d[k]=fresh[k]; });
+      if(Array.isArray(fresh.senses)&&fresh.senses.length) d.senses=fresh.senses;
+      d.vi_updated=Date.now();
+      await idbPut(Object.assign({},rec,{data:d}));
+      m[w]={r:''};                       // cleared — no longer flagged
+      ok++;
+      mLog('#refresh-log','✓ '+w+' → '+(d.vi_equivalent||'(no direct equivalent)'),'ok');
+    }catch(e){ bad++; mLog('#refresh-log','✕ '+w+' — '+(e.message||e),'bad'); }
+    scanSave(m);
+    $('#refresh-bar').style.width=Math.round((i+1)/queue.length*100)+'%';
+    await new Promise(r=>setTimeout(r,200));
+  }
+  mLog('#refresh-log','Done: '+ok+' rewritten, '+bad+' failed. '+flaggedWords().length+' still flagged.','ok');
+  await scanRefreshState(); refreshStats();
+  maintBusy=false; $('#refresh-btn').textContent='Rewrite meanings';
+  if(currentWord) jump(currentWord);
+}
+
+/* ============================================================
+   3 · EXPORT — full backup of the library
+   ============================================================ */
+async function exportDictionary(){
+  try{
+    const all=await idbAll();
+    const list=all.filter(r=>r.data&&r.data.word).map(r=>r.data);
+    const blob=new Blob([JSON.stringify(list,null,1)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='focci-dictionary-'+new Date().toISOString().slice(0,10)+'.json';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    toast('Exported '+list.length.toLocaleString()+' words');
+  }catch(e){ toast('Export failed: '+(e.message||e)); }
+}
+
+/* ============================================================
+   4 · TOP UP — find common words the library is missing
+   Frequency lists are noisy (proper names, subtitle artefacts,
+   inflected forms), so candidates pass three local filters and
+   then a cheap AI screen before they are ever generated.
+   ============================================================ */
+const SRC_FREQ='https://raw.githubusercontent.com/first20hours/google-10000-english/master/20k.txt';
+const SRC_DICT='https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt';
+const SRC_NAME='https://raw.githubusercontent.com/dominictarr/random-name/master/first-names.txt';
+const SUFFIX=[['ies','y'],['es',''],['s',''],['ed',''],['ed','e'],['ied','y'],['ing',''],['ing','e'],['er',''],['est',''],['ly',''],['ers','']];
+
+async function findMissing(){
+  if(maintBusy) return;
+  maintBusy=true; $('#miss-btn').textContent='Searching…';
+  $('#miss-log').style.display='block'; $('#miss-log').innerHTML='';
+  try{
+    mLog('#miss-log','Downloading word lists…');
+    const [fq,dc,nm]=await Promise.all([fetch(SRC_FREQ),fetch(SRC_DICT),fetch(SRC_NAME)].map(p=>p.then(r=>{
+      if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })));
+
+    const valid=new Set(dc.split(/\r?\n/).map(x=>x.trim().toLowerCase()).filter(Boolean));
+    const names=new Set(nm.split(/\r?\n/).map(x=>x.trim().toLowerCase()).filter(Boolean));
+
+    mLog('#miss-log','Reading your library…');
+    const all=await idbAll();
+    const have=new Set();
+    for(const r of all){
+      have.add(r.word.toLowerCase());
+      const d=r.data||{}, f=d.forms||{};
+      ['v1','v2','v3','ving'].forEach(k=>String(f[k]||'').split('/').forEach(p=>{ p=p.trim().toLowerCase(); if(p) have.add(p); }));
+      (d.family||[]).forEach(x=>{ const p=String(x.word||'').trim().toLowerCase(); if(p) have.add(p); });
+    }
+    const isInflection=w=>SUFFIX.some(([suf,rep])=>{
+      if(!w.endsWith(suf)||w.length-suf.length<3) return false;
+      const b=w.slice(0,w.length-suf.length)+rep;
+      return have.has(b)||(b.length>3&&b[b.length-1]===b[b.length-2]&&have.has(b.slice(0,-1)));
+    });
+
+    const seen=new Set(); const cand=[];
+    for(const ln of fq.split(/\r?\n/)){
+      const w=ln.split(/\s+/)[0].trim().toLowerCase();
+      if(!/^[a-z]{3,}$/.test(w)||seen.has(w)) continue; seen.add(w);
+      if(!valid.has(w)||names.has(w)||have.has(w)||isInflection(w)) continue;
+      cand.push(w);
+    }
+    mLog('#miss-log',cand.length+' candidates left after filtering against your '+all.length.toLocaleString()+' words.');
+
+    if(!getKey()){ mLog('#miss-log','No API key — skipping the quality screen. Expect junk in this list.','warn'); missSave({list:cand,at:Date.now()}); }
+    else {
+      mLog('#miss-log','Screening them with AI (cheap — a few cents)…');
+      const keep=[];
+      for(let i=0;i<cand.length;i+=120){
+        if(!maintBusy){ mLog('#miss-log','Stopped early — keeping what was screened.','warn'); break; }
+        const chunk=cand.slice(i,i+120);
+        try{
+          const r=await askJSON(`From this list, keep ONLY words worth an entry in a Vietnamese learner's English dictionary.
+DROP: proper nouns, brand names, place names, abbreviations, internet/spam junk, crude sexual slang, technical filler.
+KEEP: ordinary words a learner would meet in reading, conversation, work or study.
+Return JSON only: {"keep":["word", ...]}
+
+${chunk.join(', ')}`,0);
+          (r.keep||[]).forEach(w=>{ w=String(w).trim().toLowerCase(); if(chunk.includes(w)) keep.push(w); });
+        }catch(e){ mLog('#miss-log','✕ screen batch failed, keeping it unscreened','warn'); keep.push(...chunk); }
+        mLog('#miss-log','  screened '+Math.min(i+120,cand.length)+'/'+cand.length+' → keeping '+keep.length);
+      }
+      missSave({list:keep,at:Date.now()});
+    }
+  }catch(e){ mLog('#miss-log','Failed: '+(e.message||e),'bad'); }
+  maintBusy=false; $('#miss-btn').textContent='Find missing words';
+  missRefreshState();
+}
+
+function missRefreshState(){
+  const o=missLoad(); const el=$('#miss-state');
+  if(!el) return;
+  el.innerHTML = o.list.length
+    ? '<b style="color:var(--amber)">'+o.list.length.toLocaleString()+'</b> missing words are queued, ready to add whenever you like.'
+    : 'No queue yet — run the search to see what your library is missing.';
+}
+
+async function runTopUp(){
+  if(maintBusy){ maintBusy=false; return; }
+  if(!getKey()){ toast('Add your API key first'); return; }
+  const o=missLoad();
+  if(!o.list.length){ toast('Find missing words first'); return; }
+  const n=Math.max(1,+$('#miss-count').value||25);
+  const batch=o.list.slice(0,n);
+
+  maintBusy=true; $('#topup-btn').textContent='Stop';
+  $('#miss-log').style.display='block';
+  mLog('#miss-log','Adding '+batch.length+' new words…');
+
+  let ok=0,bad=0,i=0;
+  for(const w of batch){
+    if(!maintBusy){ mLog('#miss-log','Stopped. Added words are saved; the rest stay queued.','warn'); break; }
+    try{
+      const data=await askGemini(w);
+      const canon=norm(data.word||w);
+      const ex=await idbGet(canon);
+      await idbPut({word:canon,data,source:'ai',firstSeen:ex?ex.firstSeen:now(),saved:ex?ex.saved:0,savedAt:ex?ex.savedAt:0});
+      ok++; mLog('#miss-log','✓ '+w,'ok');
+    }catch(e){ bad++; mLog('#miss-log','✕ '+w+' — '+(e.message||e),'bad'); }
+    i++;
+    o.list=o.list.filter(x=>x!==w); missSave(o);   // dequeue as we go, so a crash loses nothing
+    $('#miss-bar').style.width=Math.round(i/batch.length*100)+'%';
+    await new Promise(r=>setTimeout(r,250));
+  }
+  mLog('#miss-log','Done: '+ok+' added, '+bad+' failed. '+o.list.length.toLocaleString()+' still queued.','ok');
+  maintBusy=false; $('#topup-btn').textContent='Add words';
+  missRefreshState(); refreshStats(); checkAchievements();
+}
+
+function wireMaintenance(){
+  const on=(id,fn)=>{ const el=$(id); if(el) el.addEventListener('click',fn); };
+  on('#scan-btn',()=>runScan().catch(e=>{maintBusy=false;$('#scan-btn').textContent='Scan for weak meanings';mLog('#scan-log','Error: '+(e.message||e),'bad');}));
+  on('#refresh-btn',()=>runRefresh().catch(e=>{maintBusy=false;$('#refresh-btn').textContent='Rewrite meanings';mLog('#refresh-log','Error: '+(e.message||e),'bad');}));
+  on('#export-btn',exportDictionary);
+  on('#miss-btn',()=>findMissing());
+  on('#topup-btn',()=>runTopUp().catch(e=>{maintBusy=false;$('#topup-btn').textContent='Add words';mLog('#miss-log','Error: '+(e.message||e),'bad');}));
+  on('#scan-reset',()=>{ if(confirm('Clear all scan results? You would have to scan again, which costs tokens.')){ localStorage.removeItem(SCAN_LS); scanRefreshState(); } });
+  scanRefreshState().catch(()=>{}); missRefreshState();
+}
+
 /* ============================================================
    NAV + wiring
    ============================================================ */
@@ -1038,7 +1384,7 @@ function showView(v){
   if(v==='saved') renderSaved();
   if(v==='review') startReview();
   if(v==='stats') renderInsights();
-  if(v==='settings') refreshStats();
+  if(v==='settings'){ refreshStats(); if(typeof scanRefreshState==='function'){ scanRefreshState().catch(()=>{}); missRefreshState(); } }
 }
 
 function wire(){
@@ -1075,6 +1421,7 @@ function wire(){
     const f=$('#settings-flash'); f.textContent='Saved ✓'; setTimeout(()=>f.textContent='',1800);
   });
   $('#import-btn').addEventListener('click',()=>$('#import-file').click());
+  wireMaintenance();
   $('#import-file').addEventListener('change',e=>{ if(e.target.files[0]) importSeedFile(e.target.files[0]); e.target.value=''; });
   $('#gen-upload-btn').addEventListener('click',()=>$('#gen-file').click());
   $('#gen-file').addEventListener('change', async e=>{

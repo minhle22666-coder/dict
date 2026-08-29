@@ -230,6 +230,14 @@
     background:var(--surface-2);border-radius:6px;padding:2px 7px;vertical-align:middle;letter-spacing:0}
   .feel .feel-img{margin-top:7px;color:var(--text);opacity:.9}
   .feel .vi-not{margin-top:7px;color:var(--coral)}
+  .mnt-state{background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:13.5px;
+    color:var(--muted);line-height:1.6;margin-bottom:12px}
+  .mnt-state b{color:var(--text)}
+  .mnt-bar{height:5px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:12px}
+  .mnt-bar i{display:block;height:100%;width:0;background:var(--primary);transition:width .3s}
+  .mnt-log{margin-top:12px;max-height:220px;overflow:auto;background:var(--surface-2);border-radius:10px;
+    padding:10px 12px;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+  .mnt-log .ok{color:var(--mint)} .mnt-log .warn{color:var(--amber)} .mnt-log .bad{color:var(--coral)}
   .sense{margin-bottom:15px}
   .sense-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   .senseno{width:20px;height:20px;border-radius:7px;background:var(--surface-2);color:var(--muted);
@@ -549,6 +557,48 @@
         <button class="btn sm" id="gen-run-btn" style="margin-top:0">Generate</button>
       </div>
       <div class="gen-progress" id="gen-progress"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span class="tile tile-sm amber">🔍</span>Meaning Quality Scan</div>
+      <div class="hint" style="margin-bottom:10px">Checks your entries for Vietnamese that carries the wrong feeling, reads like machine translation, or misses a common meaning. Only the word and its Vietnamese are sent, batched 40 at a time — so this is cheap. Progress is saved, so you can stop and continue any day.</div>
+      <div class="mnt-state" id="scan-state">Loading…</div>
+      <div class="field"><label for="scan-count">Words to scan this run</label><input id="scan-count" type="number" min="40" step="40" value="500"/></div>
+      <div class="btn-row">
+        <button class="btn sm" id="scan-btn" style="margin-top:0">Scan for weak meanings</button>
+        <button class="btn ghost sm" id="scan-reset" style="margin-top:0">Reset</button>
+      </div>
+      <div class="mnt-bar"><i id="scan-bar"></i></div>
+      <div class="mnt-log" id="scan-log" style="display:none"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span class="tile tile-sm primary">✎</span>Rewrite Weak Meanings</div>
+      <div class="hint" style="margin-bottom:10px">Regenerates <b>only the Vietnamese side</b> of flagged entries — collocations, idioms, phonetics and examples are kept, so each word costs about a quarter of a full rebuild. Updates land straight in your library; nothing to download or re-upload.</div>
+      <div class="mnt-state" id="refresh-state">Loading…</div>
+      <div class="field"><label for="refresh-count">Words to rewrite this run</label><input id="refresh-count" type="number" min="1" value="50"/></div>
+      <button class="btn sm" id="refresh-btn">Rewrite meanings</button>
+      <div class="mnt-bar"><i id="refresh-bar"></i></div>
+      <div class="mnt-log" id="refresh-log" style="display:none"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span class="tile tile-sm mint">🧭</span>Find Missing Words</div>
+      <div class="hint" style="margin-bottom:10px">Compares your library against a common-English frequency list, drops anything you already have (including verb forms and word families), then screens the rest with AI to remove names, abbreviations and junk. The survivors queue up — add as many or as few as you want, whenever you want.</div>
+      <div class="mnt-state" id="miss-state">No queue yet.</div>
+      <div class="btn-row">
+        <button class="btn ghost sm" id="miss-btn" style="margin-top:0">Find missing words</button>
+        <button class="btn sm" id="topup-btn" style="margin-top:0">Add words</button>
+      </div>
+      <div class="field" style="margin-top:10px"><label for="miss-count">How many to add this run</label><input id="miss-count" type="number" min="1" value="25"/></div>
+      <div class="mnt-bar"><i id="miss-bar"></i></div>
+      <div class="mnt-log" id="miss-log" style="display:none"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span class="tile tile-sm coral">💾</span>Backup</div>
+      <div class="hint" style="margin-bottom:10px">Downloads every word in your library as one JSON file. Keep a copy somewhere safe — if this device is wiped or the browser clears its storage, this file is the only way back.</div>
+      <button class="btn sm" id="export-btn">Export dictionary</button>
     </div>
 
     <div class="sec">
