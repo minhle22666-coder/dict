@@ -419,9 +419,13 @@ async function search(rawWord, forceAI){
     const local=await idbGet(word);
     if(local && local.alias){
       const canon=await idbGet(local.alias);
-      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); logEvent('search',canon.word); addXP(2); return; }
+      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); logEvent('search',canon.word); addXP(2);
+        if(_navSilent) _navSilent=false; else navPush({type:'word', value:canon.word});
+        return; }
     }
-    if(local){ currentWord=word; box.innerHTML=renderEntry(local); logEvent('search',word); addXP(2); return; }
+    if(local){ currentWord=word; box.innerHTML=renderEntry(local); logEvent('search',word); addXP(2);
+      if(_navSilent) _navSilent=false; else navPush({type:'word', value:word});
+      return; }
 
     const guess=await fuzzyLocalSearch(word);
     if(guess){ box.innerHTML=suggestState(word, guess); return; }
@@ -448,13 +452,14 @@ async function search(rawWord, forceAI){
     box.innerHTML=renderEntry(rec, canon!==word?word:null);
     logEvent('search',canon);
     addXP(2);
+    if(_navSilent) _navSilent=false; else navPush({type:'word', value:canon});
     refreshStats();
   }catch(err){
     box.innerHTML=errorState(word,err.message||'');
   }
 }
 function forceAI(word){ search(word,true); }
-function backToHome(){ currentWord=null; $('#result').innerHTML=''; $('#dashboard').style.display='block'; $('#q').value=''; $('#clearx').style.display='none'; renderDashboard(); window.scrollTo(0,0); }
+function backToHome(){ navStack=[{type:'view',value:'home'}]; updateBackBtn(); currentWord=null; $('#result').innerHTML=''; $('#dashboard').style.display='block'; $('#q').value=''; $('#clearx').style.display='none'; renderDashboard(); window.scrollTo(0,0); }
 
 /* ---------- toggle save ---------- */
 async function toggleSave(word){
@@ -518,7 +523,6 @@ function renderEntry(rec, queriedAs){
 
   let h='<div class="entry">';
   h+='<img class="entry-corner" src="./mascot-'+corner+'.webp" alt=""/>';
-  h+='<div class="back-row" onclick="backToHome()">← Home</div>';
   if(queriedAs){
     h+='<div class="corrected">Corrected from “'+esc(queriedAs)+'”'+(d.query_note?' · '+esc(d.query_note):'')+'</div>';
   }
@@ -533,10 +537,30 @@ function renderEntry(rec, queriedAs){
   h+='</div>';
 
   if(Array.isArray(d.family)&&d.family.length){
-    h+='<div class="family-scroll">';
-    for(const fm of d.family){ const fw=esc(fm.word||''); const k=posKey(fm.pos), c=POS_COLOR[k];
-      h+='<button class="family-chip pos-'+c+'" onclick="jump(\''+fw.replace(/'/g,"\\'")+'\')">'
-        +'<span class="fc-pos">'+esc(POS_SHORT[k]||'—')+'</span><span class="fc-w">'+fw+'</span></button>'; }
+    // Group the family by part of speech so a word with noun + verb + adjective
+    // branches shows each branch under its own labelled row.
+    const fg=new Map();
+    for(const fm of d.family){
+      if(!fm||!fm.word) continue;
+      const k=posKey(fm.pos);
+      if(!fg.has(k)) fg.set(k,[]);
+      fg.get(k).push(fm.word);
+    }
+    const ORDER=['noun','verb','adjective','adverb','other'];
+    const keys=[...fg.keys()].sort((a,b)=>{
+      const ia=ORDER.indexOf(a), ib=ORDER.indexOf(b);
+      return (ia<0?99:ia)-(ib<0?99:ib);
+    });
+    h+='<div class="family-box">';
+    for(const k of keys){
+      const c=POS_COLOR[k]||'blue';
+      h+='<div class="family-row">';
+      h+='<span class="family-lbl pos-'+c+'">'+esc(k==='other'?'related':k)+'</span>';
+      h+='<div class="family-words">';
+      for(const wd of fg.get(k)){ const fw=esc(wd);
+        h+='<button class="family-chip pos-'+c+'" onclick="jump(\''+fw.replace(/'/g,"\\'")+'\')">'+fw+'</button>'; }
+      h+='</div></div>';
+    }
     h+='</div>';
   }
 
@@ -664,7 +688,7 @@ function jump(w){
 function suggestState(query,guess){
   const label=esc(guess.label), target=guess.target, safeT=target.replace(/'/g,"\\'"), safeQ=query.replace(/'/g,"\\'");
   const kind = guess.type==='expr' ? ' <span style="opacity:.72">(inside “'+esc(target)+'”)</span>' : '';
-  let h='<div class="back-row" onclick="backToHome()">← Home</div>';
+  let h='';
   // Primary action: send Focci off to chart the unknown word.
   h+='<div class="ask-ai-card" onclick="forceAI(\''+safeQ+'\')">'
     +'<img src="./mascot-investigate.webp" alt=""/>'
@@ -676,16 +700,16 @@ function suggestState(query,guess){
     +'<span class="nm-go">→</span></div></div>';
   return h;
 }
-function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can chart new words for you.</p></div>'
+function needKeyState(w){ return '<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can chart new words for you.</p></div>'
    +'<button class="btn" onclick="showView(\'settings\')">Open Settings</button>'; }
-function offlineState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
+function offlineState(w){ return '<div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
 function errorState(w,msg){
   let m='Something went wrong reaching the AI.';
   if(msg.startsWith('BAD_KEY')) m='Your API key looks wrong or isn\'t enabled. Check it in Settings.';
   else if(msg.startsWith('API')) m='Google returned an error: '+esc(msg.slice(4,120));
   else if(msg==='PARSE') m='The AI reply wasn\'t in the right format. Try again.';
   else if(msg==='OFFLINE') return offlineState(w);
-  return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
+  return '<div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
 }
 function questScene(word){
   const cheers=["DON'T GIVE UP…","UNCHARTED TERRITORY!","INTO THE UNKNOWN…","A NEW LAND AWAITS!"];
@@ -806,14 +830,63 @@ async function renderDashboardStats(){
   $('#d-avg').textContent=avg;
   $('#d-time').textContent = mins<60 ? mins+'m' : Math.floor(mins/60)+'h '+(mins%60)+'m';
 
-  const week=[]; for(let i=6;i>=0;i--){ const dd=today-i*DAY; const cnt=logs.filter(l=>dayStart(l.ts)===dd && l.type==='search').length; week.push({dd,count:cnt}); }
-  const maxWeek=Math.max(1,...week.map(w=>w.count));
-  const WD=['S','M','T','W','T','F','S'];
-  let h='';
-  week.forEach(w=>{ const pct=Math.round(w.count/maxWeek*100); const wd=WD[new Date(w.dd).getDay()];
-    h+='<div class="bar-col"><div class="bar-track"><div class="bar-fill" style="height:'+Math.max(4,pct)+'%"></div></div><div class="bar-lbl">'+wd+'</div></div>'; });
-  $('#week-bars').innerHTML=h;
+  _weekLogs=logs;
+  renderWeekChart();
 }
+
+/* ---------- weekly activity chart, scrollable back through history ---------- */
+let _weekLogs=[], weekOffset=0;   // 0 = this week, 1 = last week, …
+function shiftWeek(delta){
+  const next=weekOffset+delta;
+  if(next<0) return;                 // never scroll into the future
+  weekOffset=next; renderWeekChart();
+}
+function renderWeekChart(){
+  const box=$('#week-bars'); if(!box) return;
+  const today=dayStart(now());
+  const end=today-weekOffset*7*DAY;
+  const days=[];
+  for(let i=6;i>=0;i--){
+    const dd=end-i*DAY;
+    const searches=_weekLogs.filter(l=>dayStart(l.ts)===dd && l.type==='search');
+    const reviews=_weekLogs.filter(l=>dayStart(l.ts)===dd && (l.type==='review_correct'||l.type==='review_wrong'));
+    days.push({dd, count:searches.length, rev:reviews.length});
+  }
+  const max=Math.max(1,...days.map(d=>d.count+d.rev));
+  const WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const a=new Date(days[0].dd), b=new Date(days[6].dd);
+  const range = a.getMonth()===b.getMonth()
+    ? MO[a.getMonth()]+' '+a.getDate()+'–'+b.getDate()
+    : MO[a.getMonth()]+' '+a.getDate()+' – '+MO[b.getMonth()]+' '+b.getDate();
+  const total=days.reduce((s,d)=>s+d.count,0), totalRev=days.reduce((s,d)=>s+d.rev,0);
+
+  let h='<div class="wk-head">';
+  h+='<button class="wk-nav" onclick="shiftWeek(1)">‹</button>';
+  h+='<div class="wk-title"><div class="wk-range">'+range+'</div>';
+  h+='<div class="wk-sub">'+total+' searched · '+totalRev+' practised</div></div>';
+  h+='<button class="wk-nav'+(weekOffset===0?' off':'')+'" onclick="shiftWeek(-1)">›</button>';
+  h+='</div>';
+  h+='<div class="wk-bars">';
+  days.forEach(d=>{
+    const dt=new Date(d.dd);
+    const isToday=d.dd===today;
+    const hS=Math.round(d.count/max*100), hR=Math.round(d.rev/max*100);
+    h+='<div class="bar-col'+(isToday?' today':'')+'">';
+    h+='<div class="bar-val">'+((d.count+d.rev)||'')+'</div>';
+    h+='<div class="bar-track">';
+    if(d.rev) h+='<div class="bar-fill rev" style="height:'+Math.max(3,hR)+'%"></div>';
+    h+='<div class="bar-fill" style="height:'+Math.max(d.count?3:0,hS)+'%"></div>';
+    h+='</div>';
+    h+='<div class="bar-lbl">'+WD[dt.getDay()].slice(0,1)+'</div>';
+    h+='<div class="bar-date">'+dt.getDate()+'</div>';
+    h+='</div>';
+  });
+  h+='</div>';
+  h+='<div class="wk-legend"><span class="lg s"></span>searched <span class="lg r"></span>practised</div>';
+  box.innerHTML=h;
+}
+window.shiftWeek=shiftWeek;
 
 /* Tap a stat tile → Focci explains what the number actually means. */
 function statInsight(which){
@@ -874,7 +947,13 @@ const TREE_LINES=[
   "That tickles. Take a word, then.",
   "Alright, alright — here's another one!",
   "You again? Fine. Last one… probably.",
-  "I'm a tree, not a vending machine!"
+  "I'm a tree, not a vending machine!",
+  "Do I look like I enjoy this?",
+  "Focci taught you this, didn't he.",
+  "Fine. But you have to LEARN the word.",
+  "Shake me once more and I'm going dormant.",
+  "…okay that one was kind of fun.",
+  "My roots are older than your streak, kid."
 ];
 let treeShakes=0;
 async function shakeTree(){
@@ -1032,21 +1111,74 @@ function reviewPrompt(d){
   if(s0&&s0.gloss) return s0.gloss;
   return '(no meaning saved yet)';
 }
+
+/* ============================================================
+   WORD LEVELS — an A1→C2 band for each word, used to pick
+   practice difficulty. Approximated from real-world word
+   frequency (common = easier), not an official CEFR list.
+   ============================================================ */
+const LEVEL_NAMES={1:'A1',2:'A2',3:'B1',4:'B2',5:'C1',6:'C2'};
+let LEVELS=null, levelsLoading=null;
+function loadLevels(){
+  if(LEVELS) return Promise.resolve(LEVELS);
+  if(levelsLoading) return levelsLoading;
+  levelsLoading=fetch('./levels.txt').then(r=>{
+    if(!r.ok) throw new Error('no levels');
+    return r.text();
+  }).then(t=>{
+    const m=new Map();
+    for(const line of t.split('\n')){
+      const i=line.indexOf('\t'); if(i<1) continue;
+      m.set(line.slice(0,i), +line.slice(i+1));
+    }
+    LEVELS=m; return m;
+  }).catch(()=>{ LEVELS=new Map(); return LEVELS; });
+  return levelsLoading;
+}
+function wordLevel(w){
+  if(!LEVELS) return 0;
+  return LEVELS.get(String(w).toLowerCase()) || 0;
+}
+/* practice difficulty filter: 0 = any level */
+let practiceLevel=+(localStorage.getItem('fc_level')||0);
+function setPracticeLevel(n){
+  practiceLevel=+n; localStorage.setItem('fc_level',String(n));
+  startReview();
+}
+function levelChips(){
+  let h='<div class="level-row">';
+  h+='<button class="lv-chip'+(practiceLevel===0?' on':'')+'" onclick="setPracticeLevel(0)">All</button>';
+  for(let i=1;i<=6;i++)
+    h+='<button class="lv-chip lv'+i+(practiceLevel===i?' on':'')+'" onclick="setPracticeLevel('+i+')">'+LEVEL_NAMES[i]+'</button>';
+  h+='</div>';
+  return h;
+}
+function filterByLevel(list){
+  if(!practiceLevel) return list;
+  const hit=list.filter(r=>wordLevel(r.word)===practiceLevel);
+  return hit;
+}
+window.setPracticeLevel=setPracticeLevel;
+
 let practiceMode='type';   // 'type' | 'match'
 function practiceTabs(){
   return '<div class="mode-tabs">'
     +'<button class="mode-tab'+(practiceMode==='type'?' on':'')+'" onclick="setPracticeMode(\'type\')">✍️ Type it</button>'
     +'<button class="mode-tab'+(practiceMode==='match'?' on':'')+'" onclick="setPracticeMode(\'match\')">🎯 Match it</button>'
-    +'</div>';
+    +'</div>'+levelChips();
 }
 function setPracticeMode(m){ practiceMode=m; startReview(); }
 window.setPracticeMode=setPracticeMode;
 
 async function startReview(){
   if(practiceMode==='match') return startMatch();
-  const saved=(await idbAll()).filter(r=>r.saved);
+  await loadLevels();
   const area=$('#review-area');
+  let saved=(await idbAll()).filter(r=>r.saved);
   if(saved.length<1){ area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-drink_tea_cup.webp" alt=""/><h3>Nothing to type yet</h3><p>Save a few words with the ☆ first — then Focci will quiz you from memory.</p><p style="margin-top:10px">Or try <b>Match it</b> above: it works with your whole library.</p></div>'; return; }
+  const pool=filterByLevel(saved);
+  if(pool.length<1){ area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>No '+LEVEL_NAMES[practiceLevel]+' words saved</h3><p>None of your saved words sit at this level yet. Pick another level, or save a few more.</p></div>'; return; }
+  saved=pool;
   revQueue=saved.sort(()=>Math.random()-0.5).slice(0,10); revIdx=0; revState=null;
   revResults=new Array(revQueue.length).fill(null); revCorrectCount=0; revSessionAwarded=false;
   renderReview();
@@ -1062,7 +1194,14 @@ const MATCH_TOTAL=8;
 async function startMatch(){
   const area=$('#review-area');
   area.innerHTML=practiceTabs()+'<div class="spinner"></div>';
-  const all=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || (r.data.senses||[])[0]?.vi));
+  await loadLevels();
+  let all=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || (r.data.senses||[])[0]?.vi));
+  const lvPool=filterByLevel(all);
+  if(practiceLevel && lvPool.length<8){
+    area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Not enough '+LEVEL_NAMES[practiceLevel]+' words</h3><p>Focci found only '+lvPool.length+' at this level. Try another level or add more words.</p></div>';
+    return;
+  }
+  if(practiceLevel) all=lvPool;
   if(all.length<8){
     area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Not enough words yet</h3><p>Focci needs at least 8 words in the library to build a round.</p></div>';
     return;
@@ -1081,7 +1220,8 @@ async function startMatch(){
       const c=all[Math.floor(Math.random()*all.length)];
       if(c.word!==answer.word && !opts.some(o=>o.word===c.word)) opts.push(c);
     }
-    matchRounds.push({answer, meaning:meaningOf(answer), opts:opts.sort(()=>Math.random()-0.5)});
+    const s0=(answer.data.senses||[])[0]||{};
+    matchRounds.push({answer, meaning:meaningOf(answer), pos:s0.pos||'', opts:opts.sort(()=>Math.random()-0.5)});
   }
   renderMatch();
 }
@@ -1126,7 +1266,15 @@ function renderMatch(){
   h+='<div class="rev-hero"><img class="rev-mascot" src="./mascot-'+pose+'.webp" alt=""/>'
     +'<div class="speech">'+esc(bubble)+'</div></div>';
 
-  h+='<div class="match-meaning">'+esc(r.meaning)+'</div>';
+  h+='<div class="match-meaning">'+esc(r.meaning);
+  {
+    const lv=wordLevel(r.answer.word);
+    let meta='';
+    if(r.pos) meta+=posChip(r.pos);
+    if(lv) meta+='<span class="lv-tag lv'+lv+'">'+LEVEL_NAMES[lv]+'</span>';
+    if(meta) h+='<div class="q-meta">'+meta+'</div>';
+  }
+  h+='</div>';
   h+='<div class="match-grid">';
   r.opts.forEach((o,i)=>{
     let cls='match-opt';
@@ -1200,6 +1348,14 @@ function renderReview(){
   h+='<div class="rev-card">';
   h+='<div class="prompt">What\'s the English word for…</div>';
   h+='<div class="q">'+esc(prompt)+'</div>';
+  {
+    const s0=(d.senses||[])[0]||{};
+    const lv=wordLevel(r.word);
+    let meta='';
+    if(s0.pos) meta+=posChip(s0.pos);
+    if(lv) meta+='<span class="lv-tag lv'+lv+'">'+LEVEL_NAMES[lv]+'</span>';
+    if(meta) h+='<div class="q-meta">'+meta+'</div>';
+  }
   if(d.vi_note && !revState) h+='<div class="q-note">'+esc(d.vi_note)+'</div>';
 
   if(!revState){
@@ -1917,10 +2073,40 @@ function wireMaintenance(){
   scanRefreshState().catch(()=>{}); missRefreshState();
 }
 
+
+/* ============================================================
+   NAVIGATION HISTORY — a real Back button in the header, so you
+   never have to hunt for a link in the middle of the page.
+   Tracks both tab changes and word pages.
+   ============================================================ */
+let navStack=[];
+function navPush(entry){
+  const last=navStack[navStack.length-1];
+  if(last && last.type===entry.type && last.value===entry.value) return;
+  navStack.push(entry);
+  if(navStack.length>40) navStack.shift();
+  updateBackBtn();
+}
+function updateBackBtn(){
+  const b=$('#back-btn'); if(!b) return;
+  b.style.display = navStack.length>1 ? 'flex' : 'none';
+}
+function goBack(){
+  if(navStack.length<2){ backToHome(); return; }
+  navStack.pop();                       // drop where we are now
+  const prev=navStack[navStack.length-1];
+  if(prev.type==='word'){ _navSilent=true; search(prev.value); }
+  else { _navSilent=true; showView(prev.value); }
+  updateBackBtn();
+}
+let _navSilent=false;   // set while restoring, so we don't re-record the step
+window.goBack=goBack;
+
 /* ============================================================
    NAV + wiring
    ============================================================ */
 function showView(v){
+  if(_navSilent) _navSilent=false; else navPush({type:'view', value:v});
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   $('#v-'+v).classList.add('active');
@@ -2051,6 +2237,7 @@ function wireOnboarding(){
   refreshStats();
   renderDashboard();
   logEvent('open', null);
+  loadLevels();   // warm the level table so practice chips work instantly
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
 })();
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;

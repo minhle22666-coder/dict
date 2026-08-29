@@ -547,22 +547,22 @@
   .hero-bubble::after{content:'';position:absolute;bottom:-9px;right:26px;border:8px solid transparent;border-top-color:var(--line)}
 
   /* ---- the orchard: tap the tree, fruit falls ---- */
-  .tree-widget{position:relative;height:186px;background:linear-gradient(180deg,var(--surface-2),var(--surface));
+  .tree-widget{position:relative;height:242px;background:linear-gradient(180deg,var(--surface-2),var(--surface));
     border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer}
-  .tree-hint{position:absolute;top:12px;left:14px;font-size:11px;font-weight:800;color:var(--muted-2);
-    letter-spacing:.05em;text-transform:uppercase;z-index:1}
-  .tree-img{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:172px;transform-origin:50% 100%;z-index:1}
+  .tree-hint{position:absolute;top:14px;left:16px;font-size:13.5px;font-weight:600;color:var(--muted);
+    letter-spacing:.01em;z-index:1;font-style:italic;opacity:.85}
+  .tree-img{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:196px;transform-origin:50% 100%;z-index:1}
   .tree-img.shaking{animation:tree-shake .55s ease}
   @keyframes tree-shake{0%,100%{transform:translateX(-50%) rotate(0)}
     15%{transform:translateX(-50%) rotate(-3.5deg)}35%{transform:translateX(-50%) rotate(3deg)}
     55%{transform:translateX(-50%) rotate(-2deg)}75%{transform:translateX(-50%) rotate(1.2deg)}}
   .tree-bush{position:absolute;right:8px;bottom:6px;width:74px;opacity:.55;z-index:0}
-  .fruit{position:absolute;top:52px;width:24px;z-index:2;animation:fruit-fall 1.4s cubic-bezier(.5,0,.9,.6) forwards}
+  .fruit{position:absolute;top:66px;width:24px;z-index:2;animation:fruit-fall 1.4s cubic-bezier(.5,0,.9,.6) forwards}
   @keyframes fruit-fall{0%{opacity:0;transform:translateY(0) rotate(0)}
     12%{opacity:1}
-    70%{opacity:1;transform:translateY(104px) rotate(220deg)}
-    82%{transform:translateY(92px) rotate(250deg)}
-    100%{opacity:0;transform:translateY(112px) rotate(300deg)}}
+    70%{opacity:1;transform:translateY(136px) rotate(220deg)}
+    82%{transform:translateY(122px) rotate(250deg)}
+    100%{opacity:0;transform:translateY(146px) rotate(300deg)}}
   .tree-bubble{position:absolute;left:12px;top:44px;max-width:47%;z-index:4;
     background:var(--surface);border:1.5px solid var(--line);color:var(--text);font-size:12px;font-weight:700;
     padding:8px 12px;border-radius:14px;line-height:1.4;box-shadow:var(--shadow);
@@ -671,6 +671,65 @@
   .tree-word{position:absolute;left:10px;bottom:8px;right:auto;max-width:60%;z-index:5;display:none;
     background:var(--surface);border:1.5px solid var(--primary);border-radius:99px;padding:7px 13px;
     box-shadow:var(--glow);align-items:baseline;gap:8px;animation:pop-in .4s cubic-bezier(.34,1.56,.64,1)}
+
+  /* ---- header back button, right next to the Focci icon ---- */
+  .brand img,.brand h1{cursor:pointer}
+  .back-btn{display:none;align-items:center;justify-content:center;width:34px;height:34px;flex:none;
+    background:var(--surface-2);border:1px solid var(--line);border-radius:12px;transition:transform .12s}
+  .back-btn:active{transform:scale(.9)}
+  .back-btn svg{width:19px;height:19px;stroke:var(--primary)}
+
+  /* ---- weekly activity chart ---- */
+  .bars{display:block;height:auto;padding:14px 14px 12px}
+  .wk-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .wk-nav{width:32px;height:32px;flex:none;border-radius:11px;background:var(--surface-2);border:1px solid var(--line);
+    color:var(--primary);font-size:19px;font-weight:900;line-height:1;display:flex;align-items:center;justify-content:center}
+  .wk-nav.off{opacity:.3;pointer-events:none}
+  .wk-nav:active{transform:scale(.9)}
+  .wk-title{flex:1;text-align:center;min-width:0}
+  .wk-range{font-size:13.5px;font-weight:900}
+  .wk-sub{font-size:11px;color:var(--muted);margin-top:2px;font-weight:700}
+  .wk-bars{display:flex;gap:7px;align-items:flex-end;height:130px}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:4px;min-width:0}
+  .bar-val{font-size:10px;font-weight:900;color:var(--muted);height:13px}
+  .bar-col.today .bar-val{color:var(--primary)}
+  .bar-track{width:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px}
+  .bar-fill{width:100%;background:var(--grad-hero);border-radius:5px 5px 3px 3px;min-height:3px;box-shadow:0 0 10px rgba(255,159,69,.3)}
+  .bar-fill.rev{background:linear-gradient(180deg,var(--cyan),#1E9E9C);box-shadow:none;border-radius:5px 5px 0 0}
+  .bar-lbl{font-size:9.5px;color:var(--muted-2);font-weight:800}
+  .bar-date{font-size:9px;color:var(--muted-2);opacity:.7;font-weight:700}
+  .bar-col.today .bar-lbl,.bar-col.today .bar-date{color:var(--primary)}
+  .wk-legend{display:flex;align-items:center;gap:6px;justify-content:center;margin-top:11px;font-size:10px;
+    color:var(--muted-2);font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+  .wk-legend .lg{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .wk-legend .lg.s{background:var(--primary)} .wk-legend .lg.r{background:var(--cyan);margin-left:8px}
+
+  /* ---- practice level chips ---- */
+  .level-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:12px;scrollbar-width:none}
+  .level-row::-webkit-scrollbar{display:none}
+  .lv-chip{flex:none;padding:7px 14px;border-radius:99px;font-size:12px;font-weight:900;
+    background:var(--surface-2);border:1.5px solid var(--line);color:var(--muted)}
+  .lv-chip.on{background:var(--grad-hero);color:#3A1E00;border-color:transparent;box-shadow:var(--glow)}
+  .lv-chip:active{transform:scale(.94)}
+  .q-meta{display:flex;gap:7px;justify-content:center;align-items:center;margin-top:11px;flex-wrap:wrap}
+  .lv-tag{font-size:10.5px;font-weight:900;padding:4px 10px;border-radius:99px;letter-spacing:.04em}
+  .lv1{background:var(--mint-bg);color:var(--mint)}
+  .lv2{background:var(--cyan-bg);color:var(--cyan)}
+  .lv3{background:var(--blue-bg);color:var(--blue)}
+  .lv4{background:var(--amber-bg);color:var(--amber)}
+  .lv5{background:var(--coral-bg);color:var(--coral)}
+  .lv6{background:var(--violet-bg);color:var(--violet)}
+  .lv-chip.lv1.on,.lv-chip.lv2.on,.lv-chip.lv3.on,.lv-chip.lv4.on,.lv-chip.lv5.on,.lv-chip.lv6.on{color:#3A1E00}
+
+  /* ---- word family grouped by part of speech ---- */
+  .family-box{display:flex;flex-direction:column;gap:9px;margin:14px 0 4px}
+  .family-row{display:flex;align-items:flex-start;gap:9px}
+  .family-lbl{flex:none;font-size:9.5px;font-weight:900;padding:5px 9px;border-radius:8px;
+    text-transform:uppercase;letter-spacing:.05em;min-width:56px;text-align:center}
+  .family-words{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+  .family-chip{flex:none;display:inline-flex;align-items:center;font-size:14px;font-weight:800;
+    padding:7px 13px;border-radius:99px;white-space:nowrap;border:1px solid currentColor;transition:transform .12s}
+  .family-chip:active{transform:scale(.94)}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -687,10 +746,12 @@
 
 <!-- STICKY SEARCH HEADER -->
 <div class="topbar">
-  <div class="brand" onclick="backToHome()" title="Back to home">
-    <img src="./icon-192.png" alt="" />
-    <h1>Focci</h1>
-    <span class="brand-home">⌂ home</span>
+  <div class="brand">
+    <button class="back-btn" id="back-btn" onclick="goBack()" aria-label="Back" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+    <img src="./icon-192.png" alt="" onclick="backToHome()" />
+    <h1 onclick="backToHome()">Focci</h1>
   </div>
   <div class="searchwrap">
     <div class="searchbox">
@@ -919,7 +980,7 @@
       <button class="btn ghost sm" id="persist-btn">Ask iOS to keep app data</button>
       <div class="saved-flash" id="persist-flash" style="margin-top:8px"></div>
     </div>
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v6 · territories</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v7 · levels</b></p>
   </section>
 </main>
 

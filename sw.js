@@ -5,7 +5,7 @@
    every image is cached automatically the first time it's fetched
    successfully, which happens naturally the first time you open the
    app online. */
-const CACHE = 'focci-v8';
+const CACHE = 'focci-v9';
 const SHELL = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const SHELL = [
   './manifest.json',
   './seed.json',
   './seed-files.txt',
+  './levels.txt',
   './icon-180.png',
   './icon-192.png',
   './icon-512.png'
