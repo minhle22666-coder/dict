@@ -576,6 +576,12 @@
       <div class="sec-h"><span class="tile tile-sm primary">✎</span>Rewrite Weak Meanings</div>
       <div class="hint" style="margin-bottom:10px">Regenerates <b>only the Vietnamese side</b> of flagged entries — collocations, idioms, phonetics and examples are kept, so each word costs about a quarter of a full rebuild. Updates land straight in your library; nothing to download or re-upload.</div>
       <div class="mnt-state" id="refresh-state">Loading…</div>
+      <input id="queue-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" style="display:none"/>
+      <div class="btn-row">
+        <button class="btn ghost sm" id="queue-upload-btn" style="margin-top:0">Upload word list</button>
+        <button class="btn ghost sm" id="queue-clear-btn" style="margin-top:0">Clear queue</button>
+      </div>
+      <div class="hint" style="margin:10px 0">Already have your results? Upload them instead of scanning again — a <code>.txt</code> with one word per line, an <code>audit.csv</code> (word,reason), or a JSON array. Words not in your library are skipped.</div>
       <div class="field"><label for="refresh-count">Words to rewrite this run</label><input id="refresh-count" type="number" min="1" value="50"/></div>
       <button class="btn sm" id="refresh-btn">Rewrite meanings</button>
       <div class="mnt-bar"><i id="refresh-bar"></i></div>

@@ -1165,6 +1165,82 @@ async function runScan(){
   maintBusy=false; $('#scan-btn').textContent='Scan for weak meanings';
 }
 
+/* ---------- import a rewrite queue from a file ----------
+   Accepts suspects.txt / ai-suspects.txt (one word per line),
+   audit.csv / ai-audit.csv (word,reason,…) or a JSON array.
+   Matched words are marked flagged so "Rewrite meanings" picks
+   them up — no scanning needed. -------------------------------- */
+function parseQueueFile(name,text){
+  const out=[];
+  if(/\.json$/i.test(name)){
+    let j; try{ j=JSON.parse(text); }catch(e){ throw new Error('That file is not valid JSON'); }
+    if(!Array.isArray(j)) j=[j];
+    for(const x of j){
+      if(typeof x==='string') out.push({w:x,r:'imported'});
+      else if(x&&x.word) out.push({w:x.word,r:String(x.reason||x.r||'imported')});
+      else if(x&&x.w) out.push({w:x.w,r:String(x.r||'imported')});
+    }
+    return out;
+  }
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  // detect a CSV header like: word,reason
+  let start=0;
+  if(lines.length&&/^"?word"?\s*,/i.test(lines[0])) start=1;
+  for(let i=start;i<lines.length;i++){
+    const l=lines[i];
+    let w,r='imported';
+    if(l.indexOf(',')>-1){
+      const m=l.match(/^\s*"((?:[^"]|"")*)"\s*,\s*"?((?:[^"]|"")*)"?/);
+      if(m){ w=m[1].replace(/""/g,'"'); r=(m[2]||'imported').replace(/""/g,'"'); }
+      else { const p=l.split(','); w=p[0]; r=p.slice(1).join(',')||'imported'; }
+      // audit.csv is word,score,senses,reasons — the reason is the LAST column
+      if(/^[\d,\s]*$/.test(r)){ const p=l.split(','); r=p[p.length-1]||'imported'; }
+    } else w=l;
+    w=String(w||'').trim().replace(/^"|"$/g,'');
+    r=String(r).trim().replace(/^"|"$/g,'').replace(/""/g,'"');
+    if(w) out.push({w,r:r.slice(0,48)||'imported'});
+  }
+  return out;
+}
+
+async function importQueueFile(file){
+  try{
+    const rows=parseQueueFile(file.name,await file.text());
+    if(!rows.length){ toast('No words found in that file'); return; }
+    $('#refresh-log').style.display='block'; $('#refresh-log').innerHTML='';
+    mLog('#refresh-log','Read '+rows.length.toLocaleString()+' words from '+file.name);
+
+    const all=await idbAll();
+    const index=new Map(all.map(r=>[r.word.toLowerCase(),r.word]));
+    const m=scanLoad();
+    let hit=0,missing=0,dupe=0; const notFound=[];
+    for(const {w,r} of rows){
+      const real=index.get(String(w).toLowerCase());
+      if(!real){ missing++; if(notFound.length<12) notFound.push(w); continue; }
+      if(m[real]&&m[real].r){ dupe++; continue; }
+      m[real]={r:r||'imported'}; hit++;
+    }
+    if(!scanSave(m)) return;
+    mLog('#refresh-log','✓ queued '+hit.toLocaleString()+' words for rewriting','ok');
+    if(dupe) mLog('#refresh-log','· '+dupe.toLocaleString()+' were already queued');
+    if(missing){
+      mLog('#refresh-log','· '+missing.toLocaleString()+' are not in your library — skipped','warn');
+      if(notFound.length) mLog('#refresh-log','   e.g. '+notFound.join(', '),'warn');
+    }
+    await scanRefreshState();
+    toast('Queued '+hit.toLocaleString()+' words');
+  }catch(e){ toast('Import failed: '+(e.message||e)); }
+}
+
+async function clearQueue(){
+  const n=flaggedWords().length;
+  if(!n){ toast('The queue is already empty'); return; }
+  if(!confirm('Clear the rewrite queue of '+n.toLocaleString()+' words? Scan results for the rest are kept.')) return;
+  const m=scanLoad();
+  for(const w of Object.keys(m)) if(m[w]&&m[w].r) m[w]={r:''};
+  scanSave(m); await scanRefreshState(); toast('Queue cleared');
+}
+
 /* ============================================================
    2 · REFRESH MEANINGS — rewrite ONLY the Vietnamese fields
    Collocations, idioms, phonetics etc. are kept untouched, so
@@ -1365,6 +1441,10 @@ function wireMaintenance(){
   on('#scan-btn',()=>runScan().catch(e=>{maintBusy=false;$('#scan-btn').textContent='Scan for weak meanings';mLog('#scan-log','Error: '+(e.message||e),'bad');}));
   on('#refresh-btn',()=>runRefresh().catch(e=>{maintBusy=false;$('#refresh-btn').textContent='Rewrite meanings';mLog('#refresh-log','Error: '+(e.message||e),'bad');}));
   on('#export-btn',exportDictionary);
+  on('#queue-upload-btn',()=>$('#queue-file').click());
+  on('#queue-clear-btn',clearQueue);
+  const qf=$('#queue-file');
+  if(qf) qf.addEventListener('change',e=>{ if(e.target.files[0]) importQueueFile(e.target.files[0]); e.target.value=''; });
   on('#miss-btn',()=>findMissing());
   on('#topup-btn',()=>runTopUp().catch(e=>{maintBusy=false;$('#topup-btn').textContent='Add words';mLog('#miss-log','Error: '+(e.message||e),'bad');}));
   on('#scan-reset',()=>{ if(confirm('Clear all scan results? You would have to scan again, which costs tokens.')){ localStorage.removeItem(SCAN_LS); scanRefreshState(); } });
