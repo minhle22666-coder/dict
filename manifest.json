@@ -1,13 +1,13 @@
 {
   "name": "Focci — Explore English",
   "short_name": "Focci",
-  "description": "A friendly fox guide for exploring English vocabulary, offline-first",
+  "description": "A fox explorer charting new lands of English vocabulary — offline-first",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FFF8F0",
-  "theme_color": "#FFF8F0",
+  "background_color": "#0E1B2A",
+  "theme_color": "#0E1B2A",
   "lang": "en",
   "icons": [
     { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" },

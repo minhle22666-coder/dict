@@ -11,6 +11,7 @@ const DAY = 864e5;
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1900); }
 function dayStart(ts){ const d=new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
 
 /* ---------- spelling-variant normalization (British -> American canonical) ---------- */
 const SPELLING_VARIANTS = {
@@ -133,7 +134,7 @@ function addXP(n){
     celebrate('./mascot-champion.webp', 'Level '+lvlAfter+'!', 'Total '+after+' XP', 'level');
   } else if(dailyBefore<goal && dailyAfter>=goal && localStorage.getItem(GOALHIT_LS)!==todayStr()){
     localStorage.setItem(GOALHIT_LS, todayStr());
-    celebrate('./mascot-good.webp', 'Daily goal reached!', dailyAfter+' / '+goal+' XP', 'goal');
+    celebrate('./mascot-jump.webp', 'Daily goal reached!', dailyAfter+' / '+goal+' XP', 'goal');
   }
   renderHero();
   renderGoalCard();
@@ -183,6 +184,7 @@ function processCelebrateQueue(){
   const {img,title,sub,kind}=_celebrateQueue.shift();
   const ov=document.createElement('div'); ov.className='celebrate-ov';
   ov.innerHTML='<div class="celebrate-card kind-'+kind+'"><div class="celebrate-rays"></div>'
+    +'<img class="celebrate-wand" src="./decor-magical-wand.webp" alt=""/>'
     +(img?'<img class="celebrate-img" src="'+img+'" alt=""/>':'')
     +'<div class="celebrate-title">'+esc(title)+'</div>'+(sub?'<div class="celebrate-sub">'+esc(sub)+'</div>':'')
     +'<div class="celebrate-tap">Tap anywhere to continue</div></div>';
@@ -427,8 +429,13 @@ async function search(rawWord, forceAI){
   if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
 
   box.innerHTML=questScene(word);
+  const questStart=now();
   try{
     const data=await askGemini(word);
+    // Keep the expedition scene on screen long enough to actually be seen —
+    // the AI often answers faster than the animation can play.
+    const elapsed=now()-questStart;
+    if(elapsed<2800) await new Promise(r=>setTimeout(r,2800-elapsed));
     const canon=norm(data.word||word);
     const rec={word:canon, data, source:'ai', firstSeen:now(), saved:0, savedAt:0};
     await idbPut(rec);
@@ -464,10 +471,38 @@ async function toggleSave(word){
    RENDER — word detail
    ============================================================ */
 function dots(rank){ const n=Math.max(0,Math.min(5,rank|0)); let o=''; for(let i=0;i<5;i++) o+= i<n?'●':'<span class="off">○</span>'; return o; }
+/* Part-of-speech styling. posKey() normalises whatever the AI returns
+   ("noun", "n.", "Noun (countable)", "adj", …) down to one known key, so a
+   chip never falls back to a mismatched colour. */
 const POS_COLOR={noun:'blue',verb:'mint',adjective:'amber',adverb:'pink',preposition:'primary',
-  conjunction:'blue',pronoun:'blue',interjection:'coral',article:'blue',idiom:'coral',slang:'pink'};
-function posChip(p){ if(!p) return ''; const c=POS_COLOR[String(p).toLowerCase()]||'blue';
-  return '<span class="pos-chip tile-sm '+c+'" style="background:var(--'+c+'-bg);color:var(--'+c+')">'+esc(p)+'</span>'; }
+  conjunction:'cyan',pronoun:'blue',interjection:'coral',article:'blue',idiom:'coral',
+  slang:'pink',phrase:'cyan',determiner:'blue',numeral:'blue',other:'blue'};
+const POS_SHORT={noun:'N',verb:'V',adjective:'ADJ',adverb:'ADV',preposition:'PREP',
+  conjunction:'CONJ',pronoun:'PRON',interjection:'INTJ',article:'ART',idiom:'IDIOM',
+  slang:'SLANG',phrase:'PHR',determiner:'DET',numeral:'NUM',other:'—'};
+function posKey(p){
+  const s=String(p||'').toLowerCase().trim();
+  if(!s) return 'other';
+  if(s.startsWith('noun')||s==='n'||s==='n.') return 'noun';
+  if(s.startsWith('verb')||s==='v'||s==='v.') return 'verb';
+  if(s.startsWith('adj')) return 'adjective';
+  if(s.startsWith('adv')) return 'adverb';
+  if(s.startsWith('prep')) return 'preposition';
+  if(s.startsWith('conj')) return 'conjunction';
+  if(s.startsWith('pron')) return 'pronoun';
+  if(s.startsWith('interj')||s.startsWith('excl')) return 'interjection';
+  if(s.startsWith('art')) return 'article';
+  if(s.startsWith('idiom')) return 'idiom';
+  if(s.startsWith('slang')) return 'slang';
+  if(s.startsWith('phras')) return 'phrase';
+  if(s.startsWith('det')) return 'determiner';
+  if(s.startsWith('num')) return 'numeral';
+  return POS_COLOR[s] ? s : 'other';
+}
+function posLabel(p){ const k=posKey(p); return k==='other' ? String(p||'') : k; }
+function posChip(p){ if(!p) return '';
+  const k=posKey(p), c=POS_COLOR[k];
+  return '<span class="pos-chip pos-'+c+'">'+esc(posLabel(p))+'</span>'; }
 
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
@@ -490,9 +525,9 @@ function renderEntry(rec, queriedAs){
 
   if(Array.isArray(d.family)&&d.family.length){
     h+='<div class="family-scroll">';
-    for(const fm of d.family){ const fw=esc(fm.word||''); const c=POS_COLOR[String(fm.pos||'').toLowerCase()]||'blue';
-      h+='<button class="family-chip" style="background:var(--'+c+'-bg);color:var(--'+c+')" onclick="jump(\''+fw.replace(/'/g,"\\'")+'\')">'
-        +'<span class="fc-pos">'+esc((fm.pos||'').slice(0,3))+'</span>'+fw+'</button>'; }
+    for(const fm of d.family){ const fw=esc(fm.word||''); const k=posKey(fm.pos), c=POS_COLOR[k];
+      h+='<button class="family-chip pos-'+c+'" onclick="jump(\''+fw.replace(/'/g,"\\'")+'\')">'
+        +'<span class="fc-pos">'+esc(POS_SHORT[k]||'—')+'</span><span class="fc-w">'+fw+'</span></button>'; }
     h+='</div>';
   }
 
@@ -530,10 +565,10 @@ function renderEntry(rec, queriedAs){
       const ma=Math.max(...a[1].map(x=>x.rank||0)), mb=Math.max(...b[1].map(x=>x.rank||0));
       return mb-ma || b[1].length-a[1].length;
     });
-    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm primary">📘</span>Meanings</div>';
+    h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-book-open.webp" alt=""/>Meanings</div>';
     for(const [pos,list] of order){
       list.sort((a,b)=>(b.rank||0)-(a.rank||0));
-      const c=POS_COLOR[pos]||'blue';
+      const c=POS_COLOR[posKey(pos)]||'blue';
       h+='<div class="pos-group" style="border-left-color:var(--'+c+')">';
       h+='<div class="pos-group-h">'+posChip(pos)
         +'<span class="pos-count">'+list.length+(list.length>1?' nghĩa':' nghĩa')+'</span></div>';
@@ -561,7 +596,7 @@ function renderEntry(rec, queriedAs){
 
   if(Array.isArray(d.collocations)&&d.collocations.length){
     const cs=[...d.collocations].sort((a,b)=>(b.rank||0)-(a.rank||0));
-    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm blue">🔗</span>Collocations</div>';
+    h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-note-and-pen.webp" alt=""/>Collocations</div>';
     for(const c of cs){ h+='<div class="expr"><span class="rank">'+dots(c.rank)+'</span><span class="t">'+esc(c.text)+'</span>';
       if(c.vi) h+='<span class="ev">'+esc(c.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
@@ -607,34 +642,47 @@ function renderEntry(rec, queriedAs){
   return h;
 }
 function formCell(k,v){ return '<div class="form"><div class="k">'+k+'</div><div class="v">'+esc(v||'—')+'</div></div>'; }
-function jump(w){ $('#q').value=w; search(w); window.scrollTo({top:0,behavior:'smooth'}); }
+function jump(w){
+  $('#q').value=w;
+  hideSuggest();
+  const box=$('#result');
+  if(box) box.classList.add('leaving');
+  window.scrollTo({top:0,behavior:'smooth'});
+  setTimeout(()=>{ if(box) box.classList.remove('leaving'); search(w); }, 130);
+}
 
 /* ---------- empty / error / loading states ---------- */
 function suggestState(query,guess){
   const label=esc(guess.label), target=guess.target, safeT=target.replace(/'/g,"\\'"), safeQ=query.replace(/'/g,"\\'");
   const kind = guess.type==='expr' ? ' <span style="color:var(--muted-2)">(inside “'+esc(target)+'”)</span>' : '';
   let h='<div class="back-row" onclick="backToHome()">← Home</div>';
-  h+='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>We don\'t have “'+esc(query)+'” yet</h3>';
+  h+='<div class="empty"><img class="ill" src="./mascot-investigate.webp" alt=""/><h3>We don\'t have “'+esc(query)+'” yet</h3>';
   h+='<p>Did you mean <b style="color:var(--text)">“'+label+'”</b>'+kind+'?</p></div>';
   h+='<button class="btn" onclick="jump(\''+safeT+'\')">Show “'+esc(target)+'”</button>';
   h+='<button class="btn ghost sm" style="margin-top:8px" onclick="forceAI(\''+safeQ+'\')">No — look it up as typed</button>';
   return h;
 }
-function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can look up new words for you.</p></div>'; }
-function offlineState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
+function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can look up new words for you.</p></div>'; }
+function offlineState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
 function errorState(w,msg){
   let m='Something went wrong reaching the AI.';
   if(msg.startsWith('BAD_KEY')) m='Your API key looks wrong or isn\'t enabled. Check it in Settings.';
   else if(msg.startsWith('API')) m='Google returned an error: '+esc(msg.slice(4,120));
   else if(msg==='PARSE') m='The AI reply wasn\'t in the right format. Try again.';
   else if(msg==='OFFLINE') return offlineState(w);
-  return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
+  return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
 }
 function questScene(word){
+  const cheers=["DON'T GIVE UP…","UNCHARTED TERRITORY!","INTO THE UNKNOWN…","A NEW LAND AWAITS!"];
   return '<div class="quest-scene" style="background-image:url(./bg-desert.webp)">'
-    +'<div class="quest-caption"><div class="l1">DON\'T GIVE UP…</div><div class="l2">Focci is looking up “'+esc(word)+'” for you</div></div>'
+    +'<div class="quest-caption"><div class="l1">'+pick(cheers)+'</div>'
+    +'<div class="l2">Focci is charting “'+esc(word)+'” for you</div></div>'
+    +'<img class="q-map" src="./decor-map.webp" alt=""/>'
+    +'<img class="q-rock" src="./decor-rock.webp" alt=""/>'
+    +'<img class="q-bush" src="./decor-bush.webp" alt=""/>'
     +'<img class="tumbleweed" src="./decor-tumbleweed.webp" alt=""/>'
     +'<img class="fighter" src="./mascot-fighting.webp" alt=""/>'
+    +'<div class="q-dots"><i></i><i></i><i></i></div>'
     +'</div>';
 }
 
@@ -685,13 +733,15 @@ async function renderHistory(){
     seen.add(l.word); recent.push(l.word);
   }
   const box=$('#history-list');
-  if(!recent.length){ box.innerHTML='<div class="empty" style="padding:24px 10px"><p>No searches yet — try looking up a word above!</p></div>'; return; }
+  if(!recent.length){ box.innerHTML='<div class="empty" style="padding:20px 10px"><img class="ill" style="width:110px" src="./mascot-explore.webp" alt=""/><h3>No discoveries yet</h3><p>Search a word above — Focci will chart it on the map.</p></div>'; return; }
   const recs=await Promise.all(recent.map(w=>idbGet(w)));
   let h='';
   for(const r of recs){ if(!r) continue; const d=r.data||{};
-    h+='<div class="row" onclick="jump(\''+esc(r.word).replace(/'/g,"\\'")+'\')">'
+    h+='<div class="row hist-row" onclick="jump(\''+esc(r.word).replace(/'/g,"\\'")+'\')">'
+      +'<img class="row-ico" src="./decor-magnifying-glass.webp" alt=""/>'
       +'<div class="mid"><span class="w">'+esc(r.word)+'</span> <span class="phon">'+esc(d.phonetic||'')+'</span>'
       +(d.vi_equivalent?'<div class="e">'+esc(d.vi_equivalent)+'</div>':'')+'</div>'
+      +'<span class="row-go">→</span>'
       +'</div>';
   }
   box.innerHTML=h;
@@ -739,8 +789,9 @@ const BOOKMARK_COLORS=['yellow','orange','red','blue','green'];
 async function renderSaved(){
   let all=(await idbAll()).filter(r=>r.saved);
   const box=$('#saved-list');
-  $('#saved-count').textContent=all.length+' word'+(all.length===1?'':'s')+' saved';
-  if(!all.length){ box.innerHTML='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>No saved words yet</h3><p>Tap the star ☆ on any word to save it here.</p></div>'; return; }
+  $('#saved-count').innerHTML='<img class="hdr-ico" src="./decor-earth.webp" alt=""/>'
+    +all.length+' word'+(all.length===1?'':'s')+' collected';
+  if(!all.length){ box.innerHTML='<div class="empty"><img class="ill" src="./mascot-explore.webp" alt=""/><h3>No saved words yet</h3><p>Tap the star ☆ on any word to save it here.</p></div>'; return; }
   if(savedSort==='az') all.sort((a,b)=>a.word.localeCompare(b.word));
   else if(savedSort==='oldest') all.sort((a,b)=>a.savedAt-b.savedAt);
   else all.sort((a,b)=>b.savedAt-a.savedAt);
@@ -768,7 +819,7 @@ function reviewPrompt(d){
 async function startReview(){
   const saved=(await idbAll()).filter(r=>r.saved);
   const area=$('#review-area');
-  if(saved.length<1){ area.innerHTML='<div class="empty"><img class="ill" src="./mascot-think.webp" alt=""/><h3>Nothing to practice yet</h3><p>Save a few words first, then come back here to type them out from memory.</p></div>'; return; }
+  if(saved.length<1){ area.innerHTML='<div class="empty"><img class="ill" src="./mascot-drink_tea_cup.webp" alt=""/><h3>Nothing to practice yet</h3><p>Save a few words first, then come back here to type them out from memory.</p></div>'; return; }
   revQueue=saved.sort(()=>Math.random()-0.5).slice(0,10); revIdx=0; revState=null;
   revResults=new Array(revQueue.length).fill(null); revCorrectCount=0; revSessionAwarded=false;
   renderReview();
@@ -782,7 +833,15 @@ function renderReview(){
       if(revCorrectCount===revQueue.length) localStorage.setItem(PERFECT_LS,'1');
       checkAchievements();
     }
-    area.innerHTML='<div class="empty"><img class="ill" src="./mascot-champion.webp" alt=""/><h3>Round complete!</h3><p>'+revCorrectCount+' / '+revQueue.length+' correct · +10 XP for finishing. Check Progress for details.</p></div>'
+    const perfect=revCorrectCount===revQueue.length;
+    const pose=perfect?'champion':(revCorrectCount>=revQueue.length/2?'jump':'run_and_think');
+    const say=perfect?'A flawless expedition! Every single one.'
+      :(revCorrectCount>=revQueue.length/2?'Good haul! The map is filling in.'
+      :'Every explorer stumbles. Tomorrow we go again.');
+    area.innerHTML='<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt=""/>'
+      +'<div class="speech big">'+esc(say)+'</div>'
+      +'<div class="rd-score">'+revCorrectCount+' / '+revQueue.length+'</div>'
+      +'<div class="rd-sub">correct · +10 XP for finishing</div></div>'
       +'<button class="btn" onclick="startReview()">Practice Again</button>';
     confettiBurst(area);
     return;
@@ -796,7 +855,15 @@ function renderReview(){
   }
   h+='</div>';
   h+='<div class="rev-progress">Word '+(revIdx+1)+' / '+revQueue.length+'</div>';
-  h+='<img class="rev-mascot" src="./mascot-think.webp" alt=""/>';
+  // Focci reacts to the answer you just gave
+  let pose='run_and_think', bubble="Hmm… which word was it?";
+  if(revState){
+    if(revState.correct && !revState.close){ pose='thumbsup'; bubble=pick(["Nailed it!","That's the one!","Exactly right!"]); }
+    else if(revState.correct){ pose='wonder'; bubble="So close — just the spelling!"; }
+    else { pose='tired'; bubble=pick(["We'll get it next time.","Tricky one. Keep going!"]); }
+  }
+  h+='<div class="rev-hero"><img class="rev-mascot" src="./mascot-'+pose+'.webp" alt=""/>'
+    +'<div class="speech">'+esc(bubble)+'</div></div>';
   h+='<div class="rev-card">';
   h+='<div class="prompt">What\'s the English word for…</div>';
   h+='<div class="q">'+esc(prompt)+'</div>';
@@ -906,14 +973,33 @@ async function renderInsights(){
   const area=$('#insights-area');
   const s=await computeInsights();
   if(!s.totalHourEvents){
-    area.innerHTML='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Not enough data yet</h3><p>Search and practice a few more words to see your habits here.</p></div>';
+    area.innerHTML='<div class="empty"><img class="ill" src="./mascot-read_map.webp" alt=""/><h3>Not enough data yet</h3><p>Search and practice a few more words to see your habits here.</p></div>';
     return;
   }
+  const lvl=levelFromXP(getXP()), xp=getXP();
+  const xpInLvl=xp%100;
+  // Focci's rank grows with your level — the explorer levels up with you
+  const RANKS=[[1,'run','Rookie Explorer'],[3,'explore','Scout'],[5,'read_map','Pathfinder'],
+               [8,'badass','Veteran Explorer'],[12,'champion','Legend of the Map']];
+  let rank=RANKS[0];
+  for(const r of RANKS) if(lvl>=r[0]) rank=r;
+
   let h='';
-  h+='<div class="hero-compact">';
-  h+='<img class="progress-deco" src="./decor-load-of-book.webp" alt=""/>';
-  h+='<div class="streak-n">'+s.streak+'</div><div class="streak-l">day streak</div>';
-  if(!s.hasToday && s.streak>0) h+='<div class="streak-warn">No activity yet today — explore a word to keep it going!</div>';
+  h+='<div class="prog-hero">';
+  h+='<div class="prog-rays"></div>';
+  h+='<img class="prog-char" src="./mascot-'+rank[1]+'.webp" alt=""/>';
+  h+='<div class="prog-info">';
+  h+='<div class="prog-rank">'+esc(rank[2])+'</div>';
+  h+='<div class="prog-lvl">Level '+lvl+'</div>';
+  h+='<div class="prog-xpbar"><i style="width:'+xpInLvl+'%"></i></div>';
+  h+='<div class="prog-xptxt">'+xpInLvl+' / 100 XP to level '+(lvl+1)+'</div>';
+  h+='</div></div>';
+
+  h+='<div class="streak-card'+(s.hasToday?' lit':'')+'">';
+  h+='<div class="streak-flame">🔥</div>';
+  h+='<div><div class="streak-n">'+s.streak+'<span> day'+(s.streak===1?'':'s')+'</span></div>';
+  h+='<div class="streak-l">'+(s.hasToday?'Streak alive — nice work today!':'Explore one word to keep it going')+'</div></div>';
+  h+='<img class="streak-deco" src="./decor-alarm.webp" alt=""/>';
   h+='</div>';
 
   h+='<div class="stat-grid">';
@@ -922,6 +1008,9 @@ async function renderInsights(){
   h+='<div class="stat"><div class="tile mint">🎯</div><div class="n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</div><div class="l">ACCURACY</div></div>';
   h+='</div>';
 
+  h+='<div class="library-card"><img src="./decor-load-of-book.webp" alt=""/>'
+    +'<div><div class="lib-n">'+s.totalWords.toLocaleString()+'</div>'
+    +'<div class="lib-l">words charted in Focci\'s library</div></div></div>';
   h+='<div class="sec"><div class="sec-h">What Focci noticed</div>';
   if(s.peakRange && s.peakPct>=20) h+=insightCard('blue','🕒','You\'re most active in the '+s.peakRange.name, 'About '+s.peakPct+'% of your activity happens then.');
   if(s.totalReview>=5 && s.accuracy!=null){
@@ -954,32 +1043,62 @@ function timeOfDay(){
   if(hr>=17 && hr<21) return 'evening';
   return 'night';
 }
+/* In October, Focci dresses up — a small seasonal surprise. */
+function isSpookySeason(){ const d=new Date(); return d.getMonth()===9; }
 const TIME_CONTENT={
-  morning:{bg:'morning', char:'avatar', greet:'Good morning', sub:'Ready to discover new words today?'},
-  afternoon:{bg:'afternoon', char:'map', greet:'Good afternoon', sub:'Focci found a new land to explore.'},
-  evening:{bg:'evening', char:'note', greet:'Good evening', sub:"Let's note down what you learned today."},
-  night:{bg:'night', char:'night', greet:'Good night', sub:'Rest up — more words await tomorrow.'},
+  morning:{bg:'morning', char:'avatar', sky:'decor-shiny-sun', greet:'Good morning',
+    lines:["A brand new map is waiting. Where shall we go?",
+           "The sun is up — perfect weather for word-hunting!",
+           "Focci packed the bag. Ready when you are!"]},
+  afternoon:{bg:'afternoon', char:'read_map', sky:'decor-shiny-sun', greet:'Good afternoon',
+    lines:["I spotted a new land on the map. Come see!",
+           "Halfway through the day — a few more words?",
+           "This trail looks promising. Follow me!"]},
+  evening:{bg:'evening', char:'take_note', sky:'decor-shiny-sun', greet:'Good evening',
+    lines:["Let's write down what we found today.",
+           "Camp is set. Time to review our discoveries.",
+           "Golden hour — the best time to remember things."]},
+  night:{bg:'night', char:'night', sky:'decor-moon', greet:'Good night',
+    lines:["The stars are out. One last word before bed?",
+           "Focci is sleepy… but never too sleepy to learn.",
+           "Rest well — new lands await tomorrow."]},
 };
+/* Focci reacts to how you're doing, not just the clock. */
+function heroLine(t, streak, hasToday, dailyXP, goal){
+  if(streak>0 && !hasToday) return "Our "+streak+"-day streak needs you! One word keeps it alive.";
+  if(dailyXP>=goal) return "Today's goal is done — you're on fire! 🔥";
+  if(streak>=7) return streak+" days in a row. You're a real explorer now!";
+  const arr=t.lines;
+  return arr[Math.floor(Date.now()/3600000) % arr.length];
+}
 async function renderHero(){
   const heroEl=$('#hero'); if(!heroEl) return;
   const t=TIME_CONTENT[timeOfDay()];
   const name=getName();
   heroEl.style.backgroundImage="url('./bg-"+t.bg+".webp')";
-  $('#hero-char').src='./mascot-'+t.char+'.webp';
-  $('#hero-sky').src = (t.bg==='night') ? './decor-moon.webp' : './decor-shiny-sun.webp';
+  heroEl.classList.toggle('is-night', t.bg==='night');
+  const spooky = isSpookySeason() && (timeOfDay()==='evening' || timeOfDay()==='night');
+  $('#hero-char').src='./mascot-'+(spooky?'halloween':t.char)+'.webp';
+  $('#hero-sky').src='./'+t.sky+'.webp';
+  const foliage=$('#hero-foliage');
+  if(foliage){
+    foliage.src = (t.bg==='night') ? './decor-bush.webp' : './decor-tree.webp';
+    foliage.style.display='block';
+  }
   $('#hero-greet').textContent=t.greet+(name?', '+name:'')+'!';
 
   const streakEl=$('#hero-streak'), subEl=$('#hero-sub'), levelEl=$('#hero-level');
+  let streak=0, hasToday=false;
   try{
     const logs=await logAll();
     const daySet=new Set(logs.map(l=>dayStart(l.ts)));
-    const {streak, hasToday}=computeStreak(daySet);
-    if(streak>0){
-      streakEl.style.display='inline-flex';
-      streakEl.innerHTML='🔥 '+streak+' day'+(streak===1?'':'s');
-      subEl.textContent = hasToday ? t.sub : "You haven't explored today — keep your "+streak+'-day streak alive!';
-    } else { streakEl.style.display='none'; subEl.textContent=t.sub; }
-  }catch(e){ subEl.textContent=t.sub; }
+    ({streak, hasToday}=computeStreak(daySet));
+  }catch(e){}
+  if(streak>0){
+    streakEl.style.display='inline-flex';
+    streakEl.innerHTML='🔥 '+streak+' day'+(streak===1?'':'s');
+  } else streakEl.style.display='none';
+  subEl.textContent=heroLine(t, streak, hasToday, getDailyXP(), getDailyGoal());
   const lvl=levelFromXP(getXP());
   if(levelEl) levelEl.innerHTML='⚡ Level '+lvl;
 }
