@@ -508,7 +508,14 @@ function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
   const badge = rec.source==='ai' ? '<span class="badge ai">✦ AI · saved offline</span>' : '<span class="badge off">◆ offline</span>';
 
+  // A different Focci pose peeks from the corner of each word — deterministic
+  // per word, so the same entry always has the same companion.
+  const CORNER=['drink_tea_cup','badass','investigate','wonder','run_and_think','take_note','explore','thumbsup'];
+  let seed=0; for(const ch of String(w)) seed=(seed*31+ch.charCodeAt(0))>>>0;
+  const corner=CORNER[seed%CORNER.length];
+
   let h='<div class="entry">';
+  h+='<img class="entry-corner" src="./mascot-'+corner+'.webp" alt=""/>';
   h+='<div class="back-row" onclick="backToHome()">← Home</div>';
   if(queriedAs){
     h+='<div class="corrected">Corrected from “'+esc(queriedAs)+'”'+(d.query_note?' · '+esc(d.query_note):'')+'</div>';
@@ -612,14 +619,14 @@ function renderEntry(rec, queriedAs){
 
   if(Array.isArray(d.idioms)&&d.idioms.length){
     const is_=[...d.idioms].sort((a,b)=>(b.rank||0)-(a.rank||0));
-    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm coral">💬</span>Idioms</div>';
+    h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-magnifying-glass.webp" alt=""/>Idioms</div>';
     for(const it of is_){ h+='<div class="expr"><span class="rank">'+dots(it.rank)+'</span><span class="t">'+esc(it.text)+'</span>';
       if(it.vi) h+='<span class="ev">'+esc(it.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
   }
 
   if(Array.isArray(d.prepositions)&&d.prepositions.length){
-    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm amber">🧭</span>Prepositions</div>';
+    h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-map.webp" alt=""/>Prepositions</div>';
     for(const p of d.prepositions){
       h+='<div class="prep-item"><div class="prep-w">'+esc(d.word||w)+' <b style="color:var(--amber)">'+esc(p.prep)+'</b></div>';
       if(p.meaning_vi) h+='<div class="prep-m">'+esc(p.meaning_vi)+'</div>';
@@ -630,7 +637,7 @@ function renderEntry(rec, queriedAs){
   }
 
   if((d.synonyms&&d.synonyms.length)||(d.antonyms&&d.antonyms.length)){
-    h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm mint">⇄</span>Synonyms &amp; Antonyms</div><div class="syn-ant">';
+    h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-earth.webp" alt=""/>Synonyms &amp; Antonyms</div><div class="syn-ant">';
     if(d.synonyms&&d.synonyms.length){ h+='<div class="syn-ant-row syn"><div class="lbl">✓ Similar</div><div class="chips">';
       d.synonyms.forEach(x=>h+='<button class="chip syn tap" onclick="jump(\''+esc(x)+'\')">'+esc(x)+'</button>'); h+='</div></div>'; }
     if(d.antonyms&&d.antonyms.length){ h+='<div class="syn-ant-row ant"><div class="lbl">✕ Opposite</div><div class="chips">';
@@ -654,15 +661,21 @@ function jump(w){
 /* ---------- empty / error / loading states ---------- */
 function suggestState(query,guess){
   const label=esc(guess.label), target=guess.target, safeT=target.replace(/'/g,"\\'"), safeQ=query.replace(/'/g,"\\'");
-  const kind = guess.type==='expr' ? ' <span style="color:var(--muted-2)">(inside “'+esc(target)+'”)</span>' : '';
+  const kind = guess.type==='expr' ? ' <span style="opacity:.72">(inside “'+esc(target)+'”)</span>' : '';
   let h='<div class="back-row" onclick="backToHome()">← Home</div>';
-  h+='<div class="empty"><img class="ill" src="./mascot-investigate.webp" alt=""/><h3>We don\'t have “'+esc(query)+'” yet</h3>';
-  h+='<p>Did you mean <b style="color:var(--text)">“'+label+'”</b>'+kind+'?</p></div>';
-  h+='<button class="btn" onclick="jump(\''+safeT+'\')">Show “'+esc(target)+'”</button>';
-  h+='<button class="btn ghost sm" style="margin-top:8px" onclick="forceAI(\''+safeQ+'\')">No — look it up as typed</button>';
+  // Primary action: send Focci off to chart the unknown word.
+  h+='<div class="ask-ai-card" onclick="forceAI(\''+safeQ+'\')">'
+    +'<img src="./mascot-investigate.webp" alt=""/>'
+    +'<div class="ask-ai-txt"><div class="ask-ai-t">Send Focci to explore “'+esc(query)+'”</div>'
+    +'<div class="ask-ai-s">AI charts it once, then it\'s yours offline forever</div></div>'
+    +'<div class="ask-ai-go">→</div></div>';
+  h+='<div class="near-miss"><div class="near-miss-h">Or did you mean…</div>'
+    +'<div class="near-miss-row" onclick="jump(\''+safeT+'\')"><span class="nm-w">'+label+'</span>'+kind
+    +'<span class="nm-go">→</span></div></div>';
   return h;
 }
-function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can look up new words for you.</p></div>'; }
+function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can chart new words for you.</p></div>'
+   +'<button class="btn" onclick="showView(\'settings\')">Open Settings</button>'; }
 function offlineState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
 function errorState(w,msg){
   let m='Something went wrong reaching the AI.';
@@ -779,6 +792,80 @@ function renderGoalCard(){
   const lbl=$('#goal-title'); if(lbl) lbl.textContent=Math.min(daily,goal)+(daily>goal?'+':'')+' / '+goal+' XP today';
 }
 
+
+/* ============================================================
+   THE ORCHARD — a small interactive corner on the Home tab.
+   Tap the tree: it shakes, fruit drops, and the tree complains.
+   Each shake reveals a saved word, so poking around actually
+   builds a memory hook instead of being pure decoration.
+   ============================================================ */
+const TREE_LINES=[
+  "Ouch! Careful with the branches…",
+  "Hey! Something fell out.",
+  "That tickles. Take a word, then.",
+  "Alright, alright — here's another one!",
+  "You again? Fine. Last one… probably.",
+  "I'm a tree, not a vending machine!"
+];
+let treeShakes=0;
+async function shakeTree(){
+  const wrap=$('#tree-widget'); if(!wrap) return;
+  const tree=$('#tree-img'), bubble=$('#tree-bubble');
+  treeShakes++;
+  tree.classList.remove('shaking'); void tree.offsetWidth; tree.classList.add('shaking');
+
+  // drop 2–4 pieces of fruit
+  const n=2+Math.floor(Math.random()*3);
+  for(let i=0;i<n;i++){
+    const f=document.createElement('img');
+    f.className='fruit';
+    f.src = Math.random()<0.6 ? './decor-apple-green.webp' : './decor-orange.webp';
+    f.style.left=(24+Math.random()*52)+'%';
+    f.style.animationDelay=(Math.random()*0.25)+'s';
+    wrap.appendChild(f);
+    setTimeout(()=>f.remove(),1500);
+  }
+  bubble.textContent=TREE_LINES[Math.min(treeShakes-1,TREE_LINES.length-1)];
+  bubble.classList.add('show');
+  clearTimeout(bubble._t); bubble._t=setTimeout(()=>bubble.classList.remove('show'),2600);
+
+  // every 2nd shake, a saved word falls out too — a free micro-review
+  if(treeShakes%2===0){
+    try{
+      const saved=(await idbAll()).filter(r=>r.saved);
+      const pool=saved.length?saved:(await idbAll());
+      if(pool.length){
+        const r=pool[Math.floor(Math.random()*pool.length)];
+        const eq=r.data?.vi_equivalent||'';
+        const card=$('#tree-word');
+        card.innerHTML='<span class="tw-w">'+esc(r.word)+'</span>'+(eq?'<span class="tw-e">'+esc(eq)+'</span>':'')
+          +'<span class="tw-go">tap to open →</span>';
+        card.onclick=()=>jump(r.word);
+        card.classList.add('show');
+      }
+    }catch(e){}
+  }
+}
+
+/* Tap Focci on the hero banner and he says something back. */
+const FOCCI_TAPS=[
+  "Ready when you are, explorer!",
+  "Psst… try searching a word you heard today.",
+  "My notebook has room for one more word.",
+  "The best maps are drawn one step at a time.",
+  "I once got lost looking for 'serendipity'. Worth it.",
+  "Streaks are just tiny adventures in a row."
+];
+function tapFocci(){
+  const b=$('#hero-bubble'); if(!b) return;
+  b.textContent=pick(FOCCI_TAPS);
+  b.classList.add('show');
+  const c=$('#hero-char');
+  c.classList.remove('hop'); void c.offsetWidth; c.classList.add('hop');
+  clearTimeout(b._t); b._t=setTimeout(()=>b.classList.remove('show'),2800);
+}
+window.shakeTree=shakeTree; window.tapFocci=tapFocci;
+
 /* ============================================================
    SAVED
    ============================================================ */
@@ -791,6 +878,19 @@ async function renderSaved(){
   const box=$('#saved-list');
   $('#saved-count').innerHTML='<img class="hdr-ico" src="./decor-earth.webp" alt=""/>'
     +all.length+' word'+(all.length===1?'':'s')+' collected';
+  // territory banner — the land grows greener as the collection grows
+  const banner=$('#saved-banner');
+  if(banner){
+    const tiers=[[0,'desert','Barren lands… collect words to grow them.'],
+                 [10,'morning','Green shoots! Your territory is waking up.'],
+                 [40,'afternoon','Rolling hills — a proper explorer\'s map.'],
+                 [100,'evening','Vast country. Focci is impressed.']];
+    let t=tiers[0]; for(const x of tiers) if(all.length>=x[0]) t=x;
+    banner.style.backgroundImage="url('./bg-"+t[1]+".webp')";
+    banner.innerHTML='<div class="sb-scrim"></div>'
+      +'<img class="sb-char" src="./mascot-'+(all.length>=40?'badass':'explore')+'.webp" alt=""/>'
+      +'<div class="sb-txt"><div class="sb-t">Your Territory</div><div class="sb-s">'+esc(t[2])+'</div></div>';
+  }
   if(!all.length){ box.innerHTML='<div class="empty"><img class="ill" src="./mascot-explore.webp" alt=""/><h3>No saved words yet</h3><p>Tap the star ☆ on any word to save it here.</p></div>'; return; }
   if(savedSort==='az') all.sort((a,b)=>a.word.localeCompare(b.word));
   else if(savedSort==='oldest') all.sort((a,b)=>a.savedAt-b.savedAt);
@@ -1038,10 +1138,10 @@ async function renderInsights(){
 /* ---------- greeting hero ---------- */
 function timeOfDay(){
   const hr=new Date().getHours();
-  if(hr>=5 && hr<11) return 'morning';
-  if(hr>=11 && hr<17) return 'afternoon';
-  if(hr>=17 && hr<21) return 'evening';
-  return 'night';
+  if(hr>=5  && hr<11) return 'morning';
+  if(hr>=11 && hr<16) return 'afternoon';
+  if(hr>=16 && hr<19) return 'evening';
+  return 'night';            // 19:00 → 05:00, so the moon + night fox really show up
 }
 /* In October, Focci dresses up — a small seasonal surprise. */
 function isSpookySeason(){ const d=new Date(); return d.getMonth()===9; }
@@ -1323,11 +1423,22 @@ function parseQueueFile(name,text){
 }
 
 async function importQueueFile(file){
+  return ingestQueueRows(parseQueueFile(file.name, await file.text()), file.name);
+}
+/* Paste-a-list counterpart of the file upload — same parsing, same queue. */
+async function importQueuePaste(){
+  const ta=$('#queue-text'); if(!ta) return;
+  const text=(ta.value||'').trim();
+  if(!text){ toast('Paste some words first'); return; }
+  const rows=parseQueueFile('pasted.txt', text);
+  const ok=await ingestQueueRows(rows,'your pasted list');
+  if(ok) ta.value='';
+}
+async function ingestQueueRows(rows, sourceName){
   try{
-    const rows=parseQueueFile(file.name,await file.text());
-    if(!rows.length){ toast('No words found in that file'); return; }
+    if(!rows.length){ toast('No words found in that list'); return false; }
     $('#refresh-log').style.display='block'; $('#refresh-log').innerHTML='';
-    mLog('#refresh-log','Read '+rows.length.toLocaleString()+' words from '+file.name);
+    mLog('#refresh-log','Read '+rows.length.toLocaleString()+' words from '+sourceName);
 
     const all=await idbAll();
     const index=new Map(all.map(r=>[r.word.toLowerCase(),r.word]));
@@ -1339,7 +1450,7 @@ async function importQueueFile(file){
       if(m[real]&&m[real].r){ dupe++; continue; }
       m[real]={r:r||'imported'}; hit++;
     }
-    if(!scanSave(m)) return;
+    if(!scanSave(m)) return false;
     mLog('#refresh-log','✓ queued '+hit.toLocaleString()+' words for rewriting','ok');
     if(dupe) mLog('#refresh-log','· '+dupe.toLocaleString()+' were already queued');
     if(missing){
@@ -1348,7 +1459,8 @@ async function importQueueFile(file){
     }
     await scanRefreshState();
     toast('Queued '+hit.toLocaleString()+' words');
-  }catch(e){ toast('Import failed: '+(e.message||e)); }
+    return true;
+  }catch(e){ toast('Import failed: '+(e.message||e)); return false; }
 }
 
 async function clearQueue(){
@@ -1562,6 +1674,7 @@ function wireMaintenance(){
   on('#export-btn',exportDictionary);
   on('#queue-upload-btn',()=>$('#queue-file').click());
   on('#queue-clear-btn',clearQueue);
+  on('#queue-paste-btn',importQueuePaste);
   const qf=$('#queue-file');
   if(qf) qf.addEventListener('change',e=>{ if(e.target.files[0]) importQueueFile(e.target.files[0]); e.target.value=''; });
   on('#miss-btn',()=>findMissing());
