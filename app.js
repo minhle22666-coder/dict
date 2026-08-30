@@ -419,13 +419,9 @@ async function search(rawWord, forceAI){
     const local=await idbGet(word);
     if(local && local.alias){
       const canon=await idbGet(local.alias);
-      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); logEvent('search',canon.word); addXP(2);
-        if(_navSilent) _navSilent=false; else navPush({type:'word', value:canon.word});
-        return; }
+      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); logEvent('search',canon.word); addXP(2); return; }
     }
-    if(local){ currentWord=word; box.innerHTML=renderEntry(local); logEvent('search',word); addXP(2);
-      if(_navSilent) _navSilent=false; else navPush({type:'word', value:word});
-      return; }
+    if(local){ currentWord=word; box.innerHTML=renderEntry(local); logEvent('search',word); addXP(2); return; }
 
     const guess=await fuzzyLocalSearch(word);
     if(guess){ box.innerHTML=suggestState(word, guess); return; }
@@ -452,14 +448,13 @@ async function search(rawWord, forceAI){
     box.innerHTML=renderEntry(rec, canon!==word?word:null);
     logEvent('search',canon);
     addXP(2);
-    if(_navSilent) _navSilent=false; else navPush({type:'word', value:canon});
     refreshStats();
   }catch(err){
     box.innerHTML=errorState(word,err.message||'');
   }
 }
 function forceAI(word){ search(word,true); }
-function backToHome(){ navStack=[{type:'view',value:'home'}]; updateBackBtn(); currentWord=null; $('#result').innerHTML=''; $('#dashboard').style.display='block'; $('#q').value=''; $('#clearx').style.display='none'; renderDashboard(); window.scrollTo(0,0); }
+function backToHome(){ currentWord=null; $('#result').innerHTML=''; $('#dashboard').style.display='block'; $('#q').value=''; $('#clearx').style.display='none'; renderDashboard(); window.scrollTo(0,0); }
 
 /* ---------- toggle save ---------- */
 async function toggleSave(word){
@@ -477,7 +472,16 @@ async function toggleSave(word){
 /* ============================================================
    RENDER — word detail
    ============================================================ */
-function dots(rank){ const n=Math.max(0,Math.min(5,rank|0)); let o=''; for(let i=0;i<5;i++) o+= i<n?'●':'<span class="off">○</span>'; return o; }
+/* Rank 0–5 as ONE star filled bottom-up in five vertical steps.
+   The old five-circle row ate ~60px of every line, which squeezed the
+   English column so hard that single words broke mid-word
+   ("accentuat / ed"). One 13px star gives that space back. */
+function rankStar(rank){
+  const n=Math.max(0,Math.min(5,Math.round(+rank||0)));
+  return '<span class="rk lv'+n+'" style="--f:'+(n*20)+'%" title="Common in real use: '+n+'/5" aria-label="rank '+n+' of 5"></span>';
+}
+/* kept so any older call site still works */
+function dots(rank){ return rankStar(rank); }
 /* Part-of-speech styling. posKey() normalises whatever the AI returns
    ("noun", "n.", "Noun (countable)", "adj", …) down to one known key, so a
    chip never falls back to a mismatched colour. */
@@ -523,6 +527,7 @@ function renderEntry(rec, queriedAs){
 
   let h='<div class="entry">';
   h+='<img class="entry-corner" src="./mascot-'+corner+'.webp" alt=""/>';
+  h+='<div class="back-row" onclick="backToHome()">← Home</div>';
   if(queriedAs){
     h+='<div class="corrected">Corrected from “'+esc(queriedAs)+'”'+(d.query_note?' · '+esc(d.query_note):'')+'</div>';
   }
@@ -532,35 +537,24 @@ function renderEntry(rec, queriedAs){
   const posSet=[...new Set((d.senses||[]).map(s=>s.pos).filter(Boolean))];
   if(posSet.length){ h+='<div class="pos-row">'+posSet.map(posChip).join('')+'</div>'; }
   h+=badge;
+  if(d.vi_updated) h+='<span class="badge upd">✎ rewritten</span>';
   h+='</div>';
   h+='<button class="star '+(rec.saved?'on':'')+'" onclick="toggleSave(\''+esc(w)+'\')" aria-label="Save">'+(rec.saved?'★':'☆')+'</button>';
   h+='</div>';
 
+  // Rewrite the Vietnamese side of THIS entry with AI, right here.
+  const safeW=esc(w).replace(/'/g,"\\'");
+  h+='<div class="entry-actions">'
+    +'<button class="act-btn" id="rewrite-btn" onclick="rewriteMeaning(\''+safeW+'\')">✎ Rewrite meaning</button>'
+    +(d.vi_updated?'<span class="act-note">updated '+esc(new Date(d.vi_updated).toLocaleDateString())+'</span>'
+                  :'<span class="act-note">asks Gemini for a better Vietnamese meaning</span>')
+    +'</div>';
+
   if(Array.isArray(d.family)&&d.family.length){
-    // Group the family by part of speech so a word with noun + verb + adjective
-    // branches shows each branch under its own labelled row.
-    const fg=new Map();
-    for(const fm of d.family){
-      if(!fm||!fm.word) continue;
-      const k=posKey(fm.pos);
-      if(!fg.has(k)) fg.set(k,[]);
-      fg.get(k).push(fm.word);
-    }
-    const ORDER=['noun','verb','adjective','adverb','other'];
-    const keys=[...fg.keys()].sort((a,b)=>{
-      const ia=ORDER.indexOf(a), ib=ORDER.indexOf(b);
-      return (ia<0?99:ia)-(ib<0?99:ib);
-    });
-    h+='<div class="family-box">';
-    for(const k of keys){
-      const c=POS_COLOR[k]||'blue';
-      h+='<div class="family-row">';
-      h+='<span class="family-lbl pos-'+c+'">'+esc(k==='other'?'related':k)+'</span>';
-      h+='<div class="family-words">';
-      for(const wd of fg.get(k)){ const fw=esc(wd);
-        h+='<button class="family-chip pos-'+c+'" onclick="jump(\''+fw.replace(/'/g,"\\'")+'\')">'+fw+'</button>'; }
-      h+='</div></div>';
-    }
+    h+='<div class="family-scroll">';
+    for(const fm of d.family){ const fw=esc(fm.word||''); const k=posKey(fm.pos), c=POS_COLOR[k];
+      h+='<button class="family-chip pos-'+c+'" onclick="jump(\''+fw.replace(/'/g,"\\'")+'\')">'
+        +'<span class="fc-pos">'+esc(POS_SHORT[k]||'—')+'</span><span class="fc-w">'+fw+'</span></button>'; }
     h+='</div>';
   }
 
@@ -607,7 +601,7 @@ function renderEntry(rec, queriedAs){
         +'<span class="pos-count">'+list.length+(list.length>1?' nghĩa':' nghĩa')+'</span></div>';
       list.forEach((s,i)=>{
         h+='<div class="sense"><div class="sense-top"><span class="senseno">'+(i+1)+'</span>';
-        h+='<span class="rank">'+dots(s.rank)+'</span></div>';
+        h+='<span class="rank">'+rankStar(s.rank)+'</span></div>';
         if(s.vi) h+='<div class="vi">'+esc(s.vi)+'</div>';
         if(s.vi_hint) h+='<div class="vi-hint">'+esc(s.vi_hint)+'</div>';
         if(s.gloss) h+='<div class="gloss">'+esc(s.gloss)+'</div>';
@@ -622,7 +616,7 @@ function renderEntry(rec, queriedAs){
   if(Array.isArray(d.expressions)&&d.expressions.length){
     const es=[...d.expressions].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm blue">🔗</span>Common Usage</div>';
-    for(const e of es){ h+='<div class="expr"><span class="rank">'+dots(e.rank)+'</span><span class="t">'+esc(e.text)+'</span>';
+    for(const e of es){ h+='<div class="expr"><span class="rank">'+rankStar(e.rank)+'</span><span class="t">'+esc(e.text)+'</span>';
       if(e.vi) h+='<span class="ev">'+esc(e.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
   }
@@ -630,7 +624,7 @@ function renderEntry(rec, queriedAs){
   if(Array.isArray(d.collocations)&&d.collocations.length){
     const cs=[...d.collocations].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-note-and-pen.webp" alt=""/>Collocations</div>';
-    for(const c of cs){ h+='<div class="expr"><span class="rank">'+dots(c.rank)+'</span><span class="t">'+esc(c.text)+'</span>';
+    for(const c of cs){ h+='<div class="expr"><span class="rank">'+rankStar(c.rank)+'</span><span class="t">'+esc(c.text)+'</span>';
       if(c.vi) h+='<span class="ev">'+esc(c.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
   }
@@ -638,7 +632,7 @@ function renderEntry(rec, queriedAs){
   if(Array.isArray(d.phrasal_verbs)&&d.phrasal_verbs.length){
     const ps=[...d.phrasal_verbs].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm mint">🧩</span>Phrasal Verbs</div>';
-    for(const p of ps){ h+='<div class="expr"><span class="rank">'+dots(p.rank)+'</span><span class="t">'+esc(p.text)+'</span>';
+    for(const p of ps){ h+='<div class="expr"><span class="rank">'+rankStar(p.rank)+'</span><span class="t">'+esc(p.text)+'</span>';
       if(p.vi) h+='<span class="ev">'+esc(p.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
   }
@@ -646,7 +640,7 @@ function renderEntry(rec, queriedAs){
   if(Array.isArray(d.idioms)&&d.idioms.length){
     const is_=[...d.idioms].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-magnifying-glass.webp" alt=""/>Idioms</div>';
-    for(const it of is_){ h+='<div class="expr"><span class="rank">'+dots(it.rank)+'</span><span class="t">'+esc(it.text)+'</span>';
+    for(const it of is_){ h+='<div class="expr"><span class="rank">'+rankStar(it.rank)+'</span><span class="t">'+esc(it.text)+'</span>';
       if(it.vi) h+='<span class="ev">'+esc(it.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
   }
@@ -688,7 +682,7 @@ function jump(w){
 function suggestState(query,guess){
   const label=esc(guess.label), target=guess.target, safeT=target.replace(/'/g,"\\'"), safeQ=query.replace(/'/g,"\\'");
   const kind = guess.type==='expr' ? ' <span style="opacity:.72">(inside “'+esc(target)+'”)</span>' : '';
-  let h='';
+  let h='<div class="back-row" onclick="backToHome()">← Home</div>';
   // Primary action: send Focci off to chart the unknown word.
   h+='<div class="ask-ai-card" onclick="forceAI(\''+safeQ+'\')">'
     +'<img src="./mascot-investigate.webp" alt=""/>'
@@ -700,16 +694,16 @@ function suggestState(query,guess){
     +'<span class="nm-go">→</span></div></div>';
   return h;
 }
-function needKeyState(w){ return '<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can chart new words for you.</p></div>'
+function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can chart new words for you.</p></div>'
    +'<button class="btn" onclick="showView(\'settings\')">Open Settings</button>'; }
-function offlineState(w){ return '<div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
+function offlineState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
 function errorState(w,msg){
   let m='Something went wrong reaching the AI.';
   if(msg.startsWith('BAD_KEY')) m='Your API key looks wrong or isn\'t enabled. Check it in Settings.';
   else if(msg.startsWith('API')) m='Google returned an error: '+esc(msg.slice(4,120));
   else if(msg==='PARSE') m='The AI reply wasn\'t in the right format. Try again.';
   else if(msg==='OFFLINE') return offlineState(w);
-  return '<div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
+  return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
 }
 function questScene(word){
   const cheers=["DON'T GIVE UP…","UNCHARTED TERRITORY!","INTO THE UNKNOWN…","A NEW LAND AWAITS!"];
@@ -830,63 +824,14 @@ async function renderDashboardStats(){
   $('#d-avg').textContent=avg;
   $('#d-time').textContent = mins<60 ? mins+'m' : Math.floor(mins/60)+'h '+(mins%60)+'m';
 
-  _weekLogs=logs;
-  renderWeekChart();
+  const week=[]; for(let i=6;i>=0;i--){ const dd=today-i*DAY; const cnt=logs.filter(l=>dayStart(l.ts)===dd && l.type==='search').length; week.push({dd,count:cnt}); }
+  const maxWeek=Math.max(1,...week.map(w=>w.count));
+  const WD=['S','M','T','W','T','F','S'];
+  let h='';
+  week.forEach(w=>{ const pct=Math.round(w.count/maxWeek*100); const wd=WD[new Date(w.dd).getDay()];
+    h+='<div class="bar-col"><div class="bar-track"><div class="bar-fill" style="height:'+Math.max(4,pct)+'%"></div></div><div class="bar-lbl">'+wd+'</div></div>'; });
+  $('#week-bars').innerHTML=h;
 }
-
-/* ---------- weekly activity chart, scrollable back through history ---------- */
-let _weekLogs=[], weekOffset=0;   // 0 = this week, 1 = last week, …
-function shiftWeek(delta){
-  const next=weekOffset+delta;
-  if(next<0) return;                 // never scroll into the future
-  weekOffset=next; renderWeekChart();
-}
-function renderWeekChart(){
-  const box=$('#week-bars'); if(!box) return;
-  const today=dayStart(now());
-  const end=today-weekOffset*7*DAY;
-  const days=[];
-  for(let i=6;i>=0;i--){
-    const dd=end-i*DAY;
-    const searches=_weekLogs.filter(l=>dayStart(l.ts)===dd && l.type==='search');
-    const reviews=_weekLogs.filter(l=>dayStart(l.ts)===dd && (l.type==='review_correct'||l.type==='review_wrong'));
-    days.push({dd, count:searches.length, rev:reviews.length});
-  }
-  const max=Math.max(1,...days.map(d=>d.count+d.rev));
-  const WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const a=new Date(days[0].dd), b=new Date(days[6].dd);
-  const range = a.getMonth()===b.getMonth()
-    ? MO[a.getMonth()]+' '+a.getDate()+'–'+b.getDate()
-    : MO[a.getMonth()]+' '+a.getDate()+' – '+MO[b.getMonth()]+' '+b.getDate();
-  const total=days.reduce((s,d)=>s+d.count,0), totalRev=days.reduce((s,d)=>s+d.rev,0);
-
-  let h='<div class="wk-head">';
-  h+='<button class="wk-nav" onclick="shiftWeek(1)">‹</button>';
-  h+='<div class="wk-title"><div class="wk-range">'+range+'</div>';
-  h+='<div class="wk-sub">'+total+' searched · '+totalRev+' practised</div></div>';
-  h+='<button class="wk-nav'+(weekOffset===0?' off':'')+'" onclick="shiftWeek(-1)">›</button>';
-  h+='</div>';
-  h+='<div class="wk-bars">';
-  days.forEach(d=>{
-    const dt=new Date(d.dd);
-    const isToday=d.dd===today;
-    const hS=Math.round(d.count/max*100), hR=Math.round(d.rev/max*100);
-    h+='<div class="bar-col'+(isToday?' today':'')+'">';
-    h+='<div class="bar-val">'+((d.count+d.rev)||'')+'</div>';
-    h+='<div class="bar-track">';
-    if(d.rev) h+='<div class="bar-fill rev" style="height:'+Math.max(3,hR)+'%"></div>';
-    h+='<div class="bar-fill" style="height:'+Math.max(d.count?3:0,hS)+'%"></div>';
-    h+='</div>';
-    h+='<div class="bar-lbl">'+WD[dt.getDay()].slice(0,1)+'</div>';
-    h+='<div class="bar-date">'+dt.getDate()+'</div>';
-    h+='</div>';
-  });
-  h+='</div>';
-  h+='<div class="wk-legend"><span class="lg s"></span>searched <span class="lg r"></span>practised</div>';
-  box.innerHTML=h;
-}
-window.shiftWeek=shiftWeek;
 
 /* Tap a stat tile → Focci explains what the number actually means. */
 function statInsight(which){
@@ -947,13 +892,7 @@ const TREE_LINES=[
   "That tickles. Take a word, then.",
   "Alright, alright — here's another one!",
   "You again? Fine. Last one… probably.",
-  "I'm a tree, not a vending machine!",
-  "Do I look like I enjoy this?",
-  "Focci taught you this, didn't he.",
-  "Fine. But you have to LEARN the word.",
-  "Shake me once more and I'm going dormant.",
-  "…okay that one was kind of fun.",
-  "My roots are older than your streak, kid."
+  "I'm a tree, not a vending machine!"
 ];
 let treeShakes=0;
 async function shakeTree(){
@@ -1111,77 +1050,119 @@ function reviewPrompt(d){
   if(s0&&s0.gloss) return s0.gloss;
   return '(no meaning saved yet)';
 }
-
-/* ============================================================
-   WORD LEVELS — an A1→C2 band for each word, used to pick
-   practice difficulty. Approximated from real-world word
-   frequency (common = easier), not an official CEFR list.
-   ============================================================ */
-const LEVEL_NAMES={1:'A1',2:'A2',3:'B1',4:'B2',5:'C1',6:'C2'};
-let LEVELS=null, levelsLoading=null;
-function loadLevels(){
-  if(LEVELS) return Promise.resolve(LEVELS);
-  if(levelsLoading) return levelsLoading;
-  levelsLoading=fetch('./levels.txt').then(r=>{
-    if(!r.ok) throw new Error('no levels');
-    return r.text();
-  }).then(t=>{
-    const m=new Map();
-    for(const line of t.split('\n')){
-      const i=line.indexOf('\t'); if(i<1) continue;
-      m.set(line.slice(0,i), +line.slice(i+1));
-    }
-    LEVELS=m; return m;
-  }).catch(()=>{ LEVELS=new Map(); return LEVELS; });
-  return levelsLoading;
+/* The shape of the answer: first letter shown, every other letter an
+   underscore, real gaps between words. Hyphens/apostrophes stay visible
+   because they're a spelling clue, not a letter to guess. */
+function maskHint(word){
+  const w=String(word||'').trim();
+  if(!w) return '';
+  let out='', first=true, letters=0;
+  for(const ch of w){
+    if(/\s/.test(ch)){ out+='<span class="mh-gap"></span>'; continue; }
+    if(!/[a-zA-Z\u00C0-\u024F]/.test(ch)){ out+='<span class="mh-ch punct">'+esc(ch)+'</span>'; continue; }
+    letters++;
+    if(first){ out+='<span class="mh-ch first">'+esc(ch)+'</span>'; first=false; }
+    else out+='<span class="mh-ch blank">_</span>';
+  }
+  return '<div class="mask-hint">'+out+'<span class="mh-count">'+letters+' letters</span></div>';
 }
-function wordLevel(w){
-  if(!LEVELS) return 0;
-  return LEVELS.get(String(w).toLowerCase()) || 0;
-}
-/* practice difficulty filter: 0 = any level */
-let practiceLevel=+(localStorage.getItem('fc_level')||0);
-function setPracticeLevel(n){
-  practiceLevel=+n; localStorage.setItem('fc_level',String(n));
-  startReview();
-}
-function levelChips(){
-  let h='<div class="level-row">';
-  h+='<button class="lv-chip'+(practiceLevel===0?' on':'')+'" onclick="setPracticeLevel(0)">All</button>';
-  for(let i=1;i<=6;i++)
-    h+='<button class="lv-chip lv'+i+(practiceLevel===i?' on':'')+'" onclick="setPracticeLevel('+i+')">'+LEVEL_NAMES[i]+'</button>';
-  h+='</div>';
-  return h;
-}
-function filterByLevel(list){
-  if(!practiceLevel) return list;
-  const hit=list.filter(r=>wordLevel(r.word)===practiceLevel);
-  return hit;
-}
-window.setPracticeLevel=setPracticeLevel;
 
 let practiceMode='type';   // 'type' | 'match'
+
+/* ---------- round length: tap the pill to cycle 5 → 10 → 20 → 30 → 50 ---------- */
+const QCOUNT_LS='fc_qcount', POOL_LS='fc_match_pool';
+const QCOUNTS=[5,10,20,30,50];
+function getQCount(){ const n=+localStorage.getItem(QCOUNT_LS); return QCOUNTS.indexOf(n)>=0?n:5; }
+function cycleQCount(){
+  const next=QCOUNTS[(QCOUNTS.indexOf(getQCount())+1)%QCOUNTS.length];
+  localStorage.setItem(QCOUNT_LS,String(next));
+  toast('Round length: '+next+' questions');
+  startReview();                       // a new length means a fresh round
+}
+/* ---------- match-it word pool ---------- */
+const POOLS=[['all','All words'],['searched','Words I searched'],['saved','Saved words']];
+function getPool(){ const p=localStorage.getItem(POOL_LS); return POOLS.some(x=>x[0]===p)?p:'all'; }
+function poolLabel(){ const f=POOLS.find(x=>x[0]===getPool()); return (f||POOLS[0])[1]; }
+function cyclePool(){
+  const i=POOLS.findIndex(x=>x[0]===getPool());
+  const next=POOLS[(i+1)%POOLS.length][0];
+  localStorage.setItem(POOL_LS,next);
+  toast('Word pool: '+poolLabel());
+  startMatch();
+}
+window.cycleQCount=cycleQCount; window.cyclePool=cyclePool;
+
 function practiceTabs(){
-  return '<div class="mode-tabs">'
+  let h='<div class="mode-tabs">'
     +'<button class="mode-tab'+(practiceMode==='type'?' on':'')+'" onclick="setPracticeMode(\'type\')">✍️ Type it</button>'
     +'<button class="mode-tab'+(practiceMode==='match'?' on':'')+'" onclick="setPracticeMode(\'match\')">🎯 Match it</button>'
-    +'</div>'+levelChips();
+    +'</div>';
+  h+='<div class="practice-bar">';
+  h+='<button class="opt-cycle" onclick="cycleQCount()" title="Tap to change — this starts a fresh round">'
+    +'<span class="oc-l">Questions</span><span class="oc-v">'+getQCount()+'</span><span class="oc-go">▸</span></button>';
+  if(practiceMode==='match'){
+    h+='<button class="opt-cycle" onclick="cyclePool()" title="Tap to change which words Focci quizzes you on">'
+      +'<span class="oc-l">Pool</span><span class="oc-v">'+esc(poolLabel())+'</span><span class="oc-go">▸</span></button>';
+  }
+  h+='</div>';
+  return h;
 }
 function setPracticeMode(m){ practiceMode=m; startReview(); }
 window.setPracticeMode=setPracticeMode;
 
 async function startReview(){
+  wirePracticeSwipe();
   if(practiceMode==='match') return startMatch();
-  await loadLevels();
+  const saved=(await idbAll()).filter(r=>r.saved);
   const area=$('#review-area');
-  let saved=(await idbAll()).filter(r=>r.saved);
   if(saved.length<1){ area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-drink_tea_cup.webp" alt=""/><h3>Nothing to type yet</h3><p>Save a few words with the ☆ first — then Focci will quiz you from memory.</p><p style="margin-top:10px">Or try <b>Match it</b> above: it works with your whole library.</p></div>'; return; }
-  const pool=filterByLevel(saved);
-  if(pool.length<1){ area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>No '+LEVEL_NAMES[practiceLevel]+' words saved</h3><p>None of your saved words sit at this level yet. Pick another level, or save a few more.</p></div>'; return; }
-  saved=pool;
-  revQueue=saved.sort(()=>Math.random()-0.5).slice(0,10); revIdx=0; revState=null;
+  revQueue=saved.sort(()=>Math.random()-0.5).slice(0,getQCount()); revIdx=0; revState=null;
   revResults=new Array(revQueue.length).fill(null); revCorrectCount=0; revSessionAwarded=false;
   renderReview();
+}
+
+/* ---------- swipe to move on ----------
+   The listener lives on #review-area, which survives every innerHTML
+   rewrite, so it is wired exactly once. */
+function practiceAnswered(){ return practiceMode==='match' ? !!matchPicked : !!revState; }
+function practiceAdvance(dir){
+  if(!practiceAnswered()){ toast('Answer first — then swipe to continue'); return; }
+  const area=$('#review-area'); if(!area) return;
+  const cls = dir==='right' ? 'swipe-out-r' : 'swipe-out-l';
+  area.classList.add(cls);
+  setTimeout(()=>{
+    area.classList.remove('swipe-out-l','swipe-out-r');
+    if(practiceMode==='match') nextMatch(); else nextReview();
+  },170);
+}
+function wirePracticeSwipe(){
+  const el=$('#review-area');
+  if(!el || el._swipeWired) return;
+  el._swipeWired=1;
+  let sx=0, sy=0, st=0, live=false;
+  el.addEventListener('touchstart',(e)=>{
+    if(e.touches.length!==1){ live=false; return; }
+    const t=e.touches[0]; sx=t.clientX; sy=t.clientY; st=Date.now(); live=true;
+  },{passive:true});
+  el.addEventListener('touchend',(e)=>{
+    if(!live) return; live=false;
+    const t=e.changedTouches[0];
+    const dx=t.clientX-sx, dy=t.clientY-sy, dt=Date.now()-st;
+    if(dt>900) return;                                  // a slow drag isn't a swipe
+    if(Math.abs(dx)<55 || Math.abs(dy)>Math.abs(dx)*0.8) return;   // must be clearly horizontal
+    const ae=document.activeElement;
+    if(ae && (ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) ae.blur();
+    practiceAdvance(dx<0?'left':'right');
+  },{passive:true});
+  // keyboard equivalent, handy on desktop
+  document.addEventListener('keydown',(e)=>{
+    const v=$('#v-review'); if(!v || !v.classList.contains('active')) return;
+    if(!practiceAnswered()) return;
+    if(e.key==='ArrowRight'||e.key==='ArrowLeft'||e.key==='Enter'){
+      e.preventDefault();
+      practiceAdvance(e.key==='ArrowLeft'?'right':'left');
+    }
+  });
 }
 
 /* ============================================================
@@ -1190,38 +1171,47 @@ async function startReview(){
    dictionary finally becomes something you can play with.
    ============================================================ */
 let matchRounds=[], matchIdx=0, matchHits=0, matchPicked=null, matchAwarded=false;
-const MATCH_TOTAL=8;
 async function startMatch(){
+  wirePracticeSwipe();
   const area=$('#review-area');
   area.innerHTML=practiceTabs()+'<div class="spinner"></div>';
-  await loadLevels();
-  let all=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || (r.data.senses||[])[0]?.vi));
-  const lvPool=filterByLevel(all);
-  if(practiceLevel && lvPool.length<8){
-    area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Not enough '+LEVEL_NAMES[practiceLevel]+' words</h3><p>Focci found only '+lvPool.length+' at this level. Try another level or add more words.</p></div>';
+  const usable=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || (r.data.senses||[])[0]?.vi));
+  // The ANSWERS come from the chosen pool; the decoys always come from the
+  // whole library, so a small pool still gets six believable options.
+  const pool=getPool();
+  let answers=usable;
+  if(pool==='saved') answers=usable.filter(r=>r.saved);
+  else if(pool==='searched'){
+    let seen=new Set();
+    try{ seen=new Set((await logAll()).filter(l=>l.type==='search'&&l.word).map(l=>l.word)); }catch(e){}
+    answers=usable.filter(r=>seen.has(r.word));
+  }
+  const all=usable;
+  if(all.length<6){
+    area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Not enough words yet</h3><p>Focci needs at least 6 words in the library to build a round.</p></div>';
     return;
   }
-  if(practiceLevel) all=lvPool;
-  if(all.length<8){
-    area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Not enough words yet</h3><p>Focci needs at least 8 words in the library to build a round.</p></div>';
+  if(!answers.length){
+    const why = pool==='saved'
+      ? 'You haven\'t saved any words yet — tap the ☆ on a word to add it here.'
+      : 'You haven\'t searched any words yet — look a few up and they\'ll show up in this pool.';
+    area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>This pool is empty</h3><p>'+why+'</p><p style="margin-top:10px">Tap <b>Pool</b> above to switch back to <b>All words</b>.</p></div>';
     return;
   }
   const meaningOf=(r)=>r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi || '';
   matchRounds=[]; matchIdx=0; matchHits=0; matchPicked=null; matchAwarded=false;
-  const used=new Set();
-  for(let i=0;i<MATCH_TOTAL;i++){
-    let answer=null, guard=0;
-    while(guard++<60){ const c=all[Math.floor(Math.random()*all.length)];
-      if(!used.has(c.word) && meaningOf(c)){ answer=c; used.add(c.word); break; } }
-    if(!answer) break;
+  const total=Math.min(getQCount(), answers.length);
+  // shuffle once and take from the top — with a 50-question round, random
+  // retries would keep colliding and quietly return a short round.
+  const deck=answers.slice().sort(()=>Math.random()-0.5).slice(0,total);
+  for(const answer of deck){
     const opts=[answer];
     let g2=0;
     while(opts.length<6 && g2++<200){
       const c=all[Math.floor(Math.random()*all.length)];
       if(c.word!==answer.word && !opts.some(o=>o.word===c.word)) opts.push(c);
     }
-    const s0=(answer.data.senses||[])[0]||{};
-    matchRounds.push({answer, meaning:meaningOf(answer), pos:s0.pos||'', opts:opts.sort(()=>Math.random()-0.5)});
+    matchRounds.push({answer, meaning:meaningOf(answer), opts:opts.sort(()=>Math.random()-0.5)});
   }
   renderMatch();
 }
@@ -1248,14 +1238,8 @@ function renderMatch(){
   }
   const r=matchRounds[matchIdx];
   let h=practiceTabs();
-  h+='<div class="rev-dots">';
-  for(let i=0;i<matchRounds.length;i++){
-    let cls='todo';
-    if(i<matchIdx) cls = matchRounds[i]._ok ? 'done':'wrong';
-    else if(i===matchIdx) cls='current';
-    h+='<div class="rev-dot '+cls+'"></div>';
-  }
-  h+='</div>';
+  const states=matchRounds.map((x,i)=> i<matchIdx ? (x._ok?'done':'wrong') : (i===matchIdx?'current':'todo'));
+  h+=practiceProgress(states);
   h+='<div class="rev-progress">Round '+(matchIdx+1)+' / '+matchRounds.length+'</div>';
 
   let pose='investigate', bubble="Which word means this?";
@@ -1266,15 +1250,7 @@ function renderMatch(){
   h+='<div class="rev-hero"><img class="rev-mascot" src="./mascot-'+pose+'.webp" alt=""/>'
     +'<div class="speech">'+esc(bubble)+'</div></div>';
 
-  h+='<div class="match-meaning">'+esc(r.meaning);
-  {
-    const lv=wordLevel(r.answer.word);
-    let meta='';
-    if(r.pos) meta+=posChip(r.pos);
-    if(lv) meta+='<span class="lv-tag lv'+lv+'">'+LEVEL_NAMES[lv]+'</span>';
-    if(meta) h+='<div class="q-meta">'+meta+'</div>';
-  }
-  h+='</div>';
+  h+='<div class="match-meaning">'+esc(r.meaning)+'</div>';
   h+='<div class="match-grid">';
   r.opts.forEach((o,i)=>{
     let cls='match-opt';
@@ -1286,8 +1262,28 @@ function renderMatch(){
     h+='<button class="'+cls+'" onclick="pickMatch('+i+')">'+esc(o.word)+'</button>';
   });
   h+='</div>';
-  if(matchPicked) h+='<button class="btn" onclick="nextMatch()">Next →</button>';
+  if(matchPicked) h+=swipeOn();
   area.innerHTML=h;
+}
+/* One shared "you answered — now move on" affordance. Swiping is the
+   intended gesture; the button stays as a fallback for anyone on desktop. */
+function swipeOn(){
+  return '<div class="swipe-cue"><span class="sc-arrow">←</span>'
+    +'<span class="sc-txt">Swipe to continue</span>'
+    +'<button class="sc-btn" onclick="practiceAdvance(\'left\')">Next</button></div>';
+}
+window.practiceAdvance=practiceAdvance;
+/* Dots for a short round, a slim bar once there are too many to see. */
+function practiceProgress(states){
+  const total=states.length;
+  if(total<=14){
+    return '<div class="rev-dots">'+states.map(c=>'<div class="rev-dot '+c+'"></div>').join('')+'</div>';
+  }
+  const answered=states.filter(c=>c==='done'||c==='wrong').length;
+  const okPct=Math.round(states.filter(c=>c==='done').length/total*100);
+  const badPct=Math.round(states.filter(c=>c==='wrong').length/total*100);
+  return '<div class="rev-slim" aria-label="'+answered+' of '+total+' answered">'
+    +'<i class="ok" style="width:'+okPct+'%"></i><i class="bad" style="width:'+badPct+'%"></i></div>';
 }
 async function pickMatch(i){
   if(matchPicked) return;
@@ -1329,12 +1325,9 @@ function renderReview(){
   const r=revQueue[revIdx], d=r.data||{};
   const prompt=reviewPrompt(d);
   let h=practiceTabs();
-  h+='<div class="rev-dots">';
-  for(let i=0;i<revQueue.length;i++){
-    let cls='todo'; if(revResults[i]==='correct') cls='done'; else if(revResults[i]==='wrong') cls='wrong'; else if(i===revIdx) cls='current';
-    h+='<div class="rev-dot '+cls+'"></div>';
-  }
-  h+='</div>';
+  const states=revQueue.map((x,i)=> revResults[i]==='correct' ? 'done'
+    : revResults[i]==='wrong' ? 'wrong' : (i===revIdx?'current':'todo'));
+  h+=practiceProgress(states);
   h+='<div class="rev-progress">Word '+(revIdx+1)+' / '+revQueue.length+'</div>';
   // Focci reacts to the answer you just gave
   let pose='run_and_think', bubble="Hmm… which word was it?";
@@ -1348,17 +1341,10 @@ function renderReview(){
   h+='<div class="rev-card">';
   h+='<div class="prompt">What\'s the English word for…</div>';
   h+='<div class="q">'+esc(prompt)+'</div>';
-  {
-    const s0=(d.senses||[])[0]||{};
-    const lv=wordLevel(r.word);
-    let meta='';
-    if(s0.pos) meta+=posChip(s0.pos);
-    if(lv) meta+='<span class="lv-tag lv'+lv+'">'+LEVEL_NAMES[lv]+'</span>';
-    if(meta) h+='<div class="q-meta">'+meta+'</div>';
-  }
   if(d.vi_note && !revState) h+='<div class="q-note">'+esc(d.vi_note)+'</div>';
 
   if(!revState){
+    h+=maskHint(r.word);
     h+='<input id="rev-input" class="type-input" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Type the English word…"/>';
   } else {
     const cls = revState.correct ? (revState.close?'fb-close':'fb-correct') : 'fb-wrong';
@@ -1371,9 +1357,10 @@ function renderReview(){
   h+='</div>';
 
   if(!revState){
-    h+='<div class="btn-row" style="margin-top:12px"><button class="btn ghost" onclick="skipReview()">I don\'t know</button><button class="btn" onclick="checkReview()">Check</button></div>';
+    h+='<button class="btn" style="margin-top:12px" onclick="checkReview()">Check</button>';
+    h+='<button class="link-skip" onclick="skipReview()">I don\'t know — show me</button>';
   } else {
-    h+='<button class="btn" onclick="nextReview()">Next word →</button>';
+    h+=swipeOn();
   }
   area.innerHTML=h;
   const inp=$('#rev-input'); if(inp){ inp.focus(); inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); checkReview(); } }); }
@@ -1568,12 +1555,18 @@ async function renderHero(){
   heroEl.classList.toggle('is-night', t.bg==='night');
   const spooky = isSpookySeason() && (timeOfDay()==='evening' || timeOfDay()==='night');
   $('#hero-char').src='./mascot-'+(spooky?'halloween':t.char)+'.webp';
-  $('#hero-sky').src='./'+t.sky+'.webp';
-  // Foliage only on daylight scenes — at night it just covered the greeting.
-  const foliage=$('#hero-foliage');
-  if(foliage){
-    if(t.bg==='night'){ foliage.style.display='none'; }
-    else { foliage.src='./decor-tree.webp'; foliage.style.display='block'; }
+  // Sun and moon each get their own size, place and animation, and both sit
+  // BEHIND the greeting now (z-index below the scrim), so nothing is covered.
+  const isNight=(t.bg==='night');
+  const sky=$('#hero-sky'), glow=$('#hero-glow');
+  if(sky){
+    sky.src='./'+t.sky+'.webp';
+    sky.classList.toggle('is-sun', !isNight);
+    sky.classList.toggle('is-moon', isNight);
+  }
+  if(glow){
+    glow.classList.toggle('is-sun', !isNight);
+    glow.classList.toggle('is-moon', isNight);
   }
   $('#hero-greet').textContent=t.greet+(name?', '+name:'')+'!';
 
@@ -1929,19 +1922,121 @@ async function runRefresh(){
   if(currentWord) jump(currentWord);
 }
 
+/* ---------- rewrite ONE word, straight from its own page ----------
+   Same prompt and same merge rules as the bulk rewrite above, so a word
+   fixed here is identical in shape to one fixed from Settings. The result
+   is written back into the library (data.vi_updated marks it), which is
+   also what makes it show up in the JSON export. */
+async function rewriteMeaning(word){
+  const w=norm(word||currentWord||'');
+  if(!w) return;
+  if(!getKey()){ toast('Add your Gemini API key in Settings first'); showView('settings'); return; }
+  if(!navigator.onLine){ toast('You\'re offline — Focci needs the network for this'); return; }
+  const rec=await idbGet(w);
+  if(!rec||!rec.data){ toast('That word isn\'t in your library yet'); return; }
+
+  const btn=$('#rewrite-btn');
+  if(btn){
+    if(btn.dataset.busy) return;               // no double-taps
+    btn.dataset.busy='1'; btn.classList.add('busy'); btn.textContent='✎ Rewriting…';
+  }
+  try{
+    const fresh=await askJSON(refreshPrompt(w, rec.data), 0);
+    const d=rec.data;
+    // MERGE: only the Vietnamese side is replaced — collocations, idioms,
+    // phonetics, family, synonyms all survive untouched.
+    ['vi_equivalent','vi_note','vi_feel','vi_not','register'].forEach(k=>{
+      if(fresh[k]!==undefined && fresh[k]!==null) d[k]=fresh[k];
+    });
+    if(Array.isArray(fresh.senses)&&fresh.senses.length){
+      const old=d.senses||[];
+      d.senses=fresh.senses.map((s,i)=>Object.assign({}, old[i]||{}, s));
+    }
+    d.vi_updated=Date.now();
+    const saved=Object.assign({},rec,{data:d});
+    await idbPut(saved);
+    // this word is no longer "weak" — drop it from the maintenance queue
+    try{ const m=scanLoad(); if(m[w]&&m[w].r){ m[w]={r:''}; scanSave(m); } }catch(e){}
+    currentWord=w;
+    const box=$('#result');
+    if(box){ box.innerHTML=renderEntry(saved); window.scrollTo({top:0,behavior:'smooth'}); }
+    toast('Meaning rewritten ✓');
+  }catch(e){
+    const msg=String(e.message||e);
+    toast(msg==='OFFLINE'?'You\'re offline right now'
+        : msg==='NO_KEY'?'Add your API key in Settings'
+        : 'Rewrite failed: '+msg.slice(0,60));
+    const b=$('#rewrite-btn');
+    if(b){ b.dataset.busy=''; b.classList.remove('busy'); b.textContent='✎ Rewrite meaning'; }
+  }
+}
+window.rewriteMeaning=rewriteMeaning;
+
 /* ============================================================
-   3 · EXPORT — full backup of the library
+   3 · EXPORT — full backup of the library + activity history
    ============================================================ */
+function downloadBlob(text, filename, mime){
+  const blob=new Blob([text],{type:mime});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },2000);
+}
+
 async function exportDictionary(){
   try{
     const all=await idbAll();
-    const list=all.filter(r=>r.data&&r.data.word).map(r=>r.data);
-    const blob=new Blob([JSON.stringify(list,null,1)],{type:'application/json'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download='focci-dictionary-'+new Date().toISOString().slice(0,10)+'.json';
-    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-    toast('Exported '+list.length.toLocaleString()+' words');
+    const list=all
+      .filter(r=>!r.alias && r.data)             // aliases have no data, everything else ships
+      .map(r=>{
+        const d=Object.assign({}, r.data);       // a copy, so the export can't touch the library
+        if(!d.word) d.word=r.word;               // never drop an entry over a missing word field
+        return d;                                // rewritten meanings ride along via vi_updated
+      })
+      .sort((a,b)=>String(a.word).localeCompare(String(b.word)));
+    const rewritten=list.filter(d=>d.vi_updated).length;
+    downloadBlob(JSON.stringify(list,null,1),
+      'focci-dictionary-'+new Date().toISOString().slice(0,10)+'.json','application/json');
+    toast('Exported '+list.length.toLocaleString()+' words'
+      +(rewritten?' · '+rewritten.toLocaleString()+' rewritten':''));
+  }catch(e){ toast('Export failed: '+(e.message||e)); }
+}
+
+/* Search / activity history — JSON keeps every event, CSV opens in Excel. */
+async function exportHistory(kind){
+  try{
+    const logs=(await logAll()).sort((a,b)=>a.ts-b.ts);
+    if(!logs.length){ toast('No activity recorded yet'); return; }
+    const stamp=new Date().toISOString().slice(0,10);
+    const searches=logs.filter(l=>l.type==='search'&&l.word);
+    if(kind==='csv'){
+      const q=(s)=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+      const rows=[['datetime_iso','date','time','type','word'].join(',')];
+      for(const l of logs){
+        const dt=new Date(l.ts);
+        rows.push([q(dt.toISOString()),q(dt.toLocaleDateString()),q(dt.toLocaleTimeString()),
+                   q(l.type||''),q(l.word||'')].join(','));
+      }
+      downloadBlob('\ufeff'+rows.join('\n'),'focci-history-'+stamp+'.csv','text/csv;charset=utf-8');
+    } else {
+      const counts={};
+      for(const l of searches) counts[l.word]=(counts[l.word]||0)+1;
+      const wordCounts=Object.entries(counts)
+        .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))
+        .map(([word,times])=>({word,times}));
+      const payload={
+        app:'Focci', exportedAt:new Date().toISOString(),
+        totalEvents:logs.length, searchEvents:searches.length, uniqueWordsSearched:wordCounts.length,
+        firstEventAt: new Date(logs[0].ts).toISOString(),
+        lastEventAt: new Date(logs[logs.length-1].ts).toISOString(),
+        wordCounts,
+        events: logs.map(l=>({at:new Date(l.ts).toISOString(), ts:l.ts, type:l.type||'', word:l.word||null}))
+      };
+      downloadBlob(JSON.stringify(payload,null,1),'focci-history-'+stamp+'.json','application/json');
+    }
+    toast('Exported '+logs.length.toLocaleString()+' events · '+searches.length.toLocaleString()+' searches');
   }catch(e){ toast('Export failed: '+(e.message||e)); }
 }
 
@@ -2062,6 +2157,8 @@ function wireMaintenance(){
   on('#scan-btn',()=>runScan().catch(e=>{maintBusy=false;$('#scan-btn').textContent='Scan for weak meanings';mLog('#scan-log','Error: '+(e.message||e),'bad');}));
   on('#refresh-btn',()=>runRefresh().catch(e=>{maintBusy=false;$('#refresh-btn').textContent='Rewrite meanings';mLog('#refresh-log','Error: '+(e.message||e),'bad');}));
   on('#export-btn',exportDictionary);
+  on('#export-hist-json',()=>exportHistory('json'));
+  on('#export-hist-csv',()=>exportHistory('csv'));
   on('#queue-upload-btn',()=>$('#queue-file').click());
   on('#queue-clear-btn',clearQueue);
   on('#queue-paste-btn',importQueuePaste);
@@ -2073,40 +2170,10 @@ function wireMaintenance(){
   scanRefreshState().catch(()=>{}); missRefreshState();
 }
 
-
-/* ============================================================
-   NAVIGATION HISTORY — a real Back button in the header, so you
-   never have to hunt for a link in the middle of the page.
-   Tracks both tab changes and word pages.
-   ============================================================ */
-let navStack=[];
-function navPush(entry){
-  const last=navStack[navStack.length-1];
-  if(last && last.type===entry.type && last.value===entry.value) return;
-  navStack.push(entry);
-  if(navStack.length>40) navStack.shift();
-  updateBackBtn();
-}
-function updateBackBtn(){
-  const b=$('#back-btn'); if(!b) return;
-  b.style.display = navStack.length>1 ? 'flex' : 'none';
-}
-function goBack(){
-  if(navStack.length<2){ backToHome(); return; }
-  navStack.pop();                       // drop where we are now
-  const prev=navStack[navStack.length-1];
-  if(prev.type==='word'){ _navSilent=true; search(prev.value); }
-  else { _navSilent=true; showView(prev.value); }
-  updateBackBtn();
-}
-let _navSilent=false;   // set while restoring, so we don't re-record the step
-window.goBack=goBack;
-
 /* ============================================================
    NAV + wiring
    ============================================================ */
 function showView(v){
-  if(_navSilent) _navSilent=false; else navPush({type:'view', value:v});
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   $('#v-'+v).classList.add('active');
@@ -2237,7 +2304,6 @@ function wireOnboarding(){
   refreshStats();
   renderDashboard();
   logEvent('open', null);
-  loadLevels();   // warm the level table so practice chips work instantly
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
 })();
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;
