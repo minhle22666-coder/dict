@@ -531,43 +531,49 @@ function renderEntry(rec, queriedAs){
   if(queriedAs){
     h+='<div class="corrected">Corrected from “'+esc(queriedAs)+'”'+(d.query_note?' · '+esc(d.query_note):'')+'</div>';
   }
-  h+='<div class="head"><div>';
+  const safeW=esc(w).replace(/'/g,"\\'");
+  h+='<div class="head"><div class="head-main">';
   h+='<div class="headword">'+esc(d.word||w)+'</div>';
-  if(d.phonetic) h+='<div class="phon">'+esc(d.phonetic)+'</div>';
+  h+='<div class="head-meta">';
+  if(d.phonetic) h+='<span class="phon">'+esc(d.phonetic)+'</span>';
+  h+=(typeof levelTag==='function'?levelTag(d.word||w):'');
+  h+='</div>';
   const posSet=[...new Set((d.senses||[]).map(s=>s.pos).filter(Boolean))];
   if(posSet.length){ h+='<div class="pos-row">'+posSet.map(posChip).join('')+'</div>'; }
-  h+=badge;
-  if(d.vi_updated) h+='<span class="badge upd">✎ rewritten</span>';
+  h+='<div class="badge-row">'+badge+(d.vi_updated?'<span class="badge upd">↻ refreshed</span>':'')+'</div>';
   h+='</div>';
-  h+='<button class="star '+(rec.saved?'on':'')+'" onclick="toggleSave(\''+esc(w)+'\')" aria-label="Save">'+(rec.saved?'★':'☆')+'</button>';
-  h+='</div>';
-
-  // Rewrite the Vietnamese side of THIS entry with AI, right here.
-  const safeW=esc(w).replace(/'/g,"\\'");
-  h+='<div class="entry-actions">'
-    +'<button class="act-btn" id="rewrite-btn" onclick="rewriteMeaning(\''+safeW+'\')">✎ Rewrite meaning</button>'
-    +(d.vi_updated?'<span class="act-note">updated '+esc(new Date(d.vi_updated).toLocaleDateString())+'</span>'
-                  :'<span class="act-note">asks Gemini for a better Vietnamese meaning</span>')
-    +'</div>';
+  // Icon-only actions, no boxes: save, and refresh the Vietnamese meaning.
+  h+='<div class="head-acts">';
+  h+='<button class="icon-act star '+(rec.saved?'on':'')+'" onclick="toggleSave(\''+safeW+'\')" aria-label="Save word">'+(rec.saved?'★':'☆')+'</button>';
+  h+='<button class="icon-act" id="rewrite-btn" onclick="rewriteMeaning(\''+safeW+'\')" title="Refresh the Vietnamese meaning with AI" aria-label="Refresh meaning">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">'
+    +'<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>';
+  h+='</div></div>';
 
   if(Array.isArray(d.family)&&d.family.length){
     h+='<div class="family-scroll">';
     for(const fm of d.family){ const fw=esc(fm.word||''); const k=posKey(fm.pos), c=POS_COLOR[k];
+      // The label's colour is set inline: it used to inherit the chip's own
+      // `color`, which made the text and its background the same shade —
+      // a solid dark box with invisible letters.
       h+='<button class="family-chip pos-'+c+'" onclick="jump(\''+fw.replace(/'/g,"\\'")+'\')">'
-        +'<span class="fc-pos">'+esc(POS_SHORT[k]||'—')+'</span><span class="fc-w">'+fw+'</span></button>'; }
+        +'<span class="fc-pos" style="background:var(--'+c+')">'+esc(POS_SHORT[k]||'—')+'</span>'
+        +'<span class="fc-w">'+fw+'</span></button>'; }
     h+='</div>';
   }
 
   if(d.vi_equivalent||d.vi_feel||d.vi_not){
-    h+='<div class="feel"><div class="tile primary">≈</div><div>';
-    h+='<div class="eq">'+esc(d.word||w)+' ≈ <b>'
-      +(d.vi_equivalent?esc(d.vi_equivalent):'<i style="font-weight:600;opacity:.75">không có từ tiếng Việt tương đương</i>')+'</b>';
-    if(d.register) h+='<span class="reg">'+esc(d.register)+'</span>';
+    // The meaning card: one clear Vietnamese answer, then the colour behind it.
+    h+='<div class="feel">';
+    h+='<div class="feel-top"><span class="feel-lbl">Nghĩa tiếng Việt</span>'
+      +(d.register?'<span class="reg">'+esc(d.register)+'</span>':'')+'</div>';
+    h+='<div class="feel-eq">'
+      +(d.vi_equivalent?esc(d.vi_equivalent)
+        :'<i class="no-eq">không có từ tiếng Việt tương đương</i>')+'</div>';
+    if(d.vi_note) h+='<div class="feel-note">'+esc(d.vi_note)+'</div>';
+    if(d.vi_feel) h+='<div class="feel-scene"><span class="fs-lbl">Hình dung</span>'+esc(d.vi_feel)+'</div>';
+    if(d.vi_not)  h+='<div class="feel-warn"><span class="fw-lbl">Đừng nhầm với</span>'+esc(d.vi_not)+'</div>';
     h+='</div>';
-    if(d.vi_note) h+='<div class="note">'+esc(d.vi_note)+'</div>';
-    if(d.vi_feel) h+='<div class="note feel-img">'+esc(d.vi_feel)+'</div>';
-    if(d.vi_not)  h+='<div class="note vi-not">⚠︎ '+esc(d.vi_not)+'</div>';
-    h+='</div></div>';
   }
 
   const f=d.forms;
@@ -1040,7 +1046,11 @@ function regionInfo(i,count){
 window.regionInfo=regionInfo;
 
 /* ============================================================
-   PRACTICE (typing review)
+   PRACTICE — two games, one setup screen
+   The old build hid its settings behind a pill you had to tap
+   repeatedly to discover. Now every round starts on a setup card
+   where the choices are visible and labelled, and the game screen
+   itself carries nothing but the question.
    ============================================================ */
 let revQueue=[], revIdx=0, revState=null, revResults=[], revCorrectCount=0, revSessionAwarded=false;
 function reviewPrompt(d){
@@ -1050,82 +1060,186 @@ function reviewPrompt(d){
   if(s0&&s0.gloss) return s0.gloss;
   return '(no meaning saved yet)';
 }
-/* The shape of the answer: first letter shown, every other letter an
-   underscore, real gaps between words. Hyphens/apostrophes stay visible
-   because they're a spelling clue, not a letter to guess. */
-function maskHint(word){
-  const w=String(word||'').trim();
-  if(!w) return '';
-  let out='', first=true, letters=0;
-  for(const ch of w){
-    if(/\s/.test(ch)){ out+='<span class="mh-gap"></span>'; continue; }
-    if(!/[a-zA-Z\u00C0-\u024F]/.test(ch)){ out+='<span class="mh-ch punct">'+esc(ch)+'</span>'; continue; }
-    letters++;
-    if(first){ out+='<span class="mh-ch first">'+esc(ch)+'</span>'; first=false; }
-    else out+='<span class="mh-ch blank">_</span>';
-  }
-  return '<div class="mask-hint">'+out+'<span class="mh-count">'+letters+' letters</span></div>';
+
+/* ---------- CEFR-ish levels, read from levels.txt ----------
+   levels.txt is `word<TAB>1..6`, banded by word frequency with the
+   Python wordfreq library — an approximation of CEFR, not the
+   official thing, so the UI says "level", never "official CEFR". */
+const LEVEL_NAMES={1:'A1',2:'A2',3:'B1',4:'B2',5:'C1',6:'C2'};
+let _levels=null, _levelsPromise=null;
+function loadLevels(){
+  if(_levels) return Promise.resolve(_levels);
+  if(_levelsPromise) return _levelsPromise;
+  _levelsPromise=fetch('./levels.txt')
+    .then(r=>r.ok?r.text():'')
+    .then(txt=>{
+      const m=new Map();
+      for(const line of txt.split(/\r?\n/)){
+        if(!line) continue;
+        const parts=line.split(/[\t,;]+/);
+        if(parts.length<2) continue;
+        const w=parts[0].trim().toLowerCase(), lv=parseInt(parts[1],10);
+        if(w && lv>=1 && lv<=6) m.set(w,lv);
+      }
+      _levels=m; return m;
+    })
+    .catch(()=>{ _levels=new Map(); return _levels; });
+  return _levelsPromise;
 }
+function levelOf(word){
+  if(!_levels) return 0;
+  return _levels.get(String(word||'').toLowerCase())||0;
+}
+function levelTag(word){
+  const lv=levelOf(word);
+  return lv?'<span class="lv-tag lv'+lv+'">'+LEVEL_NAMES[lv]+'</span>':'';
+}
+window.levelOf=levelOf; window.levelTag=levelTag;
 
-let practiceMode='type';   // 'type' | 'match'
-
-/* ---------- round length: tap the pill to cycle 5 → 10 → 20 → 30 → 50 ---------- */
-const QCOUNT_LS='fc_qcount', POOL_LS='fc_match_pool';
+/* ---------- round settings ---------- */
+const QCOUNT_LS='fc_qcount', POOL_LS='fc_match_pool', LEVEL_LS='fc_level';
 const QCOUNTS=[5,10,20,30,50];
 function getQCount(){ const n=+localStorage.getItem(QCOUNT_LS); return QCOUNTS.indexOf(n)>=0?n:5; }
-function cycleQCount(){
-  const next=QCOUNTS[(QCOUNTS.indexOf(getQCount())+1)%QCOUNTS.length];
-  localStorage.setItem(QCOUNT_LS,String(next));
-  toast('Round length: '+next+' questions');
-  startReview();                       // a new length means a fresh round
-}
-/* ---------- match-it word pool ---------- */
-const POOLS=[['all','All words'],['searched','Words I searched'],['saved','Saved words']];
+function setQCount(n){ localStorage.setItem(QCOUNT_LS,String(n)); renderPracticeSetup(); }
+const POOLS=[['all','Whole library'],['searched','Words I searched'],['saved','My saved words']];
 function getPool(){ const p=localStorage.getItem(POOL_LS); return POOLS.some(x=>x[0]===p)?p:'all'; }
-function poolLabel(){ const f=POOLS.find(x=>x[0]===getPool()); return (f||POOLS[0])[1]; }
-function cyclePool(){
-  const i=POOLS.findIndex(x=>x[0]===getPool());
-  const next=POOLS[(i+1)%POOLS.length][0];
-  localStorage.setItem(POOL_LS,next);
-  toast('Word pool: '+poolLabel());
-  startMatch();
-}
-window.cycleQCount=cycleQCount; window.cyclePool=cyclePool;
+function setPool(p){ localStorage.setItem(POOL_LS,p); renderPracticeSetup(); }
+function getLevel(){ const l=localStorage.getItem(LEVEL_LS); return (l&&LEVEL_NAMES[+l])?+l:0; }   // 0 = every level
+function setLevel(l){ localStorage.setItem(LEVEL_LS,String(l)); renderPracticeSetup(); }
+window.setQCount=setQCount; window.setPool=setPool; window.setLevel=setLevel;
 
-function practiceTabs(){
-  let h='<div class="mode-tabs">'
-    +'<button class="mode-tab'+(practiceMode==='type'?' on':'')+'" onclick="setPracticeMode(\'type\')">✍️ Type it</button>'
-    +'<button class="mode-tab'+(practiceMode==='match'?' on':'')+'" onclick="setPracticeMode(\'match\')">🎯 Match it</button>'
-    +'</div>';
-  h+='<div class="practice-bar">';
-  h+='<button class="opt-cycle" onclick="cycleQCount()" title="Tap to change — this starts a fresh round">'
-    +'<span class="oc-l">Questions</span><span class="oc-v">'+getQCount()+'</span><span class="oc-go">▸</span></button>';
-  if(practiceMode==='match'){
-    h+='<button class="opt-cycle" onclick="cyclePool()" title="Tap to change which words Focci quizzes you on">'
-      +'<span class="oc-l">Pool</span><span class="oc-v">'+esc(poolLabel())+'</span><span class="oc-go">▸</span></button>';
-  }
-  h+='</div>';
-  return h;
-}
-function setPracticeMode(m){ practiceMode=m; startReview(); }
+let practiceMode='type';     // 'type' | 'match'
+let practiceStage='setup';   // 'setup' | 'playing'
+function setPracticeMode(m){ practiceMode=m; practiceStage='setup'; renderPracticeSetup(); }
 window.setPracticeMode=setPracticeMode;
 
-async function startReview(){
+/* the two games, presented as cards you switch between */
+function gameSwitch(){
+  const g=(id,icon,name,tag)=>'<button class="game-tab'+(practiceMode===id?' on':'')+'" onclick="setPracticeMode(\''+id+'\')">'
+    +'<span class="gt-ico">'+icon+'</span><span class="gt-name">'+name+'</span><span class="gt-tag">'+tag+'</span></button>';
+  return '<div class="game-switch">'
+    +g('type','✍️','Type it','spell from memory')
+    +g('match','🎯','Match it','pick the right word')
+    +'</div>';
+}
+function chipRow(label, note, opts){
+  let h='<div class="setup-row"><div class="setup-l">'+esc(label)
+    +(note?'<span class="setup-note">'+esc(note)+'</span>':'')+'</div><div class="chip-row">';
+  for(const o of opts){
+    h+='<button class="set-chip'+(o.on?' on':'')+'" onclick="'+o.act+'">'+o.label+'</button>';
+  }
+  return h+'</div></div>';
+}
+async function renderPracticeSetup(){
+  practiceStage='setup';
+  const area=$('#review-area'); if(!area) return;
+  await loadLevels();
+  const n=getQCount(), pool=getPool(), lv=getLevel();
+
+  let h=gameSwitch();
+  h+='<div class="setup-card">';
+  h+='<div class="setup-head"><img src="./mascot-'+(practiceMode==='type'?'take_note':'investigate')+'.webp" alt=""/>'
+    +'<div><div class="setup-t">'+(practiceMode==='type'?'Type it':'Match it')+'</div>'
+    +'<div class="setup-s">'+(practiceMode==='type'
+        ? 'Focci shows the Vietnamese meaning — you spell the English word. Uses your saved ⭐ words.'
+        : 'Focci shows the Vietnamese meaning — you pick the right word out of six.')
+    +'</div></div></div>';
+
+  h+=chipRow('How many questions','one round',
+    QCOUNTS.map(c=>({label:String(c), on:c===n, act:'setQCount('+c+')'})));
+
+  const levelOpts=[{label:'Any', on:lv===0, act:'setLevel(0)'}]
+    .concat([1,2,3,4,5,6].map(l=>({label:LEVEL_NAMES[l], on:lv===l, act:'setLevel('+l+')'})));
+  h+=chipRow('Difficulty','by word frequency, not official CEFR', levelOpts);
+
+  if(practiceMode==='match'){
+    h+=chipRow('Which words','answers come from here',
+      POOLS.map(p=>({label:esc(p[1]), on:p[0]===pool, act:'setPool(\''+p[0]+'\')'})));
+  }
+
+  // tell them up front how many words actually qualify — no dead-end rounds
+  const avail=await availableWords();
+  h+='<div class="setup-avail">'+(avail.length
+      ? '<b>'+avail.length.toLocaleString()+'</b> word'+(avail.length===1?'':'s')+' match these settings'
+        +(avail.length<n?' — this round will be '+avail.length+' question'+(avail.length===1?'':'s')+'.':'.')
+      : 'No words match these settings yet.')+'</div>';
+  h+='<button class="btn'+(avail.length?'':' disabled')+'" onclick="startPractice()">'
+    +(avail.length?'Start round →':'Nothing to practise')+'</button>';
+  h+='</div>';
+
+  if(!avail.length) h+=setupEmptyHelp();
+  area.innerHTML=h;
+}
+window.renderPracticeSetup=renderPracticeSetup;
+
+function setupEmptyHelp(){
+  const why = practiceMode==='type'
+    ? 'Type it quizzes the words you saved with the ☆. Save a few from any word page, or switch to <b>Match it</b> — that one works with your whole library.'
+    : (getPool()==='saved' ? 'You haven\'t saved any words yet — tap the ☆ on a word page.'
+      : getPool()==='searched' ? 'You haven\'t searched any words yet. Look a few up and they\'ll land in this pool.'
+      : 'Try setting difficulty back to <b>Any</b> — that level may have no words yet.');
+  return '<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Nothing to practise here</h3><p>'+why+'</p></div>';
+}
+
+/* Which words qualify right now, for both the count preview and the round. */
+async function availableWords(){
+  const lv=getLevel();
+  const hasMeaning=(r)=>r.data && (r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi);
+  let list=(await idbAll()).filter(r=>!r.alias && hasMeaning(r));
+  if(practiceMode==='type'){
+    list=list.filter(r=>r.saved);
+  } else {
+    const pool=getPool();
+    if(pool==='saved') list=list.filter(r=>r.saved);
+    else if(pool==='searched'){
+      let seen=new Set();
+      try{ seen=new Set((await logAll()).filter(l=>l.type==='search'&&l.word).map(l=>l.word)); }catch(e){}
+      list=list.filter(r=>seen.has(r.word));
+    }
+  }
+  if(lv) list=list.filter(r=>levelOf(r.word)===lv);
+  return list;
+}
+
+async function startPractice(){
+  const avail=await availableWords();
+  if(!avail.length) return;
   wirePracticeSwipe();
-  if(practiceMode==='match') return startMatch();
-  const saved=(await idbAll()).filter(r=>r.saved);
-  const area=$('#review-area');
-  if(saved.length<1){ area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-drink_tea_cup.webp" alt=""/><h3>Nothing to type yet</h3><p>Save a few words with the ☆ first — then Focci will quiz you from memory.</p><p style="margin-top:10px">Or try <b>Match it</b> above: it works with your whole library.</p></div>'; return; }
-  revQueue=saved.sort(()=>Math.random()-0.5).slice(0,getQCount()); revIdx=0; revState=null;
+  practiceStage='playing';
+  if(practiceMode==='match') return startMatch(avail);
+  revQueue=avail.sort(()=>Math.random()-0.5).slice(0,getQCount());
+  revIdx=0; revState=null;
   revResults=new Array(revQueue.length).fill(null); revCorrectCount=0; revSessionAwarded=false;
   renderReview();
 }
+window.startPractice=startPractice;
+
+/* Entry point used by the tab bar and by "play again". */
+async function startReview(){
+  await loadLevels();
+  if(practiceStage==='playing' && (revQueue.length||matchRounds.length)) return; // don't wipe a live round
+  return renderPracticeSetup();
+}
+
+/* A thin bar at the top of a live round: quit back to setup + progress. */
+function roundBar(idx,total,states){
+  return '<div class="round-bar">'
+    +'<button class="rb-quit" onclick="quitRound()" aria-label="Back to setup">✕</button>'
+    +'<div class="rb-mid">'+practiceProgress(states)+'</div>'
+    +'<div class="rb-count">'+(idx+1)+'<span>/'+total+'</span></div></div>';
+}
+function quitRound(){
+  revQueue=[]; matchRounds=[]; revState=null; matchPicked=null;
+  practiceStage='setup'; renderPracticeSetup();
+}
+window.quitRound=quitRound;
 
 /* ---------- swipe to move on ----------
    The listener lives on #review-area, which survives every innerHTML
    rewrite, so it is wired exactly once. */
 function practiceAnswered(){ return practiceMode==='match' ? !!matchPicked : !!revState; }
 function practiceAdvance(dir){
+  if(practiceStage!=='playing') return;
   if(!practiceAnswered()){ toast('Answer first — then swipe to continue'); return; }
   const area=$('#review-area'); if(!area) return;
   const cls = dir==='right' ? 'swipe-out-r' : 'swipe-out-l';
@@ -1135,6 +1249,7 @@ function practiceAdvance(dir){
     if(practiceMode==='match') nextMatch(); else nextReview();
   },170);
 }
+window.practiceAdvance=practiceAdvance;
 function wirePracticeSwipe(){
   const el=$('#review-area');
   if(!el || el._swipeWired) return;
@@ -1148,16 +1263,15 @@ function wirePracticeSwipe(){
     if(!live) return; live=false;
     const t=e.changedTouches[0];
     const dx=t.clientX-sx, dy=t.clientY-sy, dt=Date.now()-st;
-    if(dt>900) return;                                  // a slow drag isn't a swipe
-    if(Math.abs(dx)<55 || Math.abs(dy)>Math.abs(dx)*0.8) return;   // must be clearly horizontal
+    if(dt>900) return;                                              // a slow drag isn't a swipe
+    if(Math.abs(dx)<55 || Math.abs(dy)>Math.abs(dx)*0.8) return;    // must be clearly horizontal
     const ae=document.activeElement;
     if(ae && (ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) ae.blur();
     practiceAdvance(dx<0?'left':'right');
   },{passive:true});
-  // keyboard equivalent, handy on desktop
   document.addEventListener('keydown',(e)=>{
     const v=$('#v-review'); if(!v || !v.classList.contains('active')) return;
-    if(!practiceAnswered()) return;
+    if(practiceStage!=='playing' || !practiceAnswered()) return;
     if(e.key==='ArrowRight'||e.key==='ArrowLeft'||e.key==='Enter'){
       e.preventDefault();
       practiceAdvance(e.key==='ArrowLeft'?'right':'left');
@@ -1165,44 +1279,59 @@ function wirePracticeSwipe(){
   });
 }
 
+/* Dots for a short round, a slim bar once there are too many to see. */
+function practiceProgress(states){
+  const total=states.length;
+  if(total<=14){
+    return '<div class="rev-dots">'+states.map(c=>'<div class="rev-dot '+c+'"></div>').join('')+'</div>';
+  }
+  const okPct=Math.round(states.filter(c=>c==='done').length/total*100);
+  const badPct=Math.round(states.filter(c=>c==='wrong').length/total*100);
+  return '<div class="rev-slim"><i class="ok" style="width:'+okPct+'%"></i><i class="bad" style="width:'+badPct+'%"></i></div>';
+}
+
+/* One shared "you answered — now move on" affordance. */
+function swipeOn(){
+  return '<div class="swipe-cue" onclick="practiceAdvance(\'left\')">'
+    +'<span class="sc-txt">Swipe or tap to continue</span><span class="sc-arrow">›</span></div>';
+}
+
+/* The mascot + speech line shared by both games. */
+function gameHero(pose,bubble){
+  return '<div class="rev-hero"><img class="rev-mascot" src="./mascot-'+pose+'.webp" alt=""/>'
+    +'<div class="speech">'+esc(bubble)+'</div></div>';
+}
+function roundDone(score,total,againFn){
+  const perfect=score===total;
+  const pose=perfect?'champion':(score>=total/2?'jump':'run_and_think');
+  const say=perfect?'A flawless expedition! Every single one.'
+    :(score>=total/2?'Good haul! The map is filling in.':'Every explorer stumbles. Tomorrow we go again.');
+  const pct=total?Math.round(score/total*100):0;
+  return '<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt=""/>'
+    +'<div class="speech big">'+esc(say)+'</div>'
+    +'<div class="rd-score">'+score+' <span>/ '+total+'</span></div>'
+    +'<div class="rd-ring"><i style="width:'+pct+'%"></i></div>'
+    +'<div class="rd-sub">'+pct+'% correct</div></div>'
+    +'<button class="btn" onclick="'+againFn+'">Play again</button>'
+    +'<button class="btn ghost" onclick="quitRound()">Change settings</button>';
+}
+
 /* ============================================================
-   MATCH IT — six words from the whole library, one Vietnamese
-   meaning. Works even with nothing saved, so a big seeded
-   dictionary finally becomes something you can play with.
+   MATCH IT — six candidate words, one Vietnamese meaning
    ============================================================ */
 let matchRounds=[], matchIdx=0, matchHits=0, matchPicked=null, matchAwarded=false;
-async function startMatch(){
+async function startMatch(preAvail){
   wirePracticeSwipe();
   const area=$('#review-area');
-  area.innerHTML=practiceTabs()+'<div class="spinner"></div>';
-  const usable=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || (r.data.senses||[])[0]?.vi));
-  // The ANSWERS come from the chosen pool; the decoys always come from the
-  // whole library, so a small pool still gets six believable options.
-  const pool=getPool();
-  let answers=usable;
-  if(pool==='saved') answers=usable.filter(r=>r.saved);
-  else if(pool==='searched'){
-    let seen=new Set();
-    try{ seen=new Set((await logAll()).filter(l=>l.type==='search'&&l.word).map(l=>l.word)); }catch(e){}
-    answers=usable.filter(r=>seen.has(r.word));
-  }
-  const all=usable;
-  if(all.length<6){
-    area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>Not enough words yet</h3><p>Focci needs at least 6 words in the library to build a round.</p></div>';
-    return;
-  }
-  if(!answers.length){
-    const why = pool==='saved'
-      ? 'You haven\'t saved any words yet — tap the ☆ on a word to add it here.'
-      : 'You haven\'t searched any words yet — look a few up and they\'ll show up in this pool.';
-    area.innerHTML=practiceTabs()+'<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>This pool is empty</h3><p>'+why+'</p><p style="margin-top:10px">Tap <b>Pool</b> above to switch back to <b>All words</b>.</p></div>';
-    return;
-  }
+  const answers=preAvail||await availableWords();
+  // Decoys always come from the whole library, so a small pool still gets
+  // six believable options.
+  const all=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi));
+  if(!answers.length || all.length<6){ return renderPracticeSetup(); }
+  practiceStage='playing';
   const meaningOf=(r)=>r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi || '';
   matchRounds=[]; matchIdx=0; matchHits=0; matchPicked=null; matchAwarded=false;
   const total=Math.min(getQCount(), answers.length);
-  // shuffle once and take from the top — with a 50-question round, random
-  // retries would keep colliding and quietly return a short round.
   const deck=answers.slice().sort(()=>Math.random()-0.5).slice(0,total);
   for(const answer of deck){
     const opts=[answer];
@@ -1223,34 +1352,22 @@ function renderMatch(){
       if(matchHits===matchRounds.length) localStorage.setItem(PERFECT_LS,'1');
       checkAchievements();
     }
-    const perfect=matchHits===matchRounds.length;
-    const pose=perfect?'champion':(matchHits>=matchRounds.length/2?'jump':'run_and_think');
-    const say=perfect?"Perfect run! Not one wrong turn."
-      :(matchHits>=matchRounds.length/2?"Solid work out there, explorer.":"Rough trail today — but we mapped it.");
-    area.innerHTML=practiceTabs()
-      +'<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt=""/>'
-      +'<div class="speech big">'+esc(say)+'</div>'
-      +'<div class="rd-score">'+matchHits+' / '+matchRounds.length+'</div>'
-      +'<div class="rd-sub">correct · +8 XP</div></div>'
-      +'<button class="btn" onclick="startMatch()">Play again</button>';
+    area.innerHTML=roundDone(matchHits, matchRounds.length, 'startMatch()');
     confettiBurst(area);
     return;
   }
   const r=matchRounds[matchIdx];
-  let h=practiceTabs();
   const states=matchRounds.map((x,i)=> i<matchIdx ? (x._ok?'done':'wrong') : (i===matchIdx?'current':'todo'));
-  h+=practiceProgress(states);
-  h+='<div class="rev-progress">Round '+(matchIdx+1)+' / '+matchRounds.length+'</div>';
+  let h=roundBar(matchIdx, matchRounds.length, states);
 
   let pose='investigate', bubble="Which word means this?";
   if(matchPicked){
     if(matchPicked.ok){ pose='thumbsup'; bubble=pick(["Spot on!","That's the one!","Sharp eye!"]); }
     else { pose='tired'; bubble="Not quite — here's the right one."; }
   }
-  h+='<div class="rev-hero"><img class="rev-mascot" src="./mascot-'+pose+'.webp" alt=""/>'
-    +'<div class="speech">'+esc(bubble)+'</div></div>';
+  h+=gameHero(pose,bubble);
 
-  h+='<div class="match-meaning">'+esc(r.meaning)+'</div>';
+  h+='<div class="match-meaning">'+esc(r.meaning)+levelTag(r.answer.word)+'</div>';
   h+='<div class="match-grid">';
   r.opts.forEach((o,i)=>{
     let cls='match-opt';
@@ -1265,33 +1382,13 @@ function renderMatch(){
   if(matchPicked) h+=swipeOn();
   area.innerHTML=h;
 }
-/* One shared "you answered — now move on" affordance. Swiping is the
-   intended gesture; the button stays as a fallback for anyone on desktop. */
-function swipeOn(){
-  return '<div class="swipe-cue"><span class="sc-arrow">←</span>'
-    +'<span class="sc-txt">Swipe to continue</span>'
-    +'<button class="sc-btn" onclick="practiceAdvance(\'left\')">Next</button></div>';
-}
-window.practiceAdvance=practiceAdvance;
-/* Dots for a short round, a slim bar once there are too many to see. */
-function practiceProgress(states){
-  const total=states.length;
-  if(total<=14){
-    return '<div class="rev-dots">'+states.map(c=>'<div class="rev-dot '+c+'"></div>').join('')+'</div>';
-  }
-  const answered=states.filter(c=>c==='done'||c==='wrong').length;
-  const okPct=Math.round(states.filter(c=>c==='done').length/total*100);
-  const badPct=Math.round(states.filter(c=>c==='wrong').length/total*100);
-  return '<div class="rev-slim" aria-label="'+answered+' of '+total+' answered">'
-    +'<i class="ok" style="width:'+okPct+'%"></i><i class="bad" style="width:'+badPct+'%"></i></div>';
-}
 async function pickMatch(i){
   if(matchPicked) return;
   const r=matchRounds[matchIdx], choice=r.opts[i];
   const ok=choice.word===r.answer.word;
   r._ok=ok;
   matchPicked={word:choice.word, ok};
-  if(ok){ matchHits++; addXP(3); } 
+  if(ok){ matchHits++; addXP(3); }
   await logEvent(ok?'review_correct':'review_wrong', r.answer.word);
   try{ const rec=await idbGet(r.answer.word);
     if(rec){ rec.reviewCorrect=(rec.reviewCorrect||0)+(ok?1:0); rec.reviewWrong=(rec.reviewWrong||0)+(ok?0:1);
@@ -1300,47 +1397,55 @@ async function pickMatch(i){
 }
 function nextMatch(){ matchIdx++; matchPicked=null; renderMatch(); }
 window.startMatch=startMatch; window.pickMatch=pickMatch; window.nextMatch=nextMatch;
+
+/* ============================================================
+   TYPE IT
+   ============================================================ */
+/* The shape of the answer: first letter shown, every other letter an
+   underscore, real gaps between words. */
+function maskHint(word){
+  const w=String(word||'').trim();
+  if(!w) return '';
+  let out='', first=true, letters=0;
+  for(const ch of w){
+    if(/\s/.test(ch)){ out+='<span class="mh-gap"></span>'; continue; }
+    if(!/[a-zA-Z\u00C0-\u024F]/.test(ch)){ out+='<span class="mh-ch punct">'+esc(ch)+'</span>'; continue; }
+    letters++;
+    if(first){ out+='<span class="mh-ch first">'+esc(ch)+'</span>'; first=false; }
+    else out+='<span class="mh-ch blank">_</span>';
+  }
+  return '<div class="mask-hint">'+out+'<span class="mh-count">'+letters+' letters</span></div>';
+}
+
 function renderReview(){
   const area=$('#review-area');
   if(revIdx>=revQueue.length){
     if(!revSessionAwarded && revQueue.length){
-      revSessionAwarded=true;
-      addXP(10);
+      revSessionAwarded=true; addXP(10);
       if(revCorrectCount===revQueue.length) localStorage.setItem(PERFECT_LS,'1');
       checkAchievements();
     }
-    const perfect=revCorrectCount===revQueue.length;
-    const pose=perfect?'champion':(revCorrectCount>=revQueue.length/2?'jump':'run_and_think');
-    const say=perfect?'A flawless expedition! Every single one.'
-      :(revCorrectCount>=revQueue.length/2?'Good haul! The map is filling in.'
-      :'Every explorer stumbles. Tomorrow we go again.');
-    area.innerHTML=practiceTabs()+'<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt=""/>'
-      +'<div class="speech big">'+esc(say)+'</div>'
-      +'<div class="rd-score">'+revCorrectCount+' / '+revQueue.length+'</div>'
-      +'<div class="rd-sub">correct · +10 XP for finishing</div></div>'
-      +'<button class="btn" onclick="startReview()">Practice Again</button>';
+    area.innerHTML=roundDone(revCorrectCount, revQueue.length, 'startPractice()');
     confettiBurst(area);
     return;
   }
   const r=revQueue[revIdx], d=r.data||{};
   const prompt=reviewPrompt(d);
-  let h=practiceTabs();
   const states=revQueue.map((x,i)=> revResults[i]==='correct' ? 'done'
     : revResults[i]==='wrong' ? 'wrong' : (i===revIdx?'current':'todo'));
-  h+=practiceProgress(states);
-  h+='<div class="rev-progress">Word '+(revIdx+1)+' / '+revQueue.length+'</div>';
-  // Focci reacts to the answer you just gave
+  let h=roundBar(revIdx, revQueue.length, states);
+
   let pose='run_and_think', bubble="Hmm… which word was it?";
   if(revState){
     if(revState.correct && !revState.close){ pose='thumbsup'; bubble=pick(["Nailed it!","That's the one!","Exactly right!"]); }
     else if(revState.correct){ pose='wonder'; bubble="So close — just the spelling!"; }
     else { pose='tired'; bubble=pick(["We'll get it next time.","Tricky one. Keep going!"]); }
   }
-  h+='<div class="rev-hero"><img class="rev-mascot" src="./mascot-'+pose+'.webp" alt=""/>'
-    +'<div class="speech">'+esc(bubble)+'</div></div>';
+  h+=gameHero(pose,bubble);
+
   h+='<div class="rev-card">';
   h+='<div class="prompt">What\'s the English word for…</div>';
-  h+='<div class="q">'+esc(prompt)+'</div>';
+  h+='<div class="q">'+esc(prompt)+levelTag(r.word)+'</div>';
   if(d.vi_note && !revState) h+='<div class="q-note">'+esc(d.vi_note)+'</div>';
 
   if(!revState){
@@ -1348,7 +1453,7 @@ function renderReview(){
     h+='<input id="rev-input" class="type-input" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Type the English word…"/>';
   } else {
     const cls = revState.correct ? (revState.close?'fb-close':'fb-correct') : 'fb-wrong';
-    const icon = revState.correct ? (revState.close?'〰️':'✓') : '✕';
+    const icon = revState.correct ? (revState.close?'〰︎':'✓') : '✕';
     const label = revState.correct ? (revState.close?'Close — the correct spelling is:':'Correct!') : 'Correct answer:';
     h+='<div class="rev-fb '+cls+'"><span class="fb-icon">'+icon+'</span> '+label+(revState.close||!revState.correct?' <b>'+esc(r.word)+'</b>':'')+'</div>';
     const s0=(d.senses||[])[0];
@@ -1357,7 +1462,7 @@ function renderReview(){
   h+='</div>';
 
   if(!revState){
-    h+='<button class="btn" style="margin-top:12px" onclick="checkReview()">Check</button>';
+    h+='<button class="btn" style="margin-top:14px" onclick="checkReview()">Check</button>';
     h+='<button class="link-skip" onclick="skipReview()">I don\'t know — show me</button>';
   } else {
     h+=swipeOn();
@@ -1938,7 +2043,7 @@ async function rewriteMeaning(word){
   const btn=$('#rewrite-btn');
   if(btn){
     if(btn.dataset.busy) return;               // no double-taps
-    btn.dataset.busy='1'; btn.classList.add('busy'); btn.textContent='✎ Rewriting…';
+    btn.dataset.busy='1'; btn.classList.add('busy');   // the icon spins, no text swap
   }
   try{
     const fresh=await askJSON(refreshPrompt(w, rec.data), 0);
@@ -1960,14 +2065,14 @@ async function rewriteMeaning(word){
     currentWord=w;
     const box=$('#result');
     if(box){ box.innerHTML=renderEntry(saved); window.scrollTo({top:0,behavior:'smooth'}); }
-    toast('Meaning rewritten ✓');
+    toast('Meaning refreshed ✓');
   }catch(e){
     const msg=String(e.message||e);
     toast(msg==='OFFLINE'?'You\'re offline right now'
         : msg==='NO_KEY'?'Add your API key in Settings'
         : 'Rewrite failed: '+msg.slice(0,60));
     const b=$('#rewrite-btn');
-    if(b){ b.dataset.busy=''; b.classList.remove('busy'); b.textContent='✎ Rewrite meaning'; }
+    if(b){ b.dataset.busy=''; b.classList.remove('busy'); }
   }
 }
 window.rewriteMeaning=rewriteMeaning;
