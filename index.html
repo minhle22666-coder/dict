@@ -233,12 +233,17 @@
   .stat .n{font-size:21px;font-weight:900;position:relative;z-index:1;line-height:1}
   .stat .l{font-size:9px;letter-spacing:.06em;font-weight:900;line-height:1.3;opacity:.92;position:relative;z-index:1}
 
-  .bars{display:flex;gap:8px;align-items:flex-end;height:96px;background:var(--surface);border:1px solid var(--line);
-    border-radius:var(--r-sm);padding:13px;box-shadow:var(--shadow);margin-bottom:16px}
-  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px}
+  .bars{display:flex;gap:9px;align-items:flex-end;height:154px;
+    background:linear-gradient(180deg,var(--surface),var(--surface-2));border:1px solid var(--line);
+    border-radius:var(--r);padding:16px 13px 13px;box-shadow:var(--shadow);margin-bottom:16px}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:7px}
+  .bar-n{font-size:10.5px;font-weight:900;color:var(--muted-2)}
+  .bar-col.today .bar-n{color:var(--primary)}
   .bar-track{width:100%;flex:1;display:flex;align-items:flex-end}
-  .bar-fill{width:100%;background:var(--grad-hero);border-radius:6px 6px 3px 3px;min-height:4px;box-shadow:0 0 12px rgba(255,159,69,.35)}
-  .bar-lbl{font-size:9.5px;color:var(--muted-2);font-weight:800}
+  .bar-fill{width:100%;background:var(--grad-hero);border-radius:7px 7px 4px 4px;min-height:5px;box-shadow:0 0 12px rgba(255,159,69,.35)}
+  .bar-col.today .bar-fill{box-shadow:0 0 16px rgba(255,159,69,.6)}
+  .bar-lbl{font-size:10px;color:var(--muted-2);font-weight:800}
+  .bar-col.today .bar-lbl{color:var(--primary)}
 
   .sec{margin-top:24px}
   .sec-h{display:flex;align-items:center;gap:9px;font-size:11.5px;font-weight:900;letter-spacing:.09em;
@@ -653,30 +658,32 @@
   .hero-bubble::after{content:'';position:absolute;bottom:-9px;right:26px;border:8px solid transparent;border-top-color:var(--line)}
 
   /* ---- the orchard: tap the tree, fruit falls ---- */
-  .tree-widget{position:relative;height:186px;background:linear-gradient(180deg,var(--surface-2),var(--surface));
+  .tree-widget{position:relative;height:240px;
+    background:radial-gradient(ellipse 260px 160px at 50% 100%, rgba(255,159,69,.14), transparent 70%),
+      linear-gradient(180deg,var(--surface-2),var(--surface));
     border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer}
-  .tree-hint{position:absolute;top:12px;left:14px;font-size:11px;font-weight:800;color:var(--muted-2);
+  .tree-hint{position:absolute;top:14px;left:16px;font-size:11px;font-weight:800;color:var(--muted-2);
     letter-spacing:.05em;text-transform:uppercase;z-index:1}
-  .tree-img{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:172px;transform-origin:50% 100%;z-index:1}
+  .tree-img{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);width:214px;transform-origin:50% 100%;z-index:1}
   .tree-img.shaking{animation:tree-shake .55s ease}
   @keyframes tree-shake{0%,100%{transform:translateX(-50%) rotate(0)}
     15%{transform:translateX(-50%) rotate(-3.5deg)}35%{transform:translateX(-50%) rotate(3deg)}
     55%{transform:translateX(-50%) rotate(-2deg)}75%{transform:translateX(-50%) rotate(1.2deg)}}
-  .tree-bush{position:absolute;right:8px;bottom:6px;width:74px;opacity:.55;z-index:0}
-  .fruit{position:absolute;top:52px;width:24px;z-index:2;animation:fruit-fall 1.4s cubic-bezier(.5,0,.9,.6) forwards}
+  .tree-bush{position:absolute;right:10px;bottom:8px;width:92px;opacity:.55;z-index:0}
+  .fruit{position:absolute;top:64px;width:28px;z-index:2;animation:fruit-fall 1.4s cubic-bezier(.5,0,.9,.6) forwards}
   @keyframes fruit-fall{0%{opacity:0;transform:translateY(0) rotate(0)}
     12%{opacity:1}
-    70%{opacity:1;transform:translateY(104px) rotate(220deg)}
-    82%{transform:translateY(92px) rotate(250deg)}
-    100%{opacity:0;transform:translateY(112px) rotate(300deg)}}
-  .tree-bubble{position:absolute;left:12px;top:44px;max-width:47%;z-index:4;
+    70%{opacity:1;transform:translateY(126px) rotate(220deg)}
+    82%{transform:translateY(112px) rotate(250deg)}
+    100%{opacity:0;transform:translateY(136px) rotate(300deg)}}
+  .tree-bubble{position:absolute;left:14px;top:52px;max-width:47%;z-index:4;
     background:var(--surface);border:1.5px solid var(--line);color:var(--text);font-size:12px;font-weight:700;
     padding:8px 12px;border-radius:14px;line-height:1.4;box-shadow:var(--shadow);
     opacity:0;transform:scale(.85) translateY(6px);transition:all .26s cubic-bezier(.34,1.56,.64,1)}
   .tree-bubble.show{opacity:1;transform:scale(1) translateY(0)}
-  .tree-word{position:absolute;left:12px;right:12px;bottom:10px;z-index:5;display:none;
-    background:var(--surface);border:1.5px solid var(--primary);border-radius:14px;padding:9px 13px;
-    box-shadow:var(--shadow),var(--glow);align-items:center;gap:9px;animation:pop-in .4s cubic-bezier(.34,1.56,.64,1)}
+  .tree-word{position:absolute;left:14px;bottom:14px;right:auto;max-width:70%;z-index:5;display:none;
+    background:var(--surface);border:1.5px solid var(--primary);border-radius:99px;padding:8px 14px;
+    box-shadow:var(--shadow),var(--glow);align-items:baseline;gap:8px;animation:pop-in .4s cubic-bezier(.34,1.56,.64,1)}
   .tree-word.show{display:flex}
   @keyframes pop-in{0%{opacity:0;transform:scale(.8)}100%{opacity:1;transform:scale(1)}}
   .tw-w{font-weight:900;font-size:15px}
@@ -869,10 +876,6 @@
   .hist-star.on{color:var(--amber);filter:drop-shadow(0 0 8px rgba(255,197,61,.5))}
   .hist-star:active{transform:scale(1.3)}
 
-  /* ---- tree word chip: small, sits low, never covers the trunk ---- */
-  .tree-word{position:absolute;left:10px;bottom:8px;right:auto;max-width:60%;z-index:5;display:none;
-    background:var(--surface);border:1.5px solid var(--primary);border-radius:99px;padding:7px 13px;
-    box-shadow:var(--glow);align-items:baseline;gap:8px;animation:pop-in .4s cubic-bezier(.34,1.56,.64,1)}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   /* ============================================================
      STORY ENGINE — Arc 1–4
@@ -895,26 +898,34 @@
     z-index:1;filter:drop-shadow(0 10px 14px rgba(0,0,0,.4));animation:sway 4.4s ease-in-out infinite}
 
   /* Passage card: a distinct, separate box from the scene art above it —
-     an aged-paper look built from layered CSS gradients (no image needed),
-     so it never depends on an asset that hasn't been uploaded yet. */
+     a storybook-page look built from layered CSS gradients (no image
+     needed), so it never depends on an asset that hasn't been uploaded. */
   .story-page.paper-bg{
     background:
-      radial-gradient(ellipse 140px 90px at 12% 10%, rgba(150,110,60,.22), transparent 60%),
-      radial-gradient(ellipse 110px 160px at 92% 85%, rgba(120,85,45,.2), transparent 60%),
-      radial-gradient(ellipse 90px 70px at 78% 22%, rgba(160,120,70,.14), transparent 65%),
-      radial-gradient(ellipse 130px 90px at 20% 88%, rgba(110,80,40,.15), transparent 60%),
-      radial-gradient(ellipse at 15% 8%, rgba(255,255,255,.5), transparent 45%),
-      repeating-linear-gradient(115deg, rgba(120,95,60,.06) 0px, rgba(120,95,60,.06) 2px, transparent 2px, transparent 5px),
-      linear-gradient(165deg, #f4e9d3 0%, #ecdcb8 55%, #e4d2a8 100%);
-    border:1px solid rgba(120,90,45,.28);
+      radial-gradient(ellipse 220px 140px at 50% -10%, rgba(120,90,50,.10), transparent 65%),
+      radial-gradient(ellipse 200px 160px at 100% 110%, rgba(120,90,50,.10), transparent 65%),
+      linear-gradient(175deg, #faf4e6 0%, #f3e9d2 60%, #ecdfc0 100%);
+    border:2px solid rgba(110,80,40,.22);
+    outline:1px solid rgba(110,80,40,.13);
+    outline-offset:-6px;
     border-radius:var(--r);
     padding:18px 17px 20px;
-    box-shadow:var(--shadow), inset 0 0 46px rgba(90,60,20,.16);
+    box-shadow:var(--shadow), inset 0 0 0 1px rgba(255,255,255,.4);
     color:#3a2c18}
-  .story-page.paper-bg .story-title{color:#6b4f22}
+  .story-page.paper-bg .story-title{color:#8a6a30;position:relative;padding-bottom:8px}
+  .story-page.paper-bg .story-title::after{content:'';position:absolute;left:0;bottom:0;width:34px;height:2px;background:rgba(140,105,55,.4)}
   .story-page.paper-bg .story-passage{color:#3a2c18}
   .story-page.paper-bg .wtap{background:rgba(140,100,40,.09);box-shadow:0 0 0 2px rgba(140,100,40,.09)}
   .story-page.paper-bg .wtap:active{background:rgba(120,90,20,.22)}
+
+  /* ---- picture-book illustration strip, top of the passage ---- */
+  .passage-illus{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .illus-item{width:64px;height:64px;border-radius:12px;background:rgba(255,255,255,.55);
+    border:1.5px solid rgba(110,80,40,.25);box-shadow:0 3px 8px rgba(80,55,20,.15);
+    display:flex;align-items:center;justify-content:center;padding:6px;transition:transform .12s}
+  .illus-item:active{transform:scale(.92)}
+  .illus-item img{width:100%;height:100%;object-fit:contain}
+
   .story-title{font-size:11px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;
     color:var(--muted-2);margin-bottom:9px}
   .story-passage{font-size:16px;line-height:1.7;color:var(--text);margin-bottom:16px}
@@ -1141,6 +1152,7 @@
         <img class="hero-sky is-sun" id="hero-sky" src="./decor-shiny-sun.webp" alt="" />
       </div>
 
+      <div class="hub-section-label">Today</div>
       <div class="jar-card" id="jar-card">
         <svg class="jar-svg" id="jar-svg" viewBox="0 0 60 68">
           <defs>
@@ -1180,6 +1192,7 @@
         </div>
       </div>
 
+      <div class="hub-section-label">Word Orchard</div>
       <div class="tree-widget" id="tree-widget" onclick="shakeTree()">
         <div class="tree-hint">🌳 Tap the tree…</div>
         <img class="tree-img" id="tree-img" src="./decor-tree.webp" alt="" />
@@ -1188,6 +1201,7 @@
         <div class="tree-word" id="tree-word"></div>
       </div>
 
+      <div class="hub-section-label">Your Stats</div>
       <div class="stat-grid">
         <div class="stat" onclick="statInsight('learned')"><div class="tile primary">📖</div><div class="n" id="d-total">0</div><div class="l">WORDS EXPLORED</div><span class="stat-more">tap</span></div>
         <div class="stat" onclick="statInsight('avg')"><div class="tile mint">📊</div><div class="n" id="d-avg">0</div><div class="l">NEW PER DAY</div><span class="stat-more">tap</span></div>
@@ -1384,7 +1398,7 @@
       <div class="saved-flash" id="clearlog-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v16 · discovery redesign</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v17 · asset fix & home polish</b></p>
   </section>
 </main>
 

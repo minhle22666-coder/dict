@@ -260,10 +260,11 @@ function wireJar(){
   card.addEventListener('click', async ()=>{
     card.classList.add('shaking');
     setTimeout(()=>card.classList.remove('shaking'),500);
-    const n=await todaysActivityCount();
+    const all=await idbAll();
+    const total=all.length;
     setTimeout(()=>{
       const ov=document.createElement('div'); ov.className='jar-reveal';
-      ov.innerHTML='<div class="jar-reveal-card"><div class="jar-reveal-n">✨ '+n+' ✨</div><div class="jar-reveal-l">words explored today — searches &amp; practice combined</div></div>';
+      ov.innerHTML='<div class="jar-reveal-card"><div class="jar-reveal-n">✨ '+total+' ✨</div><div class="jar-reveal-l">words explored in total, since day one</div></div>';
       document.body.appendChild(ov);
       confettiBurst(card, 20);
       requestAnimationFrame(()=>ov.classList.add('show'));
@@ -840,8 +841,8 @@ async function renderDashboardStats(){
   const maxWeek=Math.max(1,...week.map(w=>w.count));
   const WD=['S','M','T','W','T','F','S'];
   let h='';
-  week.forEach(w=>{ const pct=Math.round(w.count/maxWeek*100); const wd=WD[new Date(w.dd).getDay()];
-    h+='<div class="bar-col"><div class="bar-track"><div class="bar-fill" style="height:'+Math.max(4,pct)+'%"></div></div><div class="bar-lbl">'+wd+'</div></div>'; });
+  week.forEach((w,i)=>{ const pct=Math.round(w.count/maxWeek*100); const wd=WD[new Date(w.dd).getDay()]; const isToday=(i===week.length-1);
+    h+='<div class="bar-col'+(isToday?' today':'')+'"><div class="bar-n">'+w.count+'</div><div class="bar-track"><div class="bar-fill" style="height:'+Math.max(4,pct)+'%"></div></div><div class="bar-lbl">'+wd+'</div></div>'; });
   $('#week-bars').innerHTML=h;
 }
 

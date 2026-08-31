@@ -86,7 +86,7 @@ const PROP_LORE = {
   'other-tree':"Old enough that whatever it's seen, it's stopped reacting to.",
   'other-droplet':"Took its time falling. Some kind of drip has a rhythm if you wait for it.",
   'other-fern':"Unfurled just far enough to still look like a question mark.",
-  'other-carved-tree-trunk':"The cuts go deep enough that whoever made them wasn't in a hurry.",
+  'other-caved-tree-trunk':"The cuts go deep enough that whoever made them wasn't in a hurry.",
   'other-counter-machine':"Brass, dented on one corner, like it's been dropped exactly once, hard.",
   'other-wildflowers':"Grown in clumps, not rows — nobody planted this on purpose.",
   'other-butterflies':"None of them are going anywhere in particular. That seems to be the point.",
@@ -767,11 +767,27 @@ window.storySubmit = function(){
   if(isSubmitted(scene)) setTimeout(()=>maybeShowPresenceModal(scene), 450);
 };
 
+/* Deterministic per-scene shuffle so option ORDER on screen varies from
+   scene to scene (the correct answer used to always land in slot B —
+   easy to game). Scoring always resolves against the real data index,
+   never the on-screen position. */
+function seededShuffle(seedStr, n){
+  let seed = 0; for(let i=0;i<seedStr.length;i++) seed = (seed*31+seedStr.charCodeAt(i)) % 99991;
+  const arr = [...Array(n).keys()];
+  for(let i=n-1;i>0;i--){
+    seed = (seed*1103515245 + 12345) % 2147483648;
+    const j = seed % (i+1);
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+  return arr; // arr[displayPosition] = realDataIndex
+}
 function renderCompBlock(scene, chapter, arc){
   const log=getState().storyLog[scene.id]||{};
   const submitted = log.comp!=null;
+  const order = seededShuffle(scene.id+'|comp', scene.comp.options.length);
   let h='<div class="q-card q-comp"><div class="q-kicker">Check</div><div class="q-text">'+esc(scene.comp.q)+'</div><div class="q-opts">';
-  scene.comp.options.forEach((opt,i)=>{
+  order.forEach(i=>{
+    const opt = scene.comp.options[i];
     let cls='q-opt';
     if(submitted){ if(i===log.comp) cls += log.compCorrect?' right':' wrong'; if(i===scene.comp.correct && !log.compCorrect) cls+=' reveal'; }
     else if(_pending.comp===i) cls+=' picked';
@@ -784,8 +800,10 @@ function renderCompBlock(scene, chapter, arc){
 function renderIqBlock(scene, chapter, arc){
   const log=getState().storyLog[scene.id]||{};
   const submitted = log.iq!=null;
+  const order = seededShuffle(scene.id+'|iq', scene.iq.options.length);
   let h='<div class="q-card q-iq"><div class="q-kicker">🧩 Puzzle</div><div class="q-text">'+esc(scene.iq.q)+'</div><div class="q-opts">';
-  scene.iq.options.forEach((opt,i)=>{
+  order.forEach(i=>{
+    const opt = scene.iq.options[i];
     let cls='q-opt';
     if(submitted && i===log.iq) cls += opt.tag==='ok' ? ' right' : opt.tag==='bad' ? ' wrong' : ' neutral';
     else if(!submitted && _pending.iq===i) cls+=' picked';
@@ -833,9 +851,9 @@ const ITEM_MENTIONS = {
   '2.7|other-cicada-2':'shell',
   '3.3|other-notebook':'letters',
   '5.2|other-notebook':'ledger', '5.3|other-notebook':'ledger',
-  '7.6|other-carved-tree-trunk':'bark',
+  '7.6|other-caved-tree-trunk':'bark',
   '8.4|other-parchment':'cloth',
-  '9.1|other-carved-tree-trunk':'bark',
+  '9.1|other-caved-tree-trunk':'bark',
   '9.3|other-tree':'log',
   '11.4|other-seed-bag':'envelopes',
   '12.3|other-seed-bag':'envelope',
@@ -892,25 +910,36 @@ window.itemSparkTap = function(assetName){
    spots in the stage. First tap ever removes the extra "notice me"
    pulse for every hotspot after it.
    ============================================================ */
-const STAGE_SLOTS = [ {left:'10%',top:'14%'}, {left:'68%',top:'16%'}, {left:'40%',top:'12%'} ];
-function stageHotspotsHTML(scene, text){
+/* Stage keeps the scenery + Focci, plus (per MPT's request) just an
+   occasional bit of pure clutter — never a real story object. Real
+   objects belong in the passage now, shown like picture-book art. */
+const STAGE_SLOTS = [ {left:'12%',top:'16%'} ];
+function stageHotspotsHTML(scene){
+  const decoys = pickDecoys(scene.id+'stage', 1);
+  if(!decoys.length) return '';
+  const showHint = !getState().hotspotHintSeen;
+  const pos = STAGE_SLOTS[0];
+  const safeFact = esc(decoys[0].fact).replace(/'/g,"\\'");
+  return '<button class="stage-hotspot'+(showHint?' hint':'')+'" style="left:'+pos.left+';top:'+pos.top+'" '
+    +'onclick="stageHotspotTap(this,\''+safeFact+'\')">'
+    +'<img src="'+assetUrl(decoys[0].name)+'" alt="" onerror="this.style.display=\'none\'"/></button>';
+}
+/* Real objects — the ones NOT already shown inline via their own word
+   in the text — as small picture-book illustrations at the top of the
+   passage card. Bigger and clearly part of the page, not hidden. */
+function passageIllustrationsHTML(scene, text){
   const inlined = inlineItemFor(scene, text);
   const real = normalizeProps(scene.props).concat(normalizeProps(scene.propsFront))
     .filter(p => !inlined || p.name!==inlined.name);
-  const realItems = real.slice(0,STAGE_SLOTS.length).map(p=>({ name:p.name, fact: PROP_LORE[p.name]||"Just something lying around." }));
-  const decoyCount = Math.max(0, Math.min(2, STAGE_SLOTS.length-realItems.length) || (realItems.length?0:2));
-  const decoys = decoyCount ? pickDecoys(scene.id+'stage', decoyCount) : [];
-  const items = realItems.concat(decoys.map(d=>({ name:d.name, fact:d.fact }))).slice(0,STAGE_SLOTS.length);
-  if(!items.length) return '';
-  const showHint = !getState().hotspotHintSeen;
-  let h='';
-  items.forEach((it,i)=>{
-    const pos = STAGE_SLOTS[i]||STAGE_SLOTS[0];
-    const safeFact = esc(it.fact).replace(/'/g,"\\'");
-    h+='<button class="stage-hotspot'+(showHint?' hint':'')+'" style="left:'+pos.left+';top:'+pos.top+'" '
-      +'onclick="stageHotspotTap(this,\''+safeFact+'\')">'
-      +'<img src="'+assetUrl(it.name)+'" alt="" onerror="this.style.display=\'none\'"/></button>';
+  if(!real.length) return '';
+  let h='<div class="passage-illus">';
+  real.slice(0,3).forEach(p=>{
+    const fact = PROP_LORE[p.name] || "Just something lying around.";
+    const safeFact = esc(fact).replace(/'/g,"\\'");
+    h+='<button class="illus-item" onclick="stageHotspotTap(this,\''+safeFact+'\')">'
+      +'<img src="'+assetUrl(p.name)+'" alt="" onerror="this.parentElement.style.display=\'none\'"/></button>';
   });
+  h+='</div>';
   return h;
 }
 window.stageHotspotTap = function(btn, fact){
@@ -1035,12 +1064,13 @@ function renderStory(){
   const passageText = getSceneText(scene, chapter.id);
   h+='<div class="story-stage mood-'+mood+'" style="background-image:url(\''+assetUrl(bg)+'\')">';
   h+=ambientLayerHTML(mood);
-  h+=stageHotspotsHTML(scene, passageText);
+  h+=stageHotspotsHTML(scene);
   if(scene.npc) h+='<img class="story-npc" src="'+assetUrl(scene.npc)+'" alt="" onerror="this.style.display=\'none\'"/>';
   if(scene.mascot) h+='<img class="story-mascot" src="'+assetUrl(scene.mascot)+'" alt="" onclick="tapMascot(\''+scene.id+'\')" onerror="this.style.display=\'none\'"/>';
   h+='</div>';
 
   h+='<div class="story-page paper-bg">';
+  h+=passageIllustrationsHTML(scene, passageText);
   h+='<div class="story-title">'+esc(scene.title||'')+'</div>';
   let passageHTML = tokenizeForTap(passageText);
   passageHTML = injectItemSparkle(passageHTML, inlineItemFor(scene, passageText));
