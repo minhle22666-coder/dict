@@ -255,13 +255,21 @@ async function renderJar(){
   if(fillEl){ fillEl.setAttribute('y', 54-fillH); fillEl.setAttribute('height', fillH); }
   const titleEl=$('#jar-title'); if(titleEl) titleEl.textContent=n+' word'+(n===1?'':'s')+' today';
 }
+/* Distinct words the user has personally searched, across every day —
+   NOT the size of the offline library (which includes ~16k pre-seeded
+   words the user never looked up). This is what the jar-reveal and the
+   "words explored" stat both mean by "total". */
+async function totalWordsLearned(){
+  const logs=await logAll();
+  const searches=logs.filter(l=>l.type==='search'&&l.word);
+  return new Set(searches.map(l=>l.word)).size;
+}
 function wireJar(){
   const card=$('#jar-card'); if(!card) return;
   card.addEventListener('click', async ()=>{
     card.classList.add('shaking');
     setTimeout(()=>card.classList.remove('shaking'),500);
-    const all=await idbAll();
-    const total=all.length;
+    const total=await totalWordsLearned();
     setTimeout(()=>{
       const ov=document.createElement('div'); ov.className='jar-reveal';
       ov.innerHTML='<div class="jar-reveal-card"><div class="jar-reveal-n">✨ '+total+' ✨</div><div class="jar-reveal-l">words explored in total, since day one</div></div>';
@@ -809,6 +817,38 @@ async function toggleSaveFromList(word, btn){
 }
 window.toggleSaveFromList=toggleSaveFromList;
 
+let _weekLogsCache=[], _weekEarliestDay=0, weekOffset=0;
+const WD=['S','M','T','W','T','F','S'];
+function renderWeekBars(offset){
+  weekOffset=Math.max(0,offset);
+  const today=dayStart(now());
+  const anchorEnd=today-weekOffset*7*DAY;
+  const week=[]; for(let i=6;i>=0;i--){ const dd=anchorEnd-i*DAY;
+    const cnt=_weekLogsCache.filter(l=>dayStart(l.ts)===dd && l.type==='search').length; week.push({dd,count:cnt}); }
+  const maxWeek=Math.max(1,...week.map(w=>w.count));
+  let h='';
+  week.forEach(w=>{ const pct=Math.round(w.count/maxWeek*100); const wd=WD[new Date(w.dd).getDay()]; const isToday=(w.dd===today);
+    h+='<div class="bar-col'+(isToday?' today':'')+'"><div class="bar-n">'+w.count+'</div><div class="bar-track"><div class="bar-fill" style="height:'+Math.max(4,pct)+'%"></div></div><div class="bar-lbl">'+wd+'</div></div>'; });
+  const bars=$('#week-bars'); if(bars) bars.innerHTML=h;
+
+  const lbl=$('#week-range-label');
+  if(lbl){
+    if(weekOffset===0) lbl.textContent='This week';
+    else if(weekOffset===1) lbl.textContent='Last week';
+    else{
+      const start=new Date(anchorEnd-6*DAY), end=new Date(anchorEnd);
+      const fmt=(d)=>d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+      lbl.textContent=fmt(start)+' – '+fmt(end);
+    }
+  }
+  const nextBtn=$('#week-next'); if(nextBtn) nextBtn.disabled = weekOffset===0;
+  const prevBtn=$('#week-prev'); if(prevBtn) prevBtn.disabled = (anchorEnd-7*DAY) < _weekEarliestDay;
+}
+function wireWeekNav(){
+  const prevBtn=$('#week-prev'), nextBtn=$('#week-next');
+  if(prevBtn && !prevBtn._wired){ prevBtn._wired=true; prevBtn.addEventListener('click',()=>renderWeekBars(weekOffset+1)); }
+  if(nextBtn && !nextBtn._wired){ nextBtn._wired=true; nextBtn.addEventListener('click',()=>renderWeekBars(weekOffset-1)); }
+}
 async function renderDashboardStats(){
   const [entries, logs] = await Promise.all([idbAll(), logAll()]);
   // "Words learned" = words YOU actually looked up, not the pre-seeded library.
@@ -837,13 +877,12 @@ async function renderDashboardStats(){
   $('#d-avg').textContent=avg;
   $('#d-time').textContent = mins<60 ? mins+'m' : Math.floor(mins/60)+'h '+(mins%60)+'m';
 
-  const week=[]; for(let i=6;i>=0;i--){ const dd=today-i*DAY; const cnt=logs.filter(l=>dayStart(l.ts)===dd && l.type==='search').length; week.push({dd,count:cnt}); }
-  const maxWeek=Math.max(1,...week.map(w=>w.count));
-  const WD=['S','M','T','W','T','F','S'];
-  let h='';
-  week.forEach((w,i)=>{ const pct=Math.round(w.count/maxWeek*100); const wd=WD[new Date(w.dd).getDay()]; const isToday=(i===week.length-1);
-    h+='<div class="bar-col'+(isToday?' today':'')+'"><div class="bar-n">'+w.count+'</div><div class="bar-track"><div class="bar-fill" style="height:'+Math.max(4,pct)+'%"></div></div><div class="bar-lbl">'+wd+'</div></div>'; });
-  $('#week-bars').innerHTML=h;
+  // the chart can page back through every logged day on this device (the
+  // activity log itself is the only limit — see the Settings hint about it)
+  _weekLogsCache=logs;
+  _weekEarliestDay = logs.length ? dayStart(Math.min(...logs.map(l=>l.ts))) : today;
+  wireWeekNav();
+  renderWeekBars(0);
 }
 
 /* Tap a stat tile → Focci explains what the number actually means. */
@@ -868,11 +907,12 @@ function statInsight(which){
   }
   showInfoCard(img,title,body);
 }
-function showInfoCard(img,title,body){
+function showInfoCard(img,title,body,actionLabel,actionOnclick){
   const ov=document.createElement('div'); ov.className='info-ov';
+  const action = actionLabel ? '<button class="info-action" onclick="this.closest(\'.info-ov\').remove();'+actionOnclick+'">'+esc(actionLabel)+'</button>' : '';
   ov.innerHTML='<div class="info-card"><img src="./'+img+'.webp" alt=""/>'
     +'<div class="info-t">'+esc(title)+'</div><div class="info-b">'+esc(body)+'</div>'
-    +'<div class="info-tap">tap to close</div></div>';
+    +action+'<div class="info-tap">tap to close</div></div>';
   document.body.appendChild(ov);
   requestAnimationFrame(()=>ov.classList.add('show'));
   ov.addEventListener('click',()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),260); });
@@ -914,16 +954,17 @@ async function shakeTree(){
   treeShakes++;
   tree.classList.remove('shaking'); void tree.offsetWidth; tree.classList.add('shaking');
 
-  // drop 2–4 pieces of fruit
-  const n=2+Math.floor(Math.random()*3);
+  // drop 1–2 pieces of fruit, clearly staggered so they read as separate drops
+  const n=1+Math.floor(Math.random()*2);
   for(let i=0;i<n;i++){
     const f=document.createElement('img');
     f.className='fruit';
     f.src = Math.random()<0.6 ? './fruit-apple.png' : './fruit-orange.png';
     f.style.left=(24+Math.random()*52)+'%';
-    f.style.animationDelay=(Math.random()*0.25)+'s';
+    const delay=i*0.28 + Math.random()*0.08;
+    f.style.animationDelay=delay+'s';
     wrap.appendChild(f);
-    setTimeout(()=>f.remove(),1500);
+    setTimeout(()=>f.remove(),1500+delay*1000);
   }
   bubble.textContent=TREE_LINES[Math.min(treeShakes-1,TREE_LINES.length-1)];
   bubble.classList.add('show');
@@ -1622,7 +1663,8 @@ async function renderHero(){
   const heroEl=$('#hero'); if(!heroEl) return;
   const t=TIME_CONTENT[timeOfDay()];
   const name=getName();
-  heroEl.style.backgroundImage="url('./bg-"+t.bg+".webp')";
+  heroEl.classList.remove('hero-morning','hero-afternoon','hero-evening','hero-night');
+  heroEl.classList.add('hero-'+t.bg);
   heroEl.classList.toggle('is-night', t.bg==='night');
   const spooky = isSpookySeason() && (timeOfDay()==='evening' || timeOfDay()==='night');
   $('#hero-char').src='./mascot-'+(spooky?'halloween':t.char)+'.webp';
@@ -2319,12 +2361,58 @@ function wire(){
     const f=$('#clearlog-flash'); f.textContent='Activity log cleared ✓'; setTimeout(()=>f.textContent='',1800);
     renderHero();
   });
+  const updBtn=$('#update-btn'); if(updBtn) updBtn.addEventListener('click', forceUpdateApp);
+  const restartBtn=$('#restart-story-btn');
+  if(restartBtn) restartBtn.addEventListener('click', ()=>{
+    if(!confirm('Restart the story from Arc 1? This wipes Focci\'s journey — decisions, stats, chapters. Your dictionary and saved words are not touched.')) return;
+    if(typeof resetStoryProgress==='function') resetStoryProgress();
+    const f=$('#restart-story-flash'); if(f){ f.textContent='Story restarted ✓'; setTimeout(()=>f.textContent='',1800); }
+  });
 }
 
-/* ---------- service worker ---------- */
+/* ---------- service worker + updates ----------
+   iOS "Add to Home Screen" apps sometimes never ask the browser to check
+   sw.js again once installed, so they can keep running an old build
+   indefinitely. Three layers deal with that:
+   1. Ask for an update check on load AND every time the app is
+      foregrounded (visibilitychange) — cheap, and catches most cases.
+   2. When a new service worker takes control, reload automatically so
+      the new files are actually used, not just cached.
+   3. A manual "Update" button in Settings for the rare case even that
+      doesn't fire — it wipes the SW + caches and hard-reloads. */
+let _swReg=null, _swReloading=false;
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    if(_swReloading) return; _swReloading=true;
+    location.reload();
+  });
+  window.addEventListener('load', async ()=>{
+    try{
+      _swReg = await navigator.serviceWorker.register('./sw.js');
+      _swReg.update().catch(()=>{});
+    }catch(e){}
+  });
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible' && _swReg) _swReg.update().catch(()=>{});
+  });
 }
+async function forceUpdateApp(){
+  const btn=$('#update-btn'), flash=$('#update-flash');
+  if(btn) btn.textContent='Updating…';
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      for(const r of regs){ try{ await r.unregister(); }catch(e){} }
+    }
+    if('caches' in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k).catch(()=>{})));
+    }
+  }catch(e){}
+  if(flash) flash.textContent='Reloading with the latest version…';
+  setTimeout(()=>location.reload(true), 300);
+}
+window.forceUpdateApp=forceUpdateApp;
 
 /* ---------- seed sync (auto-merges files listed in seed-files.txt) ---------- */
 async function syncSeedFiles(){

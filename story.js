@@ -191,6 +191,16 @@ function saveState(){
   _state.lastPlayedAt = Date.now();
   try{ localStorage.setItem(STATE_LS, JSON.stringify(_state)); }catch(e){}
 }
+/* Wipes ONLY the story's own save (STATE_LS) — the dictionary, saved
+   words, XP and search history live in separate storage and are
+   untouched. Exposed for the "Restart the story" button in Settings. */
+window.resetStoryProgress = function(){
+  try{ localStorage.removeItem(STATE_LS); }catch(e){}
+  _state = null;
+  _reviewArcId = null; _reviewPos = null;
+  resetPending();
+  if(typeof renderGameHub==='function') renderGameHub();
+};
 
 /* ============================================================
    SCORING — D2 general rules + D3 pivot table (numbers live in
@@ -441,6 +451,12 @@ function getSceneText(scene, chapterId){
    that first time it just shows normally, in Settings or anywhere
    else this component is rendered.
    ============================================================ */
+function levelTicksHTML(){
+  const names = window.LEVEL_NAMES || {1:'A1',2:'A2',3:'B1',4:'B2',5:'C1',6:'C2'};
+  let h='<div class="lvl-ticks">';
+  for(let i=1;i<=6;i++) h+='<span>'+names[i]+'</span>';
+  return h+'</div>';
+}
 function levelGoalsHTML(){
   const st=getState();
   const names = window.LEVEL_NAMES || {1:'A1',2:'A2',3:'B1',4:'B2',5:'C1',6:'C2'};
@@ -452,10 +468,13 @@ function levelGoalsHTML(){
   h+='<div class="lvl-row">'
     +'<div class="lvl-row-head"><span class="lvl-row-t">Your level right now</span><span class="lvl-row-v" id="lg-current-val">'+names[st.currentLevel]+'</span></div>'
     +'<input type="range" min="1" max="6" step="1" value="'+st.currentLevel+'" class="lvl-slider" oninput="setCurrentLevel(this.value)"/>'
+    +levelTicksHTML()
     +'</div>';
   h+='<div class="lvl-row" id="lg-target-row">'
     +'<div class="lvl-row-head"><span class="lvl-row-t">Level you want to reach</span><span class="lvl-row-v" id="lg-target-val">'+names[st.targetLevel]+'</span></div>'
-    +'<input id="lg-target-slider" type="range" min="'+st.currentLevel+'" max="6" step="1" value="'+st.targetLevel+'" class="lvl-slider" oninput="setTargetLevelSlider(this.value)"/>'
+    +'<input id="lg-target-slider" type="range" min="1" max="6" step="1" value="'+st.targetLevel+'" class="lvl-slider" oninput="setTargetLevelSlider(this.value)"/>'
+    +levelTicksHTML()
+    +'<div class="hint" style="margin-top:6px">Same scale as above — it just won\'t go below your current level.</div>'
     +'</div>';
   h+='</div>';
   return h;
@@ -476,16 +495,16 @@ window.setCurrentLevel = function(v){
   saveState();
   const lbl=document.getElementById('lg-current-val'); if(lbl) lbl.textContent=names[+v];
   const tSlider=document.getElementById('lg-target-slider');
-  if(tSlider){
-    tSlider.min=v;
-    if(+tSlider.value<+v){ tSlider.value=v; window.setTargetLevelSlider(v); }
-  }
+  if(tSlider && +tSlider.value<+v){ tSlider.value=v; window.setTargetLevelSlider(v); }
   bumpRow('lg-target-row');
 };
 window.setTargetLevelSlider = function(v){
-  getState().targetLevel=+v; saveState();
+  const st=getState();
+  v = Math.max(+v, st.currentLevel);           // snap back up if dragged below current
+  st.targetLevel=v; saveState();
   const names=window.LEVEL_NAMES||{1:'A1',2:'A2',3:'B1',4:'B2',5:'C1',6:'C2'};
-  const lbl=document.getElementById('lg-target-val'); if(lbl) lbl.textContent=names[+v];
+  const lbl=document.getElementById('lg-target-val'); if(lbl) lbl.textContent=names[v];
+  const tSlider=document.getElementById('lg-target-slider'); if(tSlider) tSlider.value=v;
 };
 window.renderTargetLevelUI = function(){
   const el=$('#level-goals-field'); if(!el) return;
@@ -663,7 +682,15 @@ window.closeWordSheet = closeWordSheet;
 /* ============================================================
    NAVIGATION
    ============================================================ */
-function currentEntry(){ return entryOf(getState().pos); }
+/* "Review" lets a player reopen an ALREADY-FINISHED arc to read it
+   again without touching real progress. It's deliberately read-only:
+   every scene in a finished arc already has its storyLog answers
+   locked in, so the normal render disables every option button — the
+   scoring engine (COLOR/GREY/WGT/IQS etc.) is never re-entered. Only
+   `_reviewPos` moves; `getState().pos` and saveState() are untouched
+   while reviewing. */
+let _reviewArcId=null, _reviewPos=null;
+function currentEntry(){ return entryOf(_reviewArcId ? _reviewPos : getState().pos); }
 function nextValidIndex(fromIdx){
   const st=getState();
   let i=fromIdx+1;
@@ -674,6 +701,7 @@ function onChapterCompleted(prevChapterId, newChapterId){
   maybeGenerateAhead(newChapterId);
 }
 function advance(){
+  if(_reviewArcId){ advanceReview(); return; }
   const st=getState();
   const cur=currentEntry(); if(!cur) return;
   let targetIdx=-1;
@@ -720,6 +748,57 @@ function advance(){
   renderStory();
 }
 window.advanceStory = advance;
+
+/* Mirrors advance()'s branching (including a dec scene's goto) but reads
+   the CHOICE ALREADY MADE from storyLog instead of the one-shot
+   pendingGoto (which the real playthrough already consumed), and never
+   calls saveState() — _reviewPos is the only thing that moves. */
+function advanceReview(){
+  const cur=currentEntry(); if(!cur){ if(typeof renderGameHub==='function') renderGameHub(); return; }
+  const { scene } = cur;
+  const log = getState().storyLog[scene.id] || {};
+  let targetIdx=-1;
+  if(scene.dec && log.dec!=null && scene.dec.options[log.dec] && scene.dec.options[log.dec].goto){
+    const gi=idxOf(scene.dec.options[log.dec].goto);
+    if(gi>=0) targetIdx = condOk(FLAT[gi].scene.onlyIf, getState().flags) ? gi : nextValidIndex(gi-1);
+  } else if(scene.gotoChapter){
+    const ch=chapterById(scene.gotoChapter);
+    if(ch && ch.scenes[0]) targetIdx=idxOf(ch.scenes[0].id);
+  } else {
+    targetIdx = nextValidIndex(idxOf(scene.id));
+  }
+  const landed = targetIdx>=0 ? FLAT[targetIdx] : null;
+  if(!landed || landed.arc.id!==_reviewArcId){ renderReviewEndCard(); return; }
+  _reviewPos = landed.scene.id;
+  resetPending();
+  renderStory();
+}
+function renderReviewEndCard(){
+  const area=$('#review-area'); if(!area) return;
+  const arc = CONTENT.find(a=>a.id===_reviewArcId);
+  let h='<div class="arc-card tbc">';
+  h+='<img class="arc-card-mascot" src="./mascot-withflag-1.webp" alt="" onerror="this.style.display=\'none\'"/>';
+  h+='<div class="arc-card-t">End of review</div>';
+  h+='<div class="arc-card-s">'+esc(arc?arc.title:'')+' — you\'ve reached the end of what you played through here.</div>';
+  h+='<button class="btn ghost" onclick="renderGameHub()">Back to the Map</button>';
+  h+='</div>';
+  area.innerHTML=h;
+}
+/* Entry point — only for arcs the player has FULLY finished (strictly
+   before the arc they're currently on), so every scene it visits is
+   guaranteed already-submitted. Reviewing the in-progress arc is not
+   offered, since scenes ahead of the real position would still be live
+   and tappable. */
+window.reviewArc = function(arcId){
+  const cur=entryOf(getState().pos);
+  const reachedArc = cur ? cur.arc.id : 0;
+  if(arcId>=reachedArc) return;                 // not fully finished yet — nothing to review
+  const arc=CONTENT.find(a=>a.id===arcId); if(!arc) return;
+  const first = arc.chapters[0] && arc.chapters[0].scenes[0]; if(!first) return;
+  _reviewArcId=arcId; _reviewPos=first.id;
+  resetPending();
+  renderStory();
+};
 
 /* ============================================================
    RENDERING — the scene itself
@@ -1057,7 +1136,8 @@ function renderStory(){
 
   let h='<div class="story-view">';
   h+='<div class="story-top"><button class="story-quit" onclick="renderGameHub()">✕</button>'
-    +'<div class="story-top-t">Arc '+arc.id+' · '+esc(chapter.title)+'</div></div>';
+    +'<div class="story-top-t">Arc '+arc.id+' · '+esc(chapter.title)+'</div>'
+    +(_reviewArcId?'<span class="story-review-badge">Reviewing</span>':'')+'</div>';
 
   const bg = scene.bg || arc.bg;
   const mood = (chapter.mood||'BRIGHT').toLowerCase();
@@ -1162,6 +1242,7 @@ window.openStory = openStory;
 function isStoryStarted(){ return Object.keys(getState().storyLog).length>0; }
 
 window.renderGameHub = function(){
+  _reviewArcId=null; _reviewPos=null;
   const area=$('#review-area'); if(!area) return;
   let h='<div class="game-hub">';
 
@@ -1250,11 +1331,13 @@ function renderWorldMap(){
   h+='<div class="region-strip">';
   ARC_LANDS.forEach(meta=>{
     const unlocked = arcUnlocked(meta.id);
+    const finished = unlocked && meta.id<curArcId;
+    const status = finished ? 'tap to replay' : unlocked ? 'in progress' : 'locked';
     h+='<div class="region'+(unlocked?' on':'')+(meta.id===curArcId?' cur':'')+'" onclick="worldMapInfo('+meta.id+')">'
       +'<div class="region-img" style="background-image:url(\''+assetUrl('bg-arc'+meta.id)+'\')"></div>'
       +'<div class="region-lock">'+(unlocked?'✓':'🔒')+'</div>'
       +'<div class="region-n">'+esc(meta.name)+'</div>'
-      +'<div class="region-a">'+(unlocked?'unlocked':'locked')+'</div>'
+      +'<div class="region-a">'+status+'</div>'
       +'</div>';
   });
   h+='</div>';
@@ -1275,7 +1358,10 @@ window.worldMapInfo = function(arcId){
   let body = meta.tagline;
   if(cast.length) body += ' Met: '+cast.join(', ')+'.';
   if(pivot) body += ' Your call: '+pivot.label;
-  showInfoCard('mascot-withflag-1', meta.name, body);
+  const cur=entryOf(st.pos);
+  const finished = cur && arcId < cur.arc.id;
+  if(finished) showInfoCard('mascot-withflag-1', meta.name, body, '▶ Play it again', 'reviewArc('+arcId+')');
+  else showInfoCard('mascot-withflag-1', meta.name, body);
 };
 
 /* ---------- Bonus Scene — layout + lock state only, per the brief;

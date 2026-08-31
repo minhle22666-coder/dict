@@ -162,49 +162,50 @@
     border-left:1.5px solid var(--line);border-top:1.5px solid var(--line);border-radius:3px}
   .speech.big{font-size:15px;padding:12px 18px}
 
-  /* ---- hero ---- */
-  .hero{position:relative;border-radius:var(--r);overflow:hidden;height:244px;margin-bottom:14px;
-    box-shadow:var(--shadow);background-size:cover;background-position:center;border:1px solid var(--line)}
-  .hero-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,18,30,.18) 0%,rgba(8,18,30,.06) 42%,rgba(8,18,30,.76) 100%)}
-  .hero.is-night .hero-scrim{background:linear-gradient(180deg,rgba(8,14,34,.35) 0%,rgba(8,14,34,.2) 40%,rgba(8,14,34,.8) 100%)}
-  .hero-text{position:absolute;left:18px;top:18px;right:96px;color:#fff;z-index:2}
-  .hero-greet{font-size:22px;font-weight:900;text-shadow:0 2px 12px rgba(0,0,0,.5);letter-spacing:-.015em;cursor:pointer}
-  .hero-greet:active{opacity:.75}
-  .hero-sub{font-size:13px;opacity:.97;margin-top:6px;line-height:1.42;text-shadow:0 2px 9px rgba(0,0,0,.55)}
-  .hero-char{position:absolute;right:6px;bottom:16px;height:66%;z-index:3;cursor:pointer;
-    filter:drop-shadow(0 12px 18px rgba(0,0,0,.45));animation:char-bob 5.5s ease-in-out infinite;transition:transform .15s}
-  @keyframes char-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-  .hero-chips{position:absolute;left:18px;bottom:16px;display:flex;gap:8px;z-index:2}
-  .hero-chip{background:rgba(8,18,30,.7);backdrop-filter:blur(10px);color:#fff;font-size:12px;font-weight:800;
-    padding:7px 14px;border-radius:99px;display:flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.2)}
-  /* Sun and moon live at z-index 0 — under the scrim and under every word,
-     so they can be big without ever fighting the greeting for space. */
-  .hero-sky{position:absolute;object-fit:contain;z-index:0;pointer-events:none}
-  .hero-glow{position:absolute;z-index:0;border-radius:50%;pointer-events:none}
-
-  /* sun: rises from the middle of the background, slow turn + warm pulse */
-  .hero-sky.is-sun{left:50%;top:50%;width:206px;height:206px;
-    transform:translate(-50%,-50%);opacity:.92;
-    animation:sun-turn 46s linear infinite;
-    filter:drop-shadow(0 0 26px rgba(255,190,90,.5))}
-  @keyframes sun-turn{from{transform:translate(-50%,-50%) rotate(0deg)}
-                      to{transform:translate(-50%,-50%) rotate(360deg)}}
-  .hero-glow.is-sun{left:50%;top:50%;width:320px;height:320px;transform:translate(-50%,-50%);
-    background:radial-gradient(circle,rgba(255,206,120,.55) 0%,rgba(255,170,70,.2) 42%,rgba(255,150,60,0) 70%);
+  /* ---- hero: a compact greeting bar, not a full-height photo banner ----
+     Time-of-day is now expressed as a soft tinted gradient (using the
+     app's existing bg-tint tokens, so it already adapts to light/dark
+     theme) instead of a cropped photo — a photo designed for a 244px
+     banner would only show a random sliver at this height. */
+  .hero{position:relative;display:flex;align-items:center;gap:12px;
+    border-radius:var(--r);margin-bottom:14px;padding:13px 16px;
+    box-shadow:var(--shadow);border:1px solid var(--line);
+    background:linear-gradient(120deg,var(--surface-2),var(--surface));transition:background .5s}
+  .hero.hero-morning{background:linear-gradient(120deg,var(--primary-bg),var(--surface) 72%)}
+  .hero.hero-afternoon{background:linear-gradient(120deg,var(--amber-bg),var(--surface) 72%)}
+  .hero.hero-evening{background:linear-gradient(120deg,var(--coral-bg),var(--surface) 72%)}
+  .hero.hero-night{background:linear-gradient(120deg,var(--violet-bg),var(--surface) 72%)}
+  .hero-text{flex:1;min-width:0}
+  .hero-greet{font-size:16.5px;font-weight:900;letter-spacing:-.01em;cursor:pointer;color:var(--text);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hero-greet:active{opacity:.7}
+  .hero-sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .hero-avatar-wrap{position:relative;flex:none}
+  .hero-char{display:block;width:52px;height:52px;border-radius:50%;object-fit:contain;padding:7px;
+    background:var(--surface-2);border:1.5px solid var(--line);cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,.22);transition:transform .15s;
+    animation:char-bob 5.5s ease-in-out infinite}
+  @keyframes char-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .hero-chips{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .hero-chip{background:var(--surface-2);color:var(--text);font-size:11px;font-weight:800;
+    padding:5px 10px;border-radius:99px;display:flex;align-items:center;gap:4px;
+    border:1px solid var(--line);white-space:nowrap}
+  /* small time-of-day badge on the avatar's corner, instead of a giant
+     orbiting sun/moon taking up most of the old banner */
+  .hero-sky{position:absolute;right:-3px;bottom:-3px;width:20px;height:20px;object-fit:contain;
+    z-index:2;pointer-events:none;filter:drop-shadow(0 2px 5px rgba(0,0,0,.4))}
+  .hero-sky.is-sun{animation:sun-turn 46s linear infinite}
+  @keyframes sun-turn{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  .hero-sky.is-moon{animation:moon-drift 11s ease-in-out infinite}
+  @keyframes moon-drift{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-2px) rotate(5deg)}}
+  .hero-glow{position:absolute;right:-5px;bottom:-5px;width:28px;height:28px;border-radius:50%;
+    z-index:1;pointer-events:none}
+  .hero-glow.is-sun{background:radial-gradient(circle,rgba(255,206,120,.85) 0%,rgba(255,170,70,.3) 60%,transparent 78%);
     animation:glow-breathe 5.5s ease-in-out infinite}
-  @keyframes glow-breathe{0%,100%{opacity:.55;transform:translate(-50%,-50%) scale(1)}
-                          50%{opacity:1;transform:translate(-50%,-50%) scale(1.14)}}
-
-  /* moon: same corner as before, just far bigger and calmer — a slow drift
-     with a cool halo instead of the old bouncing wobble */
-  .hero-sky.is-moon{left:12px;top:56px;width:124px;height:124px;opacity:.96;
-    animation:moon-drift 11s ease-in-out infinite;
-    filter:drop-shadow(0 0 24px rgba(170,205,255,.55))}
-  @keyframes moon-drift{0%,100%{transform:translateY(0) rotate(-2deg)}
-                        50%{transform:translateY(-10px) rotate(2deg)}}
-  .hero-glow.is-moon{left:74px;top:118px;width:250px;height:250px;transform:translate(-50%,-50%);
-    background:radial-gradient(circle,rgba(176,212,255,.45) 0%,rgba(120,160,255,.16) 44%,rgba(120,160,255,0) 70%);
+  .hero-glow.is-moon{background:radial-gradient(circle,rgba(176,212,255,.75) 0%,rgba(120,160,255,.25) 60%,transparent 78%);
     animation:glow-breathe 8s ease-in-out infinite}
+  @keyframes glow-breathe{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.2)}}
 
   /* ---- Today: jar + goal, side by side as compact snapshot cards ---- */
   .today-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
@@ -249,6 +250,13 @@
   .progress-card .stat-grid{margin-bottom:14px}
   .progress-divider{height:1px;background:var(--line);margin-bottom:14px}
   .progress-week-label{font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:10px}
+  .week-nav{display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:10px}
+  .week-nav .progress-week-label{margin-bottom:0;flex:1;text-align:center}
+  .week-nav-btn{flex:none;width:26px;height:26px;border-radius:9px;background:var(--surface-2);
+    border:1px solid var(--line);color:var(--muted);font-size:15px;line-height:1;font-weight:900;
+    display:flex;align-items:center;justify-content:center;transition:opacity .12s,transform .12s}
+  .week-nav-btn:active{transform:scale(.9)}
+  .week-nav-btn:disabled{opacity:.32;pointer-events:none}
 
   /* ---- stat cards ---- */
   .stat-grid{display:flex;gap:10px;margin-bottom:16px}
@@ -673,24 +681,27 @@
   @keyframes strut{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-4px) rotate(-2deg)}60%{transform:translateY(-1px) rotate(2deg)}}
   @keyframes wave-in{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-8px) rotate(3deg)}}
   .hero-char.hop{animation:hop-now .55s cubic-bezier(.34,1.56,.64,1)}
-  @keyframes hop-now{0%{transform:translateY(0) scale(1)}40%{transform:translateY(-18px) scale(1.06)}100%{transform:translateY(0) scale(1)}}
-  .hero-char:active{transform:scale(.95)}
+  @keyframes hop-now{0%{transform:translateY(0) scale(1)}40%{transform:translateY(-9px) scale(1.08)}100%{transform:translateY(0) scale(1)}}
+  .hero-char:active{transform:scale(.92)}
 
-  /* ---- Focci speech bubble on the hero ---- */
-  .hero-bubble{position:absolute;right:8px;bottom:74%;z-index:4;max-width:56%;
+  /* ---- Focci speech bubble — pops up ABOVE the compact hero bar now ---- */
+  .hero-bubble{position:absolute;left:12px;bottom:100%;margin-bottom:10px;z-index:4;max-width:78%;
     background:var(--surface);border:1.5px solid var(--line);color:var(--text);font-size:12.5px;font-weight:700;
     padding:9px 13px;border-radius:15px;line-height:1.4;box-shadow:var(--shadow);
     opacity:0;transform:translateY(8px) scale(.9);transition:all .28s cubic-bezier(.34,1.56,.64,1);pointer-events:none}
   .hero-bubble.show{opacity:1;transform:translateY(0) scale(1)}
-  .hero-bubble::after{content:'';position:absolute;bottom:-9px;right:26px;border:8px solid transparent;border-top-color:var(--line)}
+  .hero-bubble::after{content:'';position:absolute;bottom:-9px;left:24px;border:8px solid transparent;border-top-color:var(--line)}
 
   /* ---- the orchard: tap the tree, fruit falls ---- */
   .tree-widget{position:relative;height:240px;
     background:radial-gradient(ellipse 260px 160px at 50% 100%, rgba(255,159,69,.14), transparent 70%),
       linear-gradient(180deg,var(--surface-2),var(--surface));
     border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer}
-  .tree-hint{position:absolute;top:14px;left:16px;font-size:11px;font-weight:800;color:var(--muted-2);
-    letter-spacing:.05em;text-transform:uppercase;z-index:1}
+  .tree-hint{position:absolute;top:13px;left:13px;font-size:12.5px;font-weight:700;color:var(--text);
+    letter-spacing:0;text-transform:none;z-index:1;display:flex;align-items:center;gap:6px;
+    background:rgba(8,16,28,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border:1px solid rgba(255,255,255,.14);border-radius:99px;padding:6px 13px 6px 10px}
+  .tree-hint-ico{font-size:14px;line-height:1}
   .tree-img{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);width:214px;transform-origin:50% 100%;z-index:1}
   .tree-img.shaking{animation:tree-shake .55s ease}
   @keyframes tree-shake{0%,100%{transform:translateX(-50%) rotate(0)}
@@ -767,6 +778,8 @@
   .info-t{font-size:18px;font-weight:900;background:var(--grad-hero);-webkit-background-clip:text;background-clip:text;color:transparent}
   .info-b{font-size:13.5px;color:var(--muted);margin-top:8px;line-height:1.6}
   .info-tap{font-size:10px;color:var(--muted-2);margin-top:16px;text-transform:uppercase;letter-spacing:.07em;font-weight:800}
+  .info-action{display:block;width:100%;margin-top:16px;font-size:13.5px;font-weight:900;color:#3A1E00;
+    background:var(--grad-hero);border-radius:14px;padding:11px;box-shadow:var(--glow)}
 
   /* ---- territory: locked region strip ---- */
   .region-strip{display:flex;gap:9px;overflow-x:auto;padding:2px 0 10px;margin-bottom:12px;scrollbar-width:none}
@@ -913,6 +926,8 @@
     color:var(--muted);font-size:16px;display:flex;align-items:center;justify-content:center}
   .story-quit:active{transform:scale(.9)}
   .story-top-t{font-size:12.5px;font-weight:800;color:var(--muted);letter-spacing:.02em}
+  .story-review-badge{margin-left:auto;font-size:10.5px;font-weight:900;color:var(--amber);
+    background:var(--amber-bg);border:1px solid var(--amber);border-radius:99px;padding:4px 10px}
 
   .story-stage{position:relative;height:200px;border-radius:var(--r);overflow:hidden;
     background-size:cover;background-position:center;background-color:var(--surface-2);
@@ -1108,6 +1123,8 @@
   .lvl-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--primary);
     box-shadow:0 3px 10px rgba(0,0,0,.3);border:3px solid var(--surface);cursor:pointer}
   .lvl-slider::-moz-focus-outer{border:0}
+  .lvl-ticks{display:flex;justify-content:space-between;margin-top:6px;padding:0 3px}
+  .lvl-ticks span{font-size:9.5px;font-weight:800;color:var(--muted-2);letter-spacing:.02em}
 
   .pp-t{font-size:18px;font-weight:900;letter-spacing:-.01em;margin-bottom:14px;text-align:center}
   .pp-name-input{width:100%;background:var(--surface-2);border:1.5px solid var(--line);border-radius:14px;
@@ -1164,9 +1181,12 @@
     <div id="result"></div>
     <div id="dashboard">
       <div class="hero" id="hero">
-        <div class="hero-scrim"></div>
-        <img class="hero-char" id="hero-char" src="./mascot-avatar.webp" alt="" onclick="tapFocci()" />
         <div class="hero-bubble" id="hero-bubble"></div>
+        <div class="hero-avatar-wrap">
+          <img class="hero-char" id="hero-char" src="./mascot-avatar.webp" alt="" onclick="tapFocci()" />
+          <div class="hero-glow is-sun" id="hero-glow"></div>
+          <img class="hero-sky is-sun" id="hero-sky" src="./decor-shiny-sun.webp" alt="" />
+        </div>
         <div class="hero-text">
           <div class="hero-greet" id="hero-greet" onclick="openProfilePanel()">Good morning!</div>
           <div class="hero-sub" id="hero-sub">Ready to discover new words today?</div>
@@ -1175,8 +1195,6 @@
           <span class="hero-chip" id="hero-streak" style="display:none"></span>
           <span class="hero-chip" id="hero-level">⚡ Level 1</span>
         </div>
-        <div class="hero-glow is-sun" id="hero-glow"></div>
-        <img class="hero-sky is-sun" id="hero-sky" src="./decor-shiny-sun.webp" alt="" />
       </div>
 
       <div class="hub-section-label">Today</div>
@@ -1231,13 +1249,17 @@
           <div class="stat" onclick="statInsight('time')"><div class="tile blue">⏱️</div><div class="n" id="d-time">0m</div><div class="l">TIME IN APP</div><span class="stat-more">tap</span></div>
         </div>
         <div class="progress-divider"></div>
-        <div class="progress-week-label">This week</div>
+        <div class="week-nav">
+          <button class="week-nav-btn" id="week-prev" aria-label="Previous week">‹</button>
+          <div class="progress-week-label" id="week-range-label">This week</div>
+          <button class="week-nav-btn" id="week-next" aria-label="Next week">›</button>
+        </div>
         <div class="bars" id="week-bars"></div>
       </div>
 
       <div class="hub-section-label">Word Orchard</div>
       <div class="tree-widget" id="tree-widget" onclick="shakeTree()">
-        <div class="tree-hint">🌳 Tap the tree…</div>
+        <div class="tree-hint"><span class="tree-hint-ico">🌳</span>Tap the tree</div>
         <img class="tree-img" id="tree-img" src="./decor-tree.webp" alt="" />
         <img class="tree-bush" src="./decor-bush.webp" alt="" />
         <div class="tree-bubble" id="tree-bubble"></div>
@@ -1429,9 +1451,24 @@
         <button class="btn ghost sm danger" id="clear-log-btn" style="margin-top:0">Clear</button>
       </div>
       <div class="saved-flash" id="clearlog-flash"></div>
+      <div class="exp-row">
+        <div class="exp-txt"><b>Check for updates</b><span>iOS home-screen apps can hold onto an old version — use this if something looks out of date</span></div>
+        <button class="btn ghost sm" id="update-btn" style="margin-top:0">Update</button>
+      </div>
+      <div class="saved-flash" id="update-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v17 · asset fix & home polish</b></p>
+    <!-- 7 · the story is separate save data from the dictionary, so it gets its own reset -->
+    <div class="set-group">
+      <div class="sg-h"><span class="tile tile-sm coral">🔄</span><div><b>Story Progress</b><i>Your dictionary and saved words are never touched by this</i></div></div>
+      <div class="exp-row">
+        <div class="exp-txt"><b>Restart the story</b><span>Wipes Focci's journey — decisions, stats, chapters — back to Arc 1</span></div>
+        <button class="btn ghost sm danger" id="restart-story-btn" style="margin-top:0">Restart</button>
+      </div>
+      <div class="saved-flash" id="restart-story-flash"></div>
+    </div>
+
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v18 · replay, jar fix &amp; refreshed home</b></p>
   </section>
 </main>
 
