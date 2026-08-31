@@ -470,7 +470,8 @@ RULES (all mandatory):
 5. Words from both bands should mostly describe things, events, actions, or feelings — a texture in the scene, something that happens, something Focci notices or feels — not plot mechanics, names, or facts the COMP/IQ questions depend on.
 6. You may add 1–3 short descriptive sentences per block if that's genuinely needed to fit the words above naturally — but keep the SAME spare, understated voice as the original (short declarative sentences, concrete images, no over-explaining) — never pad with generic filler, never change what happens, never change a character's choice or its outcome, and never touch the core vocabulary from rule 2.
 7. Not every word in each list needs to appear — use judgment; a natural passage with 4–6 of them fitted well beats a stuffed one with all of them.
-8. Output ONLY the rewritten blocks with their markers, nothing else — no preamble, no commentary, no markdown fences.
+8. Wrap 1–2 genuinely important words or short phrases per block in **double asterisks** — something worth a reader's extra attention (a key feeling, the pivotal action, a word from rule 3/4). Never bold more than that, never use any OTHER markdown (no _italics_, no #headers, no lists) — plain prose with occasional **bold** is the only formatting this reader's screen understands.
+9. Output ONLY the rewritten blocks with their markers, nothing else — no preamble, no commentary, no markdown fences.
 
 ORIGINAL:
 ${core}`;
@@ -719,15 +720,22 @@ function passageHTMLOf(text){
 function tokenizeForTap(text){
   const src = String(text||'');
   let out='', last=0, m;
-  const re=/[A-Za-z][A-Za-z']*/g;
+  const re=/\*\*|[A-Za-z][A-Za-z']*/g;              // ** is matched too, so it toggles bold instead of printing literally
+  let bold=false;
   while((m=re.exec(src))){
     out += esc(src.slice(last, m.index));           // punctuation/quotes/spaces — escaped, never re-scanned
-    const word = m[0];
-    const clean = word.replace(/^'+|'+$/g,'');
-    out += clean.length<2 ? esc(word) : '<span class="wtap" data-w="'+clean.toLowerCase()+'">'+esc(word)+'</span>';
+    if(m[0]==='**'){
+      out += bold ? '</b>' : '<b>';
+      bold=!bold;
+    } else {
+      const word = m[0];
+      const clean = word.replace(/^'+|'+$/g,'');
+      out += clean.length<2 ? esc(word) : '<span class="wtap" data-w="'+clean.toLowerCase()+'">'+esc(word)+'</span>';
+    }
     last = re.lastIndex;
   }
   out += esc(src.slice(last));
+  if(bold) out += '</b>';                            // never leave an unclosed tag if a stray marker slipped through
   return out;
 }
 function ensureWordSheet(){
@@ -1019,7 +1027,6 @@ window.storySubmit = function(){
   if(scene.iq && _pending.iq!=null) resolveIq(scene, chapter, arc, _pending.iq);
   if(scene.dec && _pending.dec!=null) resolveDec(scene, chapter, arc, _pending.dec);
   renderStory();
-  if(isSubmitted(scene)) setTimeout(()=>maybeShowPresenceModal(scene), 450);
 };
 
 /* Deterministic per-scene shuffle so option ORDER on screen varies from
@@ -1075,17 +1082,25 @@ function renderDecBlock(scene, chapter, arc){
   if(scene.dec.q) h+='<div class="q-text">'+esc(scene.dec.q)+'</div>';
   h+='<div class="q-opts vertical">';
   scene.dec.options.forEach((opt,i)=>{
-    const disabled = optionDisabled(scene, opt);
+    const locked = !submitted && optionDisabled(scene, opt);
     let cls='q-opt dec-opt';
     if(submitted && i===log.dec) cls+=' chosen';
     else if(!submitted && _pending.dec===i) cls+=' picked';
-    let title = disabled && opt.missingNote ? ' title="'+esc(opt.missingNote)+'"' : '';
-    h+='<button class="'+cls+'" '+((submitted||disabled)?'disabled':'')+title+' onclick="storyPick(\''+scene.id+'\',\'dec\','+i+')">'+esc(opt.label)+'</button>';
+    if(locked) cls+=' locked';
+    const note = esc(opt.missingNote || "Focci can't do that — not this time.").replace(/'/g,"\\'");
+    const action = locked
+      ? 'onclick="lockedDecTap(this,\''+note+'\')"'
+      : 'onclick="storyPick(\''+scene.id+'\',\'dec\','+i+')"';
+    h+='<button class="'+cls+'" '+(submitted?'disabled':'')+' '+action+'>'+esc(opt.label)+'</button>';
   });
   h+='</div>';
   if(submitted && scene.dec.options[log.dec].outcome) h+='<div class="q-fb neutral">'+esc(scene.dec.options[log.dec].outcome)+'</div>';
   return h+'</div>';
 }
+window.lockedDecTap = function(btn, note){
+  btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
+  if(typeof toast==='function') toast(note);
+};
 /* Props can be a plain asset-name string (back layer, default) or an
    {name, layer} object — kept flexible. */
 function normalizeProps(list){
@@ -1144,18 +1159,28 @@ function inlineItemFor(scene, text){
   }
   return null;
 }
-/* Inserts a small sparkle tap-target right after the matched word's own
-   .wtap span — dictionary lookup on that word still works exactly as
-   before; the sparkle is a separate, clearly-visible companion target. */
-function injectItemSparkle(html, item){
-  if(!item) return html;
-  const re = new RegExp('(<span class="wtap" data-w="'+item.keyword+'">[^<]+</span>)');
-  return html.replace(re, (m)=>m+'<button class="item-spark" onclick="itemSparkTap(\''+esc(item.name)+'\')">✦</button>');
+/* A big, faded watermark of the item sunk into the passage card's own
+   corner — not a button sitting mid-sentence. Clipped by the card's own
+   overflow:hidden, so it never bleeds into the question block below. */
+function inlineWatermarkHTML(item){
+  if(!item) return '';
+  return '<button class="passage-watermark" onclick="assetPeekTap(\''+esc(item.name)+'\')" aria-label="Look closer">'
+    +'<img src="'+assetUrl(item.name)+'" alt="" onerror="this.closest(\'.passage-watermark\').style.display=\'none\'"/></button>';
 }
-window.itemSparkTap = function(assetName){
+window.assetPeekTap = function(assetName){
   const fact = PROP_LORE[assetName] || "Just something lying around.";
-  showWordSheet('<div class="prop-peek"><img src="'+assetUrl(assetName)+'" alt="" onerror="this.parentElement.style.display=\'none\'"/></div>'
-    +'<div class="ws-loading" style="padding-top:2px;color:var(--text)">'+esc(fact)+'</div>');
+  const ov=document.createElement('div'); ov.className='peek-ov';
+  let dust='';
+  for(let k=0;k<10;k++){
+    const left=(8+Math.random()*84).toFixed(1), delay=(Math.random()*2.4).toFixed(2), dur=(2.6+Math.random()*2).toFixed(2);
+    dust+='<span class="peek-mote" style="left:'+left+'%;animation-delay:-'+delay+'s;animation-duration:'+dur+'s"></span>';
+  }
+  ov.innerHTML='<div class="peek-card">'+dust
+    +'<img class="peek-img" src="'+assetUrl(assetName)+'" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<div class="peek-t">'+esc(fact)+'</div></div>';
+  document.body.appendChild(ov);
+  requestAnimationFrame(()=>ov.classList.add('show'));
+  ov.addEventListener('click',()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),280); });
 };
 
 /* ============================================================
@@ -1192,12 +1217,25 @@ function passageIllustrationsHTML(scene, text){
   real.slice(0,3).forEach(p=>{
     const fact = PROP_LORE[p.name] || "Just something lying around.";
     const safeFact = esc(fact).replace(/'/g,"\\'");
-    h+='<button class="illus-item" onclick="stageHotspotTap(this,\''+safeFact+'\')">'
+    h+='<button class="illus-item" onclick="assetZoomTap(\''+esc(p.name)+'\',\''+safeFact+'\')">'
       +'<img src="'+assetUrl(p.name)+'" alt="" onerror="this.parentElement.style.display=\'none\'"/></button>';
   });
   h+='</div>';
   return h;
 }
+/* Big zoom-in "closer look" — 4x the small icon, centered on screen,
+   caption on a gradient scrim so white text always stays readable
+   regardless of the picture underneath. */
+window.assetZoomTap = function(name, fact){
+  const ov=document.createElement('div'); ov.className='zoom-ov';
+  ov.innerHTML='<div class="zoom-card">'
+    +'<img class="zoom-img" src="'+assetUrl(name)+'" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<div class="zoom-cap"><div class="zoom-cap-t">'+esc(fact)+'</div></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  requestAnimationFrame(()=>ov.classList.add('show'));
+  ov.addEventListener('click',()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),260); });
+};
 window.stageHotspotTap = function(btn, fact){
   const st=getState();
   if(!st.hotspotHintSeen){ st.hotspotHintSeen=true; saveState(); document.querySelectorAll('.stage-hotspot.hint').forEach(el=>el.classList.remove('hint')); }
@@ -1208,49 +1246,54 @@ window.stageHotspotTap = function(btn, fact){
 };
 
 /* ============================================================
-   PRESENCE MOMENT — a proper modal, not an inline yes/no row. Fires
-   once, automatically, right after the player submits a scene that
-   has one. Framed as a choice about what Focci does next, never as
-   a labelled advantage — staying only reveals what happens AFTER
-   they've already chosen to stay.
+   PRESENCE MOMENT — a light inline card, not a blocking modal. It
+   shows up alongside the Continue button (never gating it — the
+   player can always just tap past) with the moment's real content
+   right there, not a generic teaser. Declining and engaging both
+   get a few varied, naturally-worded options instead of a flat
+   yes/no, so tapping never reads as a free, thoughtless point.
    ============================================================ */
-function maybeShowPresenceModal(scene){
-  const log = getState().storyLog[scene.id] || {};
-  if(!scene.presence || !scene.presence.length) return;
+const PRESENCE_DECLINES = [
+  "Not now — the road's waiting",
+  "Leave it, better keep moving",
+  "Maybe later, if there's time",
+  "No — mustn't fall behind"
+];
+const PRESENCE_ACCEPTS = [
+  "Go on, take a look",
+  "Worth a moment",
+  "Why not",
+  "Go ahead, then"
+];
+function pickVaried(arr, seed){ return arr[Math.abs(seed)%arr.length]; }
+function presenceCardHTML(scene){
+  const log=getState().storyLog[scene.id]||{};
+  if(!scene.presence || !scene.presence.length) return '';
   const idx = scene.presence.findIndex((p,i)=>!(log.presence && log.presence[i]));
-  if(idx<0) return;
-  const ov = document.createElement('div'); ov.className='pmod-ov';
-  ov.innerHTML = '<div class="pmod-card">'
-    + '<img class="pmod-img" src="'+assetUrl(scene.mascot||'mascot-chilling')+'" alt="" onerror="this.style.display=\'none\'"/>'
-    + '<div class="pmod-t">Something holds Focci\'s attention for a second.</div>'
-    + '<div class="pmod-actions">'
-    + '<button class="pmod-btn stay" onclick="resolvePresenceModal(\''+scene.id+'\','+idx+',true)">Stay a moment</button>'
-    + '<button class="pmod-btn go" onclick="resolvePresenceModal(\''+scene.id+'\','+idx+',false)">Keep going</button>'
-    + '</div></div>';
-  document.body.appendChild(ov);
-  requestAnimationFrame(()=>ov.classList.add('show'));
+  if(idx<0) return '';
+  let seed=0; for(const ch of scene.id+idx) seed=(seed*31+ch.charCodeAt(0))>>>0;
+  const declineText = pickVaried(PRESENCE_DECLINES, seed);
+  const acceptText = pickVaried(PRESENCE_ACCEPTS, seed+7);
+  return '<div class="presence-card">'
+    +'<span class="presence-ico">✿</span>'
+    +'<div class="presence-t">'+esc(scene.presence[idx].text)+'</div>'
+    +'<div class="presence-actions">'
+    +'<button class="presence-btn go" onclick="resolvePresenceInline(\''+scene.id+'\','+idx+',true)">'+esc(acceptText)+'</button>'
+    +'<button class="presence-btn skip" onclick="resolvePresenceInline(\''+scene.id+'\','+idx+',false)">'+esc(declineText)+'</button>'
+    +'</div></div>';
 }
-window.resolvePresenceModal = function(sceneId, idx, stay){
-  const e = entryOf(sceneId); if(!e) return;
-  const ov = document.querySelector('.pmod-ov'); if(!ov) return;
+window.resolvePresenceInline = function(sceneId, idx, stay){
+  const e=entryOf(sceneId); if(!e) return;
   if(stay){
     resolvePresence(e.scene, e.chapter, e.arc, idx);
-    const card = ov.querySelector('.pmod-card');
-    card.innerHTML = '<div class="pmod-t">'+esc(e.scene.presence[idx].text)+'</div>'
-      +'<div class="pmod-actions"><button class="pmod-btn stay" onclick="closePresenceModal(\''+sceneId+'\')">Continue</button></div>';
   } else {
-    closePresenceModal(sceneId);
+    const st=getState();
+    const log = st.storyLog[sceneId] || (st.storyLog[sceneId]={});
+    if(!log.presence) log.presence=[];
+    log.presence[idx]=true;                 // consumed, but never scored — a real decline, not a shrug
+    saveState();
   }
-};
-window.closePresenceModal = function(sceneId){
-  const ov = document.querySelector('.pmod-ov');
-  if(ov){ ov.classList.remove('show'); setTimeout(()=>ov.remove(),260); }
-  const e = sceneId ? entryOf(sceneId) : null;
-  if(e){
-    const log = getState().storyLog[sceneId] || {};
-    const nextIdx = e.scene.presence ? e.scene.presence.findIndex((p,i)=>!(log.presence && log.presence[i])) : -1;
-    if(nextIdx>=0) setTimeout(()=>maybeShowPresenceModal(e.scene), 300); // chain to the next one, if this scene has more than one
-  }
+  renderStory();
 };
 
 /* ============================================================
@@ -1283,11 +1326,15 @@ function focciMonologue(scene, chapter){
 }
 window.tapMascot = function(sceneId){
   const e = entryOf(sceneId); if(!e) return;
+  const bubble = document.getElementById('story-mascot-bubble'); if(!bubble) return;
   const lines = focciMonologue(e.scene, e.chapter);
   if(!lines.length) return;
   const line = lines[_monologueTapCount % lines.length];
   _monologueTapCount++;
-  showWordSheet('<div class="ws-loading" style="font-style:italic;color:var(--text);padding-top:2px">'+esc(line)+'</div>');
+  bubble.innerHTML = esc(line)+'<span class="breathe-dots"><i></i><i></i><i></i></span>';
+  bubble.classList.remove('show'); void bubble.offsetWidth; bubble.classList.add('show');
+  clearTimeout(bubble._hideT);
+  bubble._hideT = setTimeout(()=>bubble.classList.remove('show'), 3600);
 };
 
 /* Pure-CSS ambient texture per chapter mood — no image assets needed, so
@@ -1331,20 +1378,22 @@ function renderStory(){
   h+='<div class="story-stage mood-'+mood+'" style="background-image:url(\''+assetUrl(bg)+'\')">';
   h+=ambientLayerHTML(mood);
   h+=stageHotspotsHTML(scene);
+  h+='<div class="story-mascot-bubble" id="story-mascot-bubble"></div>';
   if(scene.npc) h+='<img class="story-npc" src="'+assetUrl(scene.npc)+'" alt="" onerror="this.style.display=\'none\'"/>';
   if(scene.mascot) h+='<img class="story-mascot" src="'+assetUrl(scene.mascot)+'" alt="" onclick="tapMascot(\''+scene.id+'\')" onerror="this.style.display=\'none\'"/>';
   h+='</div>';
 
   h+='<div class="story-page paper-bg'+flipClass+'">';
+  h+=inlineWatermarkHTML(inlineItemFor(scene, passageText));
   h+=passageIllustrationsHTML(scene, passageText);
   h+='<div class="story-title">'+esc(scene.title||'')+'</div>';
   let passageHTML = passageHTMLOf(passageText);
-  passageHTML = injectItemSparkle(passageHTML, inlineItemFor(scene, passageText));
   h+='<div class="story-passage" id="story-passage-'+scene.id.replace('.','-')+'">'+passageHTML+'</div>';
   if(scene.comp) h+=renderCompBlock(scene, chapter, arc);
   if(scene.iq) h+=renderIqBlock(scene, chapter, arc);
   if(scene.dec) h+=renderDecBlock(scene, chapter, arc);
   const submitted = isSubmitted(scene);
+  if(submitted) h+=presenceCardHTML(scene);
   if(submitted){
     h+='<button class="btn story-continue" onclick="advanceStory()">'+(scene.endOfBuiltContent?'Continue':'Continue →')+'</button>';
   } else {
@@ -1387,9 +1436,22 @@ function playFlagWave(elId){
     if(i>=FLAG_FRAMES.length) return;
     el.src=assetUrl(FLAG_FRAMES[i]);
     el.className='arc-card-mascot flag-f'+i;
+    if(i===2) spawnFlagDust(el);
     setTimeout(step, i===1?520:400);
   };
   setTimeout(step, 450);                                    // let the walk loop play a beat first
+}
+function spawnFlagDust(el){
+  const puff=document.createElement('div'); puff.className='flag-dust';
+  for(let k=0;k<6;k++){
+    const d=document.createElement('span');
+    d.style.setProperty('--dx', (Math.random()*70-35)+'px');
+    d.style.setProperty('--dy', (-(Math.random()*22+8))+'px');
+    d.style.animationDelay=(Math.random()*0.08)+'s';
+    puff.appendChild(d);
+  }
+  el.insertAdjacentElement('afterend', puff);
+  setTimeout(()=>puff.remove(), 900);
 }
 function renderArcEndCard(arcId){
   const area=$('#review-area'); if(!area) return;

@@ -299,7 +299,7 @@ const ARCS = [
         ]},
       },
       { id:'4.6', title:"The well", bg:'bg-desert-and-cactus-arc-2', mascot:'mascot-tired-sweaty',
-        props:['other-well'],
+        props:['other-well','other-vulture-arc2'],
         en:'The well was old stone, round, with a low wall worn smooth by generations of forearms leaning on it exactly the same way. A vulture sat on that wall now, wings folded, watching Focci approach with the particular patience of someone who has already decided how this conversation is going to go. "Water," Focci said, trying to sound like a request and not a demand. The vulture didn\'t move. "Manners first," she said. "Then water. Maybe."',
         dec:{ q:"", options:[
           { label:"Greet her politely first, no rush to ask for water", delta:{CAR:1}, outcome:"" },
