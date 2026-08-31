@@ -403,7 +403,20 @@ function matchScore(query,cand){
 }
 async function fuzzyLocalSearch(query){
   if(query.length<3) return null;
-  const all=await idbAll(); let best=null,bestScore=0.6;
+  const q=norm(query);
+  const all=await idbAll();
+  // Pass 1: exact phrase — collocations/idioms/phrasal verbs are real,
+  // known phrases already in the library; no guessing needed for these.
+  for(const r of all){
+    if(r.alias) continue;
+    const buckets=[r.data&&r.data.expressions, r.data&&r.data.collocations, r.data&&r.data.phrasal_verbs, r.data&&r.data.idioms];
+    for(const arr of buckets){
+      if(!Array.isArray(arr)) continue;
+      for(const e of arr){ if(e.text && norm(e.text)===q) return {type:'expr', target:r.word, label:e.text, exact:true}; }
+    }
+  }
+  // Pass 2: fuzzy fallback, as before
+  let best=null,bestScore=0.6;
   for(const r of all){
     if(r.alias) continue;
     const s=matchScore(query,r.word);
@@ -420,6 +433,20 @@ async function fuzzyLocalSearch(query){
    SEARCH FLOW
    ============================================================ */
 let currentWord=null;
+function flashPhraseMatch(text){
+  const target=norm(text||'');
+  setTimeout(()=>{
+    const rows=document.querySelectorAll('.expr[data-ph]');
+    for(const row of rows){
+      if(row.getAttribute('data-ph')===target){
+        row.scrollIntoView({behavior:'smooth', block:'center'});
+        row.classList.add('expr-hit');
+        setTimeout(()=>row.classList.remove('expr-hit'), 2200);
+        break;
+      }
+    }
+  }, 60);
+}
 async function search(rawWord, forceAI){
   let word=norm(rawWord||'');
   if(!word) return;
@@ -439,6 +466,15 @@ async function search(rawWord, forceAI){
     if(local){ currentWord=word; box.innerHTML=renderEntry(local); logEvent('search',word); addXP(2); return; }
 
     const guess=await fuzzyLocalSearch(word);
+    if(guess && guess.exact){
+      const rec=await idbGet(guess.target);
+      if(rec){
+        currentWord=rec.word; box.innerHTML=renderEntry(rec);
+        logEvent('search',rec.word); addXP(2);
+        flashPhraseMatch(guess.label);
+        return;
+      }
+    }
     if(guess){ box.innerHTML=suggestState(word, guess); return; }
   }
 
@@ -530,6 +566,73 @@ function posChip(p){ if(!p) return '';
   const k=posKey(p), c=POS_COLOR[k];
   return '<span class="pos-chip pos-'+c+'">'+esc(posLabel(p))+'</span>'; }
 
+/* ============================================================
+   WORD FAMILY — computed locally from the offline library already
+   on-device, not the AI. The AI's "family" field was probabilistic
+   (it would sometimes list abduction/abductor and just forget
+   abductive); this is a plain prefix scan over every headword
+   ALREADY in the dictionary, so it's complete and free every time.
+   Built once, cached, refreshed in the background right after each
+   entry renders so the word page itself never waits on it.
+   ============================================================ */
+let _wordIndex=null;
+async function buildWordIndex(){
+  if(_wordIndex) return _wordIndex;
+  const all = await idbAll();
+  const out=[];
+  for(const r of all){
+    if(r.alias) continue;
+    const w=(r.word||'').trim().toLowerCase();
+    if(!w || w.includes(' ')) continue;                       // family = single words only
+    const pos=(r.data&&r.data.senses&&r.data.senses[0]&&r.data.senses[0].pos)||'';
+    out.push({ word:r.word, w, pos });
+  }
+  out.sort((a,b)=>a.w<b.w?-1:a.w>b.w?1:0);
+  _wordIndex=out;
+  return out;
+}
+const _INFLECTIONS=['ing','ies','es','ed','s','d'];
+function isJustInflection(root,form){
+  if(form===root) return true;
+  for(const suf of _INFLECTIONS) if(form===root+suf) return true;
+  if(form.endsWith('ing') && (root===form.slice(0,-3) || root===form.slice(0,-3)+'e')) return true; // running/make
+  if(form.endsWith('ied') && root===form.slice(0,-3)+'y') return true;                                // tried -> try
+  return false;
+}
+async function familyOf(word, maxN){
+  const idx = await buildWordIndex();
+  const w=(word||'').trim().toLowerCase();
+  if(w.length<4) return [];
+  const out=[];
+  for(const e of idx){
+    if(e.w===w) continue;
+    const shorter = e.w.length<w.length ? e.w : w;
+    const longer  = e.w.length<w.length ? w : e.w;
+    if(shorter.length<4 || !longer.startsWith(shorter)) continue;
+    if(isJustInflection(shorter, longer)) continue;
+    out.push(e);
+    if(out.length>=maxN) break;
+  }
+  return out;
+}
+async function renderFamilyChips(word){
+  try{
+    const fam = await familyOf(word, 8);
+    if(currentWord!==word) return;              // navigated away before this resolved — drop it
+    const el=document.getElementById('family-scroll'); if(!el) return;
+    if(!fam.length){ el.remove(); return; }
+    let h='';
+    for(const fm of fam){
+      const k=posKey(fm.pos), c=POS_COLOR[k];
+      const fw=esc(fm.word).replace(/'/g,"\\'");
+      h+='<button class="family-chip pos-'+c+'" onclick="jump(\''+fw+'\')">'
+        +'<span class="fc-pos" style="background:var(--'+c+')">'+esc(POS_SHORT[k]||'—')+'</span>'
+        +'<span class="fc-w">'+esc(fm.word)+'</span></button>';
+    }
+    el.innerHTML=h;
+  }catch(e){}
+}
+window.renderFamilyChips=renderFamilyChips;
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
   const badge = rec.source==='ai' ? '<span class="badge ai">✦ AI · saved offline</span>' : '<span class="badge off">◆ offline</span>';
@@ -565,17 +668,8 @@ function renderEntry(rec, queriedAs){
     +'<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>';
   h+='</div></div>';
 
-  if(Array.isArray(d.family)&&d.family.length){
-    h+='<div class="family-scroll">';
-    for(const fm of d.family){ const fw=esc(fm.word||''); const k=posKey(fm.pos), c=POS_COLOR[k];
-      // The label's colour is set inline: it used to inherit the chip's own
-      // `color`, which made the text and its background the same shade —
-      // a solid dark box with invisible letters.
-      h+='<button class="family-chip pos-'+c+'" onclick="jump(\''+fw.replace(/'/g,"\\'")+'\')">'
-        +'<span class="fc-pos" style="background:var(--'+c+')">'+esc(POS_SHORT[k]||'—')+'</span>'
-        +'<span class="fc-w">'+fw+'</span></button>'; }
-    h+='</div>';
-  }
+  h+='<div class="family-scroll" id="family-scroll"></div>';
+  renderFamilyChips(w);
 
   if(d.vi_equivalent||d.vi_feel||d.vi_not){
     // The meaning card: one clear Vietnamese answer, then the colour behind it.
@@ -637,7 +731,7 @@ function renderEntry(rec, queriedAs){
   if(Array.isArray(d.expressions)&&d.expressions.length){
     const es=[...d.expressions].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm blue">🔗</span>Common Usage</div>';
-    for(const e of es){ h+='<div class="expr"><span class="rank">'+rankStar(e.rank)+'</span><span class="t">'+esc(e.text)+'</span>';
+    for(const e of es){ h+='<div class="expr" data-ph="'+esc(norm(e.text||''))+'"><span class="rank">'+rankStar(e.rank)+'</span><span class="t">'+esc(e.text)+'</span>';
       if(e.vi) h+='<span class="ev">'+esc(e.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
   }
@@ -645,7 +739,7 @@ function renderEntry(rec, queriedAs){
   if(Array.isArray(d.collocations)&&d.collocations.length){
     const cs=[...d.collocations].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-note-and-pen.webp" alt=""/>Collocations</div>';
-    for(const c of cs){ h+='<div class="expr"><span class="rank">'+rankStar(c.rank)+'</span><span class="t">'+esc(c.text)+'</span>';
+    for(const c of cs){ h+='<div class="expr" data-ph="'+esc(norm(c.text||''))+'"><span class="rank">'+rankStar(c.rank)+'</span><span class="t">'+esc(c.text)+'</span>';
       if(c.vi) h+='<span class="ev">'+esc(c.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
   }
@@ -653,7 +747,7 @@ function renderEntry(rec, queriedAs){
   if(Array.isArray(d.phrasal_verbs)&&d.phrasal_verbs.length){
     const ps=[...d.phrasal_verbs].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm mint">🧩</span>Phrasal Verbs</div>';
-    for(const p of ps){ h+='<div class="expr"><span class="rank">'+rankStar(p.rank)+'</span><span class="t">'+esc(p.text)+'</span>';
+    for(const p of ps){ h+='<div class="expr" data-ph="'+esc(norm(p.text||''))+'"><span class="rank">'+rankStar(p.rank)+'</span><span class="t">'+esc(p.text)+'</span>';
       if(p.vi) h+='<span class="ev">'+esc(p.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
   }
@@ -661,7 +755,7 @@ function renderEntry(rec, queriedAs){
   if(Array.isArray(d.idioms)&&d.idioms.length){
     const is_=[...d.idioms].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-magnifying-glass.webp" alt=""/>Idioms</div>';
-    for(const it of is_){ h+='<div class="expr"><span class="rank">'+rankStar(it.rank)+'</span><span class="t">'+esc(it.text)+'</span>';
+    for(const it of is_){ h+='<div class="expr" data-ph="'+esc(norm(it.text||''))+'"><span class="rank">'+rankStar(it.rank)+'</span><span class="t">'+esc(it.text)+'</span>';
       if(it.vi) h+='<span class="ev">'+esc(it.vi)+'</span>'; h+='</div>'; }
     h+='</div>';
   }
@@ -1985,13 +2079,14 @@ RULES:
 - Connotation matters more than brevity. Before finalising each Vietnamese meaning, ask: is the English word praising or criticising? Is the Vietnamese word praising or criticising? If they differ, it is WRONG — pick a longer phrasing that carries the right feeling instead. "vui tươi, giàu tưởng tượng theo kiểu ngộ nghĩnh" (long but right) beats "kỳ quặc" (short but wrong).
 - If NO Vietnamese word truly matches, leave "vi_equivalent" as "" and carry the meaning in "vi_feel". A confident but wrong equivalent is the worst possible answer.
 - rank = how often this sense appears in real life (5 very common … 1 rare). Keep the common meaning on top; a rare-but-real sense simply sits at the bottom.
+- "vi_not" is ONE commonly-confused Vietnamese word that is WRONG for "${word}" — never a word that means the same as any of the senses you just wrote above. Before writing it, check it against every "vi" you produced in "senses": if it overlaps or is a near-synonym of any of them, that is a contradiction — leave "vi_not" as "" instead of forcing one. One short clause on why it's wrong ("hay lẫn với X vì Y" style) — no more.
 
 Return ONLY this JSON:
 {
   "vi_equivalent": "1–3 từ tiếng Việt gần nhất, cách nhau bằng ', '. Rỗng nếu không có từ nào khớp.",
   "vi_note": "1 câu ngắn tiếng Việt về cảm giác/cách dùng cốt lõi",
   "vi_feel": "1–2 câu tiếng Việt tả HÌNH ẢNH / TÌNH HUỐNG dùng từ này, không phải định nghĩa từ điển",
-  "vi_not": "từ tiếng Việt hay bị dịch nhầm + tại sao sai. Rỗng nếu không có.",
+  "vi_not": "một từ tiếng Việt hay bị lẫn + lý do ngắn. PHẢI khác nghĩa với mọi 'vi' trong senses ở trên. Rỗng nếu không có từ nào thật sự hay bị lẫn.",
   "register": "trang trọng|trung tính|thân mật|lóng · khen|trung tính|chê",
   "senses": [ { "pos":"...", "vi":"nghĩa tiếng Việt đúng sắc thái", "vi_hint":"1 câu tả cảm giác nếu 'vi' chưa đủ, ngược lại rỗng", "gloss":"short English meaning", "rank":5, "example":"natural English sentence", "example_vi":"bản dịch tự nhiên" } ]
 }`;
@@ -2464,6 +2559,7 @@ function wireOnboarding(){
   renderDashboard();
   logEvent('open', null);
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+  buildWordIndex().catch(()=>{});
 })();
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;
 window.startReview=startReview; window.checkReview=checkReview; window.skipReview=skipReview; window.nextReview=nextReview;

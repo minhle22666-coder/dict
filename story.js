@@ -171,6 +171,8 @@ function defaultState(){
     currentLevelTouched: false,// gates the progressive reveal of the target-level slider
     passages: {},              // chapterId -> { sceneTexts:{sceneId:text}, mode:'ai'|'default', ts }
     arcCardShown: {},          // arcId -> true, so a finished arc's card doesn't replay on every reopen
+    arcHistory: FLAT.length ? [FLAT[0].scene.id] : [], // scene ids visited so far in the CURRENT arc only — powers the Back button; resets whenever the arc changes
+    arcScored: {},             // arcId -> true once its stat deltas have been applied (see finalizeArcScoring)
     hotspotHintSeen: false,    // true after the player's very first stage-hotspot tap ever
     startedAt: Date.now(), lastPlayedAt: Date.now(),
   };
@@ -227,7 +229,6 @@ function resolveComp(scene, chapter, arc, idx){
   const log = st.storyLog[scene.id] || (st.storyLog[scene.id]={});
   if(log.comp!=null) return log.compCorrect;              // already scored once — never twice
   const correct = idx===scene.comp.correct;
-  applyDelta({ CLA: correct?1:-2 });
   if(!correct) bumpDrift(chapter.id);
   log.comp=idx; log.compCorrect=correct;
   saveState();
@@ -238,7 +239,6 @@ function resolveIq(scene, chapter, arc, idx){
   const log = st.storyLog[scene.id] || (st.storyLog[scene.id]={});
   if(log.iq!=null) return scene.iq.options[log.iq];
   const opt = scene.iq.options[idx];
-  applyDelta(opt.delta);
   if(opt.flag) setFlags({[opt.flag]:true});
   log.iq=idx;
   saveState();
@@ -250,11 +250,9 @@ function resolveDec(scene, chapter, arc, idx){
   if(log.dec!=null) return scene.dec.options[log.dec];
   const opt = scene.dec.options[idx];
   if(opt.requireItem && !st.items[opt.requireItem]) return null; // guarded in the UI too
-  applyDelta(opt.delta);
   if(opt.setFlags) setFlags(opt.setFlags);
   if(opt.item) st.items[opt.item]=true;
   if(opt.consumeItem) st.items[opt.consumeItem]=false;
-  if(opt.grey) applyDelta({GREY:1});
   log.dec=idx;
   if(opt.goto) st.pendingGoto=opt.goto;
   logDecision(scene, chapter, arc, scene.dec.pivot?'pivot':'dec', opt.label);
@@ -272,6 +270,82 @@ function resolvePresence(scene, chapter, arc, i){
   saveState();
   return true;
 }
+
+/* ============================================================
+   END-OF-ARC SCORING — every COMP/IQ/DEC delta for the arc is
+   applied here, ONCE, right when the arc finishes. Answering along
+   the way only records what you picked (storyLog) — it no longer
+   touches st.stats — so nothing needs to be "un-scored" when the
+   player backs up and answers differently mid-arc; whatever's on
+   the books when the arc ends is what counts.
+   (✿ COLOR from resolvePresence is a discovery/collectible, not an
+   answer to redo, so it stays immediate and untouched here.)
+   ============================================================ */
+function finalizeArcScoring(arcId){
+  const st=getState();
+  if(st.arcScored && st.arcScored[arcId]) return;           // never double-score an arc
+  const arcScenes = FLAT.filter(x=>x.arc.id===arcId);
+  for(const {scene} of arcScenes){
+    const log = st.storyLog[scene.id]; if(!log) continue;
+    if(scene.comp && log.comp!=null) applyDelta({ CLA: log.compCorrect?1:-2 });
+    if(scene.iq && log.iq!=null){ const opt=scene.iq.options[log.iq]; if(opt) applyDelta(opt.delta); }
+    if(scene.dec && log.dec!=null){
+      const opt=scene.dec.options[log.dec];
+      if(opt){ applyDelta(opt.delta); if(opt.grey) applyDelta({GREY:1}); }
+    }
+  }
+  st.arcScored = st.arcScored || {};
+  st.arcScored[arcId] = true;
+  saveState();
+}
+
+/* ============================================================
+   BACK — step back to an earlier scene in the CURRENT arc and
+   answer differently. Reverses the flags/items THAT scene's old
+   answer set (best-effort — see note below) and drops its storyLog
+   entry and every scene visited after it, so re-advancing plays out
+   fresh. Never crosses into a previous, already-finished arc — for
+   that, use "Review" from the World Map instead.
+   Known limitation: chapter-level onEnterFlags (set once, on first
+   arrival) are not reversed — they're simple narrative gates, not
+   scoring, so a stale one is harmless.
+   ============================================================ */
+function unwindSceneEffects(scene, log){
+  const st=getState();
+  if(scene.iq && log.iq!=null){
+    const opt=scene.iq.options[log.iq];
+    if(opt && opt.flag) delete st.flags[opt.flag];
+  }
+  if(scene.dec && log.dec!=null){
+    const opt=scene.dec.options[log.dec];
+    if(opt){
+      if(opt.setFlags) for(const k in opt.setFlags) delete st.flags[k];
+      if(opt.item) delete st.items[opt.item];
+      if(opt.consumeItem) st.items[opt.consumeItem]=true;   // give back what that choice used up
+    }
+  }
+}
+window.goBackScene = function(){
+  _pageDir = -1;
+  const st=getState();
+  const hist = st.arcHistory||[];
+  const curIdx = hist.indexOf(st.pos);
+  if(curIdx<=0) return;                                     // first scene of this arc — nowhere to go back to
+  const targetIdx = curIdx-1;
+  for(let i=hist.length-1;i>=targetIdx;i--){
+    const sid = hist[i];
+    const e = entryOf(sid); if(!e) continue;
+    const log = st.storyLog[sid];
+    if(log){ unwindSceneEffects(e.scene, log); delete st.storyLog[sid]; }
+    st.decisions = st.decisions.filter(d=>d.sceneId!==sid);
+  }
+  st.arcHistory = hist.slice(0, targetIdx);
+  st.pos = hist[targetIdx];
+  st.pendingGoto = null;
+  saveState();
+  resetPending();
+  renderStory();
+};
 
 /* Dynamic caps, counted from whatever content actually exists — never a
    hardcoded "12 arcs" / "108 ✿". Arc 5–12 simply grow these numbers the
@@ -322,6 +396,13 @@ function _sealedResolveEnding(){                                  // never calle
 /* ============================================================
    WORD BANK — "every 10 new words" spaced-repetition accumulator.
    Runs completely silently; no toast, no badge, nothing shown.
+   Once a fresh batch of 10 lands, it also kicks off a background
+   refresh of the NEXT chapter's passage (fire-and-forget — never
+   awaited, never blocks the UI) so newly-learned words — including
+   ones picked up outside the story entirely, like a financial term
+   typed into the search bar — get a real chance to resurface. The
+   CURRENT chapter is never touched, so nothing shifts under the
+   player mid-read.
    ============================================================ */
 window.onWordSearched = function(rawWord){
   const w = norm(rawWord||'');
@@ -330,11 +411,24 @@ window.onWordSearched = function(rawWord){
   if(st.seenWords.includes(w)) return;                      // not new
   st.seenWords.push(w);
   st.wordBankPending.push(w);
+  let bankedNewBatch=false;
   while(st.wordBankPending.length>=10){
     st.wordBank.push(...st.wordBankPending.splice(0,10));
+    bankedNewBatch=true;
   }
   saveState();
+  if(bankedNewBatch) refreshUpcomingPassage();
 };
+function refreshUpcomingPassage(){
+  try{
+    const cur=currentEntry(); if(!cur) return;
+    const order=CONTENT_CHAPTER_ORDER();
+    const idx=order.indexOf(cur.chapter.id);
+    const nextCh=order[idx+1];                              // the very next chapter — never the one being read now
+    if(nextCh==null) return;
+    generateChapterPassage(nextCh, true).catch(()=>{});      // force refresh, fire-and-forget
+  }catch(e){}
+}
 
 /* ============================================================
    PASSAGE GENERATION — 65% fixed core / 20% word-bank / 15% newest,
@@ -360,18 +454,21 @@ function bandWords(lv, n){
   return sampleWords(pool, n);
 }
 
-function buildPassagePrompt(chapter, coreBlocks, currentWords, targetWords, currentLvName, targetLvName){
+function buildPassagePrompt(chapter, coreBlocks, currentWords, targetWords, currentLvName, targetLvName, personalWords){
   const marker = (id)=>'### '+id+' ###';
   const core = coreBlocks.map(b=>marker(b.id)+'\n'+b.text).join('\n\n');
+  const personalNote = (personalWords && personalWords.length)
+    ? ` A few of these (${personalWords.join(', ')}) come from the reader's OWN recent lookups elsewhere in the app — they may belong to a completely different domain than this scene (finance, tech, medicine, anything). Do not force their literal topic in. Use SEMANTIC ROLE TRANSFER instead: strip the word down to its underlying role — is it fundamentally naming a quantity, a risk, a loss, a growth, a barrier, a relief, an exchange? — and cast only that role onto something already happening in the scene (a feeling Focci has, an object's state, an action, an outcome). "Liquidity" isn't about money here — it can describe how easily something flows or is available. If a word genuinely can't be cast this way without turning silly or confusing, quietly drop it.`
+    : '';
   return `You are lightly enriching an English reading passage for a language learner, WITHOUT changing its plot, meaning, or comprehension-question answers.
 
 RULES (all mandatory):
 1. Keep every scene block under its EXACT "### <id> ###" marker line, same ids, same order, same count. Never add, remove, merge, or rename a block.
 2. The story content, character names, item names, and factual details in the ORIGINAL text below must all remain intact — a reader must still understand the same story the same way, and every comprehension-question answer must still hold. This core plot vocabulary is about 50% of the passage and is off-limits for substitution.
 3. Naturally weave in some of these ${currentLvName}-level words (the reader is already comfortable around here — light review): ${currentWords.join(', ')||'(none available)'}. This band should land around 20% of the passage's vocabulary.
-4. Naturally weave in some of these ${targetLvName}-level words (the reader is reaching for this level — a gentle stretch): ${targetWords.join(', ')||'(none available)'}. This band should land around 30% of the passage's vocabulary.
-5. Words from both bands (3–4) should mostly describe things, events, actions, or feelings — a texture in the scene, something that happens, something Focci notices or feels — not plot mechanics, names, or facts the COMP/IQ questions depend on.
-6. You may add 1–3 short descriptive sentences per block if that's genuinely needed to fit the words above naturally — but never change what happens, never change a character's choice or its outcome, and never touch the core vocabulary from rule 2.
+4. Naturally weave in some of these ${targetLvName}-level words (the reader is reaching for this level — a gentle stretch): ${targetWords.join(', ')||'(none available)'}. This band should land around 30% of the passage's vocabulary.${personalNote}
+5. Words from both bands should mostly describe things, events, actions, or feelings — a texture in the scene, something that happens, something Focci notices or feels — not plot mechanics, names, or facts the COMP/IQ questions depend on.
+6. You may add 1–3 short descriptive sentences per block if that's genuinely needed to fit the words above naturally — but keep the SAME spare, understated voice as the original (short declarative sentences, concrete images, no over-explaining) — never pad with generic filler, never change what happens, never change a character's choice or its outcome, and never touch the core vocabulary from rule 2.
 7. Not every word in each list needs to appear — use judgment; a natural passage with 4–6 of them fitted well beats a stuffed one with all of them.
 8. Output ONLY the rewritten blocks with their markers, nothing else — no preamble, no commentary, no markdown fences.
 
@@ -397,25 +494,34 @@ function parsePassageBlocks(raw, ids){
   for(const id of ids) if(!out[id]) return null;             // parse failed to cover every block — bail to defaults
   return out;
 }
-async function generateChapterPassage(chapterId){
+const _passageGenInFlight = new Set();
+async function generateChapterPassage(chapterId, force){
   const st=getState();
-  if(st.passages[chapterId]) return;                        // generate once per chapter arrival
-  const ch = chapterById(chapterId); if(!ch) return;
-  if(typeof loadLevels==='function'){ try{ await loadLevels(); }catch(e){} }
-  const blocks = ch.scenes.filter(s=>s.en).map(s=>({id:s.id, text:baseTextOf(s)}));
-  if(!blocks.length) return;
-  const cur = bandWords(st.currentLevel, Math.max(2,Math.round(blocks.length*0.7)));   // ~20% band
-  const tgt = bandWords(st.targetLevel,  Math.max(3,Math.round(blocks.length*1.0)));   // ~30% band
+  if(!force && st.passages[chapterId]) return;               // generate once per chapter arrival, unless forced
+  if(_passageGenInFlight.has(chapterId)) return;              // already generating — don't stack calls
+  _passageGenInFlight.add(chapterId);
   try{
-    const raw = await askGeminiFlashLite(buildPassagePrompt(ch, blocks, cur, tgt, levelName(st.currentLevel), levelName(st.targetLevel)));
-    const parsed = parsePassageBlocks(raw, blocks.map(b=>b.id));
-    st.passages[chapterId] = parsed
-      ? { sceneTexts:parsed, mode:'ai', ts:Date.now() }
-      : { sceneTexts:{}, mode:'default', ts:Date.now() };
-  }catch(e){
-    st.passages[chapterId] = { sceneTexts:{}, mode:'default', ts:Date.now() }; // graceful degrade
+    const ch = chapterById(chapterId); if(!ch) return;
+    if(typeof loadLevels==='function'){ try{ await loadLevels(); }catch(e){} }
+    const blocks = ch.scenes.filter(s=>s.en).map(s=>({id:s.id, text:baseTextOf(s)}));
+    if(!blocks.length) return;
+    const cur = bandWords(st.currentLevel, Math.max(2,Math.round(blocks.length*0.7)));       // ~20% band
+    const personalPick = sampleWords((st.wordBank||[]).slice(-30), 2);                       // the reader's own recent words, seasoning only
+    const tgtRest = bandWords(st.targetLevel, Math.max(1,Math.round(blocks.length*1.0)-personalPick.length));
+    const tgt = [...new Set([...personalPick, ...tgtRest])];                                 // ~30% band total
+    try{
+      const raw = await askGeminiFlashLite(buildPassagePrompt(ch, blocks, cur, tgt, levelName(st.currentLevel), levelName(st.targetLevel), personalPick));
+      const parsed = parsePassageBlocks(raw, blocks.map(b=>b.id));
+      if(parsed) st.passages[chapterId] = { sceneTexts:parsed, mode:'ai', ts:Date.now() };
+      else if(!st.passages[chapterId]) st.passages[chapterId] = { sceneTexts:{}, mode:'default', ts:Date.now() };
+      // a failed refresh keeps whatever good version was already there
+    }catch(e){
+      if(!st.passages[chapterId]) st.passages[chapterId] = { sceneTexts:{}, mode:'default', ts:Date.now() }; // graceful degrade
+    }
+    saveState();
+  } finally {
+    _passageGenInFlight.delete(chapterId);
   }
-  saveState();
 }
 function maybeGenerateAhead(justEnteredChapterId){
   const idx = CONTENT_CHAPTER_ORDER().indexOf(justEnteredChapterId);
@@ -550,6 +656,66 @@ window.saveProfilePanel = function(){
    navigates views; a tap outside the sheet closes it instantly and
    the reader is exactly where they were.
    ============================================================ */
+/* ============================================================
+   DIALOGUE FORMATTING — a quoted line (spoken, or written like a
+   postcard/note) gets pulled onto its own paragraph instead of
+   sitting mid-sentence in a wall of narration. When a clear,
+   immediately-adjacent "Name said" / "said Name" tag is present, the
+   line gets a proper "Name:" label and that tag is dropped from the
+   visible text so it isn't said twice. No tag nearby → the line is
+   still broken onto its own paragraph (already far easier to follow
+   than before) rather than guessing at a speaker.
+   ============================================================ */
+const SPEECH_VERBS_RE = '(?:said|says|asked|asks|replied|replies|called|calls|murmured|murmurs|whispered|whispers|answered|answers|muttered|mutters)';
+function formatDialogue(text){
+  const src=String(text||'');
+  const QUOTE=/"([^"]{3,}?)"/g;
+  const paras=[]; let buffer=''; let last=0; let m;
+  const preRe=new RegExp('([A-Z][a-zA-Z\']*)\\s+'+SPEECH_VERBS_RE+'[,:]?\\s*$');
+  // covers BOTH common orders: "..." Sil said. / "..." said the cicada.
+  const postNameFirstRe=new RegExp('^[,\\s]*([A-Z][a-zA-Z\']*)\\s+'+SPEECH_VERBS_RE+'\\b[^.!?]*[.!?]?');
+  const postVerbFirstRe=new RegExp('^[,\\s]*'+SPEECH_VERBS_RE+'\\s+(the\\s+)?([a-zA-Z][a-zA-Z\']*(?:\\s[a-zA-Z][a-zA-Z\']*)?)[^.!?]*[.!?]?');
+  while((m=QUOTE.exec(src))){
+    let before=src.slice(last, m.index);
+    const afterStart=m.index+m[0].length;
+    const afterWindow=src.slice(afterStart, afterStart+60);
+    let speaker=null, consumedAfter=0;
+    const preM=before.match(preRe);
+    if(preM){
+      speaker=preM[1]; before=before.slice(0, before.length-preM[0].length);
+    } else {
+      const postM=afterWindow.match(postNameFirstRe);
+      if(postM){ speaker=postM[1]; consumedAfter=postM[0].length; }
+      else {
+        const postV=afterWindow.match(postVerbFirstRe);
+        if(postV){ speaker=(postV[1]?'The ':'')+postV[2]; speaker=speaker.charAt(0).toUpperCase()+speaker.slice(1); consumedAfter=postV[0].length; }
+      }
+    }
+    buffer+=before;
+    if(buffer.trim()){ paras.push({type:'p', text:buffer}); buffer=''; }
+    paras.push({type:'d', speaker, text:m[1]});
+    last=afterStart+consumedAfter;
+  }
+  buffer+=src.slice(last);
+  if(buffer.trim()) paras.push({type:'p', text:buffer});
+  return paras.length ? paras : [{type:'p', text:src}];
+}
+function passageHTMLOf(text){
+  const paras=formatDialogue(text);
+  if(paras.length===1 && paras[0].type==='p') return tokenizeForTap(paras[0].text);
+  let h='';
+  for(const p of paras){
+    if(p.type==='d'){
+      h+='<p class="dlg-line">'
+        +(p.speaker?'<span class="dlg-speaker">'+esc(p.speaker)+':</span> ':'')
+        +'“'+tokenizeForTap(p.text)+'”</p>';
+    } else {
+      const t=p.text.trim(); if(!t) continue;
+      h+='<p>'+tokenizeForTap(p.text)+'</p>';
+    }
+  }
+  return h;
+}
 function tokenizeForTap(text){
   const src = String(text||'');
   let out='', last=0, m;
@@ -690,6 +856,7 @@ window.closeWordSheet = closeWordSheet;
    `_reviewPos` moves; `getState().pos` and saveState() are untouched
    while reviewing. */
 let _reviewArcId=null, _reviewPos=null;
+let _pageDir=0; // 0=no flip (fresh open) · 1=forward (Continue) · -1=backward (Back) — one-shot, consumed by renderStory()
 function currentEntry(){ return entryOf(_reviewArcId ? _reviewPos : getState().pos); }
 function nextValidIndex(fromIdx){
   const st=getState();
@@ -702,6 +869,7 @@ function onChapterCompleted(prevChapterId, newChapterId){
 }
 function advance(){
   if(_reviewArcId){ advanceReview(); return; }
+  _pageDir = 1;
   const st=getState();
   const cur=currentEntry(); if(!cur) return;
   let targetIdx=-1;
@@ -721,6 +889,7 @@ function advance(){
     const finishedArc = ARC_FINAL_CHAPTER[cur.chapter.id];
     if(finishedArc && !st.arcCardShown[finishedArc]){
       st.arcCardShown[finishedArc]=true; saveState();
+      finalizeArcScoring(finishedArc);
       renderArcEndCard(finishedArc, true);
       return;
     }
@@ -729,6 +898,12 @@ function advance(){
   const landed = FLAT[targetIdx];
   const prevChapterId = cur.chapter.id, newChapterId = landed.chapter.id;
   st.pos = landed.scene.id;
+  if(landed.arc.id !== cur.arc.id){
+    st.arcHistory = [landed.scene.id];                      // new arc — fresh Back history
+  } else {
+    st.arcHistory = st.arcHistory || [];
+    if(st.arcHistory[st.arcHistory.length-1] !== landed.scene.id) st.arcHistory.push(landed.scene.id);
+  }
   resetPending();
   if(newChapterId!==prevChapterId){
     onChapterCompleted(prevChapterId, newChapterId);
@@ -738,6 +913,7 @@ function advance(){
     const finishedArc = ARC_FINAL_CHAPTER[prevChapterId];
     if(finishedArc && !st.arcCardShown[finishedArc]){
       st.arcCardShown[finishedArc]=true; saveState();
+      finalizeArcScoring(finishedArc);
       renderArcEndCard(finishedArc);
       return;
     }
@@ -978,7 +1154,8 @@ function injectItemSparkle(html, item){
 }
 window.itemSparkTap = function(assetName){
   const fact = PROP_LORE[assetName] || "Just something lying around.";
-  showWordSheet('<div class="ws-loading" style="padding-top:2px;color:var(--text)">'+esc(fact)+'</div>');
+  showWordSheet('<div class="prop-peek"><img src="'+assetUrl(assetName)+'" alt="" onerror="this.parentElement.style.display=\'none\'"/></div>'
+    +'<div class="ws-loading" style="padding-top:2px;color:var(--text)">'+esc(fact)+'</div>');
 };
 
 /* ============================================================
@@ -1025,7 +1202,9 @@ window.stageHotspotTap = function(btn, fact){
   const st=getState();
   if(!st.hotspotHintSeen){ st.hotspotHintSeen=true; saveState(); document.querySelectorAll('.stage-hotspot.hint').forEach(el=>el.classList.remove('hint')); }
   btn.classList.add('tapped'); setTimeout(()=>btn.classList.remove('tapped'),400);
-  showWordSheet('<div class="ws-loading" style="padding-top:2px;color:var(--text)">'+esc(fact)+'</div>');
+  const img = btn.querySelector('img');
+  const peek = img ? '<div class="prop-peek"><img src="'+img.src+'" alt=""/></div>' : '';
+  showWordSheet(peek+'<div class="ws-loading" style="padding-top:2px;color:var(--text)">'+esc(fact)+'</div>');
 };
 
 /* ============================================================
@@ -1134,8 +1313,15 @@ function renderStory(){
   if(!cur){ renderStoryTBC(); return; }
   const { scene, chapter, arc } = cur;
 
+  const st0=getState();
+  const hist0=st0.arcHistory||[];
+  const canGoBack = !_reviewArcId && hist0.indexOf(scene.id)>0;
+  const flipClass = _pageDir>0 ? ' page-flip-fwd' : _pageDir<0 ? ' page-flip-back' : '';
+  _pageDir=0;                                                 // one-shot — consumed now
+
   let h='<div class="story-view">';
   h+='<div class="story-top"><button class="story-quit" onclick="renderGameHub()">✕</button>'
+    +(canGoBack?'<button class="story-back" onclick="goBackScene()">‹ Back</button>':'')
     +'<div class="story-top-t">Arc '+arc.id+' · '+esc(chapter.title)+'</div>'
     +(_reviewArcId?'<span class="story-review-badge">Reviewing</span>':'')+'</div>';
 
@@ -1149,10 +1335,10 @@ function renderStory(){
   if(scene.mascot) h+='<img class="story-mascot" src="'+assetUrl(scene.mascot)+'" alt="" onclick="tapMascot(\''+scene.id+'\')" onerror="this.style.display=\'none\'"/>';
   h+='</div>';
 
-  h+='<div class="story-page paper-bg">';
+  h+='<div class="story-page paper-bg'+flipClass+'">';
   h+=passageIllustrationsHTML(scene, passageText);
   h+='<div class="story-title">'+esc(scene.title||'')+'</div>';
-  let passageHTML = tokenizeForTap(passageText);
+  let passageHTML = passageHTMLOf(passageText);
   passageHTML = injectItemSparkle(passageHTML, inlineItemFor(scene, passageText));
   h+='<div class="story-passage" id="story-passage-'+scene.id.replace('.','-')+'">'+passageHTML+'</div>';
   if(scene.comp) h+=renderCompBlock(scene, chapter, arc);
@@ -1188,6 +1374,23 @@ window.storyAnswerDec  = function(sceneId, idx){ const e=entryOf(sceneId); if(!e
 
 
 /* ---------- arc-end card: 4 visible stat bars only ---------- */
+/* 3-frame "flag" sequence for the arc-complete mascot: walks in (loops on
+   frame 1 until the sequence starts), jumps (frame 2), plants the flag and
+   settles (frame 3). Swaps the actual <img> src per frame so it reads as
+   real animation, not just a CSS wiggle on one static pose. */
+const FLAG_FRAMES=['mascot-withflag-1','mascot-withflag-2','mascot-withflag-3'];
+function playFlagWave(elId){
+  const el=document.getElementById(elId); if(!el) return;
+  let i=0;
+  const step=()=>{
+    i++;
+    if(i>=FLAG_FRAMES.length) return;
+    el.src=assetUrl(FLAG_FRAMES[i]);
+    el.className='arc-card-mascot flag-f'+i;
+    setTimeout(step, i===1?520:400);
+  };
+  setTimeout(step, 450);                                    // let the walk loop play a beat first
+}
 function renderArcEndCard(arcId){
   const area=$('#review-area'); if(!area) return;
   const st=getState(), caps=computeCaps();
@@ -1195,7 +1398,7 @@ function renderArcEndCard(arcId){
   const pivotDecision = st.decisions.slice().reverse().find(d=>d.arcId===arcId && d.kind==='pivot');
   const arcWords = st.seenWords.length; // running total; good enough as "words met" signal without a per-arc log
   let h='<div class="arc-card">';
-  h+='<img class="arc-card-mascot" src="./mascot-withflag-1.webp" alt="" onerror="this.style.display=\'none\'"/>';
+  h+='<img class="arc-card-mascot flag-f0" id="flag-mascot" src="./mascot-withflag-1.webp" alt=""/>';
   h+='<div class="arc-card-t">Arc '+arcId+' complete</div>';
   h+='<div class="arc-card-s">'+esc(arc?arc.title:'')+'</div>';
   h+='<div class="arc-bars">';
@@ -1209,6 +1412,7 @@ function renderArcEndCard(arcId){
   h+='<button class="btn" onclick="openStory()">Continue →</button>';
   h+='</div>';
   area.innerHTML=h;
+  playFlagWave('flag-mascot');
 }
 
 /* ---------- "to be continued" ---------- */
@@ -1236,7 +1440,37 @@ function renderStoryTBC(){
    entry. Three compact cards: the story, and the two mini-games,
    plus a locked Bonus Scene strip below.
    ============================================================ */
-function openStory(){ resetPending(); renderStory(); }
+/* ============================================================
+   STORY INTRO — what the Home CTA actually opens now (it used to
+   call openStory() directly into a hidden tab, which is why tapping
+   it looked like it did nothing). Told narratively on purpose, and
+   deliberately stays away from any real plot detail — this is about
+   how to play, not what happens.
+   ============================================================ */
+window.showStoryIntro = function(){
+  const ov=document.createElement('div'); ov.className='info-ov';
+  ov.innerHTML='<div class="info-card story-intro-card">'
+    +'<img src="./mascot-wonder.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<div class="info-t">Before you begin</div>'
+    +'<div class="info-b story-intro-b">'
+    +'<p>Somewhere in a field too big for the sky, a fox opens his eyes and doesn\'t remember his own name. What he does next is up to you.</p>'
+    +'<p>The story leans on your own dictionary as it goes — a passage reads a little differently depending on what you already know, and gently reaches for a few words you\'re just about ready to grow into.</p>'
+    +'<p>Along the way, you answer <i>for</i> him: what he notices, what he decides, who he ends up being. A few quiet qualities grow with your choices — but he never sees the numbers, and you don\'t need to chase them either. Just choose the way you actually would.</p>'
+    +'<p>Some things won\'t explain themselves right away — a flower by the road, a mark on a tree, an object worth a second look. Tap them anyway.</p>'
+    +'<p>Changed your mind partway down a page? Step back with <b>‹ Back</b> and answer differently — nothing is scored until the chapter ends, so there\'s room to wonder "what if."</p>'
+    +'<p>That\'s really all there is to know. The rest is his to find out, and yours to decide.</p>'
+    +'</div>'
+    +'<button class="info-action" onclick="this.closest(\'.info-ov\').remove(); showView(\'review\')">▶ Play</button>'
+    +'<div class="info-tap">tap outside to close</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  requestAnimationFrame(()=>ov.classList.add('show'));
+  ov.addEventListener('click',(e)=>{
+    if(e.target!==ov) return;                    // only the backdrop dismisses — the card itself is meant to be read
+    ov.classList.remove('show'); setTimeout(()=>ov.remove(),260);
+  });
+};
+function openStory(){ _pageDir=0; resetPending(); renderStory(); }
 window.openStory = openStory;
 
 function isStoryStarted(){ return Object.keys(getState().storyLog).length>0; }
