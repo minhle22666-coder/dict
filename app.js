@@ -977,7 +977,6 @@ async function renderSaved(){
   const box=$('#saved-list');
   $('#saved-count').innerHTML='<img class="hdr-ico" src="./decor-earth.webp" alt=""/>'
     +all.length+' word'+(all.length===1?'':'s')+' collected';
-  renderTerritory(all.length);
   if(!all.length){ box.innerHTML='<div class="empty"><img class="ill" src="./mascot-explore.webp" alt=""/><h3>No saved words yet</h3><p>Tap the star ☆ on any word to save it here.</p></div>'; return; }
   if(savedSort==='az') all.sort((a,b)=>a.word.localeCompare(b.word));
   else if(savedSort==='za') all.sort((a,b)=>b.word.localeCompare(a.word));
@@ -992,64 +991,6 @@ async function renderSaved(){
   });
   box.innerHTML=h;
 }
-
-
-/* ============================================================
-   TERRITORY — the lands Focci has claimed, and the ones still
-   locked ahead. Tapping a region tells you what it takes.
-   ============================================================ */
-const REGIONS=[
-  {at:0,   bg:'desert',    name:'Dusty Flats',    char:'explore', line:"Where every explorer starts. Dry, but full of promise."},
-  {at:10,  bg:'morning',   name:'Green Meadows',  char:'run',     line:"Grass at last! Your first real foothold."},
-  {at:40,  bg:'afternoon', name:'Rolling Hills',  char:'read_map',line:"Wide country. Focci needed a bigger map for this."},
-  {at:100, bg:'evening',   name:'Golden Valley',  char:'badass',  line:"Sunset over land you earned word by word."},
-  {at:250, bg:'night',     name:'Starlit Peaks',  char:'champion',line:"The summit. Very few explorers make it here."},
-];
-function renderTerritory(count){
-  const banner=$('#saved-banner'); if(!banner) return;
-  let cur=REGIONS[0], next=null;
-  for(let i=0;i<REGIONS.length;i++){
-    if(count>=REGIONS[i].at) cur=REGIONS[i];
-    else { next=REGIONS[i]; break; }
-  }
-  banner.style.backgroundImage="url('./bg-"+cur.bg+".webp')";
-  let h='<div class="sb-scrim"></div>';
-  h+='<img class="sb-char" src="./mascot-'+cur.char+'.webp" alt=""/>';
-  h+='<div class="sb-txt"><div class="sb-t">'+esc(cur.name)+'</div>';
-  h+='<div class="sb-s">'+esc(cur.line)+'</div>';
-  if(next){
-    const need=next.at-count;
-    h+='<div class="sb-next">🔒 '+need+' more to unlock <b>'+esc(next.name)+'</b></div>';
-    h+='<div class="sb-bar"><i style="width:'+Math.round((count-cur.at)/(next.at-cur.at)*100)+'%"></i></div>';
-  } else {
-    h+='<div class="sb-next">🏆 Every land claimed. Legendary.</div>';
-  }
-  h+='</div>';
-  banner.innerHTML=h;
-
-  // the region strip — locked lands are visible but dimmed
-  const strip=$('#region-strip');
-  if(strip){
-    let s='';
-    REGIONS.forEach((r,i)=>{
-      const unlocked=count>=r.at;
-      s+='<div class="region'+(unlocked?' on':'')+(r===cur?' cur':'')+'" onclick="regionInfo('+i+','+count+')">'
-        +'<div class="region-img" style="background-image:url(./bg-'+r.bg+'.webp)"></div>'
-        +'<div class="region-lock">'+(unlocked?'✓':'🔒')+'</div>'
-        +'<div class="region-n">'+esc(r.name)+'</div>'
-        +'<div class="region-a">'+(unlocked?'claimed':r.at+' words')+'</div>'
-        +'</div>';
-    });
-    strip.innerHTML=s;
-  }
-}
-function regionInfo(i,count){
-  const r=REGIONS[i], unlocked=count>=r.at;
-  showInfoCard('mascot-'+(unlocked?r.char:'wonder'),
-    (unlocked?'':'🔒 ')+r.name,
-    unlocked ? r.line : 'Locked. Save '+(r.at-count)+' more word'+((r.at-count)===1?'':'s')+' and this land is yours. '+r.line);
-}
-window.regionInfo=regionInfo;
 
 /* ============================================================
    PRACTICE — two games, one setup screen

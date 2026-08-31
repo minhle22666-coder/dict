@@ -131,14 +131,6 @@ function pickDecoys(sceneId, n){
   for(let i=0;i<n;i++){ seed = (seed*1103515245 + 12345) % 2147483648; out.push(DECOY_POOL[seed % DECOY_POOL.length]); }
   return out;
 }
-function hotspotPos(sceneId, idx, total){
-  // scattered, not a tidy row — deterministic per scene+index so re-renders don't jitter
-  let seed = idx*7919; for(let i=0;i<sceneId.length;i++) seed += sceneId.charCodeAt(i)*(i+1);
-  const rand = (n)=>{ const x = Math.sin(seed+n*13.37)*10000; return x - Math.floor(x); };
-  const left = 8 + rand(1)*78;
-  const top  = 30 + rand(2)*55;
-  return { left: left.toFixed(1), top: top.toFixed(1) };
-}
 
 /* ---------- condition parsing: "key=value" / "key!=value" ---------- */
 function condOk(cond, flags){
@@ -660,34 +652,10 @@ async function openWordPopup(rawWord){
 window.openWordPopup = openWordPopup;
 window.closeWordSheet = closeWordSheet;
 
-/* ============================================================
-   HOTSPOT TAPS — the world you can poke at. Same visual reaction for a
-   real object as for pure clutter: a small burst + a floating line of
-   text, never a flat "here's the item's name" label.
-   ============================================================ */
-window.tapHotspot = function(btn, name){
-  // brief tap-feedback burst, purely cosmetic
-  const burst = document.createElement('span');
-  burst.className='hs-burst';
-  btn.appendChild(burst);
-  setTimeout(()=>burst.remove(), 500);
+/* (on-image scattered hotspot tapping removed — see renderExploreBlock:
+   discoverable details now surface as a post-answer Yes/No prompt instead,
+   which is far easier to find and tap than a tiny icon on the scene art) */
 
-  const text = PROP_LORE[name] || (DECOY_POOL.find(d=>d.name===name)||{}).fact || "Just something lying around.";
-  const stage = btn.closest('.story-stage');
-  if(!stage) return;
-  const old = stage.querySelector('.hs-note'); if(old) old.remove();
-  const note = document.createElement('div');
-  note.className='hs-note';
-  note.textContent = text;
-  const btnRect = btn.getBoundingClientRect(), stageRect = stage.getBoundingClientRect();
-  const leftPct = ((btnRect.left - stageRect.left) / stageRect.width) * 100;
-  const topPct  = ((btnRect.top  - stageRect.top)  / stageRect.height) * 100;
-  note.style.left = Math.max(4, Math.min(70, leftPct)) + '%';
-  note.style.top  = Math.max(4, topPct - 8) + '%';
-  stage.appendChild(note);
-  requestAnimationFrame(()=>note.classList.add('show'));
-  setTimeout(()=>note.remove(), 4200);
-};
 
 /* ============================================================
    NAVIGATION
@@ -853,29 +821,76 @@ function renderPresenceBlock(scene, chapter, arc){
 }
 
 /* Props can be a plain asset-name string (back layer, default) or an
-   {name, layer} object — kept flexible so existing scenes never need
-   rewriting just to gain a front-layer item somewhere else. */
+   {name, layer} object — kept flexible; renderExploreBlock reads these
+   for the post-answer Yes/No prompts instead of placing them on-image. */
 function normalizeProps(list){
   if(!list) return [];
   return list.map(p => typeof p==='string' ? {name:p} : p).filter(p=>p&&p.name);
 }
-/* Mixes the scene's real (lore) props with a couple of deterministic decoys,
-   then renders every one of them the same way — scattered, unlabeled,
-   identical on tap — so nothing about their placement gives away which
-   ones matter. */
-function hotspotsHTML(scene, layerList, layerName, offset){
-  const real = normalizeProps(layerList);
-  const decoyCount = real.length ? (layerName==='back'?2:1) : 1;
-  const decoys = pickDecoys(scene.id+layerName, decoyCount);
-  const all = real.concat(decoys);
-  let h='';
-  all.forEach((p,i)=>{
-    const pos = hotspotPos(scene.id, i+offset, all.length);
-    h+='<button class="hotspot hotspot-'+layerName+'" style="left:'+pos.left+'%;top:'+pos.top+'%" onclick="tapHotspot(this,\''+esc(p.name)+'\')">'
-      +'<img src="'+assetUrl(p.name)+'" alt="" onerror="this.style.display=\'none\'"/><span class="hotspot-glow"></span></button>';
-  });
-  return h;
+
+/* Item mentions INSIDE the passage itself — a curated set of scenes
+   where a real story object is named plainly enough in the prose that
+   a small companion tap-target next to that exact word makes sense
+   (verified against the actual text, not guessed). Anything not listed
+   here still surfaces through the post-answer explore prompt instead —
+   nothing is ever lost, just placed wherever it reads most naturally. */
+const ITEM_MENTIONS = {
+  '1.2|other-counter':'machine',
+  '2.1|other-tree-trunk':'stalk',
+  '2.4|other-wagon':'carts',
+  '2.7|other-cicada-2':'shell',
+  '3.3|other-notebook':'letters',
+  '5.2|other-notebook':'ledger', '5.3|other-notebook':'ledger',
+  '7.6|other-carved-tree-trunk':'bark',
+  '8.4|other-parchment':'cloth',
+  '9.1|other-carved-tree-trunk':'bark',
+  '9.3|other-tree':'log',
+  '11.4|other-seed-bag':'envelopes',
+  '12.3|other-seed-bag':'envelope',
+  '12.6|other-scattered-seeds':'seed',
+};
+function deriveKeywordCandidates(assetName){
+  const base = assetName.replace(/^(other|fg|decoy)-/,'').replace(/-\d+$/,'');
+  const words = base.split('-');
+  const out = [];
+  if(words.length>1) out.push(words.join(' '));
+  out.push(words[words.length-1]);
+  if(words.length>1) out.push(words[0]);
+  return [...new Set(out)];
 }
+function keywordInText(sceneId, assetName, text){
+  const override = ITEM_MENTIONS[sceneId+'|'+assetName];
+  const candidates = override ? [override] : deriveKeywordCandidates(assetName);
+  for(const kw of candidates){
+    const re = new RegExp('\\b'+kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+    if(re.test(text)) return kw.toLowerCase();
+  }
+  return null;
+}
+/* Which single real prop (if any) gets its inline sparkle for this scene —
+   computed the same, deterministic way wherever it's needed, so the stage
+   render and the explore block always agree on which one was already shown. */
+function inlineItemFor(scene, text){
+  const real = normalizeProps(scene.props).concat(normalizeProps(scene.propsFront));
+  for(const p of real){
+    const kw = keywordInText(scene.id, p.name, text||'');
+    if(kw) return { name:p.name, keyword:kw };
+  }
+  return null;
+}
+/* Inserts a small sparkle tap-target right after the matched word's own
+   .wtap span — dictionary lookup on that word still works exactly as
+   before; the sparkle is a separate, clearly-visible companion target. */
+function injectItemSparkle(html, item){
+  if(!item) return html;
+  const re = new RegExp('(<span class="wtap" data-w="'+item.keyword+'">[^<]+</span>)');
+  return html.replace(re, (m)=>m+'<button class="item-spark" onclick="itemSparkTap(\''+esc(item.name)+'\')">✦</button>');
+}
+window.itemSparkTap = function(assetName){
+  const fact = PROP_LORE[assetName] || "Just something lying around.";
+  showWordSheet('<div class="ws-word" style="font-size:15px">A closer look</div><div class="ws-loading" style="padding-top:6px;color:var(--text)">'+esc(fact)+'</div>');
+};
+
 /* Pure-CSS ambient texture per chapter mood — no image assets needed, so
    this always renders even before any real art is uploaded. BRIGHT gets
    a few soft floating motes, DARK gets slower, dimmer drifting dust, and
@@ -907,20 +922,21 @@ function renderStory(){
   const mood = (chapter.mood||'BRIGHT').toLowerCase();
   h+='<div class="story-stage mood-'+mood+'" style="background-image:url(\''+assetUrl(bg)+'\')">';
   h+=ambientLayerHTML(mood);
-  h+=hotspotsHTML(scene, scene.props, 'back', 0);
   if(scene.mascot) h+='<img class="story-mascot" src="'+assetUrl(scene.mascot)+'" alt="" onerror="this.style.display=\'none\'"/>';
-  h+=hotspotsHTML(scene, scene.propsFront, 'front', 50);
-  h+='<div class="story-dialogue"><div class="story-dialogue-title">'+esc(scene.title||'')+'</div>'
-    +'<div class="story-passage" id="story-passage-'+scene.id.replace('.','-')+'">'+tokenizeForTap(getSceneText(scene, chapter.id))+'</div></div>';
   h+='</div>';
 
-  h+='<div class="story-page">';
+  h+='<div class="story-page paper-bg">';
+  h+='<div class="story-title">'+esc(scene.title||'')+'</div>';
+  const passageText = getSceneText(scene, chapter.id);
+  let passageHTML = tokenizeForTap(passageText);
+  passageHTML = injectItemSparkle(passageHTML, inlineItemFor(scene, passageText));
+  h+='<div class="story-passage" id="story-passage-'+scene.id.replace('.','-')+'">'+passageHTML+'</div>';
   if(scene.comp) h+=renderCompBlock(scene, chapter, arc);
   if(scene.iq) h+=renderIqBlock(scene, chapter, arc);
   if(scene.dec) h+=renderDecBlock(scene, chapter, arc);
-  if(scene.presence && scene.presence.length) h+=renderPresenceBlock(scene, chapter, arc);
   const submitted = isSubmitted(scene);
   if(submitted){
+    h += renderExploreBlock(scene);
     h+='<button class="btn story-continue" onclick="advanceStory()">'+(scene.endOfBuiltContent?'Continue':'Continue →')+'</button>';
   } else {
     h+='<button class="btn story-continue" '+(canSubmit(scene)?'':'disabled')+' onclick="storySubmit()">Choose an answer</button>';
@@ -930,11 +946,62 @@ function renderStory(){
   area.innerHTML=h;
   wireWordTaps();
 }
+
+/* ============================================================
+   EXPLORE — shown only once every question in the scene has been
+   answered. Combines the scripted ✿ presence actions with a couple
+   of world-detail prompts (mixing a real object's lore with pure
+   decoy fun-facts, worded and offered identically either way).
+   Each is a plain Yes/No: Yes reveals a line, No just moves on.
+   ============================================================ */
+function renderExploreBlock(scene){
+  const st=getState();
+  const log = st.storyLog[scene.id] || {};
+  const hasPresence = scene.presence && scene.presence.length;
+  const entry = entryOf(scene.id);
+  const inlined = inlineItemFor(scene, entry ? getSceneText(scene, entry.chapter.id) : (scene.en||''));
+  const real = normalizeProps(scene.props).concat(normalizeProps(scene.propsFront))
+    .filter(p => !inlined || p.name!==inlined.name); // already offered inline — don't repeat it here
+  const decoys = pickDecoys(scene.id+'x', real.length?1:2);
+  const loreItems = real.slice(0,1).map(p=>({ name:p.name, fact: PROP_LORE[p.name]||"Just something lying around." }));
+  const hotspotItems = loreItems.concat(decoys.map(d=>({ name:d.name, fact:d.fact })));
+  if(!hasPresence && !hotspotItems.length) return '';
+  let h='<div class="explore-block">';
+  if(hasPresence) h += renderPresenceBlock(scene, null, null);
+  hotspotItems.forEach((it,i)=>{
+    const key='hs'+i;
+    const done = log.explore && log.explore[key];
+    if(done){
+      h += '<div class="explore-item done"><span class="ei-txt">'+esc(done.said==='yes'?done.fact:"Focci decides to leave it be.")+'</span></div>';
+    } else {
+      const safeFact = esc(it.fact).replace(/'/g,"\\'");
+      h += '<div class="explore-item">'
+        +'<span class="ei-prompt">Something catches Focci\'s eye. Take a look?</span>'
+        +'<div class="ei-btns">'
+        +'<button class="ei-btn yes" onclick="exploreAnswer(\''+scene.id+'\',\''+key+'\',\'yes\',\''+safeFact+'\')">Yes</button>'
+        +'<button class="ei-btn no" onclick="exploreAnswer(\''+scene.id+'\',\''+key+'\',\'no\',\'\')">No</button>'
+        +'</div></div>';
+    }
+  });
+  h+='</div>';
+  return h;
+}
+window.exploreAnswer = function(sceneId, key, said, fact){
+  const st=getState();
+  const log = st.storyLog[sceneId] || (st.storyLog[sceneId]={});
+  if(!log.explore) log.explore={};
+  if(log.explore[key]) return;
+  log.explore[key] = { said, fact };
+  saveState();
+  renderStory();
+};
 function wireWordTaps(){
   const area=$('#review-area'); if(!area || area._wtapWired) return;
   area._wtapWired=true;
   area.addEventListener('click', (e)=>{
-    const t=e.target.closest('.wtap'); if(t) openWordPopup(t.dataset.w);
+    const t=e.target.closest('.wtap'); if(!t) return;
+    t.classList.remove('tap-flash'); void t.offsetWidth; t.classList.add('tap-flash');
+    openWordPopup(t.dataset.w);
   });
 }
 
@@ -1033,70 +1100,91 @@ window.renderGameHub = function(){
 };
 
 /* ============================================================
-   WORLD MAP — 12 lands, lives entirely in the Game tab. Nothing here
-   is ever shown by default; tapping a land is the only way to see
-   anything about it. Locked lands show a short, spoiler-free hint;
-   unlocked ones show the player's own personal history there.
+   THE MAP — reuses the app's existing "Territory" banner+strip
+   pattern (the one already shown after saving words) so the two
+   feel identical, just pointed at story progress instead of word
+   count. Names are deliberately vague — tied to Focci's amnesia,
+   never to plot — so a locked land's name is never a spoiler.
    ============================================================ */
-const WORLD_MAP_ARCS = [
-  { id:1,  hint:"Where Focci woke up with no name, and a warm bag beside him." },
-  { id:2,  hint:"Thirst, a vulture who says no, and a crocodile who needs a favor." },
-  { id:3,  hint:"Getting lost, and learning to say so." },
-  { id:4,  hint:"A field that doesn't ask anything of you." },
-  { id:5,  hint:"A night under a falling sky, and a fire that isn't going out." },
-  { id:6,  hint:"Somewhere the ground finally runs out and the water starts." },
-  { id:7,  hint:"Heat that comes up through the soles of your feet." },
-  { id:8,  hint:"Warm water, and something worth diving for." },
-  { id:9,  hint:"The first cold that actually means something." },
-  { id:10, hint:"Rows and rows of what other people decided to keep." },
-  { id:11, hint:"White in every direction, and no footprints yet but your own." },
-  { id:12, hint:"Light that blinks on its own schedule, not yours." },
+const ARC_LANDS = [
+  { id:1,  name:"The Nameless Field",   tagline:"Where Focci woke up owning nothing but a bag and a bandana." },
+  { id:2,  name:"The Unspoken Sands",   tagline:"Thirst, a ledger that doesn't lie, and a promise made to a crocodile." },
+  { id:3,  name:"The Unmarked Woods",   tagline:"Getting lost, and finally saying so out loud." },
+  { id:4,  name:"The Unchanging Garden",tagline:"A place that stopped changing eleven years ago." },
+  { id:5,  name:"The Waiting Sky",      tagline:"A night under a falling sky, and a fire that won't go out." },
+  { id:6,  name:"The Edge of Water",    tagline:"Somewhere the ground finally runs out." },
+  { id:7,  name:"The Underglow",        tagline:"Heat that comes up through the soles of your feet." },
+  { id:8,  name:"The Deep Unknown",     tagline:"Warm water, and something worth diving for." },
+  { id:9,  name:"The First Frost",      tagline:"The first cold that actually means something." },
+  { id:10, name:"The Kept Pages",       tagline:"Rows and rows of what other people decided to keep." },
+  { id:11, name:"The Blank White",      tagline:"White in every direction, and no footprints but your own — yet." },
+  { id:12, name:"The Blinking Dark",    tagline:"Light that keeps its own schedule, not yours." },
 ];
 function arcUnlocked(arcId){
   const cur=currentEntry();
   const reached = cur ? cur.arc.id : 0;
   return arcId<=reached && !!CONTENT.find(a=>a.id===arcId);
 }
-function arcCardBody(meta){
-  const st=getState();
-  const unlocked = arcUnlocked(meta.id);
-  const arc = CONTENT.find(a=>a.id===meta.id);
-  let body='';
-  if(!unlocked){
-    body = '<div class="wm-body-s">'+esc(meta.hint)+'</div>';
-  } else {
-    const decs = st.decisions.filter(d=>d.arcId===meta.id);
-    const pivot = decs.slice().reverse().find(d=>d.kind==='pivot');
-    const cast = [...new Set(arc.chapters.map(c=>CHAPTER_CAST[c.id]).filter(Boolean))];
-    if(cast.length) body += '<div class="wm-body-row"><b>Met:</b> '+cast.map(esc).join(', ')+'</div>';
-    if(pivot) body += '<div class="wm-body-row"><b>Your call:</b> '+esc(pivot.label)+'</div>';
-    body += '<div class="wm-body-row"><b>Decisions made:</b> '+decs.length+'</div>';
-  }
-  return body;
-}
-window.toggleWorldMapCard = function(id){
-  const card = document.getElementById('wm-card-'+id); if(!card) return;
-  const wasOpen = card.classList.contains('open');
-  document.querySelectorAll('.wm-card.open').forEach(c=>c.classList.remove('open'));
-  if(!wasOpen) card.classList.add('open');
-};
 function renderWorldMap(){
-  let h='<div class="world-map">';
-  WORLD_MAP_ARCS.forEach(meta=>{
+  const cur = currentEntry();
+  const curArcId = cur ? cur.arc.id : 1;
+  const curMeta = ARC_LANDS.find(a=>a.id===curArcId) || ARC_LANDS[0];
+  const nextMeta = ARC_LANDS.find(a=>a.id===curArcId+1);
+  const curArcContent = CONTENT.find(a=>a.id===curArcId);
+
+  let pct=0;
+  if(curArcContent && cur){
+    const arcScenes = FLAT.filter(x=>x.arc.id===curArcId);
+    const idx = arcScenes.findIndex(x=>x.scene.id===cur.scene.id);
+    pct = arcScenes.length ? Math.round(((idx+1)/arcScenes.length)*100) : 0;
+  }
+  const charImg = (curArcContent && curArcContent.chapters[0] && curArcContent.chapters[0].scenes[0].mascot) || 'mascot-wander';
+
+  let h='<div class="saved-banner" style="background-image:url(\''+assetUrl('bg-arc'+curArcId)+'\')">';
+  h+='<div class="sb-scrim"></div>';
+  h+='<img class="sb-char" src="'+assetUrl(charImg)+'" alt="" onerror="this.style.display=\'none\'"/>';
+  h+='<div class="sb-txt"><div class="sb-t">'+esc(curMeta.name)+'</div>';
+  h+='<div class="sb-s">'+esc(curMeta.tagline)+'</div>';
+  if(nextMeta && CONTENT.find(a=>a.id===nextMeta.id)){
+    h+='<div class="sb-next">🔒 Finish this land to reach <b>'+esc(nextMeta.name)+'</b></div>';
+    h+='<div class="sb-bar"><i style="width:'+pct+'%"></i></div>';
+  } else if(nextMeta){
+    h+='<div class="sb-next">🛠️ More lands are still being drawn.</div>';
+  } else {
+    h+='<div class="sb-next">🏆 Every built land explored.</div>';
+  }
+  h+='</div></div>';
+
+  h+='<div class="region-strip">';
+  ARC_LANDS.forEach(meta=>{
     const unlocked = arcUnlocked(meta.id);
-    const arc = CONTENT.find(a=>a.id===meta.id);
-    const title = unlocked && arc ? arc.title : 'Land '+meta.id;
-    h+='<div class="wm-card'+(unlocked?' unlocked':' locked')+'" id="wm-card-'+meta.id+'">';
-    h+='<button class="wm-face" onclick="toggleWorldMapCard('+meta.id+')" style="background-image:url(\''+assetUrl('bg-arc'+meta.id)+'\')">';
-    if(!unlocked) h+='<span class="wm-lock">🔒</span>';
-    h+='<span class="wm-face-t">'+esc(title)+'</span>';
-    h+='</button>';
-    h+='<div class="wm-drop">'+arcCardBody(meta)+'</div>';
-    h+='</div>';
+    h+='<div class="region'+(unlocked?' on':'')+(meta.id===curArcId?' cur':'')+'" onclick="worldMapInfo('+meta.id+')">'
+      +'<div class="region-img" style="background-image:url(\''+assetUrl('bg-arc'+meta.id)+'\')"></div>'
+      +'<div class="region-lock">'+(unlocked?'✓':'🔒')+'</div>'
+      +'<div class="region-n">'+esc(meta.name)+'</div>'
+      +'<div class="region-a">'+(unlocked?'unlocked':'locked')+'</div>'
+      +'</div>';
   });
   h+='</div>';
   return h;
 }
+window.worldMapInfo = function(arcId){
+  const meta = ARC_LANDS.find(a=>a.id===arcId); if(!meta) return;
+  const unlocked = arcUnlocked(arcId);
+  if(!unlocked){
+    showInfoCard('mascot-wonder', '🔒 '+meta.name, meta.tagline);
+    return;
+  }
+  const st=getState();
+  const arc = CONTENT.find(a=>a.id===arcId);
+  const decs = st.decisions.filter(d=>d.arcId===arcId);
+  const pivot = decs.slice().reverse().find(d=>d.kind==='pivot');
+  const cast = [...new Set(arc.chapters.map(c=>CHAPTER_CAST[c.id]).filter(Boolean))];
+  let body = meta.tagline;
+  if(cast.length) body += ' Met: '+cast.join(', ')+'.';
+  if(pivot) body += ' Your call: '+pivot.label;
+  showInfoCard('mascot-withflag-1', meta.name, body);
+};
 
 /* ---------- Bonus Scene — layout + lock state only, per the brief;
    the actual sequel content isn't written yet. ---------- */
