@@ -100,6 +100,12 @@ async function logEvent(type, word){
     await logAdd({ts:now(), type, word:word||null});
     const c=await logCount(); if(c>3000) logTrim();
     renderHero();
+    // Every search — whether typed in the search bar or tapped inside a
+    // story passage — lands here, so this is the one place the word-bank's
+    // "new word" detector needs to watch.
+    if(type==='search' && word && typeof window.onWordSearched==='function'){
+      try{ window.onWordSearched(word); }catch(e){}
+    }
   }catch(e){ /* logging is best-effort, never blocks the app */ }
 }
 
@@ -1095,6 +1101,19 @@ function levelTag(word){
   return lv?'<span class="lv-tag lv'+lv+'">'+LEVEL_NAMES[lv]+'</span>':'';
 }
 window.levelOf=levelOf; window.levelTag=levelTag;
+let _wordsAtLevelCache=null;
+function wordsAtLevel(lv){
+  if(!_levels) return [];
+  if(!_wordsAtLevelCache){
+    _wordsAtLevelCache=new Map();
+    for(const [w,l] of _levels.entries()){
+      if(!_wordsAtLevelCache.has(l)) _wordsAtLevelCache.set(l,[]);
+      _wordsAtLevelCache.get(l).push(w);
+    }
+  }
+  return _wordsAtLevelCache.get(lv)||[];
+}
+window.wordsAtLevel=wordsAtLevel;
 
 /* ---------- round settings ---------- */
 const QCOUNT_LS='fc_qcount', POOL_LS='fc_match_pool', LEVEL_LS='fc_level';
@@ -1117,7 +1136,12 @@ window.setPracticeMode=setPracticeMode;
 function gameSwitch(){
   const g=(id,icon,name,tag)=>'<button class="game-tab'+(practiceMode===id?' on':'')+'" onclick="setPracticeMode(\''+id+'\')">'
     +'<span class="gt-ico">'+icon+'</span><span class="gt-name">'+name+'</span><span class="gt-tag">'+tag+'</span></button>';
-  return '<div class="game-switch">'
+  // Hub back-link: only shows once the story engine has actually taken over
+  // this tab (renderGameHub defined) — the mini-games still work standalone
+  // if story.js ever fails to load.
+  const back=(typeof renderGameHub==='function')
+    ? '<button class="hub-back" onclick="renderGameHub()">← Games</button>' : '';
+  return back+'<div class="game-switch">'
     +g('type','✍️','Type it','spell from memory')
     +g('match','🎯','Match it','pick the right word')
     +'</div>';
@@ -2290,10 +2314,10 @@ function showView(v){
     if(currentWord && $('#result').innerHTML.trim()){ $('#dashboard').style.display='none'; }
     else { $('#dashboard').style.display='block'; renderDashboard(); }
   }
-  if(v==='saved') renderSaved();
-  if(v==='review') startReview();
+  if(v==='saved'){ renderSaved(); if(typeof renderArcSummaries==='function') renderArcSummaries(); }
+  if(v==='review'){ if(typeof renderGameHub==='function') renderGameHub(); else startReview(); }
   if(v==='stats') renderInsights();
-  if(v==='settings'){ refreshStats(); if(typeof scanRefreshState==='function'){ scanRefreshState().catch(()=>{}); missRefreshState(); } }
+  if(v==='settings'){ refreshStats(); if(typeof scanRefreshState==='function'){ scanRefreshState().catch(()=>{}); missRefreshState(); } if(typeof renderTargetLevelUI==='function') renderTargetLevelUI(); }
 }
 
 function wire(){
