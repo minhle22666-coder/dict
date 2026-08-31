@@ -2314,7 +2314,7 @@ function showView(v){
     if(currentWord && $('#result').innerHTML.trim()){ $('#dashboard').style.display='none'; }
     else { $('#dashboard').style.display='block'; renderDashboard(); }
   }
-  if(v==='saved'){ renderSaved(); if(typeof renderArcSummaries==='function') renderArcSummaries(); }
+  if(v==='saved') renderSaved();
   if(v==='review'){ if(typeof renderGameHub==='function') renderGameHub(); else startReview(); }
   if(v==='stats') renderInsights();
   if(v==='settings'){ refreshStats(); if(typeof scanRefreshState==='function'){ scanRefreshState().catch(()=>{}); missRefreshState(); } if(typeof renderTargetLevelUI==='function') renderTargetLevelUI(); }

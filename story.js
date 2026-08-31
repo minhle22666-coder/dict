@@ -12,8 +12,7 @@
    Hooks this file EXPOSES back into app.js (called from app.js):
      window.onWordSearched(word)   — logEvent() calls this for every
                                       'search' event, story or search-bar
-     window.renderGameHub()        — showView('review') calls this
-     window.renderArcSummaries()   — showView('saved') calls this
+     window.renderGameHub()        — showView('review') calls this (includes the World Map)
      window.renderTargetLevelUI()  — showView('settings') calls this
 
    PRIVACY OF THE SCORING ENGINE — per the sealed build brief:
@@ -44,6 +43,102 @@ const CHAPTER_CAST = {
   2:'Sil the cicada', 3:'Owen the crow', 5:'Vask the vulture', 6:'Ghar the crocodile',
   8:'Odd the gecko', 9:'Odd the gecko', 11:'Talla the old bird', 12:'Talla the old bird'
 };
+
+/* HOTSPOTS — the world you can poke at.
+   Two flavors of tap-target render exactly the same way, on purpose:
+   - "lore" props are the real objects already woven into that scene
+     (the hourglass, Ghar's rope, the eight symbols) — tapping one gives a
+     short in-world detail about THAT thing.
+   - "noise" props are ambient clutter with no bearing on anything — tapping
+     one just gives a small, unrelated fun fact. There is no visual, textual,
+     or timing difference between the two; which is which is never revealed. */
+const PROP_LORE = {
+  'other-bag':"The strap's gone soft with wear — years of a hand, not weeks.",
+  'other-hourglass':"The sand keeps disobeying gravity. Whoever owned this stopped trusting it a while ago.",
+  'other-envelope':"No name, no address. Sealed like it was meant for exactly one reader, someday.",
+  'other-counter':"A small window, a smaller number. It only counts what gets named out loud.",
+  'other-path-map':"Two ruts worn into the dirt, no signs. Someone else already had to guess.",
+  'other-cicada-1':"Up close, the wings look like they were cut from a broken bottle.",
+  'other-tree-trunk':"Bark this dry has been standing through more than one summer alone.",
+  'other-wagon':"Six sets of wheel-ruts, one direction. Someone's making good time.",
+  'other-badger':"Doesn't look up from the reins. Been down this road too many times to be curious anymore.",
+  'other-beetle':"Six legs, unhurried. It has nowhere in particular to be either.",
+  'other-moon-clouds':"The light comes and goes as the clouds decide, not the moon.",
+  'other-cicada-2':"Hollow all the way through. Whatever was inside left cleanly.",
+  'other-bird-nest':"Lined with something shiny that isn't grass. Somebody's been collecting.",
+  'other-bread-bag':"Still warm at the bottom. Fresh enough to feel a little undeserved.",
+  'other-signpost':"One arm confident, one arm missing. The stump doesn't explain itself.",
+  'other-cactus':"Spines this size aren't for show. Something out here has learned to respect them.",
+  'other-red-rocks':"Hot enough at midday to cook on, cold enough at night to hurt bare feet.",
+  'other-skeleton':"Ribs in order, skull to the east. Somebody set a table here once.",
+  'other-sand-dunes':"The ripples all lean the same way — one wind, blowing a very long time.",
+  'other-well':"Worn smooth exactly where forearms rest. A lot of thirsty mornings, one shape.",
+  'other-bucket':"A rope-burn on the handle in the same place, over and over.",
+  'other-notebook':"The ink's gone patchy where a thumb keeps landing on the same page.",
+  'other-rock-formation':"Stacked just a little too neatly to be an accident of weather.",
+  'other-rope':"Frayed at one end like something heavy pulled hard, more than once.",
+  'other-crocodile-1':"Skin cracked into a map of somewhere that used to be underwater.",
+  'other-footprints':"Small, fresh, and already gone — whoever left them wasn't waiting around.",
+  'other-smoke':"Steady and thin. Not the kind that means anything's going wrong.",
+  'other-vine':"Thick enough to hold weight, if you didn't know better and tried.",
+  'other-chameleon':"Doesn't bother changing color for you. You're not the interesting part of its day.",
+  'other-parchment':"Corners curled from being rolled and unrolled more than it was ever meant to be.",
+  'other-tree':"Old enough that whatever it's seen, it's stopped reacting to.",
+  'other-droplet':"Took its time falling. Some kind of drip has a rhythm if you wait for it.",
+  'other-fern':"Unfurled just far enough to still look like a question mark.",
+  'other-carved-tree-trunk':"The cuts go deep enough that whoever made them wasn't in a hurry.",
+  'other-counter-machine':"Brass, dented on one corner, like it's been dropped exactly once, hard.",
+  'other-wildflowers':"Grown in clumps, not rows — nobody planted this on purpose.",
+  'other-butterflies':"None of them are going anywhere in particular. That seems to be the point.",
+  'other-pinecone-branch':"Sap along the edge, half-dried. Not old, not new.",
+  'other-potted-flowers':"Root-bound — this pot stopped being big enough a while back.",
+  'other-sprout':"Barely up out of the dirt yet, and already leaning hard toward the light.",
+  'other-scattered-seeds':"Dropped, not planted — no rows, no pattern, no plan.",
+  'other-seed-bag':"Forty little paper packets inside, and most of them still sealed shut.",
+  'other-fireflies':"Glowing in broad daylight, for no reason a firefly should have.",
+  'other-river-landscape':"The bank's still damp an arm's length back from where the water is now.",
+  'other-signpost-arm':"Snapped clean, not rotted. Something hit this, once, hard.",
+};
+
+/* Reused across many scenes, generic on purpose. Some are MPT's own
+   unused list items; a few (decoy-*) are new suggested filler assets —
+   optional, and gracefully invisible until uploaded. */
+const DECOY_POOL = [
+  { name:'other-blank-paper',       fact:"A blank page always looks more patient than it is." },
+  { name:'other-desert-path',       fact:"Every desert path looks like the right one from far enough away." },
+  { name:'other-forest-landscape',  fact:"Forests are quietest exactly where you'd expect the most noise." },
+  { name:'other-blue-flower',       fact:"Blue is the rarest color in flowers — most 'blue' petals are cheating with light." },
+  { name:'other-flying-bird',       fact:"Some birds sleep for seconds at a time, mid-flight, without falling." },
+  { name:'other-standing-bird',     fact:"Standing still for an hour burns almost nothing, if you're built for it." },
+  { name:'other-cottage',           fact:"Smoke from a chimney means someone decided today was worth the firewood." },
+  { name:'other-hibiscus-patch',    fact:"A hibiscus flower usually lasts exactly one day before it's done." },
+  { name:'other-bird-bowl',         fact:"A shallow bowl of water gets visited more than a deep one, apparently." },
+  { name:'other-firefly',           fact:"The blinking isn't random — each species has its own rhythm, like a signature." },
+  { name:'other-sunset',            fact:"The sky turns orange for the same reason the daytime sky is blue, just backwards." },
+  { name:'other-neon-text-card',    fact:"Some inks were never meant to be read in daylight." },
+  { name:'other-crocodile-2',       fact:"A crocodile can go a very long time between meals if it has to." },
+  { name:'decoy-pebble',            fact:"Every pebble used to be part of something much bigger." },
+  { name:'decoy-shiny-stone',       fact:"Shiny rocks are rarely valuable. They're just good at reflecting light." },
+  { name:'decoy-feather',           fact:"A feather this size fell off something that's doing just fine." },
+  { name:'decoy-snail-shell',       fact:"Empty shells outlast the thing that built them by years." },
+  { name:'decoy-curled-leaf',       fact:"A leaf curls up like that mostly to save water, not to look interesting." },
+  { name:'decoy-broken-twig',       fact:"Snapped, not cut — something walked through here, not around it." },
+];
+function pickDecoys(sceneId, n){
+  // deterministic-but-scattered: same scene always gets the same decoys
+  let seed = 0; for(let i=0;i<sceneId.length;i++) seed = (seed*31 + sceneId.charCodeAt(i)) % 99991;
+  const out = [];
+  for(let i=0;i<n;i++){ seed = (seed*1103515245 + 12345) % 2147483648; out.push(DECOY_POOL[seed % DECOY_POOL.length]); }
+  return out;
+}
+function hotspotPos(sceneId, idx, total){
+  // scattered, not a tidy row — deterministic per scene+index so re-renders don't jitter
+  let seed = idx*7919; for(let i=0;i<sceneId.length;i++) seed += sceneId.charCodeAt(i)*(i+1);
+  const rand = (n)=>{ const x = Math.sin(seed+n*13.37)*10000; return x - Math.floor(x); };
+  const left = 8 + rand(1)*78;
+  const top  = 30 + rand(2)*55;
+  return { left: left.toFixed(1), top: top.toFixed(1) };
+}
 
 /* ---------- condition parsing: "key=value" / "key!=value" ---------- */
 function condOk(cond, flags){
@@ -363,7 +458,7 @@ function levelGoalsHTML(){
     +'<div class="lvl-row-head"><span class="lvl-row-t">Your level right now</span><span class="lvl-row-v" id="lg-current-val">'+names[st.currentLevel]+'</span></div>'
     +'<input type="range" min="1" max="6" step="1" value="'+st.currentLevel+'" class="lvl-slider" oninput="setCurrentLevel(this.value)"/>'
     +'</div>';
-  h+='<div class="lvl-row lvl-target-row'+(st.currentLevelTouched?'':' lvl-hidden')+'">'
+  h+='<div class="lvl-row" id="lg-target-row">'
     +'<div class="lvl-row-head"><span class="lvl-row-t">Level you want to reach</span><span class="lvl-row-v" id="lg-target-val">'+names[st.targetLevel]+'</span></div>'
     +'<input id="lg-target-slider" type="range" min="'+st.currentLevel+'" max="6" step="1" value="'+st.targetLevel+'" class="lvl-slider" oninput="setTargetLevelSlider(this.value)"/>'
     +'</div>';
@@ -374,26 +469,23 @@ window.setDailyWordTarget = function(v){
   getState().dailyWordTarget=+v; saveState();
   const el=document.getElementById('lg-daily-val'); if(el) el.textContent=v;
 };
-let _goalsContext=null; // 'onboarding' | 'settings' — whichever last rendered the sliders
+function bumpRow(id){
+  const el=document.getElementById(id); if(!el) return;
+  el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  setTimeout(()=>el.classList.remove('bump'), 420);
+}
 window.setCurrentLevel = function(v){
   const st=getState(), names=window.LEVEL_NAMES||{1:'A1',2:'A2',3:'B1',4:'B2',5:'C1',6:'C2'};
   st.currentLevel=+v;
-  const firstTime=!st.currentLevelTouched;
-  st.currentLevelTouched=true;
   if(st.targetLevel<st.currentLevel) st.targetLevel=st.currentLevel;   // target never sits below current
   saveState();
   const lbl=document.getElementById('lg-current-val'); if(lbl) lbl.textContent=names[+v];
-  if(firstTime){
-    // reveal the target-level row for the first time — re-render wherever
-    // this component was last shown (the static #level-goals-field div
-    // always exists in the DOM, even off-screen in Settings, so presence
-    // alone can't tell us which host is actually live right now)
-    if(_goalsContext==='settings') window.renderTargetLevelUI();
-    else renderOnboarding();
-  } else {
-    const tSlider=document.getElementById('lg-target-slider');
-    if(tSlider){ tSlider.min=v; if(+tSlider.value<+v){ tSlider.value=v; window.setTargetLevelSlider(v); } }
+  const tSlider=document.getElementById('lg-target-slider');
+  if(tSlider){
+    tSlider.min=v;
+    if(+tSlider.value<+v){ tSlider.value=v; window.setTargetLevelSlider(v); }
   }
+  bumpRow('lg-target-row');
 };
 window.setTargetLevelSlider = function(v){
   getState().targetLevel=+v; saveState();
@@ -402,25 +494,42 @@ window.setTargetLevelSlider = function(v){
 };
 window.renderTargetLevelUI = function(){
   const el=$('#level-goals-field'); if(!el) return;
-  _goalsContext='settings';
   el.innerHTML=levelGoalsHTML();
 };
 
-/* ---------- one-time onboarding, shown the first time the Game tab
-   is opened, in place of the hub, until the sliders above are saved ---------- */
-function renderOnboarding(){
-  const area=$('#review-area'); if(!area) return;
-  _goalsContext='onboarding';
-  let h='<div class="onboard-card">';
-  h+='<img class="onboard-mascot" src="./mascot-headband.webp" alt="" onerror="this.style.display=\'none\'"/>';
-  h+='<div class="onboard-t">Before Focci sets off…</div>';
-  h+='<div class="onboard-s">A couple of quick settings — you can always change these later in Settings.</div>';
-  h+='<div id="onboard-goals">'+levelGoalsHTML()+'</div>';
-  h+='<button class="btn" onclick="finishOnboarding()">Let\'s go →</button>';
-  h+='</div>';
-  area.innerHTML=h;
+/* ---------- Home-tab profile panel: name + vocabulary goals, opened by
+   tapping the "Good morning" greeting. Same sliders as Settings. ---------- */
+function ensureProfilePanel(){
+  let el=document.getElementById('profile-panel');
+  if(el) return el;
+  el=document.createElement('div');
+  el.id='profile-panel';
+  el.className='word-sheet'; // reuse the same bottom-sheet mechanics/backdrop
+  el.innerHTML='<div class="ws-backdrop"></div><div class="ws-card"><div class="ws-body" id="pp-body"></div></div>';
+  document.body.appendChild(el);
+  el.querySelector('.ws-backdrop').addEventListener('click', closeProfilePanel);
+  return el;
 }
-window.finishOnboarding = function(){ getState().onboarded=true; saveState(); renderGameHub(); };
+window.closeProfilePanel = function(){ const el=document.getElementById('profile-panel'); if(el) el.classList.remove('show'); };
+window.openProfilePanel = function(){
+  const el=ensureProfilePanel();
+  const name = (typeof getName==='function') ? getName() : '';
+  let h='<div class="pp-t">Your profile</div>';
+  h+='<input id="pp-name" class="pp-name-input" type="text" maxlength="24" placeholder="What should Focci call you?" value="'+esc(name)+'"/>';
+  h+='<div id="profile-goals">'+levelGoalsHTML()+'</div>';
+  h+='<button class="btn" onclick="saveProfilePanel()">Done</button>';
+  el.querySelector('#pp-body').innerHTML=h;
+  requestAnimationFrame(()=>el.classList.add('show'));
+};
+window.saveProfilePanel = function(){
+  const input=document.getElementById('pp-name');
+  if(input && typeof localStorage!=='undefined'){
+    const v=input.value.trim().slice(0,24);
+    localStorage.setItem('sd_name', v);
+  }
+  if(typeof renderHero==='function') renderHero();
+  closeProfilePanel();
+};
 
 /* ============================================================
    WORD-TAP POPUP — reuses the app's own vocab pipeline. Never
@@ -428,11 +537,18 @@ window.finishOnboarding = function(){ getState().onboarded=true; saveState(); re
    the reader is exactly where they were.
    ============================================================ */
 function tokenizeForTap(text){
-  return esc(text).replace(/([A-Za-z][A-Za-z']*)/g, (m)=>{
-    const clean=m.replace(/^'+|'+$/g,'');
-    if(clean.length<2) return m;
-    return '<span class="wtap" data-w="'+clean.toLowerCase()+'">'+m+'</span>';
-  });
+  const src = String(text||'');
+  let out='', last=0, m;
+  const re=/[A-Za-z][A-Za-z']*/g;
+  while((m=re.exec(src))){
+    out += esc(src.slice(last, m.index));           // punctuation/quotes/spaces — escaped, never re-scanned
+    const word = m[0];
+    const clean = word.replace(/^'+|'+$/g,'');
+    out += clean.length<2 ? esc(word) : '<span class="wtap" data-w="'+clean.toLowerCase()+'">'+esc(word)+'</span>';
+    last = re.lastIndex;
+  }
+  out += esc(src.slice(last));
+  return out;
 }
 function ensureWordSheet(){
   let el=document.getElementById('word-sheet');
@@ -453,23 +569,66 @@ function showWordSheet(html){
 }
 function condensedEntryHTML(rec){
   const d=rec.data||{}; const w=rec.word;
+  const safeW = esc(w).replace(/'/g,"\\'");
   let h='<div class="ws-head"><div class="ws-word">'+esc(d.word||w)+'</div>';
   if(typeof levelTag==='function') h+=levelTag(d.word||w);
+  h+='<button class="ws-star'+(rec.saved?' on':'')+'" onclick="wordPopupToggleSave(\''+safeW+'\')" aria-label="Save word">'+(rec.saved?'★':'☆')+'</button>';
   h+='</div>';
   if(d.phonetic) h+='<div class="ws-phon">'+esc(d.phonetic)+'</div>';
   const pos=[...new Set((d.senses||[]).map(s=>s.pos).filter(Boolean))];
   if(pos.length) h+='<div class="ws-pos">'+pos.map(posChip).join('')+'</div>';
-  h+='<div class="ws-vi">'+(d.vi_equivalent?esc(d.vi_equivalent):'<i>không có từ tương đương</i>')+'</div>';
+  h+='<div class="ws-vi">'+(d.vi_equivalent?esc(d.vi_equivalent):'<i>no direct equivalent yet</i>')+'</div>';
   const s0=(d.senses||[])[0];
   if(s0&&s0.vi && s0.vi!==d.vi_equivalent) h+='<div class="ws-sense">'+esc(s0.vi)+'</div>';
   if(d.collocations&&d.collocations.length) h+='<div class="ws-colloc">'+esc(d.collocations[0].text)+'</div>';
-  h+='<button class="ws-full" onclick="closeWordSheet(); showView(\'home\'); search(\''+esc(w).replace(/'/g,"\\'")+'\');">See full entry →</button>';
+  h+='<div class="ws-actions">';
+  h+='<button class="ws-full" onclick="closeWordSheet(); showView(\'home\'); search(\''+safeW+'\');">See full entry →</button>';
+  h+='<button class="ws-ai-retry" onclick="wordPopupForceAI(\''+safeW+'\')">Not quite right? Ask AI</button>';
+  h+='</div>';
   return h;
 }
 function loadingSheetHTML(w){ return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Focci is charting this one…</div>'; }
-function needKeySheetHTML(w){ return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Add a Gemini key in Settings to look this up.</div>'; }
-function offlineSheetHTML(w){ return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Offline right now — try again once connected.</div>'; }
-function errorSheetHTML(w,msg){ return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Couldn\'t look that up ('+esc((msg||'').slice(0,40))+').</div>'; }
+function needKeySheetHTML(w){
+  const safeW=esc(w).replace(/'/g,"\\'");
+  return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Not in your library yet.</div>'
+    +'<button class="ws-full" onclick="closeWordSheet(); showView(\'settings\');">Add a Gemini key to look it up →</button>';
+}
+function offlineSheetHTML(w){
+  const safeW=esc(w).replace(/'/g,"\\'");
+  return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Offline right now.</div>'
+    +'<button class="ws-full" onclick="wordPopupForceAI(\''+safeW+'\')">Try again</button>';
+}
+function errorSheetHTML(w,msg){
+  const safeW=esc(w).replace(/'/g,"\\'");
+  return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Couldn\'t look that up ('+esc((msg||'').slice(0,40))+').</div>'
+    +'<button class="ws-full" onclick="wordPopupForceAI(\''+safeW+'\')">Ask AI</button>';
+}
+window.wordPopupToggleSave = async function(word){
+  await toggleSave(word);
+  const rec = await idbGet(word);
+  if(rec) showWordSheet(condensedEntryHTML(rec));
+};
+window.wordPopupForceAI = async function(rawWord){
+  const word = norm(normalizeSpelling(rawWord||''));
+  if(!word) return;
+  showWordSheet(loadingSheetHTML(word));
+  try{
+    if(!getKey()){ showWordSheet(needKeySheetHTML(word)); return; }
+    if(!navigator.onLine){ showWordSheet(offlineSheetHTML(word)); return; }
+    const data = await askGemini(word);
+    const canon = norm(data.word||word);
+    const existing = await idbGet(canon);
+    const rec = { word:canon, data, source:'ai', firstSeen:Date.now(),
+      saved:existing?existing.saved:0, savedAt:existing?existing.savedAt:0 };
+    await idbPut(rec);
+    if(canon!==word) await idbPut({ word, alias:canon, firstSeen:Date.now(), saved:0, savedAt:0 });
+    await logEvent('search', rec.word);
+    addXP(1);
+    showWordSheet(condensedEntryHTML(rec));
+  }catch(err){
+    showWordSheet(errorSheetHTML(word, err.message||''));
+  }
+};
 
 async function openWordPopup(rawWord){
   let word = norm(normalizeSpelling(rawWord||''));
@@ -502,15 +661,32 @@ window.openWordPopup = openWordPopup;
 window.closeWordSheet = closeWordSheet;
 
 /* ============================================================
-   PROP TAPS — decorative environment taps (other-*). Flavour only,
-   no scoring; a short caption, dismissed on next tap or timeout.
+   HOTSPOT TAPS — the world you can poke at. Same visual reaction for a
+   real object as for pure clutter: a small burst + a floating line of
+   text, never a flat "here's the item's name" label.
    ============================================================ */
-window.tapProp = function(btn, name){
-  const cap = document.createElement('div');
-  cap.className='prop-cap';
-  cap.textContent = name.replace(/^other-/,'').replace(/-/g,' ');
-  btn.appendChild(cap);
-  setTimeout(()=>cap.remove(), 1600);
+window.tapHotspot = function(btn, name){
+  // brief tap-feedback burst, purely cosmetic
+  const burst = document.createElement('span');
+  burst.className='hs-burst';
+  btn.appendChild(burst);
+  setTimeout(()=>burst.remove(), 500);
+
+  const text = PROP_LORE[name] || (DECOY_POOL.find(d=>d.name===name)||{}).fact || "Just something lying around.";
+  const stage = btn.closest('.story-stage');
+  if(!stage) return;
+  const old = stage.querySelector('.hs-note'); if(old) old.remove();
+  const note = document.createElement('div');
+  note.className='hs-note';
+  note.textContent = text;
+  const btnRect = btn.getBoundingClientRect(), stageRect = stage.getBoundingClientRect();
+  const leftPct = ((btnRect.left - stageRect.left) / stageRect.width) * 100;
+  const topPct  = ((btnRect.top  - stageRect.top)  / stageRect.height) * 100;
+  note.style.left = Math.max(4, Math.min(70, leftPct)) + '%';
+  note.style.top  = Math.max(4, topPct - 8) + '%';
+  stage.appendChild(note);
+  requestAnimationFrame(()=>note.classList.add('show'));
+  setTimeout(()=>note.remove(), 4200);
 };
 
 /* ============================================================
@@ -554,6 +730,7 @@ function advance(){
   const landed = FLAT[targetIdx];
   const prevChapterId = cur.chapter.id, newChapterId = landed.chapter.id;
   st.pos = landed.scene.id;
+  resetPending();
   if(newChapterId!==prevChapterId){
     onChapterCompleted(prevChapterId, newChapterId);
     if(landed.chapter.onEnterFlags) setFlags(landed.chapter.onEnterFlags);
@@ -577,59 +754,91 @@ window.advanceStory = advance;
    RENDERING — the scene itself
    ============================================================ */
 function assetUrl(name){ return name ? './'+name+'.webp' : ''; }
-function isRequiredAnswered(scene){
+/* Selection vs. submission: tapping an option only PICKS it — freely
+   changeable, not scored, not disabled — until the player is happy and
+   presses the action button, which submits every pending pick at once
+   (scoring + locking them) and only then turns into "Continue". This is
+   reset whenever the displayed scene changes. */
+let _pending = {};
+function resetPending(){ _pending = {}; }
+function isSubmitted(scene){
   const log = getState().storyLog[scene.id] || {};
   if(scene.comp && log.comp==null) return false;
   if(scene.iq && log.iq==null) return false;
   if(scene.dec && log.dec==null) return false;
   return true;
 }
+function isRequiredAnswered(scene){ return isSubmitted(scene); }
+function canSubmit(scene){
+  if(scene.comp && _pending.comp==null) return false;
+  if(scene.iq && _pending.iq==null) return false;
+  if(scene.dec && _pending.dec==null) return false;
+  return true;
+}
 function optionDisabled(scene, opt){
   return !!(opt.requireItem && !getState().items[opt.requireItem]);
 }
+window.storyPick = function(sceneId, kind, idx){
+  const e=entryOf(sceneId); if(!e) return;
+  const log = getState().storyLog[sceneId] || {};
+  if(log[kind]!=null) return;                     // already submitted — no more changes
+  if(kind==='dec' && optionDisabled(e.scene, e.scene.dec.options[idx])) return;
+  _pending[kind]=idx;
+  renderStory();
+};
+window.storySubmit = function(){
+  const cur=currentEntry(); if(!cur) return;
+  const { scene, chapter, arc } = cur;
+  if(scene.comp && _pending.comp!=null) resolveComp(scene, chapter, arc, _pending.comp);
+  if(scene.iq && _pending.iq!=null) resolveIq(scene, chapter, arc, _pending.iq);
+  if(scene.dec && _pending.dec!=null) resolveDec(scene, chapter, arc, _pending.dec);
+  renderStory();
+};
 
 function renderCompBlock(scene, chapter, arc){
   const log=getState().storyLog[scene.id]||{};
+  const submitted = log.comp!=null;
   let h='<div class="q-card q-comp"><div class="q-kicker">Check</div><div class="q-text">'+esc(scene.comp.q)+'</div><div class="q-opts">';
   scene.comp.options.forEach((opt,i)=>{
-    const answered = log.comp!=null;
     let cls='q-opt';
-    if(answered){ if(i===log.comp) cls += log.compCorrect?' right':' wrong'; if(i===scene.comp.correct && !log.compCorrect) cls+=' reveal'; }
-    h+='<button class="'+cls+'" '+(answered?'disabled':'')+' onclick="storyAnswerComp(\''+scene.id+'\','+i+')">'+esc(opt)+'</button>';
+    if(submitted){ if(i===log.comp) cls += log.compCorrect?' right':' wrong'; if(i===scene.comp.correct && !log.compCorrect) cls+=' reveal'; }
+    else if(_pending.comp===i) cls+=' picked';
+    h+='<button class="'+cls+'" '+(submitted?'disabled':'')+' onclick="storyPick(\''+scene.id+'\',\'comp\','+i+')">'+esc(opt)+'</button>';
   });
   h+='</div>';
-  if(log.comp!=null) h+='<div class="q-fb '+(log.compCorrect?'ok':'bad')+'">'+(log.compCorrect?'Correct.':'Not quite — the passage says otherwise.')+'</div>';
+  if(submitted) h+='<div class="q-fb '+(log.compCorrect?'ok':'bad')+'">'+(log.compCorrect?'Correct.':'Not quite — the passage says otherwise.')+'</div>';
   return h+'</div>';
 }
 function renderIqBlock(scene, chapter, arc){
   const log=getState().storyLog[scene.id]||{};
+  const submitted = log.iq!=null;
   let h='<div class="q-card q-iq"><div class="q-kicker">🧩 Puzzle</div><div class="q-text">'+esc(scene.iq.q)+'</div><div class="q-opts">';
   scene.iq.options.forEach((opt,i)=>{
-    const answered = log.iq!=null;
     let cls='q-opt';
-    if(answered && i===log.iq) cls += opt.tag==='ok' ? ' right' : opt.tag==='bad' ? ' wrong' : ' neutral';
-    h+='<button class="'+cls+'" '+(answered?'disabled':'')+' onclick="storyAnswerIq(\''+scene.id+'\','+i+')">'+esc(opt.label)+'</button>';
+    if(submitted && i===log.iq) cls += opt.tag==='ok' ? ' right' : opt.tag==='bad' ? ' wrong' : ' neutral';
+    else if(!submitted && _pending.iq===i) cls+=' picked';
+    h+='<button class="'+cls+'" '+(submitted?'disabled':'')+' onclick="storyPick(\''+scene.id+'\',\'iq\','+i+')">'+esc(opt.label)+'</button>';
   });
   h+='</div>';
-  if(log.iq!=null) h+='<div class="q-fb '+(scene.iq.options[log.iq].tag==='ok'?'ok':scene.iq.options[log.iq].tag==='bad'?'bad':'neutral')+'">'+esc(scene.iq.options[log.iq].note||'')+'</div>';
+  if(submitted) h+='<div class="q-fb '+(scene.iq.options[log.iq].tag==='ok'?'ok':scene.iq.options[log.iq].tag==='bad'?'bad':'neutral')+'">'+esc(scene.iq.options[log.iq].note||'')+'</div>';
   return h+'</div>';
 }
 function renderDecBlock(scene, chapter, arc){
   const log=getState().storyLog[scene.id]||{};
-  let h='<div class="q-card q-dec'+(scene.dec.pivot?' q-pivot':'')+'">';
-  if(scene.dec.pivot) h+='<div class="q-kicker pivot">⭐ A moment that matters</div>';
+  const submitted = log.dec!=null;
+  let h='<div class="q-card q-dec">';
   if(scene.dec.q) h+='<div class="q-text">'+esc(scene.dec.q)+'</div>';
   h+='<div class="q-opts vertical">';
   scene.dec.options.forEach((opt,i)=>{
-    const answered = log.dec!=null;
     const disabled = optionDisabled(scene, opt);
     let cls='q-opt dec-opt';
-    if(answered && i===log.dec) cls+=' chosen';
+    if(submitted && i===log.dec) cls+=' chosen';
+    else if(!submitted && _pending.dec===i) cls+=' picked';
     let title = disabled && opt.missingNote ? ' title="'+esc(opt.missingNote)+'"' : '';
-    h+='<button class="'+cls+'" '+((answered||disabled)?'disabled':'')+title+' onclick="storyAnswerDec(\''+scene.id+'\','+i+')">'+esc(opt.label)+'</button>';
+    h+='<button class="'+cls+'" '+((submitted||disabled)?'disabled':'')+title+' onclick="storyPick(\''+scene.id+'\',\'dec\','+i+')">'+esc(opt.label)+'</button>';
   });
   h+='</div>';
-  if(log.dec!=null && scene.dec.options[log.dec].outcome) h+='<div class="q-fb neutral">'+esc(scene.dec.options[log.dec].outcome)+'</div>';
+  if(submitted && scene.dec.options[log.dec].outcome) h+='<div class="q-fb neutral">'+esc(scene.dec.options[log.dec].outcome)+'</div>';
   return h+'</div>';
 }
 function renderPresenceBlock(scene, chapter, arc){
@@ -650,10 +859,22 @@ function normalizeProps(list){
   if(!list) return [];
   return list.map(p => typeof p==='string' ? {name:p} : p).filter(p=>p&&p.name);
 }
-function propsLayerHTML(list, layer){
-  let h='<div class="story-props story-props-'+layer+'">';
-  list.forEach(p=>h+='<button class="story-prop" onclick="tapProp(this,\''+esc(p.name)+'\')"><img src="'+assetUrl(p.name)+'" alt="" onerror="this.style.display=\'none\'"/></button>');
-  return h+'</div>';
+/* Mixes the scene's real (lore) props with a couple of deterministic decoys,
+   then renders every one of them the same way — scattered, unlabeled,
+   identical on tap — so nothing about their placement gives away which
+   ones matter. */
+function hotspotsHTML(scene, layerList, layerName, offset){
+  const real = normalizeProps(layerList);
+  const decoyCount = real.length ? (layerName==='back'?2:1) : 1;
+  const decoys = pickDecoys(scene.id+layerName, decoyCount);
+  const all = real.concat(decoys);
+  let h='';
+  all.forEach((p,i)=>{
+    const pos = hotspotPos(scene.id, i+offset, all.length);
+    h+='<button class="hotspot hotspot-'+layerName+'" style="left:'+pos.left+'%;top:'+pos.top+'%" onclick="tapHotspot(this,\''+esc(p.name)+'\')">'
+      +'<img src="'+assetUrl(p.name)+'" alt="" onerror="this.style.display=\'none\'"/><span class="hotspot-glow"></span></button>';
+  });
+  return h;
 }
 /* Pure-CSS ambient texture per chapter mood — no image assets needed, so
    this always renders even before any real art is uploaded. BRIGHT gets
@@ -677,7 +898,6 @@ function renderStory(){
   const cur=currentEntry();
   if(!cur){ renderStoryTBC(); return; }
   const { scene, chapter, arc } = cur;
-  if(scene.endOfBuiltContent){ /* still render it once, then Continue leads to TBC */ }
 
   let h='<div class="story-view">';
   h+='<div class="story-top"><button class="story-quit" onclick="renderGameHub()">✕</button>'
@@ -687,27 +907,24 @@ function renderStory(){
   const mood = (chapter.mood||'BRIGHT').toLowerCase();
   h+='<div class="story-stage mood-'+mood+'" style="background-image:url(\''+assetUrl(bg)+'\')">';
   h+=ambientLayerHTML(mood);
-  // "back" props sit behind Focci (distant scenery/items); a scene can also
-  // list propsFront for things that should visually sit IN FRONT of him
-  // (tall grass, mist, hanging vines…) — same tap/no-op-if-missing behaviour,
-  // just stacked the other side of the mascot layer for a bit of depth.
-  const backProps = normalizeProps(scene.props);
-  const frontProps = normalizeProps(scene.propsFront);
-  if(backProps.length) h+=propsLayerHTML(backProps, 'back');
+  h+=hotspotsHTML(scene, scene.props, 'back', 0);
   if(scene.mascot) h+='<img class="story-mascot" src="'+assetUrl(scene.mascot)+'" alt="" onerror="this.style.display=\'none\'"/>';
-  if(frontProps.length) h+=propsLayerHTML(frontProps, 'front');
+  h+=hotspotsHTML(scene, scene.propsFront, 'front', 50);
+  h+='<div class="story-dialogue"><div class="story-dialogue-title">'+esc(scene.title||'')+'</div>'
+    +'<div class="story-passage" id="story-passage-'+scene.id.replace('.','-')+'">'+tokenizeForTap(getSceneText(scene, chapter.id))+'</div></div>';
   h+='</div>';
 
   h+='<div class="story-page">';
-  h+='<div class="story-title">'+esc(scene.title||'')+'</div>';
-  h+='<div class="story-passage" id="story-passage-'+scene.id.replace('.','-')+'">'+tokenizeForTap(getSceneText(scene, chapter.id))+'</div>';
   if(scene.comp) h+=renderCompBlock(scene, chapter, arc);
   if(scene.iq) h+=renderIqBlock(scene, chapter, arc);
   if(scene.dec) h+=renderDecBlock(scene, chapter, arc);
   if(scene.presence && scene.presence.length) h+=renderPresenceBlock(scene, chapter, arc);
-  const ready=isRequiredAnswered(scene);
-  h+='<button class="btn story-continue" '+(ready?'':'disabled')+' onclick="advanceStory()">'
-    +(scene.endOfBuiltContent?'Continue':'Continue →')+'</button>';
+  const submitted = isSubmitted(scene);
+  if(submitted){
+    h+='<button class="btn story-continue" onclick="advanceStory()">'+(scene.endOfBuiltContent?'Continue':'Continue →')+'</button>';
+  } else {
+    h+='<button class="btn story-continue" '+(canSubmit(scene)?'':'disabled')+' onclick="storySubmit()">Choose an answer</button>';
+  }
   h+='</div></div>';
 
   area.innerHTML=h;
@@ -720,6 +937,7 @@ function wireWordTaps(){
     const t=e.target.closest('.wtap'); if(t) openWordPopup(t.dataset.w);
   });
 }
+
 
 /* answer handlers, called from onclick */
 window.storyAnswerComp = function(sceneId, idx){ const e=entryOf(sceneId); if(!e) return; resolveComp(e.scene,e.chapter,e.arc,idx); renderStory(); };
@@ -776,7 +994,7 @@ function renderStoryTBC(){
    entry. Three compact cards: the story, and the two mini-games,
    plus a locked Bonus Scene strip below.
    ============================================================ */
-function openStory(){ renderStory(); }
+function openStory(){ resetPending(); renderStory(); }
 window.openStory = openStory;
 
 function storyProgressLabel(){
@@ -788,7 +1006,6 @@ function isStoryStarted(){ return Object.keys(getState().storyLog).length>0; }
 
 window.renderGameHub = function(){
   const area=$('#review-area'); if(!area) return;
-  if(!getState().onboarded){ renderOnboarding(); return; }
   const st=getState(), caps=computeCaps();
   let h='<div class="game-hub">';
 
@@ -803,6 +1020,8 @@ window.renderGameHub = function(){
     +'<span class="hub-cta">'+(isStoryStarted()?'Continue →':'Play →')+'</span>'
     +'</button>';
 
+  h+=renderWorldMap();
+
   h+='<div class="hub-row">';
   h+='<button class="hub-card hub-mini" onclick="setPracticeMode(\'type\')"><span class="hub-mini-ico">✍️</span><span class="hub-mini-t">Type it</span></button>';
   h+='<button class="hub-card hub-mini" onclick="setPracticeMode(\'match\')"><span class="hub-mini-ico">🎯</span><span class="hub-mini-t">Match it</span></button>';
@@ -812,6 +1031,72 @@ window.renderGameHub = function(){
   h+='</div>';
   area.innerHTML=h;
 };
+
+/* ============================================================
+   WORLD MAP — 12 lands, lives entirely in the Game tab. Nothing here
+   is ever shown by default; tapping a land is the only way to see
+   anything about it. Locked lands show a short, spoiler-free hint;
+   unlocked ones show the player's own personal history there.
+   ============================================================ */
+const WORLD_MAP_ARCS = [
+  { id:1,  hint:"Where Focci woke up with no name, and a warm bag beside him." },
+  { id:2,  hint:"Thirst, a vulture who says no, and a crocodile who needs a favor." },
+  { id:3,  hint:"Getting lost, and learning to say so." },
+  { id:4,  hint:"A field that doesn't ask anything of you." },
+  { id:5,  hint:"A night under a falling sky, and a fire that isn't going out." },
+  { id:6,  hint:"Somewhere the ground finally runs out and the water starts." },
+  { id:7,  hint:"Heat that comes up through the soles of your feet." },
+  { id:8,  hint:"Warm water, and something worth diving for." },
+  { id:9,  hint:"The first cold that actually means something." },
+  { id:10, hint:"Rows and rows of what other people decided to keep." },
+  { id:11, hint:"White in every direction, and no footprints yet but your own." },
+  { id:12, hint:"Light that blinks on its own schedule, not yours." },
+];
+function arcUnlocked(arcId){
+  const cur=currentEntry();
+  const reached = cur ? cur.arc.id : 0;
+  return arcId<=reached && !!CONTENT.find(a=>a.id===arcId);
+}
+function arcCardBody(meta){
+  const st=getState();
+  const unlocked = arcUnlocked(meta.id);
+  const arc = CONTENT.find(a=>a.id===meta.id);
+  let body='';
+  if(!unlocked){
+    body = '<div class="wm-body-s">'+esc(meta.hint)+'</div>';
+  } else {
+    const decs = st.decisions.filter(d=>d.arcId===meta.id);
+    const pivot = decs.slice().reverse().find(d=>d.kind==='pivot');
+    const cast = [...new Set(arc.chapters.map(c=>CHAPTER_CAST[c.id]).filter(Boolean))];
+    if(cast.length) body += '<div class="wm-body-row"><b>Met:</b> '+cast.map(esc).join(', ')+'</div>';
+    if(pivot) body += '<div class="wm-body-row"><b>Your call:</b> '+esc(pivot.label)+'</div>';
+    body += '<div class="wm-body-row"><b>Decisions made:</b> '+decs.length+'</div>';
+  }
+  return body;
+}
+window.toggleWorldMapCard = function(id){
+  const card = document.getElementById('wm-card-'+id); if(!card) return;
+  const wasOpen = card.classList.contains('open');
+  document.querySelectorAll('.wm-card.open').forEach(c=>c.classList.remove('open'));
+  if(!wasOpen) card.classList.add('open');
+};
+function renderWorldMap(){
+  let h='<div class="world-map">';
+  WORLD_MAP_ARCS.forEach(meta=>{
+    const unlocked = arcUnlocked(meta.id);
+    const arc = CONTENT.find(a=>a.id===meta.id);
+    const title = unlocked && arc ? arc.title : 'Land '+meta.id;
+    h+='<div class="wm-card'+(unlocked?' unlocked':' locked')+'" id="wm-card-'+meta.id+'">';
+    h+='<button class="wm-face" onclick="toggleWorldMapCard('+meta.id+')" style="background-image:url(\''+assetUrl('bg-arc'+meta.id)+'\')">';
+    if(!unlocked) h+='<span class="wm-lock">🔒</span>';
+    h+='<span class="wm-face-t">'+esc(title)+'</span>';
+    h+='</button>';
+    h+='<div class="wm-drop">'+arcCardBody(meta)+'</div>';
+    h+='</div>';
+  });
+  h+='</div>';
+  return h;
+}
 
 /* ---------- Bonus Scene — layout + lock state only, per the brief;
    the actual sequel content isn't written yet. ---------- */
@@ -838,34 +1123,6 @@ function renderBonusStrip(){
 if(typeof todaysActivityCount==='function'){
   todaysActivityCount().then(n=>{ window.__todaysCountCache=n; }).catch(()=>{});
 }
-
-/* ============================================================
-   SAVED TAB — personalised arc summaries, above the existing
-   saved-words list. Combines the content's own life-lessons/cast
-   with the user's actual decision log.
-   ============================================================ */
-window.renderArcSummaries = function(){
-  const host = document.getElementById('arc-summaries');
-  if(!host) return;
-  const st=getState();
-  const touchedArcs = new Set(st.decisions.map(d=>d.arcId));
-  const cur=currentEntry(); if(cur) touchedArcs.add(cur.arc.id);
-  if(!touchedArcs.size){ host.innerHTML=''; return; }
-
-  let h='<div class="arc-sum-head">Your Journey</div>';
-  [...touchedArcs].sort().forEach(arcId=>{
-    const arc = CONTENT.find(a=>a.id===arcId); if(!arc) return;
-    const decs = st.decisions.filter(d=>d.arcId===arcId);
-    const pivot = decs.slice().reverse().find(d=>d.kind==='pivot');
-    const cast = [...new Set(arc.chapters.map(c=>CHAPTER_CAST[c.id]).filter(Boolean))];
-    h+='<details class="arc-sum-card"><summary><span class="acc-t">Arc '+arcId+' · '+esc(arc.title)+'</span><span class="acc-x">▾</span></summary><div class="acc-body">';
-    if(cast.length) h+='<div class="arc-sum-row"><b>Met:</b> '+cast.map(esc).join(', ')+'</div>';
-    if(pivot) h+='<div class="arc-sum-row"><b>Your call:</b> '+esc(pivot.label)+'</div>';
-    if(decs.length) h+='<div class="arc-sum-row"><b>Decisions:</b> '+decs.length+'</div>';
-    h+='</div></details>';
-  });
-  host.innerHTML=h;
-};
 
 /* ============================================================
    INIT — nothing to boot eagerly; the hub/settings hooks above
