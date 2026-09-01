@@ -808,25 +808,21 @@ async function renderFamilyChips(word){
 }
 window.renderFamilyChips=renderFamilyChips;
 /* ============================================================
-   YOUGLISH — opens in the system browser instead of embedding inline.
+   YOUGLISH — embedded via a two-layer proxy iframe.
    Why: iOS WKWebView (what any "Add to Home Screen" PWA runs inside)
    has a documented WebKit bug (#169846) where it doesn't send the
-   Referer header YouTube requires for embeds, and Google's "verify
-   you're not a robot" challenge is separately known to malfunction
-   inside WKWebView (the checkbox just loops and does nothing). Both
-   are WebKit/WKWebView-level limitations, not anything specific to
-   YouGlish's widget — embedding YouTube any other way would hit the
-   same wall. Opening in the real system browser (a normal Safari tab,
-   with normal cookies/Referer handling) sidesteps it entirely.
+   Referer header YouTube/YouGlish expects for a direct embed. Routing
+   through a plain page hosted on a real HTTPS domain (GitHub Pages)
+   fixes that: THAT page is a normal top-level document, not running
+   inside WKWebView, so it sends a proper Referer when it loads the
+   real YouGlish widget itself.
    ============================================================ */
+const YOUGLISH_PROXY = 'https://minhle22666-coder.github.io/test-api/youglish-embed.html';
 function maybeLoadYouglish(word){
   const box=$('#youglish-box'); if(!box) return;
   if(!navigator.onLine) return;                    // offline — leave it empty, don't even try
-  const url='https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
-  box.innerHTML='<a class="yg-link-btn" href="'+url+'" target="_blank" rel="noopener">'
-    +'<span class="yg-link-ico">▶</span>'
-    +'<span class="yg-link-text"><b>Nghe trong câu thật</b><span>Mở YouGlish trong trình duyệt</span></span>'
-    +'</a>';
+  const url=YOUGLISH_PROXY+'?word='+encodeURIComponent(word)+'&accent=us';
+  box.innerHTML='<iframe class="yg-frame" src="'+url+'" loading="lazy" allow="autoplay; encrypted-media"></iframe>';
 }
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
@@ -1062,8 +1058,8 @@ function renderSuggestList(label, recs, deletable){
     const safeW=esc(r.word).replace(/'/g,"\\'");
     h+='<div class="suggest-item" onclick="jump(\''+safeW+'\')">'
       +'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>'
-      +'<span class="w">'+esc(r.word)+'</span>'
-      +(d.vi_equivalent?'<span class="e">'+esc(d.vi_equivalent)+'</span>':'')
+      +'<span class="suggest-mid"><span class="w">'+esc(r.word)+'</span>'
+      +(d.vi_equivalent?'<span class="e">'+esc(d.vi_equivalent)+'</span>':'')+'</span>'
       +(deletable?'<button class="suggest-del" onclick="event.stopPropagation();removeFromSuggest(\''+safeW+'\',this)" aria-label="Remove">✕</button>':'')
       +'</div>';
   }
@@ -1158,23 +1154,31 @@ const FISH_STORIES=[
 ];
 
 /* ============================================================
-   FOCCI FISHING — the Home footer easter egg. Story text comes from
-   short one-liner jokes, revealed ~1 sentence-group per tap with a
-   trailing "…" when there's more; a finished story rolls a new
-   random one for next time. Most taps are just a quick idle wobble
-   (frame 1 <-> frame 2); every 5th tap plays the actual catch
-   (frame 3 -> frame 4) before settling back to idle.
+   FOCCI FISHING — the Home footer easter egg. The 4-pose cycle runs
+   on its own via CSS now; tapping only advances the story text, ~1
+   chunk per tap with a trailing "…" when there's more, until the
+   story ends and a new random one is queued up. Progress is
+   persisted so backgrounding/reloading the app mid-story doesn't
+   lose the spot (the most likely cause of it seeming to "skip" to a
+   new story before the current one finished).
    ============================================================ */
-let _fishTapCount=0, _fishStoryIdx=-1, _fishChunkIdx=0, _fishBusy=false;
+let _fishStoryIdx=-1, _fishChunkIdx=0;
+(function loadFishState(){
+  try{
+    const raw=localStorage.getItem('fc_fish_state');
+    if(raw){ const s=JSON.parse(raw); _fishStoryIdx=s.storyIdx; _fishChunkIdx=s.chunkIdx; }
+  }catch(e){}
+})();
+function saveFishState(){
+  try{ localStorage.setItem('fc_fish_state', JSON.stringify({storyIdx:_fishStoryIdx, chunkIdx:_fishChunkIdx})); }catch(e){}
+}
 function pickNewFishStory(){
   _fishStoryIdx = Math.floor(Math.random()*FISH_STORIES.length);
   _fishChunkIdx = 0;
 }
 function tapFishMascot(){
-  if(_fishBusy) return;
-  _fishTapCount++;
   const bubble=$('#fish-footer-bubble'), tag=$('#fish-footer-tag'); if(!bubble) return;
-  if(_fishStoryIdx<0) pickNewFishStory();
+  if(_fishStoryIdx<0 || _fishStoryIdx>=FISH_STORIES.length) pickNewFishStory();
   const isNewStoryStart = (_fishChunkIdx===0);
   const story=FISH_STORIES[_fishStoryIdx];
   let text=story[_fishChunkIdx];
@@ -1183,26 +1187,7 @@ function tapFishMascot(){
   if(tag) tag.classList.toggle('show', isNewStoryStart);
   if(hasMore) _fishChunkIdx++;
   else pickNewFishStory();          // story finished — a new random one is queued up for next time
-
-  if(_fishTapCount%5===0) playFishCatchSequence();
-  else playFishIdleWobble();
-}
-function playFishIdleWobble(){
-  const img=$('#fish-footer-img'); if(!img) return;
-  img.src='./mascot-fishing-dreamy.webp';
-  setTimeout(()=>{ if(img) img.src='./mascot-fishing.webp'; }, 500);
-}
-function playFishCatchSequence(){
-  _fishBusy=true;
-  const img=$('#fish-footer-img'); if(!img){ _fishBusy=false; return; }
-  const seq=['./mascot-fishing-realize.webp','./mascot-fishing-catch-it.webp'];
-  let i=0;
-  const step=()=>{
-    if(i>=seq.length){ img.src='./mascot-fishing.webp'; _fishBusy=false; return; }
-    img.src=seq[i]; i++;
-    setTimeout(step, 900);
-  };
-  step();
+  saveFishState();
 }
 
 let _statCache={learned:0,avg:0,mins:0,activeDays:0,todayNew:0,bestDay:0};

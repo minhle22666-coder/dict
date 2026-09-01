@@ -146,12 +146,13 @@
   @keyframes drop-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
   .suggest-lbl{font-size:10.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);padding:12px 16px 5px}
   .suggest-item{display:flex;align-items:center;gap:11px;padding:12px 16px;font-size:15px}
-  .suggest-del{flex:none;margin-left:auto;width:22px;height:22px;border-radius:50%;font-size:11px;
+  .suggest-del{flex:none;margin-left:auto;width:28px;height:28px;border-radius:50%;font-size:14px;
     color:var(--muted-2);display:flex;align-items:center;justify-content:center}
   .suggest-del:active{background:var(--coral-bg);color:var(--coral);transform:scale(.9)}
   .suggest-item:active{background:var(--surface-2)}
+  .suggest-mid{flex:1;min-width:0;display:flex;flex-direction:column;text-align:left}
   .suggest-item .w{font-weight:700}
-  .suggest-item .e{color:var(--muted);font-size:13px;margin-left:auto;text-align:right;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .suggest-item .e{color:var(--muted);font-size:13px;margin-top:1px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .suggest-item svg{width:15px;height:15px;stroke:var(--muted-2);flex:none}
 
   main{padding:16px}
@@ -438,15 +439,7 @@
     opacity:.7;margin-bottom:4px}
 
   #youglish-box:not(:empty){margin-top:14px}
-  .yg-link-btn{display:flex;align-items:center;gap:12px;width:100%;padding:13px 15px;
-    background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
-  .yg-link-btn:active{transform:scale(.98);background:var(--surface-2)}
-  .yg-link-ico{flex:none;width:38px;height:38px;border-radius:50%;background:var(--grad-hero);
-    color:#3A1E00;font-size:15px;display:flex;align-items:center;justify-content:center;padding-left:2px;
-    box-shadow:var(--glow)}
-  .yg-link-text{display:flex;flex-direction:column;gap:2px}
-  .yg-link-text b{font-size:13.5px;color:var(--text)}
-  .yg-link-text span{font-size:11.5px;color:var(--muted)}
+  .yg-frame{width:100%;height:280px;border:none;border-radius:16px;background:var(--surface-2)}
 
   .forms{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
   .form{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:9px 11px;flex:1;min-width:78px;text-align:center}
@@ -1080,9 +1073,19 @@
     backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     overflow:visible;cursor:pointer;display:flex;align-items:center;gap:4px;padding:14px 16px 14px 2px}
   .fish-footer:active{transform:scale(.99)}
-  .fish-footer-img{position:relative;z-index:2;flex:none;width:96px;margin-left:-16px;
-    transform:scale(1.16);filter:drop-shadow(0 10px 16px rgba(0,0,0,.32));transition:transform .15s}
-  .fish-footer:active .fish-footer-img{transform:scale(1.1)}
+  .fish-anim{position:relative;z-index:2;flex:none;width:96px;height:96px;margin-left:-16px;
+    transform:scale(1.16);transition:transform .15s}
+  .fish-footer:active .fish-anim{transform:scale(1.1)}
+  .fish-f{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;
+    filter:drop-shadow(0 10px 16px rgba(0,0,0,.32))}
+  .fish-f1{animation:ff1 7.5s steps(1) infinite}
+  .fish-f2{animation:ff2 7.5s steps(1) infinite}
+  .fish-f3{animation:ff3 7.5s steps(1) infinite}
+  .fish-f4{animation:ff4 7.5s steps(1) infinite}
+  @keyframes ff1{0%{opacity:1}17%{opacity:1}17.1%{opacity:0}100%{opacity:0}}
+  @keyframes ff2{0%{opacity:0}17%{opacity:0}17.1%{opacity:1}55%{opacity:1}55.1%{opacity:0}100%{opacity:0}}
+  @keyframes ff3{0%{opacity:0}55%{opacity:0}55.1%{opacity:1}68%{opacity:1}68.1%{opacity:0}100%{opacity:0}}
+  @keyframes ff4{0%{opacity:0}68%{opacity:0}68.1%{opacity:1}100%{opacity:1}}
   .fish-footer-text{position:relative;z-index:3;flex:1;min-width:0}
   .fish-footer-tag{font-size:9.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;
     color:var(--primary);margin-bottom:4px;height:11px;opacity:0;transition:opacity .3s;
@@ -1347,14 +1350,17 @@
   .glow-border{position:absolute;inset:0;border-radius:inherit;z-index:0;pointer-events:none;padding:2.5px;
     background:conic-gradient(from 0deg,
       transparent 0%,
-      rgba(255,90,20,.25) 4%,
-      rgba(255,150,30,.95) 10%,
-      rgba(255,214,80,1) 15%,
-      rgba(255,150,30,.9) 20%,
-      rgba(255,70,20,.35) 27%,
-      transparent 34%);
-    animation:glow-spin 2.6s linear infinite;
-    filter:drop-shadow(0 0 5px rgba(255,150,40,.65));
+      rgba(255,60,10,.1) 6%,
+      rgba(255,90,20,.28) 16%,
+      rgba(255,140,30,.6) 28%,
+      rgba(255,190,60,.88) 38%,
+      rgba(255,235,150,1) 46%,
+      rgba(255,190,60,.85) 51%,
+      rgba(255,110,25,.35) 60%,
+      transparent 72%,
+      transparent 100%);
+    animation:glow-spin 5.5s linear infinite;
+    filter:drop-shadow(0 0 6px rgba(255,150,40,.55));
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
     -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude}
   @keyframes glow-spin{to{transform:rotate(360deg)}}
@@ -1629,7 +1635,12 @@
 
       <div class="fish-footer" id="fish-footer" onclick="tapFishMascot()">
         <div class="fish-footer-ripple"><i></i><i></i><i></i><i></i></div>
-        <img class="fish-footer-img" id="fish-footer-img" src="./mascot-fishing.webp" alt=""/>
+        <div class="fish-anim">
+          <img class="fish-f fish-f1" src="./mascot-fishing.webp" alt=""/>
+          <img class="fish-f fish-f2" src="./mascot-fishing-dreamy.webp" alt=""/>
+          <img class="fish-f fish-f3" src="./mascot-fishing-realize.webp" alt=""/>
+          <img class="fish-f fish-f4" src="./mascot-fishing-catch-it.webp" alt=""/>
+        </div>
         <div class="fish-footer-text">
           <div class="fish-footer-tag" id="fish-footer-tag">✦ New story</div>
           <div class="fish-footer-bubble" id="fish-footer-bubble">Tap Focci for a story</div>
@@ -1833,7 +1844,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v34 · YouGlish now opens in-browser (no more embed/CAPTCHA)</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v35 · YouGlish proxy embed, fuse-glow, fishing fixes</b></p>
   </section>
 </main>
 
