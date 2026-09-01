@@ -1751,13 +1751,11 @@ function renderWorldMap(){
   }
 
   h+='<button class="lesson-entry" onclick="showLifeLessons()">'
-    +'<div class="lesson-particles">'
-      +'<i class="lp p1">✦</i><i class="lp p2">✧</i><i class="lp p3">✦</i><i class="lp p4">✧</i><i class="lp p5">✦</i><i class="lp p6">✧</i>'
-    +'</div>'
+    +'<div class="lesson-particles"><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i></div>'
     +'<img class="lesson-mascot" src="./mascot-withflag-3.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<div class="lesson-text">'
       +'<div class="lesson-entry-t">What Focci Has Learned?</div>'
-      +'<div class="lesson-entry-sub">Every lesson Focci reflects on after each event in his journey</div>'
+      +'<div class="lesson-entry-sub">Every lesson Focci reflects on after each event</div>'
     +'</div>'
     +'<span class="lesson-play">▶</span>'
     +'<img class="lesson-bushes" src="./other-bushes.webp" alt="" onerror="this.style.display=\'none\'"/>'

@@ -421,8 +421,25 @@ function viResultsState(query, words){
   return h;
 }
 function viNotFoundState(query){
+  const safeQ=esc(query).replace(/'/g,"\\'");
   return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/>'
-    +'<h3>No match for “'+esc(query)+'” yet</h3><p>This only searches Vietnamese meanings already saved in your library — look up more English words and this gets better over time.</p></div>';
+    +'<h3>No match for “'+esc(query)+'” yet</h3><p>This only searches Vietnamese meanings already saved in your library — look up more English words and this gets better over time.</p>'
+    +'<button class="btn ghost sm" style="margin:14px auto 0" onclick="forceViTranslate(\''+safeQ+'\')">Translate with AI instead</button></div>';
+}
+async function forceViTranslate(word){
+  if(!getKey()){ $('#result').innerHTML=needKeyState(word); return; }
+  if(!navigator.onLine){ $('#result').innerHTML=offlineState(word); return; }
+  const box=$('#result');
+  box.innerHTML=questScene(word);
+  const questStart=now();
+  try{
+    const result=await translatePhrase(word);
+    const elapsed=now()-questStart;
+    if(elapsed<1800) await new Promise(r=>setTimeout(r,1800-elapsed));
+    currentWord=null;
+    box.innerHTML=phraseResultState(word, result);
+    logEvent('search', null); addXP(1);
+  }catch(err){ box.innerHTML=errorState(word,err.message||''); }
 }
 
 /* ============================================================
@@ -557,20 +574,23 @@ function flashPhraseMatch(text){
 async function search(rawWord, forceAI){
   let word=norm(rawWord||'');
   if(!word) return;
-  const isPhrase = /\s/.test(word.trim());
-  if(!isPhrase) word=normalizeSpelling(word);
+  const hasSpace = /\s/.test(word.trim());
+  const isVN = looksVietnamese(word);
+  if(!hasSpace) word=normalizeSpelling(word);
   hideSuggest();
   // A search always takes you to the word page, no matter which tab you were on.
   if(!$('#v-home').classList.contains('active')) showView('home');
   $('#dashboard').style.display='none';
   const box=$('#result');
 
-  // Vietnamese single word → offline reverse lookup, no AI needed at all
-  if(!forceAI && !isPhrase && looksVietnamese(word)){
+  // Vietnamese → offline reverse lookup, ALWAYS tried first, regardless of
+  // spaces — most Vietnamese words are written with spaces between
+  // syllables ("tranh luận"), so space-count can't be used to route this.
+  if(!forceAI && isVN){
     currentWord=null;
     const hits=await viReverseLookup(word);
-    box.innerHTML = hits.length ? viResultsState(word, hits) : viNotFoundState(word);
-    if(hits.length){ logEvent('search', null); addXP(1); }
+    if(hits.length){ box.innerHTML=viResultsState(word, hits); logEvent('search', null); addXP(1); return; }
+    box.innerHTML=viNotFoundState(word);   // opt-in "Translate with AI" button lives in here — never automatic
     return;
   }
 
@@ -592,16 +612,16 @@ async function search(rawWord, forceAI){
         return;
       }
     }
-    if(guess && !isPhrase){ box.innerHTML=suggestState(word, guess); return; }
+    if(guess && !hasSpace){ box.innerHTML=suggestState(word, guess); return; }
   }
 
   if(!getKey()){ box.innerHTML=needKeyState(word); return; }
   if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
 
-  // Multiple words with no local match — this reads as "translate this
-  // for me", not "look this word up", so it gets its own AI call and its
-  // own result view instead of forcing it through the dictionary prompt.
-  if(isPhrase){
+  // Multiple English words with no local match — this reads as "translate
+  // this for me", not "look this word up", so it gets its own AI call and
+  // its own result view instead of forcing it through the dictionary prompt.
+  if(hasSpace){
     box.innerHTML=questScene(word);
     const questStart=now();
     try{
@@ -1031,26 +1051,34 @@ async function showRecentSuggest(){
   }
   if(!recent.length){ hideSuggest(); return; }
   const recs=await Promise.all(recent.map(w=>idbGet(w)));
-  renderSuggestList('Recent Searches', recs.filter(Boolean));
+  renderSuggestList('Recent Searches', recs.filter(Boolean), true);
 }
 async function showTypedSuggest(q){
   if(q.length<2){ hideSuggest(); return; }
   const results=await idbPrefix(q);
   if(!results.length){ hideSuggest(); return; }
-  renderSuggestList('Suggestions', results);
+  renderSuggestList('Suggestions', results, false);
 }
-function renderSuggestList(label, recs){
+function renderSuggestList(label, recs, deletable){
   const el=$('#suggest');
   let h='<div class="suggest-lbl">'+label+'</div>';
   for(const r of recs.slice(0,8)){
     const d=r.data||{};
-    h+='<div class="suggest-item" onclick="jump(\''+esc(r.word).replace(/'/g,"\\'")+'\')">'
+    const safeW=esc(r.word).replace(/'/g,"\\'");
+    h+='<div class="suggest-item" onclick="jump(\''+safeW+'\')">'
       +'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>'
       +'<span class="w">'+esc(r.word)+'</span>'
       +(d.vi_equivalent?'<span class="e">'+esc(d.vi_equivalent)+'</span>':'')
+      +(deletable?'<button class="suggest-del" onclick="event.stopPropagation();removeFromSuggest(\''+safeW+'\',this)" aria-label="Remove">✕</button>':'')
       +'</div>';
   }
   el.innerHTML=h; el.classList.add('show');
+}
+async function removeFromSuggest(word, btn){
+  await logDeleteWord(word);
+  const item=btn.closest('.suggest-item'); if(item) item.remove();
+  const el=$('#suggest');
+  if(el && !el.querySelector('.suggest-item')) hideSuggest();
 }
 
 /* ============================================================
