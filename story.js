@@ -796,11 +796,11 @@ window.advanceStory = advance;
 function advanceReview(){
   const cur=currentEntry(); if(!cur){ if(typeof renderGameHub==='function') renderGameHub(); return; }
   const { scene } = cur;
-  const log = getState().storyLog[scene.id] || {};
+  const st=getState();
   let targetIdx=-1;
-  if(scene.dec && log.dec!=null && scene.dec.options[log.dec] && scene.dec.options[log.dec].goto){
-    const gi=idxOf(scene.dec.options[log.dec].goto);
-    if(gi>=0) targetIdx = condOk(FLAT[gi].scene.onlyIf, getState().flags) ? gi : nextValidIndex(gi-1);
+  if(st.pendingGoto){
+    const gi=idxOf(st.pendingGoto); st.pendingGoto=null;
+    targetIdx = gi>=0 ? gi : nextValidIndex(idxOf(scene.id));
   } else if(scene.gotoChapter){
     const ch=chapterById(scene.gotoChapter);
     if(ch && ch.scenes[0]) targetIdx=idxOf(ch.scenes[0].id);
@@ -810,9 +810,37 @@ function advanceReview(){
   const landed = targetIdx>=0 ? FLAT[targetIdx] : null;
   if(!landed || landed.arc.id!==_reviewArcId){ renderReviewEndCard(); return; }
   _reviewPos = landed.scene.id;
+  if(_reviewHistory[_reviewHistory.length-1]!==_reviewPos) _reviewHistory.push(_reviewPos);
   resetPending();
   renderStory();
 }
+/* A review-scoped Back — same trick as the real goBackScene (clear the
+   scene's log + unwind its flags/items so it's freely re-answerable),
+   just walking _reviewHistory instead of the real arcHistory. Since
+   scoring for this arc is already finalized and never re-runs, changing
+   an answer here can never touch the real score — it only changes what
+   the player sees on replay from this point forward. */
+function reviewGoBack(){
+  const hist=_reviewHistory;
+  const curIdx=hist.indexOf(_reviewPos);
+  if(curIdx<=0) return;
+  const targetIdx=curIdx-1;
+  const st=getState();
+  for(let i=hist.length-1;i>=targetIdx;i--){
+    const sid=hist[i];
+    const e=entryOf(sid); if(!e) continue;
+    const log=st.storyLog[sid];
+    if(log){ unwindSceneEffects(e.scene, log); delete st.storyLog[sid]; }
+    st.decisions = st.decisions.filter(d=>d.sceneId!==sid);
+  }
+  _reviewHistory = hist.slice(0, targetIdx);
+  _reviewPos = hist[targetIdx];
+  st.pendingGoto=null;
+  saveState();
+  resetPending();
+  renderStory();
+}
+window.reviewGoBack = reviewGoBack;
 function renderReviewEndCard(){
   const area=$('#review-area'); if(!area) return;
   const arc = CONTENT.find(a=>a.id===_reviewArcId);
@@ -826,16 +854,17 @@ function renderReviewEndCard(){
 }
 /* Entry point — only for arcs the player has FULLY finished (strictly
    before the arc they're currently on), so every scene it visits is
-   guaranteed already-submitted. Reviewing the in-progress arc is not
-   offered, since scenes ahead of the real position would still be live
-   and tappable. */
+   guaranteed already-submitted (and its score already locked in).
+   Reviewing the in-progress arc is not offered, since scenes ahead of
+   the real position would still be live and tappable. */
+let _reviewHistory=[];
 window.reviewArc = function(arcId){
   const cur=entryOf(getState().pos);
   const reachedArc = cur ? cur.arc.id : 0;
   if(arcId>=reachedArc) return;                 // not fully finished yet — nothing to review
   const arc=CONTENT.find(a=>a.id===arcId); if(!arc) return;
   const first = arc.chapters[0] && arc.chapters[0].scenes[0]; if(!first) return;
-  _reviewArcId=arcId; _reviewPos=first.id;
+  _reviewArcId=arcId; _reviewPos=first.id; _reviewHistory=[first.id];
   resetPending();
   renderStory();
 };
@@ -1129,6 +1158,7 @@ const PRESENCE_ACCEPTS = [
 ];
 function pickVaried(arr, seed){ return arr[Math.abs(seed)%arr.length]; }
 window.storyContinueOrEvent = function(){
+  if(_reviewArcId){ advance(); return; }        // presence moments score immediately (unlike comp/iq/dec) — never re-trigger them in review
   const cur=currentEntry(); if(!cur){ advance(); return; }
   const { scene } = cur;
   const log=getState().storyLog[scene.id]||{};
@@ -1288,8 +1318,8 @@ function renderStory(){
   const { scene, chapter, arc } = cur;
 
   const st0=getState();
-  const hist0=st0.arcHistory||[];
-  const canGoBack = !_reviewArcId && hist0.indexOf(scene.id)>0;
+  const hist0 = _reviewArcId ? _reviewHistory : (st0.arcHistory||[]);
+  const canGoBack = hist0.indexOf(_reviewArcId ? _reviewPos : scene.id)>0;
   const flipClass = _pageDir>0 ? ' page-flip-fwd' : _pageDir<0 ? ' page-flip-back' : '';
   _pageDir=0;                                                 // one-shot — consumed now
 
@@ -1323,7 +1353,7 @@ function renderStory(){
   const submitted = isSubmitted(scene);
   if(submitted){
     h+='<div class="story-nav">'
-      +'<button class="story-nav-btn back" '+(canGoBack?'':'disabled')+' onclick="goBackScene()" aria-label="Back">‹</button>'
+      +'<button class="story-nav-btn back" '+(canGoBack?'':'disabled')+' onclick="'+(_reviewArcId?'reviewGoBack()':'goBackScene()')+'" aria-label="Back">‹</button>'
       +'<button class="story-nav-btn fwd" onclick="storyContinueOrEvent()" aria-label="Continue">›</button>'
       +'</div>';
   } else {
@@ -1466,7 +1496,7 @@ window.openStory = openStory;
 function isStoryStarted(){ return Object.keys(getState().storyLog).length>0; }
 
 window.renderGameHub = function(){
-  _reviewArcId=null; _reviewPos=null;
+  _reviewArcId=null; _reviewPos=null; _reviewHistory=[];
   if(_waitTimer){ clearInterval(_waitTimer); _waitTimer=null; }
   const area=$('#review-area'); if(!area) return;
   let h='<div class="game-hub">';
@@ -1476,9 +1506,11 @@ window.renderGameHub = function(){
   h+='<div class="hub-section-label">Quick Games</div>';
   h+='<div class="hub-row">';
   h+='<button class="hub-card hub-mini mini-type" onclick="setPracticeMode(\'type\')">'
+    +'<span class="glow-border"></span>'
     +'<img class="hub-mini-deco" src="./decor-note-and-pen.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<span class="hub-mini-t">Type it</span><span class="hub-mini-s">Spell from memory</span></button>';
   h+='<button class="hub-card hub-mini mini-match" onclick="setPracticeMode(\'match\')">'
+    +'<span class="glow-border"></span>'
     +'<img class="hub-mini-deco" src="./decor-magnifying-glass.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<span class="hub-mini-t">Match it</span><span class="hub-mini-s">Pick the right word</span></button>';
   h+='</div>';
@@ -1597,8 +1629,8 @@ function renderWorldMap(){
   }
   const charImg = (curArcContent && curArcContent.chapters[0] && curArcContent.chapters[0].scenes[0].mascot) || 'mascot-wander';
 
-  let h='<button class="saved-banner playable" onclick="openStory()" style="background-image:url(\''+assetUrl('bg-arc'+curArcId)+'\')">';
-  h+='<div class="sb-scrim"></div>';
+  let h='<button class="saved-banner playable" id="continue-card" onclick="openStory()" style="background-image:url(\''+assetUrl('bg-arc'+curArcId)+'\')" data-arc="'+curArcId+'">';
+  h+='<div class="sb-scrim"></div><div class="sb-corner-shadow"></div>';
   h+='<img class="sb-char" src="'+assetUrl(charImg)+'" alt="" onerror="this.style.display=\'none\'"/>';
   h+='<div class="sb-txt"><div class="sb-t">'+esc(curMeta.name)+'</div>';
   h+='<div class="sb-s">'+esc(curMeta.tagline)+'</div>';
@@ -1635,7 +1667,7 @@ function renderWorldMap(){
     const unlocked = arcUnlocked(meta.id);
     const finished = unlocked && meta.id<curArcId;
     const status = finished ? 'tap to replay' : unlocked ? 'in progress' : 'locked';
-    h+='<div class="region'+(unlocked?' on':'')+(meta.id===curArcId?' cur':'')+'" onclick="worldMapInfo('+meta.id+')">'
+    h+='<div class="region'+(unlocked?' on':'')+(meta.id===curArcId?' cur':'')+'" onclick="worldMapInfo('+meta.id+');updateContinueCard('+meta.id+')">'
       +'<div class="region-img" style="background-image:url(\''+assetUrl('bg-arc'+meta.id)+'\')"></div>'
       +'<div class="region-lock">'+(unlocked?'✓':'🔒')+'</div>'
       +'<div class="region-n">'+esc(meta.name)+'</div>'
@@ -1664,6 +1696,23 @@ window.worldMapInfo = function(arcId){
   const finished = cur && arcId < cur.arc.id;
   if(finished) showInfoCard('mascot-withflag-1', meta.name, body, '▶ Play it again', 'reviewArc('+arcId+')');
   else showInfoCard('mascot-withflag-1', meta.name, body);
+};
+/* Tapping any unlocked region tile previews it on the main Continue card
+   too — background, title, tagline all switch to that land. Purely a
+   preview: it never touches real progress. A finished land's card
+   offers Review instead of Continue. */
+window.updateContinueCard = function(arcId){
+  const card=$('#continue-card'); if(!card) return;
+  const meta = ARC_LANDS.find(a=>a.id===arcId); if(!meta) return;
+  if(!arcUnlocked(arcId)) return;                 // locked — the info popup already explains why
+  const cur = entryOf(getState().pos);
+  const finished = cur && arcId < cur.arc.id;
+  card.style.backgroundImage = "url('"+assetUrl('bg-arc'+arcId)+"')";
+  const t=card.querySelector('.sb-t'); if(t) t.textContent=meta.name;
+  const s=card.querySelector('.sb-s'); if(s) s.textContent=meta.tagline;
+  const cta=card.querySelector('.sb-cta');
+  if(cta) cta.textContent = finished ? '▶ Review' : (isStoryStarted()?'Continue →':'Play →');
+  card.onclick = finished ? function(){ reviewArc(arcId); } : function(){ openStory(); };
 };
 
 /* ---------- Bonus Scene — layout + lock state only, per the brief;

@@ -386,14 +386,25 @@ let _viIndex=null;
 async function buildViIndex(){
   if(_viIndex) return _viIndex;
   const all=await idbAll();
-  const idx=new Map();
+  const idx=new Map();                    // term -> [{word, primary}]
+  const add=(term, word, primary)=>{
+    const t=term.trim().toLowerCase(); if(!t) return;
+    if(!idx.has(t)) idx.set(t, []);
+    const arr=idx.get(t);
+    const existing=arr.find(e=>e.word===word);
+    if(existing){ existing.primary = existing.primary || primary; }
+    else arr.push({word, primary});
+  };
   for(const r of all){
     if(r.alias) continue;
-    const ve=r.data && r.data.vi_equivalent; if(!ve) continue;
-    for(const raw of ve.split(',')){
-      const t=raw.trim().toLowerCase(); if(!t) continue;
-      if(!idx.has(t)) idx.set(t, []);
-      const arr=idx.get(t); if(!arr.includes(r.word)) arr.push(r.word);
+    const d=r.data; if(!d) continue;
+    // primary: the word's own top 1-3 closest Vietnamese terms
+    if(d.vi_equivalent) for(const raw of d.vi_equivalent.split(',')) add(raw, r.word, true);
+    // secondary: every individual sense often carries its OWN Vietnamese
+    // phrasing too (a word can mean several different things) — this data
+    // was already being generated and stored, just never searched before
+    if(Array.isArray(d.senses)) for(const s of d.senses){
+      if(s.vi) for(const raw of String(s.vi).split(',')) add(raw, r.word, false);
     }
   }
   _viIndex=idx;
@@ -402,14 +413,21 @@ async function buildViIndex(){
 async function viReverseLookup(term){
   const idx=await buildViIndex();
   const q=term.trim().toLowerCase();
+  const rank=(entries)=>{
+    const words = entries.slice().sort((a,b)=>(b.primary?1:0)-(a.primary?1:0)).map(e=>e.word);
+    return [...new Set(words)];
+  };
   const exact=idx.get(q);
-  if(exact && exact.length) return exact.slice(0,12);
+  if(exact && exact.length) return rank(exact).slice(0,14);
   // no exact entry — a loose "contains" pass catches close-enough phrasing
-  const out=new Set();
-  for(const [t,words] of idx){
-    if(t.includes(q) || q.includes(t)){ for(const w of words) out.add(w); if(out.size>=12) break; }
+  const out=[]; const seen=new Set();
+  for(const [t,entries] of idx){
+    if(t.includes(q) || q.includes(t)){
+      for(const w of rank(entries)) if(!seen.has(w)){ seen.add(w); out.push(w); }
+      if(out.length>=14) break;
+    }
   }
-  return [...out];
+  return out;
 }
 function viResultsState(query, words){
   let h='';
@@ -811,7 +829,13 @@ window.onYouglishAPIReady=function(){
 };
 function renderYouglishWidget(word){
   const box=$('#youglish-box'); if(!box || currentWord!==word) return;   // navigated away while loading
-  box.innerHTML='<div id="yg-slot" class="yg-slot"></div><div class="yg-credit">YouGlish</div>';
+  box.innerHTML='<div class="yg-accent-row">'
+    +'<button class="yg-accent on" id="yg-accent-us" onclick="setYgAccent(\'us\')">🇺🇸 US</button>'
+    +'<button class="yg-accent" id="yg-accent-uk" onclick="setYgAccent(\'uk\')">🇬🇧 UK</button>'
+    +'</div>'
+    +'<div class="yg-clip"><div id="yg-slot" class="yg-slot"></div></div>'
+    +'<div class="yg-credit">YouGlish</div>';
+  window._ygWord=word;
   try{
     _ygWidget = new YG.Widget('yg-slot', {
       autoStart:0, components:8+64,   // caption + the widget's own control row only — no title, no search box
@@ -821,9 +845,15 @@ function renderYouglishWidget(word){
       }
     });
     window._ygWidget=_ygWidget;
-    _ygWidget.fetch(word, 'english');
+    _ygWidget.fetch(word, 'english', 'us');
   }catch(e){ box.innerHTML=''; }
 }
+window.setYgAccent=function(accent){
+  if(!window._ygWidget || !window._ygWord) return;
+  $('#yg-accent-us').classList.toggle('on', accent==='us');
+  $('#yg-accent-uk').classList.toggle('on', accent==='uk');
+  try{ window._ygWidget.fetch(window._ygWord, 'english', accent); }catch(e){}
+};
 function maybeLoadYouglish(word){
   const box=$('#youglish-box'); if(!box) return;
   if(!navigator.onLine) return;                    // offline — leave it empty, don't even try
@@ -1175,15 +1205,14 @@ function pickNewFishStory(){
 function tapFishMascot(){
   if(_fishBusy) return;
   _fishTapCount++;
-  const bubble=$('#fish-footer-bubble'); if(!bubble) return;
+  const bubble=$('#fish-footer-bubble'), tag=$('#fish-footer-tag'); if(!bubble) return;
   if(_fishStoryIdx<0) pickNewFishStory();
+  const isNewStoryStart = (_fishChunkIdx===0);
   const story=FISH_STORIES[_fishStoryIdx];
   let text=story[_fishChunkIdx];
   const hasMore = _fishChunkIdx < story.length-1;
   bubble.textContent = hasMore ? text+' …' : text;
-  bubble.classList.remove('show'); void bubble.offsetWidth; bubble.classList.add('show');
-  clearTimeout(bubble._hideT);
-  bubble._hideT=setTimeout(()=>bubble.classList.remove('show'), 4200);
+  if(tag) tag.classList.toggle('show', isNewStoryStart);
   if(hasMore) _fishChunkIdx++;
   else pickNewFishStory();          // story finished — a new random one is queued up for next time
 
@@ -1322,7 +1351,7 @@ function showInfoCard(img,title,body,actionLabel,actionOnclick){
   const action = actionLabel ? '<button class="info-action" onclick="this.closest(\'.info-ov\').remove();'+actionOnclick+'">'+esc(actionLabel)+'</button>' : '';
   ov.innerHTML='<div class="info-card"><img src="./'+img+'.webp" alt=""/>'
     +'<div class="info-t">'+esc(title)+'</div><div class="info-b">'+esc(body)+'</div>'
-    +action+'<div class="info-tap">tap to close</div></div>';
+    +action+'</div>';
   document.body.appendChild(ov);
   requestAnimationFrame(()=>ov.classList.add('show'));
   ov.addEventListener('click',()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),260); });
