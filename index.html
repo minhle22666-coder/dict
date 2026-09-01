@@ -748,19 +748,22 @@
   .sb-cta{display:inline-block;font-size:12.5px;font-weight:900;color:#3A1E00;background:var(--grad-hero);
     padding:6px 14px;border-radius:99px}
   .sb-progress{font-size:11px;font-weight:800;color:var(--muted);margin-bottom:14px}
-  .lesson-entry{position:relative;overflow:hidden;width:100%;height:76px;margin-bottom:16px;border:none;
-    border-radius:16px;box-shadow:0 10px 22px rgba(0,0,0,.32);display:flex;align-items:center;justify-content:center}
-  .lesson-entry::before{content:'';position:absolute;inset:0;
-    background-image:url('./bg-life-lesson.png');background-size:cover;background-position:center;background-repeat:no-repeat}
+  .lesson-entry{position:relative;overflow:hidden;width:100%;height:84px;margin-bottom:16px;border:none;
+    border-radius:18px;box-shadow:0 14px 30px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#3a6b4a 0%,#5c8a52 45%,#e8a33d 100%);
+    border-top:1px solid rgba(255,255,255,.28)}
+  .lesson-entry::before{content:'';position:absolute;width:220px;height:220px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.22),transparent 70%);
+    top:-90px;left:-40px;pointer-events:none}
   .lesson-entry:active{transform:scale(.98)}
-  .lesson-entry-t{position:relative;z-index:1;font-size:14px;font-weight:900;letter-spacing:.02em;
-    color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+  .lesson-entry-t{position:relative;z-index:1;font-size:15.5px;font-weight:900;letter-spacing:.01em;
+    color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.4)}
   .lesson-leaf{position:absolute;width:22px;height:22px;z-index:2;pointer-events:none}
-  .lesson-leaf.tl{top:6px;left:8px}
-  .lesson-leaf.tr{top:6px;right:8px;transform:scaleX(-1)}
-  .lesson-leaf.bl{bottom:6px;left:8px;transform:scaleY(-1)}
-  .lesson-leaf.br{bottom:6px;right:8px;transform:scale(-1,-1)}
-  .lesson-leaf-in{display:inline-block;width:100%;height:100%;opacity:.92;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
+  .lesson-leaf.tl{top:8px;left:10px}
+  .lesson-leaf.tr{top:8px;right:10px;transform:scaleX(-1)}
+  .lesson-leaf.bl{bottom:8px;left:10px;transform:scaleY(-1)}
+  .lesson-leaf.br{bottom:8px;right:10px;transform:scale(-1,-1)}
+  .lesson-leaf-in{display:inline-block;width:100%;height:100%;opacity:.95;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
     animation:lesson-leaf-sway 3.4s ease-in-out infinite}
   .lesson-leaf.tr .lesson-leaf-in{animation-delay:.6s}
   .lesson-leaf.bl .lesson-leaf-in{animation-delay:1.2s}
@@ -1673,7 +1676,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v26 · fixed leaf-corner bug, white text, full-frame background</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v27 · life-lesson banner rebuilt in pure CSS, no image</b></p>
   </section>
 </main>
 
