@@ -394,15 +394,11 @@ function _sealedResolveEnding(){                                  // never calle
 }
 
 /* ============================================================
-   WORD BANK — "every 10 new words" spaced-repetition accumulator.
-   Runs completely silently; no toast, no badge, nothing shown.
-   Once a fresh batch of 10 lands, it also kicks off a background
-   refresh of the NEXT chapter's passage (fire-and-forget — never
-   awaited, never blocks the UI) so newly-learned words — including
-   ones picked up outside the story entirely, like a financial term
-   typed into the search bar — get a real chance to resurface. The
-   CURRENT chapter is never touched, so nothing shifts under the
-   player mid-read.
+   WORD BANK — accumulates every new word the reader looks up,
+   anywhere in the app, in batches of 10. Runs completely silently.
+   This is a pool, not a trigger: a word banked back in Arc 1 is
+   just as eligible for Arc 5's passage as one banked yesterday —
+   see generateArcPassages() below for when it actually gets used.
    ============================================================ */
 window.onWordSearched = function(rawWord){
   const w = norm(rawWord||'');
@@ -411,24 +407,11 @@ window.onWordSearched = function(rawWord){
   if(st.seenWords.includes(w)) return;                      // not new
   st.seenWords.push(w);
   st.wordBankPending.push(w);
-  let bankedNewBatch=false;
   while(st.wordBankPending.length>=10){
     st.wordBank.push(...st.wordBankPending.splice(0,10));
-    bankedNewBatch=true;
   }
   saveState();
-  if(bankedNewBatch) refreshUpcomingPassage();
 };
-function refreshUpcomingPassage(){
-  try{
-    const cur=currentEntry(); if(!cur) return;
-    const order=CONTENT_CHAPTER_ORDER();
-    const idx=order.indexOf(cur.chapter.id);
-    const nextCh=order[idx+1];                              // the very next chapter — never the one being read now
-    if(nextCh==null) return;
-    generateChapterPassage(nextCh, true).catch(()=>{});      // force refresh, fire-and-forget
-  }catch(e){}
-}
 
 /* ============================================================
    PASSAGE GENERATION — 65% fixed core / 20% word-bank / 15% newest,
@@ -524,14 +507,15 @@ async function generateChapterPassage(chapterId, force){
     _passageGenInFlight.delete(chapterId);
   }
 }
-function maybeGenerateAhead(justEnteredChapterId){
-  const idx = CONTENT_CHAPTER_ORDER().indexOf(justEnteredChapterId);
-  if(idx<0) return;
-  const target = CONTENT_CHAPTER_ORDER()[idx+1];              // "gối đầu 1 nhịp": prep the one AFTER next
-  if(target==null) return;
-  if(getState().passages[target]) return;
-  // fire-and-forget, silent, never blocks the UI
-  generateChapterPassage(target).catch(()=>{});
+/* Fires once, right when an arc finishes (see finalizeArcScoring's call
+   sites in advance()) — generates every chapter of the NEXT arc in one
+   batch, force-refreshed so it uses the fullest word-bank available
+   (everything banked up through the arc that just ended, plus anything
+   from earlier arcs — the pool never resets). All fire-and-forget: the
+   arc-end card and the next arc's opening scenes never wait on this. */
+function generateArcPassages(arcId){
+  const arc = CONTENT.find(a=>a.id===arcId); if(!arc) return;
+  for(const ch of arc.chapters) generateChapterPassage(ch.id, true).catch(()=>{});
 }
 let _chOrder=null;
 function CONTENT_CHAPTER_ORDER(){
@@ -877,7 +861,8 @@ function nextValidIndex(fromIdx){
   return -1;
 }
 function onChapterCompleted(prevChapterId, newChapterId){
-  maybeGenerateAhead(newChapterId);
+  // passage generation is now triggered per-arc (see generateArcPassages,
+  // called from finalizeArcScoring's call sites below), not per-chapter
 }
 function advance(){
   if(_reviewArcId){ advanceReview(); return; }
@@ -902,6 +887,7 @@ function advance(){
     if(finishedArc && !st.arcCardShown[finishedArc]){
       st.arcCardShown[finishedArc]=true; saveState();
       finalizeArcScoring(finishedArc);
+      generateArcPassages(finishedArc+1);
       renderArcEndCard(finishedArc, true);
       return;
     }
@@ -926,6 +912,7 @@ function advance(){
     if(finishedArc && !st.arcCardShown[finishedArc]){
       st.arcCardShown[finishedArc]=true; saveState();
       finalizeArcScoring(finishedArc);
+      generateArcPassages(finishedArc+1);
       renderArcEndCard(finishedArc);
       return;
     }
@@ -1155,9 +1142,11 @@ function keywordInText(sceneId, assetName, text){
 /* Which single real prop (if any) gets its inline sparkle for this scene —
    computed the same, deterministic way wherever it's needed, so the stage
    and the passage always agree on which one was already shown inline. */
+const NEVER_INLINE = new Set(['other-lantern-card','other-lantern-card-flip']);
 function inlineItemFor(scene, text){
   const real = normalizeProps(scene.props).concat(normalizeProps(scene.propsFront));
   for(const p of real){
+    if(NEVER_INLINE.has(p.name)) continue;
     const kw = keywordInText(scene.id, p.name, text||'');
     if(kw) return { name:p.name, keyword:kw };
   }
@@ -1420,9 +1409,7 @@ function renderStory(){
   _pageDir=0;                                                 // one-shot — consumed now
 
   let h='<div class="story-view">';
-  h+='<div class="story-top"><button class="story-quit" onclick="renderGameHub()">✕</button>'
-    +(canGoBack?'<button class="story-back" onclick="goBackScene()">‹ Back</button>':'')
-    +'<div class="story-top-t">Arc '+arc.id+' · '+esc(chapter.title)+'</div>'
+  h+='<div class="story-top"><div class="story-top-t">Arc '+arc.id+' · '+esc(chapter.title)+'</div>'
     +(_reviewArcId?'<span class="story-review-badge">Reviewing</span>':'')+'</div>';
 
   const bg = scene.bg || arc.bg;
@@ -1447,7 +1434,10 @@ function renderStory(){
   if(scene.dec) h+=renderDecBlock(scene, chapter, arc);
   const submitted = isSubmitted(scene);
   if(submitted){
-    h+='<button class="btn story-continue" onclick="storyContinueOrEvent()">'+(scene.endOfBuiltContent?'Continue':'Continue →')+'</button>';
+    h+='<div class="story-nav">'
+      +'<button class="story-nav-btn back" '+(canGoBack?'':'disabled')+' onclick="goBackScene()" aria-label="Back">‹</button>'
+      +'<button class="story-nav-btn fwd" onclick="storyContinueOrEvent()" aria-label="Continue">›</button>'
+      +'</div>';
   } else {
     h+='<button class="btn story-continue" '+(canSubmit(scene)?'':'disabled')+' onclick="storySubmit()">Choose an answer</button>';
   }
@@ -1567,12 +1557,11 @@ window.showStoryIntro = function(){
     +'<img src="./mascot-wonder.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<div class="info-t">Before you begin</div>'
     +'<div class="info-b story-intro-b">'
-    +'<p>Somewhere in a field too big for the sky, a fox opens his eyes and doesn\'t remember his own name. What he does next is up to you.</p>'
-    +'<p>The story leans on your own dictionary as it goes — a passage reads a little differently depending on what you already know, and gently reaches for a few words you\'re just about ready to grow into.</p>'
-    +'<p>Along the way, you answer <i>for</i> him: what he notices, what he decides, who he ends up being. A few quiet qualities grow with your choices — but he never sees the numbers, and you don\'t need to chase them either. Just choose the way you actually would.</p>'
-    +'<p>Some things won\'t explain themselves right away — a flower by the road, a mark on a tree, an object worth a second look. Tap them anyway.</p>'
-    +'<p>Changed your mind partway down a page? Step back with <b>‹ Back</b> and answer differently — nothing is scored until the chapter ends, so there\'s room to wonder "what if."</p>'
-    +'<p>That\'s really all there is to know. The rest is his to find out, and yours to decide.</p>'
+    +'<p>Somewhere in a field too big for the sky, a fox forgets his own name. What he does next is up to you.</p>'
+    +'<p>The story adapts to <b>your own dictionary</b> — reaching for words you already know, and a few you\'re just growing into.</p>'
+    +'<p>You answer <b>for him</b>: what he notices, what he decides, who he becomes. A few quiet qualities grow with your choices — just choose the way you actually would.</p>'
+    +'<p>Some things won\'t explain themselves right away. <b>Tap them anyway.</b></p>'
+    +'<p>Changed your mind? Step back with <b>‹</b> and answer differently — <b>nothing is scored until the chapter ends</b>.</p>'
     +'</div>'
     +'<button class="info-action" onclick="this.closest(\'.info-ov\').remove(); showView(\'review\')">▶ Play</button>'
     +'<div class="info-tap">tap outside to close</div>'
@@ -1725,7 +1714,10 @@ function renderWorldMap(){
     h+='<div class="sb-progress"><span>🏆 Every built land explored.</span></div>';
   }
 
-  h+='<button class="lesson-entry" onclick="showLifeLessons()"><span>📖</span> What Focci Has Learned</button>';
+  h+='<button class="lesson-entry" onclick="showLifeLessons()">'
+    +'<span class="lesson-star s1">✦</span><span class="lesson-star s2">✧</span><span class="lesson-star s3">✦</span>'
+    +'<span class="lesson-entry-t">What Focci Has Learned</span>'
+    +'</button>';
 
   h+='<div class="hub-section-label">The Map</div>';
   h+='<div class="region-strip">';

@@ -1231,6 +1231,14 @@ function chipRow(label, note, opts){
   }
   return h+'</div></div>';
 }
+function dropdownRow(label, note, opts, onChange){
+  let h='<div class="setup-row"><div class="setup-l">'+esc(label)
+    +(note?'<span class="setup-note">'+esc(note)+'</span>':'')+'</div>';
+  h+='<select class="setup-select" onchange="'+onChange+'(this.value)">';
+  for(const o of opts) h+='<option value="'+esc(o.value)+'"'+(o.on?' selected':'')+'>'+esc(o.label)+'</option>';
+  h+='</select></div>';
+  return h;
+}
 async function renderPracticeSetup(){
   practiceStage='setup';
   const area=$('#review-area'); if(!area) return;
@@ -1254,8 +1262,8 @@ async function renderPracticeSetup(){
   h+=chipRow('Difficulty','by word frequency, not official CEFR', levelOpts);
 
   if(practiceMode==='match'){
-    h+=chipRow('Which words','answers come from here',
-      POOLS.map(p=>({label:esc(p[1]), on:p[0]===pool, act:'setPool(\''+p[0]+'\')'})));
+    h+=dropdownRow('Which words','answers come from here',
+      POOLS.map(p=>({value:p[0], label:p[1], on:p[0]===pool})), 'setPool');
   }
 
   // tell them up front how many words actually qualify — no dead-end rounds
@@ -1472,12 +1480,15 @@ function renderMatch(){
   h+='<div class="match-grid">';
   r.opts.forEach((o,i)=>{
     let cls='match-opt';
+    let action='onclick="pickMatch('+i+')"';
     if(matchPicked){
       if(o.word===r.answer.word) cls+=' right';
       else if(o.word===matchPicked.word) cls+=' wrong';
       else cls+=' dim';
+      const safeWord=esc(o.word).replace(/'/g,"\\'");
+      action='onclick="matchWordPeek(\''+safeWord+'\')"';
     }
-    h+='<button class="'+cls+'" onclick="pickMatch('+i+')">'+esc(o.word)+'</button>';
+    h+='<button class="'+cls+'" '+action+'>'+esc(o.word)+'</button>';
   });
   h+='</div>';
   if(matchPicked) h+=swipeOn();
@@ -1496,6 +1507,20 @@ async function pickMatch(i){
       rec.lastReviewedAt=now(); await idbPut(rec); } }catch(e){}
   renderMatch();
 }
+window.matchWordPeek = async function(word){
+  try{
+    const rec = await idbGet(word);
+    if(!rec) return;
+    const ov=document.createElement('div'); ov.className='peek-full-ov';
+    ov.innerHTML='<div class="peek-full-card">'+renderEntry(rec)+'</div>';
+    document.body.appendChild(ov);
+    requestAnimationFrame(()=>ov.classList.add('show'));
+    ov.addEventListener('click',(e)=>{
+      if(e.target!==ov) return;                    // only the backdrop dismisses — the entry itself is meant to be read
+      ov.classList.remove('show'); setTimeout(()=>ov.remove(),260);
+    });
+  }catch(e){}
+};
 function nextMatch(){ matchIdx++; matchPicked=null; renderMatch(); }
 window.startMatch=startMatch; window.pickMatch=pickMatch; window.nextMatch=nextMatch;
 
@@ -1685,9 +1710,9 @@ async function renderInsights(){
   h+='</div>';
 
   h+='<div class="stat-grid">';
-  h+='<div class="stat"><div class="tile primary">📖</div><div class="n">'+s.totalWords+'</div><div class="l">WORDS</div></div>';
-  h+='<div class="stat"><div class="tile amber">⭐</div><div class="n">'+s.savedCount+'</div><div class="l">SAVED</div></div>';
-  h+='<div class="stat"><div class="tile mint">🎯</div><div class="n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</div><div class="l">ACCURACY</div></div>';
+  h+='<div class="stat"><div class="tile primary">📖</div><div class="n">'+s.totalWords+'</div><div class="l">WORDS</div><img class="stat-deco" src="./decor-book-open.webp" alt=""/></div>';
+  h+='<div class="stat"><div class="tile amber">⭐</div><div class="n">'+s.savedCount+'</div><div class="l">SAVED</div><img class="stat-deco" src="./decor-magical-wand.webp" alt=""/></div>';
+  h+='<div class="stat"><div class="tile mint">🎯</div><div class="n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</div><div class="l">ACCURACY</div><img class="stat-deco" src="./decor-magnifying-glass.webp" alt=""/></div>';
   h+='</div>';
 
   h+='<div class="library-card"><img src="./decor-load-of-book.webp" alt=""/>'

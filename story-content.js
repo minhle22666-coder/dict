@@ -182,11 +182,11 @@ const ARCS = [
     lifeLesson:"Someone **being kind to you** can also **need something from you** at the very same time. Both things can be real.",
     onEnterFlags:{'D-CH03':true},
     scenes:[
-      { id:'3.1', title:"Something on the milestone", bg:'bg-peaceful-field-arc-1', mascot:'mascot-wander',
+      { id:'3.1', title:"Something on the milestone", bg:'bg-peaceful-field-arc-1', mascot:'mascot-wander', npc:'mascot-owen-blunt',
         props:['other-notebook'],
         en:'By the trail stood a waist-high stone marker, its carved numbers **mostly worn away**. The only digits left were a **4 and half of a 0**. Perched on top sat a **glossy black crow** with a **slightly crooked leg**, picking through a small stack of papers with the **cold focus of an accountant**. "**You\'re in my light**," the crow muttered, without looking up.',
       },
-      { id:'3.2', title:"Owen", bg:'bg-peaceful-field-arc-1', mascot:'mascot-owen-worries-hidding',
+      { id:'3.2', title:"Owen", bg:'bg-peaceful-field-arc-1', mascot:'mascot-confused', npc:'mascot-owen-blunt',
         en:'"Owen," the crow said. "I\'d offer a shake, but." He lifted the crooked leg half an inch, then tapped it back down on the stone. "Where\'re you headed?" "The Keeper\'s Station." Owen\'s **head tilted**—a tiny, sharp twitch that was **gone in half a second**. "Course you are. Everybody is, this time of year." "Have you been there?" "I\'ve been **near it**," Owen said. "\'Near\' is a wide word. **Covers a whole lot of ground**."',
         comp:{ q:"What does Owen actually answer?", options:["yes, he has been there","no, never","he answers without answering"], correct:2 },
         iq:{ q:'Owen just heard "Keeper\'s Station" and tilted his head for half a second. What does that mean?', options:[
@@ -195,7 +195,7 @@ const ARCS = [
           { label:"His leg is just hurting", tag:'accept', delta:{}, note:"" }
         ]},
       },
-      { id:'3.3', title:"The paper", bg:'bg-peaceful-field-arc-1', mascot:'mascot-owen-worries-hidding',
+      { id:'3.3', title:"The paper", bg:'bg-peaceful-field-arc-1', mascot:'mascot-challenge', npc:'mascot-owen-blunt',
         props:['other-notebook'],
         en:'The stack turned out to be letters. Not fresh ones—the paper was soft and **foxed at the edges**, some **still creased shut**. "Are those yours?" "**They\'re in my possession**," Owen replied. "That\'s a **deliberate choice of words**, kid." He held one up to the fading light, read a few lines, let out a dry sound like a **chuckle with the humor stripped out**, and slipped it into his satchel.',
         dec:{ q:"", options:[
@@ -205,7 +205,7 @@ const ARCS = [
         ]},
         presence:[{ text:"Ask Owen why his leg is crooked — and hear the whole answer." }],
       },
-      { id:'3.4', title:"Bread and quail", bg:'bg-peaceful-field-arc-1', mascot:'mascot-owen-worries-hidding',
+      { id:'3.4', title:"Bread and quail", bg:'bg-peaceful-field-arc-1', mascot:'mascot-cry', npc:'mascot-owen-blunt',
         props:['other-bird-nest','other-bread-bag'],
         en:'A family of quail waddled by and politely asked where he was coming from. "**The station**," Focci said. The words **slipped out easily**, long before he had time to think about them. The quail looked impressed and shared a **crust of bread** with him. Focci chewed it slowly, feeling the **weight of the lie** sitting right beside the bread in his stomach. Perched on his milestone, **Owen watched the whole exchange and said nothing at all**, which somehow felt a whole lot worse.',
         dec:{ q:"", options:[
@@ -215,7 +215,7 @@ const ARCS = [
         ]},
         presence:[{ text:"Answer the smallest quail's odd little question: \"Do foxes have birthdays?\"" }],
       },
-      { id:'3.5', title:"What Owen gives", bg:'bg-peaceful-field-arc-1', mascot:'mascot-owen-happy-crow',
+      { id:'3.5', title:"What Owen gives", bg:'bg-peaceful-field-arc-1', mascot:'mascot-wow', npc:'mascot-owen-happy',
         onEnterFlags:{'D-05':true},
         props:['other-bag'],
         en:'At dusk, Owen swept down and dropped something heavy straight into Focci\'s pack mid-flight, barely slowing his wings. It was a **waterskin, filled to the brim**. "**The desert takes four days!**" he shouted back. "You\'d have figured that out the hard way by day two." "Why help me?" "Because I\'ll be seeing you down the road," Owen called out, "and it\'s terribly boring having a **chat with a corpse**." ⟦D-05⟧',

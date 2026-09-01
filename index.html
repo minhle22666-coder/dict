@@ -266,6 +266,7 @@
   .stat:nth-child(2){background:linear-gradient(150deg,#3DD9D6,#1E9E9C)}
   .stat:nth-child(3){background:linear-gradient(150deg,#5AA9FF,#3B6FD4)}
   .stat::after{content:'';position:absolute;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.15);top:-32px;right:-26px}
+  .stat-deco{position:absolute;right:-10px;bottom:-10px;width:52px;opacity:.22;z-index:0;pointer-events:none}
   .stat .tile{background:rgba(255,255,255,.24)!important;color:#fff!important;width:32px;height:32px;border-radius:11px;font-size:15px;position:relative;z-index:1}
   .stat .n{font-size:21px;font-weight:900;position:relative;z-index:1;line-height:1}
   .stat .l{font-size:9px;letter-spacing:.06em;font-weight:900;line-height:1.3;opacity:.92;position:relative;z-index:1}
@@ -527,7 +528,8 @@
   .prog-hero{position:relative;overflow:hidden;display:flex;align-items:center;gap:14px;border-radius:var(--r);
     padding:20px 18px;margin-bottom:12px;background:linear-gradient(150deg,#2A4767,#16283C);
     border:1px solid var(--line);box-shadow:var(--shadow)}
-  .prog-rays{position:absolute;inset:-50%;background:repeating-conic-gradient(rgba(255,159,69,.10) 0deg 15deg, transparent 15deg 30deg);animation:rays-spin 20s linear infinite}
+  .prog-rays{position:absolute;top:50%;left:50%;width:640px;height:640px;margin:-320px 0 0 -320px;
+    background:repeating-conic-gradient(rgba(255,159,69,.10) 0deg 15deg, transparent 15deg 30deg);animation:rays-spin 20s linear infinite}
   @keyframes rays-spin{to{transform:rotate(360deg)}}
   .prog-char{position:relative;z-index:1;width:68px;flex:none;filter:drop-shadow(0 10px 14px rgba(0,0,0,.4));animation:strut 3s ease-in-out infinite}
   .prog-info{position:relative;z-index:1;flex:1;min-width:0}
@@ -746,11 +748,24 @@
   .sb-cta{display:inline-block;font-size:12.5px;font-weight:900;color:#3A1E00;background:var(--grad-hero);
     padding:6px 14px;border-radius:99px}
   .sb-progress{font-size:11px;font-weight:800;color:var(--muted);margin-bottom:14px}
-  .lesson-entry{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
-    font-size:12.5px;font-weight:800;color:var(--text);padding:11px;margin-bottom:16px;
-    background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .lesson-entry{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;
+    width:100%;height:64px;margin-bottom:16px;border:none;border-radius:12px;
+    background:url('./bg-life-lesson.png') center/cover;box-shadow:0 10px 24px rgba(0,0,0,.32)}
   .lesson-entry:active{transform:scale(.98)}
-  .lesson-entry span{font-size:15px}
+  .lesson-entry-t{position:relative;z-index:1;font-size:13.5px;font-weight:900;color:#fff;
+    text-shadow:0 2px 6px rgba(0,0,0,.65);letter-spacing:.02em}
+  .lesson-star{position:absolute;color:#fff;font-size:12px;opacity:0;pointer-events:none;
+    text-shadow:0 0 6px rgba(255,255,255,.8);animation:lesson-star-fly 5s ease-in-out infinite}
+  .lesson-star.s1{left:14%;top:24%;animation-delay:0s}
+  .lesson-star.s2{left:52%;top:68%;animation-delay:1.4s}
+  .lesson-star.s3{left:82%;top:28%;animation-delay:2.8s}
+  @keyframes lesson-star-fly{
+    0%{opacity:0;transform:translateY(8px) scale(.6)}
+    18%{opacity:1;transform:translateY(0) scale(1)}
+    38%{opacity:1}
+    55%{opacity:0;transform:translateY(-12px) scale(.6)}
+    100%{opacity:0}
+  }
 
   /* ---- Life Lessons journal — an old scroll, not a modal list ---- */
   .lesson-ov{position:fixed;inset:0;background:rgba(10,6,2,.78);z-index:996;display:flex;align-items:center;
@@ -873,6 +888,11 @@
     padding:9px 15px;font-size:13px;font-weight:800;color:var(--muted);transition:transform .12s,all .18s}
   .set-chip:active{transform:scale(.94)}
   .set-chip.on{background:var(--grad-hero);color:#3A1E00;box-shadow:var(--glow)}
+  .setup-select{width:100%;margin-top:2px;padding:12px 14px;border-radius:14px;border:none;
+    background:var(--grad-hero);color:#3A1E00;font-size:13.5px;font-weight:800;
+    box-shadow:var(--glow);-webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%233A1E00'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%233A1E00' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center;padding-right:34px}
   .setup-avail{font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:14px;
     padding:11px 13px;margin:4px 0 14px;line-height:1.5}
   .setup-avail b{color:var(--primary)}
@@ -965,12 +985,6 @@
      ============================================================ */
   .story-view{padding-bottom:8px}
   .story-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-  .story-quit{width:34px;height:34px;flex:none;border-radius:12px;background:var(--surface-2);
-    color:var(--muted);font-size:16px;display:flex;align-items:center;justify-content:center}
-  .story-quit:active{transform:scale(.9)}
-  .story-back{flex:none;height:34px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);
-    color:var(--text);font-size:12px;font-weight:800;padding:0 12px;display:flex;align-items:center}
-  .story-back:active{transform:scale(.92)}
   .story-top-t{font-size:12.5px;font-weight:800;color:var(--muted);letter-spacing:.02em}
   .story-review-badge{margin-left:auto;font-size:10.5px;font-weight:900;color:var(--amber);
     background:var(--amber-bg);border:1px solid var(--amber);border-radius:99px;padding:4px 10px}
@@ -1052,6 +1066,16 @@
     45%{opacity:1;transform:rotate(300deg)}50%,100%{opacity:0;transform:rotate(360deg)}}
 
   /* ---- zoom-in "closer look" popup for the top illustration row ---- */
+  /* ---- Match-it: full entry popup instead of a short peek ---- */
+  .peek-full-ov{position:fixed;inset:0;background:rgba(6,10,16,.7);z-index:999;display:flex;align-items:center;
+    justify-content:center;padding:16px;opacity:0;transition:opacity .22s;pointer-events:none}
+  .peek-full-ov.show{opacity:1;pointer-events:auto}
+  .peek-full-card{max-width:400px;width:100%;max-height:84vh;overflow-y:auto;border-radius:20px;
+    background:var(--surface);box-shadow:0 24px 60px rgba(0,0,0,.5);padding:18px 16px;
+    transform:scale(.9) translateY(10px);transition:transform .3s cubic-bezier(.22,.9,.34,1.1)}
+  .peek-full-ov.show .peek-full-card{transform:scale(1) translateY(0)}
+  .peek-full-card .back-row{display:none}
+
   .zoom-ov{position:fixed;inset:0;background:rgba(6,10,16,.82);display:flex;align-items:center;justify-content:center;
     z-index:999;opacity:0;transition:opacity .22s;pointer-events:none;padding:24px}
   .zoom-ov.show{opacity:1;pointer-events:auto}
@@ -1147,8 +1171,8 @@
   .event-view{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
     padding:24px;animation:event-fade-in .35s ease}
   @keyframes event-fade-in{0%{opacity:0}100%{opacity:1}}
-  .event-bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(1.5px) brightness(.55)}
-  .event-scrim{position:absolute;inset:0;background:linear-gradient(160deg,rgba(20,14,30,.72),rgba(10,8,16,.88))}
+  .event-bg{position:fixed;inset:0;background-size:cover;background-position:center;filter:blur(1.5px) brightness(.55)}
+  .event-scrim{position:fixed;inset:0;background:linear-gradient(160deg,rgba(20,14,30,.72),rgba(10,8,16,.88))}
   .event-card{position:relative;z-index:1;max-width:340px;width:100%;padding:26px 22px 22px;border-radius:22px;
     text-align:center;background:linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.05));
     border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(10px);
@@ -1173,6 +1197,13 @@
     text-shadow:0 2px 10px rgba(0,0,0,.4)}
 
   .story-continue{margin-top:4px}
+  .story-nav{display:flex;gap:10px;margin-top:4px}
+  .story-nav-btn{flex:1;height:48px;border-radius:14px;font-size:20px;font-weight:900;
+    display:flex;align-items:center;justify-content:center;transition:transform .12s,opacity .12s}
+  .story-nav-btn.back{background:var(--surface-2);border:1px solid var(--line);color:var(--text)}
+  .story-nav-btn.fwd{background:var(--grad-hero);color:#3A1E00;box-shadow:var(--glow)}
+  .story-nav-btn:active{transform:scale(.94)}
+  .story-nav-btn:disabled{opacity:.32;pointer-events:none}
   .story-continue:disabled{opacity:.4;pointer-events:none}
 
   /* ---- arc-end / to-be-continued card ---- */
@@ -1405,9 +1436,9 @@
       <div class="hub-section-label">Your Progress</div>
       <div class="progress-card">
         <div class="stat-grid">
-          <div class="stat" onclick="statInsight('learned')"><div class="tile primary">📖</div><div class="n" id="d-total">0</div><div class="l">WORDS EXPLORED</div><span class="stat-more">tap</span></div>
-          <div class="stat" onclick="statInsight('avg')"><div class="tile mint">📊</div><div class="n" id="d-avg">0</div><div class="l">NEW PER DAY</div><span class="stat-more">tap</span></div>
-          <div class="stat" onclick="statInsight('time')"><div class="tile blue">⏱️</div><div class="n" id="d-time">0m</div><div class="l">TIME IN APP</div><span class="stat-more">tap</span></div>
+          <div class="stat" onclick="statInsight('learned')"><div class="tile primary">📖</div><div class="n" id="d-total">0</div><div class="l">WORDS EXPLORED</div><span class="stat-more">tap</span><img class="stat-deco" src="./decor-book-open.webp" alt=""/></div>
+          <div class="stat" onclick="statInsight('avg')"><div class="tile mint">📊</div><div class="n" id="d-avg">0</div><div class="l">NEW PER DAY</div><span class="stat-more">tap</span><img class="stat-deco" src="./decor-shiny-sun.webp" alt=""/></div>
+          <div class="stat" onclick="statInsight('time')"><div class="tile blue">⏱️</div><div class="n" id="d-time">0m</div><div class="l">TIME IN APP</div><span class="stat-more">tap</span><img class="stat-deco" src="./decor-alarm.webp" alt=""/></div>
         </div>
         <div class="progress-divider"></div>
         <div class="week-nav">
@@ -1629,7 +1660,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v22 · unexpected-event moments, real countdowns &amp; life lessons</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v23 · icon nav, arc-based AI trigger &amp; visual fixes</b></p>
   </section>
 </main>
 
