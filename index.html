@@ -114,13 +114,18 @@
   /* ---- top bar ---- */
   .topbar{position:sticky;top:0;z-index:40;background:rgba(14,27,42,.88);
     backdrop-filter:saturate(1.6) blur(18px);-webkit-backdrop-filter:saturate(1.6) blur(18px);
-    padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 12px;border-bottom:1px solid var(--line)}
+    padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 12px}
   :root[data-theme="light"] .topbar{background:rgba(243,247,251,.9)}
   .brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   .brand img{width:32px;height:32px;border-radius:10px;box-shadow:var(--glow)}
   .brand h1{font-size:19px;font-weight:900;margin:0;letter-spacing:-.02em;
     background:var(--grad-hero);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .searchwrap{position:relative}
+  .searchwrap{position:relative;display:flex;align-items:center;gap:8px}
+  .searchbox{flex:1;min-width:0}
+  .topbar-back{flex:none;width:38px;height:38px;border-radius:50%;background:var(--surface-2);
+    border:1px solid var(--line);color:var(--text);font-size:20px;font-weight:900;
+    display:flex;align-items:center;justify-content:center}
+  .topbar-back:active{transform:scale(.9);background:var(--primary-bg)}
   .searchbox{display:flex;align-items:center;gap:10px;
     background:linear-gradient(135deg,var(--surface-2),var(--surface));
     border:1.5px solid var(--line);border-radius:99px;padding:0 16px;
@@ -261,6 +266,7 @@
     border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;margin-bottom:16px;
     box-shadow:var(--shadow);overflow:hidden;transition:transform .12s}
   .story-cta:active{transform:scale(.98)}
+  .story-cta .glow-border{border-radius:var(--r)}
   .story-cta::before{content:'';position:absolute;right:-34px;top:-34px;width:130px;height:130px;
     border-radius:50%;background:var(--primary-bg);pointer-events:none;z-index:0}
   .story-cta::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
@@ -431,14 +437,9 @@
   .fs-lbl,.fw-lbl{display:block;font-size:9.5px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;
     opacity:.7;margin-bottom:4px}
 
-  #youglish-box:not(:empty){margin-top:14px;background:var(--surface);border:1px solid var(--line);
-    border-radius:16px;padding:12px;box-shadow:var(--shadow)}
-  .yg-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
-  .yg-lbl{font-size:11px;font-weight:900;letter-spacing:.02em;color:var(--muted)}
-  .yg-next{margin-left:auto;font-size:11.5px;font-weight:800;color:var(--primary);
-    background:var(--primary-bg);border-radius:99px;padding:5px 11px}
+  #youglish-box:not(:empty){margin-top:14px}
   .yg-slot{width:100%;border-radius:12px;overflow:hidden;min-height:1px}
-  .yg-credit{margin-top:8px;font-size:9.5px;color:var(--muted-2);text-align:right}
+  .yg-credit{margin-top:5px;font-size:9px;color:var(--muted-2);text-align:right}
 
   .forms{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
   .form{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:9px 11px;flex:1;min-width:78px;text-align:center}
@@ -739,7 +740,7 @@
   .hero-bubble::after{content:'';position:absolute;bottom:-9px;left:24px;border:8px solid transparent;border-top-color:var(--line)}
 
   /* ---- the orchard: tap the tree, fruit falls ---- */
-  .tree-widget{position:relative;height:240px;
+  .tree-widget{position:relative;height:262px;
     background:radial-gradient(ellipse 260px 160px at 50% 100%, rgba(255,159,69,.14), transparent 70%),
       linear-gradient(180deg,var(--surface-2),var(--surface));
     border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer}
@@ -760,11 +761,11 @@
     70%{opacity:1;transform:translateY(126px) rotate(220deg)}
     82%{transform:translateY(112px) rotate(250deg)}
     100%{opacity:0;transform:translateY(136px) rotate(300deg)}}
-  .tree-bubble{position:absolute;left:14px;top:52px;max-width:47%;z-index:4;
-    background:var(--surface);border:1.5px solid var(--line);color:var(--text);font-size:12px;font-weight:700;
-    padding:8px 12px;border-radius:14px;line-height:1.4;box-shadow:var(--shadow);
-    opacity:0;transform:scale(.85) translateY(6px);transition:all .26s cubic-bezier(.34,1.56,.64,1)}
-  .tree-bubble.show{opacity:1;transform:scale(1) translateY(0)}
+  .tree-bubble{position:absolute;left:16px;top:16px;max-width:60%;z-index:4;
+    color:var(--text);font-size:13px;font-weight:800;line-height:1.4;
+    text-shadow:0 2px 8px var(--surface),0 1px 3px var(--surface);
+    opacity:0;transform:translateY(6px);transition:all .26s cubic-bezier(.34,1.56,.64,1)}
+  .tree-bubble.show{opacity:1;transform:translateY(0)}
   .tree-word{position:absolute;left:14px;bottom:14px;right:auto;max-width:70%;z-index:5;display:none;
     background:var(--surface);border:1.5px solid var(--primary);border-radius:99px;padding:8px 14px;
     box-shadow:var(--shadow),var(--glow);align-items:baseline;gap:8px;animation:pop-in .4s cubic-bezier(.34,1.56,.64,1)}
@@ -829,45 +830,7 @@
     100%{opacity:0;transform:translateY(-10px) scale(1)}}
 
   /* ---- Focci fishing — a quiet little easter egg below the lessons banner ---- */
-  .fishing-scene{position:relative;width:95px;height:87px;margin:0 auto 16px;flex:none}
-  .fish-frame{position:absolute;inset:0;opacity:0}
-  .fish-frame img{width:100%;height:100%;object-fit:contain;display:block;transform-origin:50% 85%}
-  .fish-frame svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-  .fish-line{fill:none;stroke:#5b4a3a;stroke-width:1.3;stroke-linecap:round;transform-box:fill-box}
-  .f1{animation:ff1 9s steps(1) infinite}
-  .f2{animation:ff2 9s steps(1) infinite}
-  .f3{animation:ff3 9s steps(1) infinite}
-  .f4{animation:ff4 9s steps(1) infinite}
-  @keyframes ff1{0%{opacity:1}17%{opacity:1}17.1%{opacity:0}100%{opacity:0}}
-  @keyframes ff2{17%{opacity:0}17.1%{opacity:1}55%{opacity:1}55.1%{opacity:0}100%{opacity:0}}
-  @keyframes ff3{55%{opacity:0}55.1%{opacity:1}68%{opacity:1}68.1%{opacity:0}100%{opacity:0}}
-  @keyframes ff4{68%{opacity:0}68.1%{opacity:1}95%{opacity:1}95.1%{opacity:0}100%{opacity:0}}
-  .breathe-1{animation:fish-breathe 3.2s ease-in-out infinite}
-  .breathe-2{animation:fish-breathe 4s ease-in-out infinite}
-  .breathe-4{animation:fish-breathe 3.4s ease-in-out infinite}
-  @keyframes fish-breathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2px) scale(1.012)}}
-  .jolt{animation:fish-jolt .5s ease-in-out infinite}
-  @keyframes fish-jolt{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-3px) rotate(-1deg)}60%{transform:translateY(0) rotate(1deg)}}
-  .line-1{animation:fline-a 2.6s ease-in-out infinite}
-  .line-2{animation:fline-b 3.4s ease-in-out infinite}
-  .line-3{animation:fline-tense .35s ease-in-out infinite alternate}
-  .line-4{animation:fline-a 2.8s ease-in-out infinite}
-  @keyframes fline-a{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
-  @keyframes fline-b{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
-  @keyframes fline-tense{0%{transform:rotate(-1.2deg)}100%{transform:rotate(1.2deg)}}
-  /* water ripple — clipped to an ellipse that hugs the pond's own shape
-     (measured from the actual artwork's water pixels), so it never
-     bleeds onto the wooden dock the fox is sitting on */
-  .water-ripple{position:absolute;left:0;right:0;bottom:0;height:34%;pointer-events:none;
-    clip-path:ellipse(46% 78% at 50% 100%);-webkit-clip-path:ellipse(46% 78% at 50% 100%);
-    background:rgba(119,202,220,.001)}
-  .water-ripple i{position:absolute;left:-25%;right:-25%;height:3px;border-radius:50%;
-    background:linear-gradient(90deg,transparent,rgba(255,255,255,.9),transparent);
-    opacity:.6;animation:ripple-drift linear infinite}
-  .water-ripple i:nth-child(1){bottom:10%;animation-duration:2.6s}
-  .water-ripple i:nth-child(2){bottom:42%;animation-duration:3.4s;animation-delay:-1s;opacity:.45}
-  .water-ripple i:nth-child(3){bottom:68%;animation-duration:2.9s;animation-delay:-.4s;opacity:.35}
-  @keyframes ripple-drift{0%{transform:translateX(-12%) scaleX(.85)}50%{transform:translateX(12%) scaleX(1.1)}100%{transform:translateX(-12%) scaleX(.85)}}
+
 
   /* ---- Life Lessons journal — an old scroll, not a modal list ---- */
   .lesson-ov{position:fixed;inset:0;background:rgba(10,6,2,.78);z-index:996;display:flex;align-items:center;
@@ -1100,6 +1063,32 @@
   .hist-del{font-size:12px;color:var(--muted-2);padding:4px 6px;flex:none;line-height:1;
     width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center}
   .hist-del:active{background:var(--coral-bg);color:var(--coral);transform:scale(.9)}
+  .history-scroll{max-height:440px;overflow-y:auto}
+
+  /* ---- Focci fishing — a little interactive footer under Recent Searches ---- */
+  .fish-footer{position:relative;height:92px;margin-top:14px;border-radius:20px;
+    background:rgba(116,180,195,.24);border:1px solid rgba(116,180,195,.4);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    overflow:visible;cursor:pointer;display:flex;align-items:flex-end;justify-content:flex-end}
+  .fish-footer:active{transform:scale(.99)}
+  .fish-footer-img{position:relative;z-index:2;width:112px;margin-right:16px;margin-bottom:-16px;
+    transform:scale(1.18);filter:drop-shadow(0 10px 16px rgba(0,0,0,.32));transition:transform .15s}
+  .fish-footer:active .fish-footer-img{transform:scale(1.12)}
+  .fish-footer-bubble{position:absolute;right:14px;bottom:100%;margin-bottom:6px;max-width:82%;z-index:3;
+    color:var(--text);font-size:12.5px;font-weight:700;line-height:1.5;text-align:right;
+    text-shadow:0 2px 10px var(--bg),0 1px 4px var(--bg),0 0 14px var(--bg);
+    opacity:0;transform:translateY(6px);transition:all .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none}
+  .fish-footer-bubble.show{opacity:1;transform:translateY(0)}
+  .fish-footer-ripple{position:absolute;inset:0;overflow:hidden;border-radius:20px;pointer-events:none;z-index:1}
+  .fish-footer-ripple i{position:absolute;width:3px;height:3px;border-radius:50%;
+    background:radial-gradient(circle,#fff,rgba(255,255,255,.25) 70%,transparent);opacity:0;
+    animation:fish-dot-drift ease-in-out infinite}
+  .fish-footer-ripple i:nth-child(1){right:26%;top:32%;animation-duration:3.2s;animation-delay:0s}
+  .fish-footer-ripple i:nth-child(2){right:15%;top:58%;animation-duration:2.8s;animation-delay:.8s}
+  .fish-footer-ripple i:nth-child(3){right:40%;top:22%;animation-duration:3.6s;animation-delay:1.6s}
+  .fish-footer-ripple i:nth-child(4){right:52%;top:62%;animation-duration:3s;animation-delay:2.4s}
+  @keyframes fish-dot-drift{0%{opacity:0;transform:translateY(4px) scale(.5)}
+    30%{opacity:.7}70%{opacity:.5}100%{opacity:0;transform:translateY(-8px) scale(1)}}
 
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   /* ============================================================
@@ -1318,7 +1307,7 @@
   .event-card{position:relative;z-index:1;max-width:340px;width:100%;padding:26px 22px 22px;border-radius:22px;
     text-align:center;background:linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.05));
     border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(10px);
-    box-shadow:0 24px 60px rgba(0,0,0,.5);animation:event-card-in .45s cubic-bezier(.22,.9,.34,1.1)}
+    box-shadow:0 24px 60px rgba(0,0,0,.5);animation:event-card-in .45s cubic-bezier(.22,.9,.34,1.1);overflow:hidden}
   @keyframes event-card-in{0%{opacity:0;transform:translateY(14px) scale(.94)}100%{opacity:1;transform:translateY(0) scale(1)}}
   .event-ico{font-size:22px;display:block;margin-bottom:10px;filter:drop-shadow(0 0 8px rgba(255,255,255,.6));
     animation:presence-shimmer 2.2s ease-in-out infinite}
@@ -1330,13 +1319,22 @@
   .event-btn.go{background:rgba(255,255,255,.24);border:1px solid rgba(255,255,255,.36)}
   .event-btn.skip{background:transparent;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.2)}
   .event-btn:active{transform:scale(.96)}
-  /* timed-wait variant: mascot-meditate, a real countdown, paced breathing text */
+  /* timed-wait variant: mascot-meditate, a real countdown (no number shown),
+     paced breathing text. Tap the backdrop to bail out early. */
   .wait-mascot{width:84px;margin:0 auto 14px;filter:drop-shadow(0 10px 16px rgba(0,0,0,.4));
     animation:wait-breathe 4s ease-in-out infinite}
   @keyframes wait-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
   .wait-breath{margin-top:14px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:.02em}
-  .wait-count{margin-top:8px;font-size:26px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;
-    text-shadow:0 2px 10px rgba(0,0,0,.4)}
+
+  /* ---- rotating glow-border: a light chasing clockwise around a rounded
+     rectangle's edge. Reused on the Focci Story card and every event card
+     (choice + wait) — the same "something's alive here" cue everywhere. */
+  .glow-border{position:absolute;inset:0;border-radius:inherit;z-index:0;pointer-events:none;padding:2px;
+    background:conic-gradient(from 0deg,transparent 0%,var(--primary) 12%,var(--amber) 20%,transparent 34%);
+    animation:glow-spin 3.5s linear infinite;
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude}
+  @keyframes glow-spin{to{transform:rotate(360deg)}}
 
   .story-continue{margin-top:4px}
   .story-nav{display:flex;gap:10px;margin-top:4px}
@@ -1499,6 +1497,7 @@
     <h1>Focci</h1>
   </div>
   <div class="searchwrap">
+    <button class="topbar-back" id="topbar-back" onclick="backToHome()" style="display:none" aria-label="Back">‹</button>
     <div class="searchbox">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="q" type="search" inputmode="search" autocapitalize="none" autocorrect="off" spellcheck="false"
@@ -1566,6 +1565,7 @@
       </div>
 
       <button class="story-cta" onclick="showStoryIntro()">
+        <span class="glow-border"></span>
         <img class="story-cta-char" src="./mascot-explore.webp" alt="" />
         <div class="story-cta-text">
           <div class="story-cta-title">Focci's story</div>
@@ -1601,7 +1601,13 @@
 
       <div class="sec">
         <div class="sec-h"><span class="tile tile-sm primary">🕘</span>Recent Searches</div>
-        <div id="history-list"></div>
+        <div id="history-list" class="history-scroll"></div>
+      </div>
+
+      <div class="fish-footer" id="fish-footer" onclick="tapFishMascot()">
+        <div class="fish-footer-bubble" id="fish-footer-bubble"></div>
+        <div class="fish-footer-ripple"><i></i><i></i><i></i><i></i></div>
+        <img class="fish-footer-img" id="fish-footer-img" src="./mascot-fishing.webp" alt=""/>
       </div>
     </div>
   </section>
@@ -1801,7 +1807,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v31 · VI compound-word fix, fishing scene &amp; banner rebuild</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v32 · fishing footer, AI-gen removed, glow borders</b></p>
   </section>
 </main>
 

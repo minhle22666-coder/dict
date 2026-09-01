@@ -412,7 +412,7 @@ async function viReverseLookup(term){
   return [...out];
 }
 function viResultsState(query, words){
-  let h='<div class="back-row" onclick="backToHome()">← Home</div>';
+  let h='';
   h+='<div class="vi-results"><div class="vi-results-h">“'+esc(query)+'” in English</div><div class="vi-results-list">';
   for(const w of words){
     h+='<button class="vi-result-chip" onclick="jump(\''+esc(w).replace(/'/g,"\\'")+'\')">'+esc(w)+'</button>';
@@ -422,7 +422,7 @@ function viResultsState(query, words){
 }
 function viNotFoundState(query){
   const safeQ=esc(query).replace(/'/g,"\\'");
-  return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/>'
+  return '<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/>'
     +'<h3>No match for “'+esc(query)+'” yet</h3><p>This only searches Vietnamese meanings already saved in your library — look up more English words and this gets better over time.</p>'
     +'<button class="btn ghost sm" style="margin:14px auto 0" onclick="forceViTranslate(\''+safeQ+'\')">Translate with AI instead</button></div>';
 }
@@ -469,7 +469,7 @@ async function translatePhrase(text){
 }
 function phraseResultState(original, result){
   const dirLbl = result.source_lang==='vi' ? 'Vietnamese → English' : 'English → Vietnamese';
-  let h='<div class="back-row" onclick="backToHome()">← Home</div>';
+  let h='';
   h+='<div class="tr-card"><div class="tr-dir">'+esc(dirLbl)+'</div>';
   h+='<div class="tr-src">'+esc(original)+'</div>';
   h+='<div class="tr-arrow">↓</div>';
@@ -581,6 +581,7 @@ async function search(rawWord, forceAI){
   // A search always takes you to the word page, no matter which tab you were on.
   if(!$('#v-home').classList.contains('active')) showView('home');
   $('#dashboard').style.display='none';
+  $('#topbar-back').style.display='flex';
   const box=$('#result');
 
   // Vietnamese → offline reverse lookup, ALWAYS tried first, regardless of
@@ -660,7 +661,7 @@ async function search(rawWord, forceAI){
   }
 }
 function forceAI(word){ search(word,true); }
-function backToHome(){ currentWord=null; $('#result').innerHTML=''; $('#dashboard').style.display='block'; $('#q').value=''; $('#clearx').style.display='none'; renderDashboard(); window.scrollTo(0,0); }
+function backToHome(){ currentWord=null; $('#result').innerHTML=''; $('#dashboard').style.display='block'; $('#topbar-back').style.display='none'; $('#q').value=''; $('#clearx').style.display='none'; renderDashboard(); window.scrollTo(0,0); }
 
 /* ---------- toggle save ---------- */
 async function toggleSave(word){
@@ -810,16 +811,12 @@ window.onYouglishAPIReady=function(){
 };
 function renderYouglishWidget(word){
   const box=$('#youglish-box'); if(!box || currentWord!==word) return;   // navigated away while loading
-  box.innerHTML='<div class="yg-head"><span class="yg-lbl">Nghe trong câu thật</span>'
-    +'<button class="yg-next" id="yg-next-btn" style="display:none" onclick="if(window._ygWidget)window._ygWidget.next()">Video khác ›</button></div>'
-    +'<div id="yg-slot" class="yg-slot"></div>'
-    +'<div class="yg-credit">Powered by YouGlish</div>';
+  box.innerHTML='<div id="yg-slot" class="yg-slot"></div><div class="yg-credit">YouGlish</div>';
   try{
     _ygWidget = new YG.Widget('yg-slot', {
-      autoStart:0, components:4+8+64,   // title + caption + control buttons, no search box/accent panel
+      autoStart:0, components:8+64,   // caption + the widget's own control row only — no title, no search box
       events:{
-        onFetchDone:(e)=>{ if(!e||!e.totalResult){ box.innerHTML=''; return; }
-          const btn=$('#yg-next-btn'); if(btn) btn.style.display = e.totalResult>1 ? 'inline-flex' : 'none'; },
+        onFetchDone:(e)=>{ if(!e||!e.totalResult) box.innerHTML=''; },
         onError:()=>{ box.innerHTML=''; }
       }
     });
@@ -845,7 +842,7 @@ function renderEntry(rec, queriedAs){
 
   let h='<div class="entry">';
   h+='<img class="entry-corner" src="./mascot-'+corner+'.webp" alt=""/>';
-  h+='<div class="back-row" onclick="backToHome()">← Home</div>';
+  h+='';
   if(queriedAs){
     h+='<div class="corrected">Corrected from “'+esc(queriedAs)+'”'+(d.query_note?' · '+esc(d.query_note):'')+'</div>';
   }
@@ -1000,7 +997,7 @@ function jump(w){
 function suggestState(query,guess){
   const label=esc(guess.label), target=guess.target, safeT=target.replace(/'/g,"\\'"), safeQ=query.replace(/'/g,"\\'");
   const kind = guess.type==='expr' ? ' <span style="opacity:.72">(inside “'+esc(target)+'”)</span>' : '';
-  let h='<div class="back-row" onclick="backToHome()">← Home</div>';
+  let h='';
   // Primary action: send Focci off to chart the unknown word.
   h+='<div class="ask-ai-card" onclick="forceAI(\''+safeQ+'\')">'
     +'<img src="./mascot-investigate.webp" alt=""/>'
@@ -1012,16 +1009,16 @@ function suggestState(query,guess){
     +'<span class="nm-go">→</span></div></div>';
   return h;
 }
-function needKeyState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can chart new words for you.</p></div>'
+function needKeyState(w){ return '<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can chart new words for you.</p></div>'
    +'<button class="btn" onclick="showView(\'settings\')">Open Settings</button>'; }
-function offlineState(w){ return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
+function offlineState(w){ return '<div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
 function errorState(w,msg){
   let m='Something went wrong reaching the AI.';
   if(msg.startsWith('BAD_KEY')) m='Your API key looks wrong or isn\'t enabled. Check it in Settings.';
   else if(msg.startsWith('API')) m='Google returned an error: '+esc(msg.slice(4,120));
   else if(msg==='PARSE') m='The AI reply wasn\'t in the right format. Try again.';
   else if(msg==='OFFLINE') return offlineState(w);
-  return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
+  return '<div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>Couldn\'t look up “'+esc(w)+'”</h3><p>'+m+'</p></div>';
 }
 function questScene(word){
   const cheers=["DON'T GIVE UP…","UNCHARTED TERRITORY!","INTO THE UNKNOWN…","A NEW LAND AWAITS!"];
@@ -1087,7 +1084,7 @@ async function removeFromSuggest(word, btn){
 async function renderHistory(){
   const logs=await logAll();
   const seen=new Set(); const recent=[];
-  for(let i=logs.length-1;i>=0 && recent.length<12;i--){
+  for(let i=logs.length-1;i>=0 && recent.length<8;i--){
     const l=logs[i]; if(l.type!=='search'||!l.word||seen.has(l.word)) continue;
     seen.add(l.word); recent.push(l.word);
   }
@@ -1109,6 +1106,108 @@ async function renderHistory(){
   }
   box.innerHTML=h;
 }
+const FISH_STORIES=[
+['A boy asks his father, "Dad, are bugs good to eat?" "That\'s disgusting.','Don\'t talk about things like that over dinner," the dad replies.','After dinner the father asks, "Now, son, what did you want to ask me?" "Oh, nothing," the boy says.','"There was a bug in your soup, but now it\'s gone."'],
+['A man walks into a bank and asks to rob it.','The banker says, "Sir, that\'s illegal." The man responds, "I know, but I\'m tired of pretending to be employed.','You robbed me for 20 years with taxes."'],
+['A teacher asks her student, "Why didn\'t you do your homework?" The student says, "My dog ate it." The teacher replies, "That\'s the oldest excuse in the book." The student says, "Exactly.','He has very good taste in literature."'],
+['A woman tells her friend, "My husband never listens to me." Her friend asks, "What did he say when you told him?" The woman answers, "I don\'t know—he was asleep."'],
+['A job interviewer asks, "What\'s your biggest weakness?" The candidate says, "Honesty." The interviewer responds, "I don\'t think honesty is a weakness." The candidate replies, "I don\'t care what you think."'],
+['A doctor tells his patient, "You need to cut back on sugar." The patient asks, "Or what?" The doctor says, "Or you\'ll die." The patient responds, "I\'m going to die anyway, so at least I\'ll enjoy it."'],
+['A child asks his mother, "Why do people lie?" She answers, "To protect people\'s feelings." Later, he asks, "Do you think I\'m smart?" She says, "Of course, honey."'],
+['A man tells his friend, "I quit my job to pursue my dreams." His friend asks, "How\'s that going?" He replies, "Terrible.','Turns out my dream was just having a salary."'],
+['A woman asks her boss, "Can I leave early today?" He says, "Only if you leave better." She responds, "I\'ve been trying for five years."'],
+['A student tells his teacher, "This math problem is impossible." The teacher responds, "There\'s always a solution." The student says, "Exactly—it\'s called dropping out."'],
+['A man walks into his house and finds his wife with another man.','He says calmly, "I\'m leaving you." She responds, "Is it because of him?" He says, "No, because you\'re still the same person who married me, and clearly your judgment is terrible."'],
+['A therapist asks, "How do you feel about your childhood?" His patient responds, "I\'m paying you $150 an hour to talk to me about something I can\'t change."'],
+['A politician says, "I\'m here to serve the people." A citizen asks, "How?" The politician responds, "I already am—I\'ve taken their money and their hope."'],
+['A woman tells a man at a bar, "I\'m a psychologist." He asks, "Can you read my mind?" She says, "You\'re thinking I\'m interested." He replies, "Actually I was wondering if you\'d buy me a drink." She says, "My diagnosis was correct."'],
+['A boy asks his father, "Why do you work so much?" His father says, "To provide for you." The boy responds, "But you\'re never here.','I\'d prefer the opposite."'],
+['A customer complains to a restaurant manager, "This food is cold." The manager replies, "That\'s impossible—we just made it." The customer says, "Exactly.','You\'ve been talking to me for 15 minutes."'],
+['A man tells his friend, "I\'m getting in shape." His friend asks, "For what?" He says, "For my wedding." His friend responds, "Congratulations!','Who\'s the lucky woman?" He answers, "Gym."'],
+['A lawyer tells his client, "The truth will set you free." His client responds, "That\'s why I hired you—to lie."'],
+['A mother asks her son, "Did you finish your vegetables?" He says, "I\'m trying to eat healthy." She responds, "Then why is there pizza in your room?" He says, "So I don\'t eat it with the vegetables—that would be bad combinations."'],
+['A friend asks, "Why don\'t you ever admit you\'re wrong?" Another responds, "I\'m never wrong.','Remember when I thought I was wrong? I was wrong about that too."'],
+['A man tells a stranger, "I\'m trying to change my life." The stranger asks, "How?" He responds, "I moved to a different apartment." The stranger says, "That\'s not change." He replies, "Exactly—my problems followed me here too."'],
+['A girl tells her boyfriend, "I think we should see other people." He asks, "Why?" She says, "Because you\'re always on your phone." He puts his phone down and says, "I\'m not anymore." She replies, "Too late—I already called someone else."'],
+['A parent asks their child, "Did you learn anything at school today?" The child responds, "Yes—that I should\'ve stayed home."'],
+['A man walks into a gym for the first time.','The trainer asks, "What\'s your goal?" He says, "To leave and never come back." The trainer replies, "Honestly, most people\'s goal by month two."'],
+['A woman asks her husband, "Do you love me?" He says, "Of course." She asks, "Then why don\'t you show it?" He responds, "Because showing it would be more expensive than saying it."'],
+['A student asks his teacher, "Will this be on the test?" The teacher says, "No." The student then stops paying attention.','The teacher adds, "Actually, that question will be."'],
+['A man tells his son, "Honesty is the best policy." Later, the son asks, "Do I look fat?" His father says, "Yes." His mother gets angry.','His father whispers, "You said honesty is the best policy."'],
+['A wealthy man tells a homeless person, "Have you tried getting a job?" The homeless person responds, "I had three." The man asks, "Then why are you homeless?" The homeless person says, "Because employers like you keep asking me stupid questions instead of paying me."'],
+['A pessimist tells an optimist, "Nothing ever works out." The optimist responds, "That\'s not true!','Look, we\'re both still alive." The pessimist says, "Exactly—we haven\'t even accomplished that yet."'],
+['A woman tells her therapist, "I have no self-control." Her therapist asks, "How long have you felt this way?" She responds, "Since the moment you asked—I was supposed to be on a diet."'],
+['A man asks a beggar, "Why don\'t you work for your money?" The beggar responds, "I tried that. Now I\'m here.','Apparently hard work doesn\'t guarantee success—just guarantees you\'re tired too."'],
+['A teenager tells his mom, "I need privacy." She asks, "Why?" He says, "Everyone deserves privacy." She responds, "I know—that\'s why I read your diary in private."'],
+['A customer asks a waiter, "Is this fish fresh?" The waiter replies, "It was swimming this morning." The customer says, "Then why does it smell like it died yesterday?" The waiter responds, "Because you caught it this morning, sir."'],
+['A man tells his boss, "I deserve a raise." His boss asks, "Why?" He says, "I\'ve been working here for 10 years." His boss responds, "Exactly—you\'re still learning."'],
+['A friend asks, "Why are you so tired?" Another replies, "I\'ve been trying to sleep, but I keep thinking about my problems." His friend says, "Just don\'t think about them." He responds, "Wow, I never thought of that—but I can\'t stop thinking."'],
+['A woman tells her date, "I\'m looking for someone honest." He says, "Great, I\'m very honest." She asks, "So how many people have you dated?" He responds, "Honestly?','I\'ve lost count." She says, "See, honesty works."'],
+['A child asks, "Dad, why do you drink so much coffee?" His father replies, "To stay awake at work." The child asks, "Why do you need to stay awake?" The father says, "To make money." The child asks, "To buy what?" The father responds, "More coffee."'],
+['A man tells his doctor, "I snore too much." The doctor asks, "Does it bother you?" He says, "No, it bothers my wife." The doctor responds, "Then she should come see me."'],
+['A boss tells his employee, "You\'re fired." The employee asks, "Why?" The boss says, "You\'re not productive." The employee responds, "I know—that\'s why I never finished anything.','If I finished my work, you\'d fire me for being idle."'],
+['A woman tells her friend, "I\'m on a diet." Her friend asks, "Does it work?" She responds, "Yes—every diet works when you don\'t follow it."'],
+['A teenager tells his mom, "I failed my test." She asks, "How?" He says, "By not studying." She responds, "That\'s not how, that\'s why." He says, "Exactly—if I knew how, I would\'ve passed."'],
+['A man asks a fortune teller, "Can you predict my future?" She says, "Yes, you\'ll be very successful." He asks, "When?" She responds, "When you stop asking fortune tellers about your future and start working."'],
+['A friend asks, "Why did you quit your gym membership?" Another replies, "I was paying for exercise." His friend says, "So you could get healthy." He responds, "No, so I could feel guilty about not going—which is free."'],
+['A customer asks a used car salesman, "Is this car reliable?" The salesman says, "Absolutely." The customer asks, "Then why are you selling it?" The salesman responds, "Because I\'m reliable, not stupid."'],
+['A woman tells her therapist, "I have anxiety about the future." The therapist asks, "What worries you most?" She responds, "That I\'ll still be anxious about the future." The therapist says, "That\'s actually a sign of progress."'],
+['A man tells his friend, "I\'m finally debt-free." His friend asks, "How?" He says, "I stopped counting." His friend responds, "That\'s not how debt works." He says, "I know—that\'s why it\'s working so well."'],
+['A parent asks their child, "Why did you hit your brother?" The child responds, "He hit me first." The parent says, "That doesn\'t make it okay." The child replies, "Exactly—so we\'re both not okay now.','It\'s fair."'],
+['A musician tells someone, "I haven\'t made any money from my music." The person asks, "Why do you keep doing it?" The musician responds, "Because if I stop, it means my hobby was a waste of time.','If I keep going, there\'s still hope."'],
+['A man tells his wife, "I bought us a surprise vacation." She asks, "Where?" He says, "You\'ll see when we get there." She responds, "I hate surprises." He says, "Good, because we\'re going to my mother\'s house." She replies, "Perfect—I already knew."'],
+['A student asks his professor, "Will you teach us how to be successful?" The professor responds, "No, I\'m a teacher—if I knew how to be successful, I wouldn\'t be teaching."'],
+];
+
+/* ============================================================
+   FOCCI FISHING — the Home footer easter egg. Story text comes from
+   short one-liner jokes, revealed ~1 sentence-group per tap with a
+   trailing "…" when there's more; a finished story rolls a new
+   random one for next time. Most taps are just a quick idle wobble
+   (frame 1 <-> frame 2); every 5th tap plays the actual catch
+   (frame 3 -> frame 4) before settling back to idle.
+   ============================================================ */
+let _fishTapCount=0, _fishStoryIdx=-1, _fishChunkIdx=0, _fishBusy=false;
+function pickNewFishStory(){
+  _fishStoryIdx = Math.floor(Math.random()*FISH_STORIES.length);
+  _fishChunkIdx = 0;
+}
+function tapFishMascot(){
+  if(_fishBusy) return;
+  _fishTapCount++;
+  const bubble=$('#fish-footer-bubble'); if(!bubble) return;
+  if(_fishStoryIdx<0) pickNewFishStory();
+  const story=FISH_STORIES[_fishStoryIdx];
+  let text=story[_fishChunkIdx];
+  const hasMore = _fishChunkIdx < story.length-1;
+  bubble.textContent = hasMore ? text+' …' : text;
+  bubble.classList.remove('show'); void bubble.offsetWidth; bubble.classList.add('show');
+  clearTimeout(bubble._hideT);
+  bubble._hideT=setTimeout(()=>bubble.classList.remove('show'), 4200);
+  if(hasMore) _fishChunkIdx++;
+  else pickNewFishStory();          // story finished — a new random one is queued up for next time
+
+  if(_fishTapCount%5===0) playFishCatchSequence();
+  else playFishIdleWobble();
+}
+function playFishIdleWobble(){
+  const img=$('#fish-footer-img'); if(!img) return;
+  img.src='./mascot-fishing-dreamy.webp';
+  setTimeout(()=>{ if(img) img.src='./mascot-fishing.webp'; }, 500);
+}
+function playFishCatchSequence(){
+  _fishBusy=true;
+  const img=$('#fish-footer-img'); if(!img){ _fishBusy=false; return; }
+  const seq=['./mascot-fishing-realize.webp','./mascot-fishing-catch-it.webp'];
+  let i=0;
+  const step=()=>{
+    if(i>=seq.length){ img.src='./mascot-fishing.webp'; _fishBusy=false; return; }
+    img.src=seq[i]; i++;
+    setTimeout(step, 900);
+  };
+  step();
+}
+
 let _statCache={learned:0,avg:0,mins:0,activeDays:0,todayNew:0,bestDay:0};
 
 async function removeFromHistory(word){
@@ -2627,8 +2726,8 @@ function showView(v){
   if(v==='home'){
     renderHero();
     // keep an open word visible; only rebuild the dashboard when none is open
-    if(currentWord && $('#result').innerHTML.trim()){ $('#dashboard').style.display='none'; }
-    else { $('#dashboard').style.display='block'; renderDashboard(); }
+    if(currentWord && $('#result').innerHTML.trim()){ $('#dashboard').style.display='none'; $('#topbar-back').style.display='flex'; }
+    else { $('#dashboard').style.display='block'; $('#topbar-back').style.display='none'; renderDashboard(); }
   }
   if(v==='saved') renderSaved();
   if(v==='review'){ if(typeof renderGameHub==='function') renderGameHub(); else startReview(); }

@@ -393,141 +393,8 @@ function _sealedResolveEnding(){                                  // never calle
   return (COU>=55) ? 'ASH' : 'THE_WAITER';
 }
 
-/* ============================================================
-   WORD BANK — accumulates every new word the reader looks up,
-   anywhere in the app, in batches of 10. Runs completely silently.
-   This is a pool, not a trigger: a word banked back in Arc 1 is
-   just as eligible for Arc 5's passage as one banked yesterday —
-   see generateArcPassages() below for when it actually gets used.
-   ============================================================ */
-window.onWordSearched = function(rawWord){
-  const w = norm(rawWord||'');
-  if(!w) return;
-  const st=getState();
-  if(st.seenWords.includes(w)) return;                      // not new
-  st.seenWords.push(w);
-  st.wordBankPending.push(w);
-  while(st.wordBankPending.length>=10){
-    st.wordBank.push(...st.wordBankPending.splice(0,10));
-  }
-  saveState();
-};
-
-/* ============================================================
-   PASSAGE GENERATION — 65% fixed core / 20% word-bank / 15% newest,
-   at the Target Level, via Gemini 2.5 Flash Lite ONLY (never the
-   model configured for dictionary lookups).
-   ============================================================ */
-const PASSAGE_MODEL = 'gemini-2.5-flash-lite';
-function sampleWords(arr, n){
-  if(!arr.length || n<=0) return [];
-  const pool = arr.slice();
-  const out=[];
-  while(out.length<n && pool.length) out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
-  return out;
-}
-function levelName(lv){ return (window.LEVEL_NAMES && window.LEVEL_NAMES[lv]) || 'B1'; }
-
-/* Word source for the 20%/30% bands: the app's own CEFR-ish frequency list
-   (levels.txt), filtered to the user's current/target level — NOT the
-   personal word-bank. A learner's "confident" and "reach-for" vocabulary is
-   about proficiency band, not what they happen to have searched before. */
-function bandWords(lv, n){
-  const pool = (typeof wordsAtLevel==='function') ? wordsAtLevel(lv) : [];
-  return sampleWords(pool, n);
-}
-
-function buildPassagePrompt(chapter, coreBlocks, currentWords, targetWords, currentLvName, targetLvName, personalWords){
-  const marker = (id)=>'### '+id+' ###';
-  const core = coreBlocks.map(b=>marker(b.id)+'\n'+b.text).join('\n\n');
-  const personalNote = (personalWords && personalWords.length)
-    ? ` A few of these (${personalWords.join(', ')}) come from the reader's OWN recent lookups elsewhere in the app — they may belong to a completely different domain than this scene (finance, tech, medicine, anything). Do not force their literal topic in. Use SEMANTIC ROLE TRANSFER instead: strip the word down to its underlying role — is it fundamentally naming a quantity, a risk, a loss, a growth, a barrier, a relief, an exchange? — and cast only that role onto something already happening in the scene (a feeling Focci has, an object's state, an action, an outcome). "Liquidity" isn't about money here — it can describe how easily something flows or is available. If a word genuinely can't be cast this way without turning silly or confusing, quietly drop it.`
-    : '';
-  return `You are lightly enriching an English reading passage for a language learner, WITHOUT changing its plot, meaning, or comprehension-question answers.
-
-RULES (all mandatory):
-1. Keep every scene block under its EXACT "### <id> ###" marker line, same ids, same order, same count. Never add, remove, merge, or rename a block.
-2. The story content, character names, item names, and factual details in the ORIGINAL text below must all remain intact — a reader must still understand the same story the same way, and every comprehension-question answer must still hold. This core plot vocabulary is about 50% of the passage and is off-limits for substitution.
-3. Naturally weave in some of these ${currentLvName}-level words (the reader is already comfortable around here — light review): ${currentWords.join(', ')||'(none available)'}. This band should land around 20% of the passage's vocabulary.
-4. Naturally weave in some of these ${targetLvName}-level words (the reader is reaching for this level — a gentle stretch): ${targetWords.join(', ')||'(none available)'}. This band should land around 30% of the passage's vocabulary.${personalNote}
-5. Words from both bands should mostly describe things, events, actions, or feelings — a texture in the scene, something that happens, something Focci notices or feels — not plot mechanics, names, or facts the COMP/IQ questions depend on.
-6. You may add 1–3 short descriptive sentences per block if that's genuinely needed to fit the words above naturally — but keep the SAME spare, understated voice as the original (short declarative sentences, concrete images, no over-explaining) — never pad with generic filler, never change what happens, never change a character's choice or its outcome, and never touch the core vocabulary from rule 2.
-7. Not every word in each list needs to appear — use judgment; a natural passage with 4–6 of them fitted well beats a stuffed one with all of them.
-8. Wrap 1–2 genuinely important words or short phrases per block in **double asterisks** — something worth a reader's extra attention (a key feeling, the pivotal action, a word from rule 3/4). Never bold more than that, never use any OTHER markdown (no _italics_, no #headers, no lists) — plain prose with occasional **bold** is the only formatting this reader's screen understands.
-9. Output ONLY the rewritten blocks with their markers, nothing else — no preamble, no commentary, no markdown fences.
-
-ORIGINAL:
-${core}`;
-}
-async function askGeminiFlashLite(prompt){
-  const key=getKey(); if(!key) throw new Error('NO_KEY');
-  if(!navigator.onLine) throw new Error('OFFLINE');
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/${PASSAGE_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
-  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.5}})});
-  if(!res.ok) throw new Error('API:'+res.status);
-  const data=await res.json();
-  return (data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim();
-}
-function baseTextOf(scene){ return scene.en || ''; } // pre-branch base text; see file header note on variants
-function parsePassageBlocks(raw, ids){
-  const out={};
-  const re=/###\s*([\w.\-]+)\s*###\s*([\s\S]*?)(?=###\s*[\w.\-]+\s*###|$)/g;
-  let m;
-  while((m=re.exec(raw))) out[m[1].trim()]=m[2].trim();
-  for(const id of ids) if(!out[id]) return null;             // parse failed to cover every block — bail to defaults
-  return out;
-}
-const _passageGenInFlight = new Set();
-async function generateChapterPassage(chapterId, force){
-  const st=getState();
-  if(!force && st.passages[chapterId]) return;               // generate once per chapter arrival, unless forced
-  if(_passageGenInFlight.has(chapterId)) return;              // already generating — don't stack calls
-  _passageGenInFlight.add(chapterId);
-  try{
-    const ch = chapterById(chapterId); if(!ch) return;
-    if(typeof loadLevels==='function'){ try{ await loadLevels(); }catch(e){} }
-    const blocks = ch.scenes.filter(s=>s.en).map(s=>({id:s.id, text:baseTextOf(s)}));
-    if(!blocks.length) return;
-    const cur = bandWords(st.currentLevel, Math.max(2,Math.round(blocks.length*0.7)));       // ~20% band
-    const personalPick = sampleWords((st.wordBank||[]).slice(-30), 2);                       // the reader's own recent words, seasoning only
-    const tgtRest = bandWords(st.targetLevel, Math.max(1,Math.round(blocks.length*1.0)-personalPick.length));
-    const tgt = [...new Set([...personalPick, ...tgtRest])];                                 // ~30% band total
-    try{
-      const raw = await askGeminiFlashLite(buildPassagePrompt(ch, blocks, cur, tgt, levelName(st.currentLevel), levelName(st.targetLevel), personalPick));
-      const parsed = parsePassageBlocks(raw, blocks.map(b=>b.id));
-      if(parsed) st.passages[chapterId] = { sceneTexts:parsed, mode:'ai', ts:Date.now() };
-      else if(!st.passages[chapterId]) st.passages[chapterId] = { sceneTexts:{}, mode:'default', ts:Date.now() };
-      // a failed refresh keeps whatever good version was already there
-    }catch(e){
-      if(!st.passages[chapterId]) st.passages[chapterId] = { sceneTexts:{}, mode:'default', ts:Date.now() }; // graceful degrade
-    }
-    saveState();
-  } finally {
-    _passageGenInFlight.delete(chapterId);
-  }
-}
-/* Fires once, right when an arc finishes (see finalizeArcScoring's call
-   sites in advance()) — generates every chapter of the NEXT arc in one
-   batch, force-refreshed so it uses the fullest word-bank available
-   (everything banked up through the arc that just ended, plus anything
-   from earlier arcs — the pool never resets). All fire-and-forget: the
-   arc-end card and the next arc's opening scenes never wait on this. */
-function generateArcPassages(arcId){
-  const arc = CONTENT.find(a=>a.id===arcId); if(!arc) return;
-  for(const ch of arc.chapters) generateChapterPassage(ch.id, true).catch(()=>{});
-}
-let _chOrder=null;
-function CONTENT_CHAPTER_ORDER(){
-  if(_chOrder) return _chOrder;
-  _chOrder=[]; for(const arc of CONTENT) for(const ch of arc.chapters) _chOrder.push(ch.id);
-  return _chOrder;
-}
 function getSceneText(scene, chapterId){
   const st=getState();
-  const p = st.passages[chapterId];
-  if(p && p.mode==='ai' && p.sceneTexts[scene.id]) return p.sceneTexts[scene.id];
-  // variant / base resolution, always the safe fallback
   if(scene.variant3If && condOk(scene.variant3If, st.flags)) return scene.variant3En;
   if(scene.variant2If && condOk(scene.variant2If, st.flags)) return scene.variant2En;
   if(scene.variantIf && condOk(scene.variantIf, st.flags)) return (scene.en||'') + (scene.variantEn?'\n\n'+scene.variantEn:'');
@@ -887,7 +754,6 @@ function advance(){
     if(finishedArc && !st.arcCardShown[finishedArc]){
       st.arcCardShown[finishedArc]=true; saveState();
       finalizeArcScoring(finishedArc);
-      generateArcPassages(finishedArc+1);
       renderArcEndCard(finishedArc, true);
       return;
     }
@@ -912,7 +778,6 @@ function advance(){
     if(finishedArc && !st.arcCardShown[finishedArc]){
       st.arcCardShown[finishedArc]=true; saveState();
       finalizeArcScoring(finishedArc);
-      generateArcPassages(finishedArc+1);
       renderArcEndCard(finishedArc);
       return;
     }
@@ -1274,19 +1139,18 @@ window.storyContinueOrEvent = function(){
 function renderPresenceEvent(scene, idx){
   const area=$('#review-area'); if(!area) return;
   const p = scene.presence[idx];
-  let h='<div class="event-view"><div class="event-bg" style="background-image:url(\''+assetUrl(scene.bg)+'\')"></div><div class="event-scrim"></div>';
+  let h='<div class="event-view" onclick="if(event.target===this) cancelWait(\''+scene.id+'\','+idx+')"><div class="event-bg" style="background-image:url(\''+assetUrl(scene.bg)+'\')"></div><div class="event-scrim"></div>';
   if(p.wait){
-    h+='<div class="event-card wait-card">'
+    h+='<div class="event-card wait-card"><span class="glow-border"></span>'
       +'<img class="wait-mascot" src="'+assetUrl('mascot-meditate')+'" alt="" onerror="this.style.display=\'none\'"/>'
       +'<div class="event-q">'+esc(p.text)+'</div>'
       +'<div class="wait-breath" id="wait-breath">Breathe in<span class="breathe-dots"><i></i><i></i><i></i></span></div>'
-      +'<div class="wait-count" id="wait-count">'+p.wait+'</div>'
       +'</div>';
   } else {
     let seed=0; for(const ch of scene.id+idx) seed=(seed*31+ch.charCodeAt(0))>>>0;
     const declineText = pickVaried(PRESENCE_DECLINES, seed);
     const acceptText = pickVaried(PRESENCE_ACCEPTS, seed+7);
-    h+='<div class="event-card">'
+    h+='<div class="event-card"><span class="glow-border"></span>'
       +'<span class="event-ico">✿</span>'
       +'<div class="event-q">'+esc(p.text)+'</div>'
       +'<div class="event-actions">'
@@ -1298,6 +1162,11 @@ function renderPresenceEvent(scene, idx){
   area.innerHTML=h;
   if(p.wait) startWaitCountdown(scene.id, idx, p.wait);
 }
+window.cancelWait = function(sceneId, idx){
+  if(!_waitTimer) return;               // only meaningful mid-countdown — a normal choice event ignores backdrop taps
+  clearInterval(_waitTimer); _waitTimer=null;
+  window.resolvePresenceEvent(sceneId, idx, false);
+};
 window.resolvePresenceEvent = function(sceneId, idx, stay){
   const e=entryOf(sceneId); if(!e) return;
   if(stay){
@@ -1317,7 +1186,6 @@ function startWaitCountdown(sceneId, idx, seconds){
   let remaining=seconds, tick=0, breathIn=true;
   _waitTimer=setInterval(()=>{
     remaining--; tick++;
-    const countEl=document.getElementById('wait-count'); if(countEl) countEl.textContent=Math.max(0,remaining);
     if(tick%2===0){
       breathIn=!breathIn;
       const breathEl=document.getElementById('wait-breath');
@@ -1760,21 +1628,6 @@ function renderWorldMap(){
     +'<span class="lesson-play">▶</span>'
     +'<img class="lesson-bushes" src="./other-bushes.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'</button>';
-
-  h+='<div class="fishing-scene">'
-    +'<div class="fish-frame f1"><img class="breathe-1" src="./mascot-fishing.webp" alt=""/>'
-      +'<svg viewBox="0 0 272 249"><g class="line-1" style="transform-origin:234px 51px"><path class="fish-line" d="M234,51 Q214,120 200,208"/></g></svg>'
-      +'<div class="water-ripple"><i></i><i></i><i></i></div></div>'
-    +'<div class="fish-frame f2"><img class="breathe-2" src="./mascot-fishing-dreamy.webp" alt=""/>'
-      +'<svg viewBox="0 0 264 262"><g class="line-2" style="transform-origin:228px 44px"><path class="fish-line" d="M228,44 Q208,125 195,215"/></g></svg>'
-      +'<div class="water-ripple"><i></i><i></i><i></i></div></div>'
-    +'<div class="fish-frame f3"><img class="jolt" src="./mascot-fishing-realize.webp" alt=""/>'
-      +'<svg viewBox="0 0 287 253"><g class="line-3" style="transform-origin:254px 27px"><path class="fish-line" d="M254,27 Q259,110 248,205"/></g></svg>'
-      +'<div class="water-ripple"><i></i><i></i><i></i></div></div>'
-    +'<div class="fish-frame f4"><img class="breathe-4" src="./mascot-fishing-catch-it.webp" alt=""/>'
-      +'<svg viewBox="0 0 285 253"><g class="line-4" style="transform-origin:243px 20px"><path class="fish-line" d="M243,20 Q220,50 193,87 Q189,93 188,99"/></g></svg>'
-      +'<div class="water-ripple"><i></i><i></i><i></i></div></div>'
-    +'</div>';
 
   h+='<div class="hub-section-label">The Map</div>';
   h+='<div class="region-strip">';
