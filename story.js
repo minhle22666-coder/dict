@@ -720,13 +720,16 @@ function passageHTMLOf(text){
 function tokenizeForTap(text){
   const src = String(text||'');
   let out='', last=0, m;
-  const re=/\*\*|[A-Za-z][A-Za-z']*/g;              // ** is matched too, so it toggles bold instead of printing literally
-  let bold=false;
+  const re=/\*\*|\*|[A-Za-z][A-Za-z']*/g;      // ** (bold) checked before lone * (italic), so a run of ** never gets misread as two italics
+  let bold=false, italic=false;
   while((m=re.exec(src))){
     out += esc(src.slice(last, m.index));           // punctuation/quotes/spaces — escaped, never re-scanned
     if(m[0]==='**'){
       out += bold ? '</b>' : '<b>';
       bold=!bold;
+    } else if(m[0]==='*'){
+      out += italic ? '</i>' : '<i>';
+      italic=!italic;
     } else {
       const word = m[0];
       const clean = word.replace(/^'+|'+$/g,'');
@@ -736,6 +739,7 @@ function tokenizeForTap(text){
   }
   out += esc(src.slice(last));
   if(bold) out += '</b>';                            // never leave an unclosed tag if a stray marker slipped through
+  if(italic) out += '</i>';
   return out;
 }
 function ensureWordSheet(){
@@ -1246,12 +1250,15 @@ window.stageHotspotTap = function(btn, fact){
 };
 
 /* ============================================================
-   PRESENCE MOMENT — a light inline card, not a blocking modal. It
-   shows up alongside the Continue button (never gating it — the
-   player can always just tap past) with the moment's real content
-   right there, not a generic teaser. Declining and engaging both
-   get a few varied, naturally-worded options instead of a flat
-   yes/no, so tapping never reads as a free, thoughtless point.
+   PRESENCE MOMENT — a distinct "unexpected event" screen, not a card
+   stitched onto the bottom of the reading passage. Pressing Continue
+   on a scene with an unresolved moment opens this instead of
+   advancing; the real content is the prompt itself (never a generic
+   teaser), and choices are varied, naturally-worded phrasings — never
+   a flat yes/no — so tapping never reads as a free, thoughtless point.
+   Moments with a `wait` field (7.5, 10.1) get no choice at all: a
+   real countdown, paced breathing text, and mascot-meditate — the
+   player actually waits it out rather than tapping through instantly.
    ============================================================ */
 const PRESENCE_DECLINES = [
   "Not now — the road's waiting",
@@ -1266,23 +1273,42 @@ const PRESENCE_ACCEPTS = [
   "Go ahead, then"
 ];
 function pickVaried(arr, seed){ return arr[Math.abs(seed)%arr.length]; }
-function presenceCardHTML(scene){
+window.storyContinueOrEvent = function(){
+  const cur=currentEntry(); if(!cur){ advance(); return; }
+  const { scene } = cur;
   const log=getState().storyLog[scene.id]||{};
-  if(!scene.presence || !scene.presence.length) return '';
-  const idx = scene.presence.findIndex((p,i)=>!(log.presence && log.presence[i]));
-  if(idx<0) return '';
-  let seed=0; for(const ch of scene.id+idx) seed=(seed*31+ch.charCodeAt(0))>>>0;
-  const declineText = pickVaried(PRESENCE_DECLINES, seed);
-  const acceptText = pickVaried(PRESENCE_ACCEPTS, seed+7);
-  return '<div class="presence-card">'
-    +'<span class="presence-ico">✿</span>'
-    +'<div class="presence-t">'+esc(scene.presence[idx].text)+'</div>'
-    +'<div class="presence-actions">'
-    +'<button class="presence-btn go" onclick="resolvePresenceInline(\''+scene.id+'\','+idx+',true)">'+esc(acceptText)+'</button>'
-    +'<button class="presence-btn skip" onclick="resolvePresenceInline(\''+scene.id+'\','+idx+',false)">'+esc(declineText)+'</button>'
-    +'</div></div>';
+  const idx = (scene.presence||[]).findIndex((p,i)=>!(log.presence && log.presence[i]));
+  if(idx>=0){ renderPresenceEvent(scene, idx); return; }
+  advance();
+};
+function renderPresenceEvent(scene, idx){
+  const area=$('#review-area'); if(!area) return;
+  const p = scene.presence[idx];
+  let h='<div class="event-view"><div class="event-bg" style="background-image:url(\''+assetUrl(scene.bg)+'\')"></div><div class="event-scrim"></div>';
+  if(p.wait){
+    h+='<div class="event-card wait-card">'
+      +'<img class="wait-mascot" src="'+assetUrl('mascot-meditate')+'" alt="" onerror="this.style.display=\'none\'"/>'
+      +'<div class="event-q">'+esc(p.text)+'</div>'
+      +'<div class="wait-breath" id="wait-breath">Breathe in<span class="breathe-dots"><i></i><i></i><i></i></span></div>'
+      +'<div class="wait-count" id="wait-count">'+p.wait+'</div>'
+      +'</div>';
+  } else {
+    let seed=0; for(const ch of scene.id+idx) seed=(seed*31+ch.charCodeAt(0))>>>0;
+    const declineText = pickVaried(PRESENCE_DECLINES, seed);
+    const acceptText = pickVaried(PRESENCE_ACCEPTS, seed+7);
+    h+='<div class="event-card">'
+      +'<span class="event-ico">✿</span>'
+      +'<div class="event-q">'+esc(p.text)+'</div>'
+      +'<div class="event-actions">'
+      +'<button class="event-btn go" onclick="resolvePresenceEvent(\''+scene.id+'\','+idx+',true)">'+esc(acceptText)+'</button>'
+      +'<button class="event-btn skip" onclick="resolvePresenceEvent(\''+scene.id+'\','+idx+',false)">'+esc(declineText)+'</button>'
+      +'</div></div>';
+  }
+  h+='</div>';
+  area.innerHTML=h;
+  if(p.wait) startWaitCountdown(scene.id, idx, p.wait);
 }
-window.resolvePresenceInline = function(sceneId, idx, stay){
+window.resolvePresenceEvent = function(sceneId, idx, stay){
   const e=entryOf(sceneId); if(!e) return;
   if(stay){
     resolvePresence(e.scene, e.chapter, e.arc, idx);
@@ -1293,8 +1319,35 @@ window.resolvePresenceInline = function(sceneId, idx, stay){
     log.presence[idx]=true;                 // consumed, but never scored — a real decline, not a shrug
     saveState();
   }
-  renderStory();
+  continueAfterEvent(sceneId);
 };
+let _waitTimer=null;
+function startWaitCountdown(sceneId, idx, seconds){
+  clearInterval(_waitTimer);
+  let remaining=seconds, tick=0, breathIn=true;
+  _waitTimer=setInterval(()=>{
+    remaining--; tick++;
+    const countEl=document.getElementById('wait-count'); if(countEl) countEl.textContent=Math.max(0,remaining);
+    if(tick%2===0){
+      breathIn=!breathIn;
+      const breathEl=document.getElementById('wait-breath');
+      if(breathEl) breathEl.innerHTML=(breathIn?'Breathe in':'Breathe out')+'<span class="breathe-dots"><i></i><i></i><i></i></span>';
+    }
+    if(remaining<=0){
+      clearInterval(_waitTimer); _waitTimer=null;
+      const e=entryOf(sceneId); if(!e) return;
+      resolvePresence(e.scene, e.chapter, e.arc, idx);
+      continueAfterEvent(sceneId);
+    }
+  }, 1000);
+}
+function continueAfterEvent(sceneId){
+  const e=entryOf(sceneId); if(!e){ advance(); return; }
+  const log=getState().storyLog[sceneId]||{};
+  const nextIdx=(e.scene.presence||[]).findIndex((p,i)=>!(log.presence && log.presence[i]));
+  if(nextIdx>=0){ renderPresenceEvent(e.scene, nextIdx); return; }   // this scene has another moment queued — chain to it
+  advance();                                                        // no moments left — actually move to the next scene
+}
 
 /* ============================================================
    MASCOT MONOLOGUE — tapping Focci never says something generic.
@@ -1393,9 +1446,8 @@ function renderStory(){
   if(scene.iq) h+=renderIqBlock(scene, chapter, arc);
   if(scene.dec) h+=renderDecBlock(scene, chapter, arc);
   const submitted = isSubmitted(scene);
-  if(submitted) h+=presenceCardHTML(scene);
   if(submitted){
-    h+='<button class="btn story-continue" onclick="advanceStory()">'+(scene.endOfBuiltContent?'Continue':'Continue →')+'</button>';
+    h+='<button class="btn story-continue" onclick="storyContinueOrEvent()">'+(scene.endOfBuiltContent?'Continue':'Continue →')+'</button>';
   } else {
     h+='<button class="btn story-continue" '+(canSubmit(scene)?'':'disabled')+' onclick="storySubmit()">Choose an answer</button>';
   }
@@ -1539,6 +1591,7 @@ function isStoryStarted(){ return Object.keys(getState().storyLog).length>0; }
 
 window.renderGameHub = function(){
   _reviewArcId=null; _reviewPos=null;
+  if(_waitTimer){ clearInterval(_waitTimer); _waitTimer=null; }
   const area=$('#review-area'); if(!area) return;
   let h='<div class="game-hub">';
 
@@ -1586,6 +1639,55 @@ function arcUnlocked(arcId){
   const reached = cur ? cur.arc.id : 0;
   return arcId<=reached && !!CONTENT.find(a=>a.id===arcId);
 }
+/* ============================================================
+   LIFE LESSONS — a journal, not a bullet list. Only shows a
+   chapter's lesson once the player has actually started that
+   chapter (any scene of it logged); collected under the arc it
+   belongs to, oldest first.
+   ============================================================ */
+function collectLifeLessons(){
+  const st=getState();
+  const out=[];
+  for(const arc of CONTENT){
+    const lessons=[];
+    for(const ch of arc.chapters){
+      if(!ch.lifeLesson) continue;
+      const started = chapterEntries(ch.id).some(e=>st.storyLog[e.scene.id]);
+      if(started) lessons.push(ch.lifeLesson);
+    }
+    if(lessons.length){
+      const meta = ARC_LANDS.find(a=>a.id===arc.id);
+      out.push({ arcName: meta ? meta.name : ('Arc '+arc.id), lessons });
+    }
+  }
+  return out;
+}
+window.showLifeLessons = function(){
+  const data = collectLifeLessons();
+  const ov=document.createElement('div'); ov.className='lesson-ov';
+  let h='<div class="lesson-scroll">';
+  h+='<button class="lesson-close" onclick="hideLifeLessons()">✕</button>';
+  h+='<div class="lesson-head"><span class="lesson-head-orn">❦</span><div class="lesson-head-t">What Focci Has Learned</div><span class="lesson-head-orn">❦</span></div>';
+  if(!data.length){
+    h+='<div class="lesson-empty">Nothing written yet. Keep walking.</div>';
+  } else {
+    data.forEach(d=>{
+      h+='<div class="lesson-arc-t">'+esc(d.arcName)+'</div>';
+      d.lessons.forEach(l=>{
+        h+='<div class="lesson-quote"><span class="lq-mark">“</span>'+tokenizeForTap(l)+'<span class="lq-mark">”</span></div>';
+      });
+    });
+  }
+  h+='</div>';
+  ov.innerHTML=h;
+  document.body.appendChild(ov);
+  requestAnimationFrame(()=>ov.classList.add('show'));
+};
+window.hideLifeLessons = function(){
+  const ov=document.querySelector('.lesson-ov');
+  if(ov){ ov.classList.remove('show'); setTimeout(()=>ov.remove(),280); }
+};
+
 function renderWorldMap(){
   const cur = currentEntry();
   const curArcId = cur ? cur.arc.id : 1;
@@ -1622,6 +1724,8 @@ function renderWorldMap(){
   } else {
     h+='<div class="sb-progress"><span>🏆 Every built land explored.</span></div>';
   }
+
+  h+='<button class="lesson-entry" onclick="showLifeLessons()"><span>📖</span> What Focci Has Learned</button>';
 
   h+='<div class="hub-section-label">The Map</div>';
   h+='<div class="region-strip">';
