@@ -373,6 +373,95 @@ WORKED EXAMPLE of the quality bar (for "assertive") — match this DEPTH and thi
 - Every "text"/"prep" entry must be something a fluent English speaker would actually say — no filler entries just to fill a slot.
 - Return ONLY the JSON object.`;}
 
+/* ============================================================
+   VIETNAMESE → ENGLISH reverse lookup — fully offline. Built once
+   from the vi_equivalent field every entry already has (which can
+   list several Vietnamese words per entry, comma-separated), so no
+   new data needs to ship — just an index over what's already there.
+   ============================================================ */
+function looksVietnamese(s){
+  return /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(s);
+}
+let _viIndex=null;
+async function buildViIndex(){
+  if(_viIndex) return _viIndex;
+  const all=await idbAll();
+  const idx=new Map();
+  for(const r of all){
+    if(r.alias) continue;
+    const ve=r.data && r.data.vi_equivalent; if(!ve) continue;
+    for(const raw of ve.split(',')){
+      const t=raw.trim().toLowerCase(); if(!t) continue;
+      if(!idx.has(t)) idx.set(t, []);
+      const arr=idx.get(t); if(!arr.includes(r.word)) arr.push(r.word);
+    }
+  }
+  _viIndex=idx;
+  return idx;
+}
+async function viReverseLookup(term){
+  const idx=await buildViIndex();
+  const q=term.trim().toLowerCase();
+  const exact=idx.get(q);
+  if(exact && exact.length) return exact.slice(0,12);
+  // no exact entry — a loose "contains" pass catches close-enough phrasing
+  const out=new Set();
+  for(const [t,words] of idx){
+    if(t.includes(q) || q.includes(t)){ for(const w of words) out.add(w); if(out.size>=12) break; }
+  }
+  return [...out];
+}
+function viResultsState(query, words){
+  let h='<div class="back-row" onclick="backToHome()">← Home</div>';
+  h+='<div class="vi-results"><div class="vi-results-h">“'+esc(query)+'” in English</div><div class="vi-results-list">';
+  for(const w of words){
+    h+='<button class="vi-result-chip" onclick="jump(\''+esc(w).replace(/'/g,"\\'")+'\')">'+esc(w)+'</button>';
+  }
+  h+='</div></div>';
+  return h;
+}
+function viNotFoundState(query){
+  return '<div class="back-row" onclick="backToHome()">← Home</div><div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/>'
+    +'<h3>No match for “'+esc(query)+'” yet</h3><p>This only searches Vietnamese meanings already saved in your library — look up more English words and this gets better over time.</p></div>';
+}
+
+/* ============================================================
+   PHRASE / SENTENCE TRANSLATION — for anything longer than a single
+   word or short collocation. Auto-detects direction (EN↔VI).
+   ============================================================ */
+async function translatePhrase(text){
+  const key=getKey(); if(!key) throw new Error('NO_KEY');
+  if(!navigator.onLine) throw new Error('OFFLINE');
+  const model=getModel();
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const prompt='Translate the text below between English and Vietnamese — detect which language it\'s already in, and translate it into the other one. Return ONLY this JSON, no commentary, no markdown fences:\n'
+    +'{"source_lang":"en or vi","translation":"the natural translation","note":"one short Vietnamese sentence on tone/register — ONLY if genuinely useful, otherwise an empty string"}\n\n'
+    +'TEXT:\n'+text;
+  const body={ contents:[{parts:[{text:prompt}]}], generationConfig:{ temperature:0.2, responseMimeType:"application/json" } };
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!res.ok){
+    let m=res.status; try{const e=await res.json(); m=(e.error&&e.error.message)||m;}catch(_){}
+    if(res.status===400||res.status===403) throw new Error('BAD_KEY:'+m);
+    throw new Error('API:'+m);
+  }
+  const data=await res.json();
+  let raw=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
+  raw=raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  let obj; try{ obj=JSON.parse(raw); }catch(e){ throw new Error('PARSE'); }
+  return obj;
+}
+function phraseResultState(original, result){
+  const dirLbl = result.source_lang==='vi' ? 'Vietnamese → English' : 'English → Vietnamese';
+  let h='<div class="back-row" onclick="backToHome()">← Home</div>';
+  h+='<div class="tr-card"><div class="tr-dir">'+esc(dirLbl)+'</div>';
+  h+='<div class="tr-src">'+esc(original)+'</div>';
+  h+='<div class="tr-arrow">↓</div>';
+  h+='<div class="tr-out">'+esc(result.translation||'')+'</div>';
+  if(result.note) h+='<div class="tr-note">'+esc(result.note)+'</div>';
+  h+='</div>';
+  return h;
+}
+
 async function askGemini(word){
   const key=getKey(); if(!key) throw new Error('NO_KEY');
   if(!navigator.onLine) throw new Error('OFFLINE');
@@ -468,12 +557,22 @@ function flashPhraseMatch(text){
 async function search(rawWord, forceAI){
   let word=norm(rawWord||'');
   if(!word) return;
-  word=normalizeSpelling(word);
+  const isPhrase = /\s/.test(word.trim());
+  if(!isPhrase) word=normalizeSpelling(word);
   hideSuggest();
   // A search always takes you to the word page, no matter which tab you were on.
   if(!$('#v-home').classList.contains('active')) showView('home');
   $('#dashboard').style.display='none';
   const box=$('#result');
+
+  // Vietnamese single word → offline reverse lookup, no AI needed at all
+  if(!forceAI && !isPhrase && looksVietnamese(word)){
+    currentWord=null;
+    const hits=await viReverseLookup(word);
+    box.innerHTML = hits.length ? viResultsState(word, hits) : viNotFoundState(word);
+    if(hits.length){ logEvent('search', null); addXP(1); }
+    return;
+  }
 
   if(!forceAI){
     const local=await idbGet(word);
@@ -493,11 +592,29 @@ async function search(rawWord, forceAI){
         return;
       }
     }
-    if(guess){ box.innerHTML=suggestState(word, guess); return; }
+    if(guess && !isPhrase){ box.innerHTML=suggestState(word, guess); return; }
   }
 
   if(!getKey()){ box.innerHTML=needKeyState(word); return; }
   if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
+
+  // Multiple words with no local match — this reads as "translate this
+  // for me", not "look this word up", so it gets its own AI call and its
+  // own result view instead of forcing it through the dictionary prompt.
+  if(isPhrase){
+    box.innerHTML=questScene(word);
+    const questStart=now();
+    try{
+      const result=await translatePhrase(word);
+      const elapsed=now()-questStart;
+      if(elapsed<1800) await new Promise(r=>setTimeout(r,1800-elapsed));
+      currentWord=null;
+      box.innerHTML=phraseResultState(word, result);
+      logEvent('search', null);
+      addXP(1);
+    }catch(err){ box.innerHTML=errorState(word,err.message||''); }
+    return;
+  }
 
   box.innerHTML=questScene(word);
   const questStart=now();
@@ -679,7 +796,7 @@ function renderYouglishWidget(word){
     +'<div class="yg-credit">Powered by YouGlish</div>';
   try{
     _ygWidget = new YG.Widget('yg-slot', {
-      width:0, autoStart:0, components:4+8+64,   // title + caption + control buttons, no search box/accent panel
+      autoStart:0, components:4+8+64,   // title + caption + control buttons, no search box/accent panel
       events:{
         onFetchDone:(e)=>{ if(!e||!e.totalResult){ box.innerHTML=''; return; }
           const btn=$('#yg-next-btn'); if(btn) btn.style.display = e.totalResult>1 ? 'inline-flex' : 'none'; },
@@ -2652,6 +2769,7 @@ function wireOnboarding(){
   logEvent('open', null);
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
   buildWordIndex().catch(()=>{});
+  buildViIndex().catch(()=>{});
 })();
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;
 window.startReview=startReview; window.checkReview=checkReview; window.skipReview=skipReview; window.nextReview=nextReview;

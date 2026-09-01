@@ -608,7 +608,8 @@ const ARCS = [
     lifeLesson:"**Preserving the past unchanged** is the slowest way to kill it.",
     scenes:[
       { id:'11.1', title:"The garden's shape", bg:'bg-wildflowers-field-arc-4', mascot:'mascot-frozen-in-shock', npc:'other-bird-arc4',
-        props:['other-wildflowers','other-house-arc4'],
+        props:['other-wildflowers'],
+        cornerAsset:'other-house-arc4',
         en:"Once Focci took a proper look around, the garden revealed itself as a **rigid rectangle**. Flowers bloomed strictly within its borders, with **nothing allowed to spill past an edge** that had once been marked with twine and had stayed that way **out of pure habit** long after the string rotted away.",
         comp:{ q:"What kept the garden's rectangular shape even after the original markers were gone?", options:["a fence","habit — the shape was simply maintained by routine","natural growth patterns"], correct:1 },
       },

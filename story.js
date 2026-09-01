@@ -1155,9 +1155,9 @@ function inlineItemFor(scene, text){
 /* A big, faded watermark of the item sunk into the passage card's own
    corner — not a button sitting mid-sentence. Clipped by the card's own
    overflow:hidden, so it never bleeds into the question block below. */
-function inlineWatermarkHTML(item){
+function inlineWatermarkHTML(item, pos){
   if(!item) return '';
-  return '<button class="passage-watermark" onclick="assetPeekTap(\''+esc(item.name)+'\')" aria-label="Look closer">'
+  return '<button class="passage-watermark'+(pos==='bottom'?' bottom':'')+'" onclick="assetPeekTap(\''+esc(item.name)+'\')" aria-label="Look closer">'
     +'<span class="watermark-dust"><i></i><i></i><i></i><i></i></span>'
     +'<img src="'+assetUrl(item.name)+'" alt="" onerror="this.closest(\'.passage-watermark\').style.display=\'none\'"/></button>';
 }
@@ -1442,7 +1442,9 @@ function renderStory(){
   h+='</div>';
 
   h+='<div class="story-page paper-bg'+flipClass+'">';
-  h+=inlineWatermarkHTML(inlineItemFor(scene, passageText));
+  h+= scene.cornerAsset
+    ? inlineWatermarkHTML({name:scene.cornerAsset}, 'bottom')
+    : inlineWatermarkHTML(inlineItemFor(scene, passageText));
   h+=passageIllustrationsHTML(scene, passageText);
   h+='<div class="story-title">'+esc(scene.title||'')+'</div>';
   let passageHTML = passageHTMLOf(passageText);
@@ -1748,14 +1750,33 @@ function renderWorldMap(){
     h+='<div class="sb-progress"><span>🏆 Every built land explored.</span></div>';
   }
 
-  const leafSVG='<svg viewBox="0 0 24 24" fill="none"><path d="M4 20c8-1 15-8 16-16C11 5 5 12 4 20Z" fill="#4CAF50" stroke="#2E7D32" stroke-width="1"/><path d="M5 19c5-4 9-8 13-13" stroke="#2E7D32" stroke-width="1" stroke-linecap="round"/></svg>';
-  const leafHTML='<span class="lesson-leaf-in">'+leafSVG+'</span>';
   h+='<button class="lesson-entry" onclick="showLifeLessons()">'
-    +'<span class="lesson-leaf tl">'+leafHTML+'</span><span class="lesson-leaf tr">'+leafHTML+'</span>'
-    +'<span class="lesson-leaf bl">'+leafHTML+'</span><span class="lesson-leaf br">'+leafHTML+'</span>'
-    +'<span class="lesson-star s1">✦</span><span class="lesson-star s2">✧</span><span class="lesson-star s3">✦</span>'
-    +'<span class="lesson-entry-t">What Focci Has Learned</span>'
+    +'<div class="lesson-particles">'
+      +'<i class="lp p1">✦</i><i class="lp p2">✧</i><i class="lp p3">✦</i><i class="lp p4">✧</i><i class="lp p5">✦</i><i class="lp p6">✧</i>'
+    +'</div>'
+    +'<img class="lesson-mascot" src="./mascot-withflag-3.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<div class="lesson-text">'
+      +'<div class="lesson-entry-t">What Focci Has Learned?</div>'
+      +'<div class="lesson-entry-sub">Every lesson Focci reflects on after each event in his journey</div>'
+    +'</div>'
+    +'<span class="lesson-play">▶</span>'
+    +'<img class="lesson-bushes" src="./other-bushes.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'</button>';
+
+  h+='<div class="fishing-scene">'
+    +'<div class="fish-frame f1"><img class="breathe-1" src="./mascot-fishing.webp" alt=""/>'
+      +'<svg viewBox="0 0 272 249"><g class="line-1" style="transform-origin:234px 51px"><path class="fish-line" d="M234,51 Q214,120 200,208"/></g></svg>'
+      +'<div class="water-ripple"><i></i><i></i><i></i></div></div>'
+    +'<div class="fish-frame f2"><img class="breathe-2" src="./mascot-fishing-dreamy.webp" alt=""/>'
+      +'<svg viewBox="0 0 264 262"><g class="line-2" style="transform-origin:228px 44px"><path class="fish-line" d="M228,44 Q208,125 195,215"/></g></svg>'
+      +'<div class="water-ripple"><i></i><i></i><i></i></div></div>'
+    +'<div class="fish-frame f3"><img class="jolt" src="./mascot-fishing-realize.webp" alt=""/>'
+      +'<svg viewBox="0 0 287 253"><g class="line-3" style="transform-origin:254px 27px"><path class="fish-line" d="M254,27 Q259,110 248,205"/></g></svg>'
+      +'<div class="water-ripple"><i></i><i></i><i></i></div></div>'
+    +'<div class="fish-frame f4"><img class="breathe-4" src="./mascot-fishing-catch-it.webp" alt=""/>'
+      +'<svg viewBox="0 0 285 253"><g class="line-4" style="transform-origin:243px 20px"><path class="fish-line" d="M243,20 Q220,50 193,87 Q189,93 188,99"/></g></svg>'
+      +'<div class="water-ripple"><i></i><i></i><i></i></div></div>'
+    +'</div>';
 
   h+='<div class="hub-section-label">The Map</div>';
   h+='<div class="region-strip">';
