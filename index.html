@@ -72,6 +72,9 @@
   :root[data-theme="light"] body{background-image:
     radial-gradient(820px 470px at 84% -12%, rgba(232,128,42,.12), transparent 70%),
     radial-gradient(660px 410px at -10% 30%, rgba(15,168,165,.09), transparent 70%);}
+  /* scrolling stays fully functional everywhere — this only hides the visible scrollbar track/thumb */
+  *{scrollbar-width:none;-ms-overflow-style:none}
+  *::-webkit-scrollbar{display:none;width:0;height:0}
   .entry,.rev-card,.row,.ins-card,.empty{overflow-wrap:anywhere;word-break:break-word}
   /* …but never inside an English word. `overflow-wrap:anywhere` above was
      splitting "accentuated" into "accentuat / ed"; these elements hold real
@@ -173,7 +176,6 @@
     background:linear-gradient(120deg,var(--surface-2),var(--surface));transition:background .5s}
   .hero.hero-morning{background:linear-gradient(120deg,var(--primary-bg),var(--surface) 72%)}
   .hero.hero-afternoon{background:linear-gradient(120deg,var(--amber-bg),var(--surface) 72%)}
-  .hero.hero-evening{background:linear-gradient(120deg,var(--coral-bg),var(--surface) 72%)}
   .hero.hero-night{background:linear-gradient(120deg,var(--violet-bg),var(--surface) 72%)}
   .hero-text{flex:1;min-width:0}
   .hero-greet{font-size:16.5px;font-weight:900;letter-spacing:-.01em;cursor:pointer;color:var(--text);
@@ -234,7 +236,9 @@
     box-shadow:var(--shadow);overflow:hidden;transition:transform .12s}
   .story-cta:active{transform:scale(.98)}
   .story-cta::before{content:'';position:absolute;right:-34px;top:-34px;width:130px;height:130px;
-    border-radius:50%;background:var(--primary-bg);pointer-events:none}
+    border-radius:50%;background:var(--primary-bg);pointer-events:none;z-index:0}
+  .story-cta::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:url('./bg-peaceful-field-arc-1.webp') center/cover;opacity:.16}
   .story-cta-char{width:54px;height:54px;object-fit:contain;flex:none;position:relative;z-index:1;
     filter:drop-shadow(0 6px 10px rgba(0,0,0,.3))}
   .story-cta-text{flex:1;min-width:0;position:relative;z-index:1}
@@ -267,7 +271,10 @@
   .stat:nth-child(3){background:linear-gradient(150deg,#5AA9FF,#3B6FD4)}
   .stat::after{content:'';position:absolute;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.15);top:-32px;right:-26px}
   .stat-deco{position:absolute;right:-10px;bottom:-10px;width:52px;opacity:.22;z-index:0;pointer-events:none}
-  .stat .tile{background:rgba(255,255,255,.24)!important;color:#fff!important;width:32px;height:32px;border-radius:11px;font-size:15px;position:relative;z-index:1}
+  .stat::before{content:'';position:absolute;top:0;right:0;width:0;height:0;z-index:1;
+    border-style:solid;border-width:0 22px 22px 0;
+    border-color:transparent rgba(255,255,255,.32) transparent transparent;
+    border-top-right-radius:8px}
   .stat .n{font-size:21px;font-weight:900;position:relative;z-index:1;line-height:1}
   .stat .l{font-size:9px;letter-spacing:.06em;font-weight:900;line-height:1.3;opacity:.92;position:relative;z-index:1}
 
@@ -282,9 +289,9 @@
   .bar-col.today .bar-lbl{color:var(--primary)}
 
   .sec{margin-top:24px}
-  .sec-h{display:flex;align-items:center;gap:9px;font-size:11.5px;font-weight:900;letter-spacing:.09em;
-    text-transform:uppercase;color:var(--muted);margin-bottom:12px}
-  .sec-h .more{margin-left:auto;font-size:11px;color:var(--cyan);text-transform:none;letter-spacing:0}
+  .sec-h{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:900;letter-spacing:-.01em;
+    text-transform:none;color:var(--text);margin-bottom:12px}
+  .sec-h .more{margin-left:auto;font-size:11px;color:var(--cyan);text-transform:none;letter-spacing:0;font-weight:800}
 
   /* ---- rows ---- */
   .row{position:relative;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);
@@ -397,6 +404,15 @@
   .feel-warn{background:var(--coral-bg);color:var(--coral)}
   .fs-lbl,.fw-lbl{display:block;font-size:9.5px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;
     opacity:.7;margin-bottom:4px}
+
+  #youglish-box:not(:empty){margin-top:14px;background:var(--surface);border:1px solid var(--line);
+    border-radius:16px;padding:12px;box-shadow:var(--shadow)}
+  .yg-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .yg-lbl{font-size:11px;font-weight:900;letter-spacing:.02em;color:var(--muted)}
+  .yg-next{margin-left:auto;font-size:11.5px;font-weight:800;color:var(--primary);
+    background:var(--primary-bg);border-radius:99px;padding:5px 11px}
+  .yg-slot{width:100%;border-radius:12px;overflow:hidden;min-height:1px}
+  .yg-credit{margin-top:8px;font-size:9.5px;color:var(--muted-2);text-align:right}
 
   .forms{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
   .form{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:9px 11px;flex:1;min-width:78px;text-align:center}
@@ -689,8 +705,8 @@
   .hero-char:active{transform:scale(.92)}
 
   /* ---- Focci speech bubble — pops up ABOVE the compact hero bar now ---- */
-  .hero-bubble{position:absolute;left:12px;bottom:100%;margin-bottom:10px;z-index:4;max-width:78%;
-    background:var(--surface);border:1.5px solid var(--line);color:var(--text);font-size:12.5px;font-weight:700;
+  .hero-bubble{position:absolute;left:12px;bottom:100%;margin-bottom:10px;z-index:45;max-width:72%;
+    background:var(--surface);border:1.5px solid var(--line);color:var(--text);font-size:12px;font-weight:700;
     padding:9px 13px;border-radius:15px;line-height:1.4;box-shadow:var(--shadow);
     opacity:0;transform:translateY(8px) scale(.9);transition:all .28s cubic-bezier(.34,1.56,.64,1);pointer-events:none}
   .hero-bubble.show{opacity:1;transform:translateY(0) scale(1)}
@@ -804,20 +820,30 @@
   .lesson-head{text-align:center;margin-bottom:20px;clear:both}
   .lesson-head-t{font-size:15.5px;font-weight:900;letter-spacing:.02em;margin:4px 0;color:#3a2812}
   .lesson-head-orn{font-size:13px;opacity:.55;display:block}
-  .lesson-arc-t{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.09em;
-    color:rgba(74,52,24,.6);margin:20px 0 10px;padding-bottom:5px;border-bottom:1px solid rgba(110,80,40,.28)}
-  .lesson-arc-t:first-child{margin-top:0}
-  .lesson-quote{font-style:italic;font-size:13.5px;line-height:1.7;margin-bottom:16px;padding-left:11px;
-    border-left:2px solid rgba(110,80,40,.32);color:#4a3418}
-  .lesson-quote b{font-style:normal;color:#8a5a20}
+  .lesson-arc-frame{position:relative;overflow:hidden;border-radius:16px;padding:16px 16px 14px;
+    margin-bottom:16px;box-shadow:0 6px 16px rgba(60,40,15,.18)}
+  .lesson-arc-frame:last-child{margin-bottom:0}
+  .lesson-arc-deco{position:absolute;width:26px;height:26px;opacity:.85;pointer-events:none;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.2))}
+  .lesson-arc-deco.tl{top:8px;left:10px;transform:rotate(-12deg)}
+  .lesson-arc-deco.tr{top:8px;right:10px;transform:rotate(10deg)}
+  .lesson-arc-t{position:relative;text-align:center;font-size:13.5px;font-weight:900;letter-spacing:.02em;
+    color:#3a2812;text-shadow:0 1px 0 rgba(255,255,255,.3);margin:0 0 12px}
+  .lesson-quote{font-style:italic;font-size:13px;line-height:1.65;margin-bottom:12px;padding-left:11px;
+    border-left:2px solid rgba(60,40,15,.3);color:#3a2812}
+  .lesson-quote:last-child{margin-bottom:0}
+  .lesson-quote b{font-style:normal;color:#6b3f10}
   .lq-mark{font-style:normal;font-weight:900;opacity:.4;font-size:15px}
   .lesson-empty{text-align:center;font-size:13px;color:rgba(74,52,24,.6);padding:20px 0}
   .sb-progress b{color:var(--primary)}
   .sb-progress .sb-bar{height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-top:6px;max-width:220px}
   .sb-progress .sb-bar i{display:block;height:100%;background:var(--grad-hero);border-radius:99px;transition:width .6s}
 
-  .hub-section-label{font-size:10.5px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--muted-2);margin:4px 2px 10px}
+  .hub-section-label{position:relative;font-size:15px;font-weight:900;letter-spacing:-.01em;
+    text-transform:none;color:var(--text);margin:20px 2px 11px;padding-left:12px}
+  .hub-section-label::before{content:'';position:absolute;left:0;top:2px;bottom:2px;width:4px;
+    border-radius:3px;background:var(--grad-hero)}
+  .hub-section-label:first-child{margin-top:4px}
 
   /* ---- quiet companion in the corner of a word page ---- */
   .entry{position:relative}
@@ -848,10 +874,10 @@
   .info-tap{font-size:10px;color:var(--muted-2);margin-top:16px;text-transform:uppercase;letter-spacing:.07em;font-weight:800}
   .info-action{display:block;width:100%;margin-top:16px;font-size:13.5px;font-weight:900;color:#3A1E00;
     background:var(--grad-hero);border-radius:14px;padding:11px;box-shadow:var(--glow)}
-  .story-intro-card{max-width:380px;max-height:82vh;overflow-y:auto}
-  .story-intro-card img{width:64px}
-  .story-intro-b{text-align:left;font-size:13.5px}
-  .story-intro-b p{margin:0 0 10px}
+  .story-intro-card{max-width:360px;max-height:82vh;overflow-y:auto;padding:22px 20px 18px}
+  .story-intro-card img{width:52px;margin-bottom:8px}
+  .story-intro-b{text-align:left;font-size:13px}
+  .story-intro-b p{margin:0 0 8px}
   .story-intro-b p:last-child{margin-bottom:0}
   .story-intro-b b{color:var(--text)}
 
@@ -904,11 +930,18 @@
     padding:9px 15px;font-size:13px;font-weight:800;color:var(--muted);transition:transform .12s,all .18s}
   .set-chip:active{transform:scale(.94)}
   .set-chip.on{background:var(--grad-hero);color:#3A1E00;box-shadow:var(--glow)}
-  .setup-select{width:100%;margin-top:2px;padding:12px 14px;border-radius:14px;border:none;
-    background:var(--grad-hero);color:#3A1E00;font-size:13.5px;font-weight:800;
-    box-shadow:var(--glow);-webkit-appearance:none;appearance:none;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%233A1E00'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%233A1E00' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;background-position:right 14px center;padding-right:34px}
+  .setup-select{width:100%;margin-top:2px;padding:12px 14px;border-radius:14px;
+    color:var(--text);font-size:13.5px;font-weight:800;
+    border:2px solid transparent;-webkit-appearance:none;appearance:none;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%23FF9F45' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
+      linear-gradient(var(--surface),var(--surface)),
+      linear-gradient(120deg,var(--primary),var(--amber));
+    background-repeat:no-repeat,no-repeat,no-repeat;
+    background-position:right 14px center,0 0,0 0;
+    background-origin:padding-box,padding-box,border-box;
+    background-clip:padding-box,padding-box,border-box;
+    padding-right:34px}
   .setup-avail{font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:14px;
     padding:11px 13px;margin:4px 0 14px;line-height:1.5}
   .setup-avail b{color:var(--primary)}
@@ -994,6 +1027,9 @@
   .hist-star{font-size:19px;color:var(--muted-2);padding:4px 6px;flex:none;transition:transform .15s}
   .hist-star.on{color:var(--amber);filter:drop-shadow(0 0 8px rgba(255,197,61,.5))}
   .hist-star:active{transform:scale(1.3)}
+  .hist-del{font-size:12px;color:var(--muted-2);padding:4px 6px;flex:none;line-height:1;
+    width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .hist-del:active{background:var(--coral-bg);color:var(--coral);transform:scale(.9)}
 
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   /* ============================================================
@@ -1025,7 +1061,13 @@
   .breathe-dots i:nth-child(3){animation-delay:.4s}
   @keyframes breathe-dot{0%,60%,100%{opacity:.25;transform:scale(.85)}30%{opacity:1;transform:scale(1.15)}}
   .story-npc{position:absolute;bottom:6px;left:10px;width:78px;height:78px;object-fit:contain;
-    z-index:1;filter:drop-shadow(0 10px 14px rgba(0,0,0,.4));animation:sway 4.4s ease-in-out infinite}
+    z-index:1;filter:drop-shadow(0 10px 14px rgba(0,0,0,.4));animation:sway 4.4s ease-in-out infinite;cursor:pointer}
+  .story-npc-bubble{position:absolute;left:8px;bottom:88px;max-width:64%;z-index:4;
+    background:var(--surface);border:1.5px solid var(--line);color:var(--text);font-size:12px;font-weight:700;
+    padding:9px 13px;border-radius:15px;line-height:1.4;box-shadow:var(--shadow);
+    opacity:0;transform:scale(.85) translateY(6px);transition:all .26s cubic-bezier(.34,1.56,.64,1);pointer-events:none}
+  .story-npc-bubble.show{opacity:1;transform:scale(1) translateY(0)}
+  .story-npc-bubble::after{content:'';position:absolute;top:100%;left:22px;border:7px solid transparent;border-top-color:var(--line)}
 
   .story-view{perspective:1200px}
   /* Passage card: a distinct, separate box from the scene art above it —
@@ -1104,8 +1146,8 @@
     background:linear-gradient(0deg,rgba(0,0,0,.85),rgba(0,0,0,0))}
   .zoom-cap-t{color:#fff;font-size:13.5px;font-weight:700;line-height:1.5;text-shadow:0 2px 8px rgba(0,0,0,.5)}
 
-  .story-title{font-size:11px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;
-    color:var(--muted-2);margin-bottom:9px}
+  .story-title{font-size:18px;font-weight:900;letter-spacing:-.01em;text-transform:none;
+    color:var(--text);margin-bottom:10px}
   .story-passage{position:relative;z-index:1;font-size:16px;line-height:1.7;color:var(--text);margin-bottom:16px}
   .story-passage p{margin:0 0 12px}
   .story-passage p:last-child{margin-bottom:0}
@@ -1121,10 +1163,23 @@
   /* the item's own picture, sunk faded into the passage card's corner —
      replaces the old inline ✦ sparkle button */
   .passage-watermark{position:absolute;top:8px;right:8px;width:132px;height:132px;
-    opacity:.24;z-index:0;padding:0;border:none;background:none;pointer-events:auto}
+    opacity:.24;z-index:2;padding:0;border:none;background:none;pointer-events:auto}
   .story-page.paper-bg .passage-watermark{opacity:.21}
-  .passage-watermark img{width:100%;height:100%;object-fit:contain}
+  .passage-watermark img{width:100%;height:100%;object-fit:contain;position:relative;z-index:1}
   .passage-watermark:active{opacity:.36;transform:scale(.97)}
+  .watermark-dust{position:absolute;inset:-16px;pointer-events:none;z-index:0;
+    animation:dust-orbit 6s linear infinite}
+  .watermark-dust i{position:absolute;width:4px;height:4px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,230,180,.95),rgba(255,230,180,0) 70%);
+    box-shadow:0 0 5px rgba(255,222,160,.8)}
+  .watermark-dust i:nth-child(1){top:0;left:50%}
+  .watermark-dust i:nth-child(2){top:50%;right:0}
+  .watermark-dust i:nth-child(3){bottom:0;left:50%}
+  .watermark-dust i:nth-child(4){top:50%;left:0}
+  @keyframes dust-orbit{0%{transform:rotate(0deg) scale(.7);opacity:0}
+    12%{opacity:.9;transform:rotate(60deg) scale(1)}
+    88%{opacity:.9}
+    100%{transform:rotate(360deg) scale(.7);opacity:0}}
 
   /* light, magical "closer look" popup — replaces the dark bottom sheet
      for this one interaction, with a handful of drifting dust motes */
@@ -1452,9 +1507,9 @@
       <div class="hub-section-label">Your Progress</div>
       <div class="progress-card">
         <div class="stat-grid">
-          <div class="stat" onclick="statInsight('learned')"><div class="tile primary">📖</div><div class="n" id="d-total">0</div><div class="l">WORDS EXPLORED</div><span class="stat-more">tap</span><img class="stat-deco" src="./decor-book-open.webp" alt=""/></div>
-          <div class="stat" onclick="statInsight('avg')"><div class="tile mint">📊</div><div class="n" id="d-avg">0</div><div class="l">NEW PER DAY</div><span class="stat-more">tap</span><img class="stat-deco" src="./decor-shiny-sun.webp" alt=""/></div>
-          <div class="stat" onclick="statInsight('time')"><div class="tile blue">⏱️</div><div class="n" id="d-time">0m</div><div class="l">TIME IN APP</div><span class="stat-more">tap</span><img class="stat-deco" src="./decor-alarm.webp" alt=""/></div>
+          <div class="stat" onclick="statInsight('learned')"><div class="n" id="d-total">0</div><div class="l">WORDS EXPLORED</div><span class="stat-more">tap</span><img class="stat-deco" src="./other-book.webp" alt=""/></div>
+          <div class="stat" onclick="statInsight('avg')"><div class="n" id="d-avg">0</div><div class="l">NEW PER DAY</div><span class="stat-more">tap</span><img class="stat-deco" src="./other-puzzle.webp" alt=""/></div>
+          <div class="stat" onclick="statInsight('time')"><div class="n" id="d-time">0m</div><div class="l">TIME IN APP</div><span class="stat-more">tap</span><img class="stat-deco" src="./decor-alarm.webp" alt=""/></div>
         </div>
         <div class="progress-divider"></div>
         <div class="week-nav">
@@ -1676,7 +1731,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v27 · life-lesson banner rebuilt in pure CSS, no image</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v29 · typography hierarchy &amp; optional YouGlish video</b></p>
   </section>
 </main>
 

@@ -1158,6 +1158,7 @@ function inlineItemFor(scene, text){
 function inlineWatermarkHTML(item){
   if(!item) return '';
   return '<button class="passage-watermark" onclick="assetPeekTap(\''+esc(item.name)+'\')" aria-label="Look closer">'
+    +'<span class="watermark-dust"><i></i><i></i><i></i><i></i></span>'
     +'<img src="'+assetUrl(item.name)+'" alt="" onerror="this.closest(\'.passage-watermark\').style.display=\'none\'"/></button>';
 }
 window.assetPeekTap = function(assetName){
@@ -1379,6 +1380,22 @@ window.tapMascot = function(sceneId){
   bubble._hideT = setTimeout(()=>bubble.classList.remove('show'), 3600);
 };
 
+/* NPCs get a lighter touch than Focci — a short, universal reaction
+   rather than invented character-specific lines, since guessing at
+   each NPC's voice risks clashing with how they actually talk in the
+   passage text itself. */
+const NPC_GLANCES = ["…no answer, just yet.","Still watching, quietly.","A glance back — nothing more.","Not much to add, for now."];
+let _npcTapCount = 0;
+window.tapNpc = function(){
+  const bubble = document.getElementById('story-npc-bubble'); if(!bubble) return;
+  const line = NPC_GLANCES[_npcTapCount % NPC_GLANCES.length];
+  _npcTapCount++;
+  bubble.innerHTML = esc(line)+'<span class="breathe-dots"><i></i><i></i><i></i></span>';
+  bubble.classList.remove('show'); void bubble.offsetWidth; bubble.classList.add('show');
+  clearTimeout(bubble._hideT);
+  bubble._hideT = setTimeout(()=>bubble.classList.remove('show'), 3200);
+};
+
 /* Pure-CSS ambient texture per chapter mood — no image assets needed, so
    this always renders even before any real art is uploaded. BRIGHT gets
    a few soft floating motes, DARK gets slower, dimmer drifting dust, and
@@ -1419,7 +1436,8 @@ function renderStory(){
   h+=ambientLayerHTML(mood);
   h+=stageHotspotsHTML(scene);
   h+='<div class="story-mascot-bubble" id="story-mascot-bubble"></div>';
-  if(scene.npc) h+='<img class="story-npc" src="'+assetUrl(scene.npc)+'" alt="" onerror="this.style.display=\'none\'"/>';
+  h+='<div class="story-npc-bubble" id="story-npc-bubble"></div>';
+  if(scene.npc) h+='<img class="story-npc" src="'+assetUrl(scene.npc)+'" alt="" onclick="tapNpc()" onerror="this.style.display=\'none\'"/>';
   if(scene.mascot) h+='<img class="story-mascot" src="'+assetUrl(scene.mascot)+'" alt="" onclick="tapMascot(\''+scene.id+'\')" onerror="this.style.display=\'none\'"/>';
   h+='</div>';
 
@@ -1564,7 +1582,6 @@ window.showStoryIntro = function(){
     +'<p>Changed your mind? Step back with <b>‹</b> and answer differently — <b>nothing is scored until the chapter ends</b>.</p>'
     +'</div>'
     +'<button class="info-action" onclick="this.closest(\'.info-ov\').remove(); showView(\'review\')">▶ Play</button>'
-    +'<div class="info-tap">tap outside to close</div>'
     +'</div>';
   document.body.appendChild(ov);
   requestAnimationFrame(()=>ov.classList.add('show'));
@@ -1634,6 +1651,19 @@ function arcUnlocked(arcId){
    chapter (any scene of it logged); collected under the arc it
    belongs to, oldest first.
    ============================================================ */
+/* Hand-picked to match each arc's own setting — a "dominant colour"
+   can't be pulled from a background photo in pure CSS, so this is a
+   curated palette instead. Arcs 5+ aren't built yet; the fallback
+   just keeps things from breaking once they are. */
+const ARC_TINT = {
+  1:['#dff0c4','#a9d178'],   // the grassy field
+  2:['#f3ddb0','#dcae5c'],   // the desert
+  3:['#c7e8cf','#5fa876'],   // the jungle
+  4:['#f0d7ee','#cd93c6'],   // the wildflower meadow
+};
+function arcTint(arcId){ return ARC_TINT[arcId] || ['#e4ddc9','#b8ac86']; }
+const FLOWER_SVG='<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="#F2A93C"/><circle cx="12" cy="5" r="3.6" fill="#E67AA6"/><circle cx="18.2" cy="9" r="3.6" fill="#E67AA6"/><circle cx="18.2" cy="16" r="3.6" fill="#E67AA6"/><circle cx="12" cy="19.5" r="3.6" fill="#E67AA6"/><circle cx="5.8" cy="16" r="3.6" fill="#E67AA6"/><circle cx="5.8" cy="9" r="3.6" fill="#E67AA6"/></svg>';
+const LEAF_SVG='<svg viewBox="0 0 24 24" fill="none"><path d="M4 20c8-1 15-8 16-16C11 5 5 12 4 20Z" fill="#4CAF50" stroke="#2E7D32" stroke-width="1"/><path d="M5 19c5-4 9-8 13-13" stroke="#2E7D32" stroke-width="1" stroke-linecap="round"/></svg>';
 function collectLifeLessons(){
   const st=getState();
   const out=[];
@@ -1646,7 +1676,7 @@ function collectLifeLessons(){
     }
     if(lessons.length){
       const meta = ARC_LANDS.find(a=>a.id===arc.id);
-      out.push({ arcName: meta ? meta.name : ('Arc '+arc.id), lessons });
+      out.push({ arcId:arc.id, arcName: meta ? meta.name : ('Arc '+arc.id), lessons });
     }
   }
   return out;
@@ -1661,10 +1691,14 @@ window.showLifeLessons = function(){
     h+='<div class="lesson-empty">Nothing written yet. Keep walking.</div>';
   } else {
     data.forEach(d=>{
+      const [c1,c2]=arcTint(d.arcId);
+      h+='<div class="lesson-arc-frame" style="background:linear-gradient(155deg,'+c1+','+c2+')">';
+      h+='<span class="lesson-arc-deco tl">'+LEAF_SVG+'</span><span class="lesson-arc-deco tr">'+FLOWER_SVG+'</span>';
       h+='<div class="lesson-arc-t">'+esc(d.arcName)+'</div>';
       d.lessons.forEach(l=>{
         h+='<div class="lesson-quote"><span class="lq-mark">“</span>'+tokenizeForTap(l)+'<span class="lq-mark">”</span></div>';
       });
+      h+='</div>';
     });
   }
   h+='</div>';
@@ -1714,7 +1748,11 @@ function renderWorldMap(){
     h+='<div class="sb-progress"><span>🏆 Every built land explored.</span></div>';
   }
 
+  const leafSVG='<svg viewBox="0 0 24 24" fill="none"><path d="M4 20c8-1 15-8 16-16C11 5 5 12 4 20Z" fill="#4CAF50" stroke="#2E7D32" stroke-width="1"/><path d="M5 19c5-4 9-8 13-13" stroke="#2E7D32" stroke-width="1" stroke-linecap="round"/></svg>';
+  const leafHTML='<span class="lesson-leaf-in">'+leafSVG+'</span>';
   h+='<button class="lesson-entry" onclick="showLifeLessons()">'
+    +'<span class="lesson-leaf tl">'+leafHTML+'</span><span class="lesson-leaf tr">'+leafHTML+'</span>'
+    +'<span class="lesson-leaf bl">'+leafHTML+'</span><span class="lesson-leaf br">'+leafHTML+'</span>'
     +'<span class="lesson-star s1">✦</span><span class="lesson-star s2">✧</span><span class="lesson-star s3">✦</span>'
     +'<span class="lesson-entry-t">What Focci Has Learned</span>'
     +'</button>';

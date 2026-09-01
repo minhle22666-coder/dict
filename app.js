@@ -84,6 +84,24 @@ function logAdd(rec){ return logTx('readwrite').then(s=>new Promise((res,rej)=>{
 function logAll(){ return logTx('readonly').then(s=>new Promise((res,rej)=>{const r=s.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})); }
 function logCount(){ return logTx('readonly').then(s=>new Promise((res,rej)=>{const r=s.count();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})); }
 function logClearAll(){ return logTx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.clear();r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})); }
+/* Removes every 'search' log entry for one word, so it stops showing up
+   in Recent Searches / suggestions. Saved-word status is untouched. */
+function logDeleteWord(word){
+  return logTx('readwrite').then(s=>new Promise((res)=>{
+    const req=s.openCursor();
+    const ids=[];
+    req.onsuccess=(e)=>{
+      const c=e.target.result;
+      if(c){
+        if(c.value.type==='search' && c.value.word===word) ids.push(c.primaryKey);
+        c.continue();
+      } else {
+        Promise.all(ids.map(id=>new Promise(r=>{ const dr=s.delete(id); dr.onsuccess=()=>r(); dr.onerror=()=>r(); }))).then(()=>res());
+      }
+    };
+    req.onerror=()=>res();
+  }));
+}
 function logTrim(){
   return logTx('readwrite').then(s=>new Promise((res)=>{
     const idx=s.index('ts'); const req=idx.openCursor(); let ids=[];
@@ -633,6 +651,51 @@ async function renderFamilyChips(word){
   }catch(e){}
 }
 window.renderFamilyChips=renderFamilyChips;
+/* ============================================================
+   YOUGLISH — a real spoken-usage video, pulled in only when the
+   device actually has a connection. Offline (or on any failure),
+   the container is simply left empty — no black placeholder frame,
+   no spinner, nothing that could read as "broken" while the rest of
+   the offline-first entry works fine.
+   ============================================================ */
+let _ygScriptLoading=false, _ygReady=false, _ygPendingWord=null, _ygWidget=null;
+function ensureYouglishScript(){
+  if(_ygReady || _ygScriptLoading) return;
+  _ygScriptLoading=true;
+  const tag=document.createElement('script');
+  tag.src='https://youglish.com/public/emb/widget.js';
+  tag.onerror=()=>{ _ygScriptLoading=false; };
+  document.head.appendChild(tag);
+}
+window.onYouglishAPIReady=function(){
+  _ygReady=true; _ygScriptLoading=false;
+  if(_ygPendingWord){ const w=_ygPendingWord; _ygPendingWord=null; renderYouglishWidget(w); }
+};
+function renderYouglishWidget(word){
+  const box=$('#youglish-box'); if(!box || currentWord!==word) return;   // navigated away while loading
+  box.innerHTML='<div class="yg-head"><span class="yg-lbl">Nghe trong câu thật</span>'
+    +'<button class="yg-next" id="yg-next-btn" style="display:none" onclick="if(window._ygWidget)window._ygWidget.next()">Video khác ›</button></div>'
+    +'<div id="yg-slot" class="yg-slot"></div>'
+    +'<div class="yg-credit">Powered by YouGlish</div>';
+  try{
+    _ygWidget = new YG.Widget('yg-slot', {
+      width:0, autoStart:0, components:4+8+64,   // title + caption + control buttons, no search box/accent panel
+      events:{
+        onFetchDone:(e)=>{ if(!e||!e.totalResult){ box.innerHTML=''; return; }
+          const btn=$('#yg-next-btn'); if(btn) btn.style.display = e.totalResult>1 ? 'inline-flex' : 'none'; },
+        onError:()=>{ box.innerHTML=''; }
+      }
+    });
+    window._ygWidget=_ygWidget;
+    _ygWidget.fetch(word, 'english');
+  }catch(e){ box.innerHTML=''; }
+}
+function maybeLoadYouglish(word){
+  const box=$('#youglish-box'); if(!box) return;
+  if(!navigator.onLine) return;                    // offline — leave it empty, don't even try
+  if(_ygReady) renderYouglishWidget(word);
+  else { _ygPendingWord=word; ensureYouglishScript(); }
+}
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
   const badge = rec.source==='ai' ? '<span class="badge ai">✦ AI · saved offline</span>' : '<span class="badge off">◆ offline</span>';
@@ -684,6 +747,9 @@ function renderEntry(rec, queriedAs){
     if(d.vi_not)  h+='<div class="feel-warn"><span class="fw-lbl">Đừng nhầm với</span>'+esc(d.vi_not)+'</div>';
     h+='</div>';
   }
+
+  h+='<div id="youglish-box"></div>';
+  maybeLoadYouglish(w);
 
   const f=d.forms;
   if(f && (f.v2||f.v3||f.ving)){
@@ -885,19 +951,25 @@ async function renderHistory(){
   const recs=await Promise.all(recent.map(w=>idbGet(w)));
   let h='';
   for(const r of recs){ if(!r) continue; const d=r.data||{}; const w=esc(r.word);
-    h+='<div class="hist-item" onclick="jump(\''+w.replace(/'/g,"\\'")+'\')">'
+    const safeW=w.replace(/'/g,"\\'");
+    h+='<div class="hist-item" onclick="jump(\''+safeW+'\')">'
       +'<img class="hist-ico" src="./decor-magnifying-glass.webp" alt=""/>'
       +'<div class="hist-mid"><div class="hist-top"><span class="w">'+w+'</span>'
       +(d.phonetic?'<span class="phon">'+esc(d.phonetic)+'</span>':'')+'</div>'
       +(d.vi_equivalent?'<div class="e">'+esc(d.vi_equivalent)+'</div>':'')+'</div>'
-      +'<button class="hist-star'+(r.saved?' on':'')+'" onclick="event.stopPropagation();toggleSaveFromList(\''+w.replace(/'/g,"\\'")+'\',this)">'
+      +'<button class="hist-star'+(r.saved?' on':'')+'" onclick="event.stopPropagation();toggleSaveFromList(\''+safeW+'\',this)">'
       +(r.saved?'★':'☆')+'</button>'
+      +'<button class="hist-del" onclick="event.stopPropagation();removeFromHistory(\''+safeW+'\')" aria-label="Remove from history">✕</button>'
       +'</div>';
   }
   box.innerHTML=h;
 }
 let _statCache={learned:0,avg:0,mins:0,activeDays:0,todayNew:0,bestDay:0};
 
+async function removeFromHistory(word){
+  await logDeleteWord(word);
+  renderHistory();
+}
 /* Star a word straight from a list without leaving the page. */
 async function toggleSaveFromList(word, btn){
   const rec=await idbGet(word); if(!rec) return;
@@ -1710,9 +1782,9 @@ async function renderInsights(){
   h+='</div>';
 
   h+='<div class="stat-grid">';
-  h+='<div class="stat"><div class="tile primary">📖</div><div class="n">'+s.totalWords+'</div><div class="l">WORDS</div><img class="stat-deco" src="./decor-book-open.webp" alt=""/></div>';
-  h+='<div class="stat"><div class="tile amber">⭐</div><div class="n">'+s.savedCount+'</div><div class="l">SAVED</div><img class="stat-deco" src="./decor-magical-wand.webp" alt=""/></div>';
-  h+='<div class="stat"><div class="tile mint">🎯</div><div class="n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</div><div class="l">ACCURACY</div><img class="stat-deco" src="./decor-magnifying-glass.webp" alt=""/></div>';
+  h+='<div class="stat"><div class="n">'+s.totalWords+'</div><div class="l">WORDS</div><img class="stat-deco" src="./other-puzzle.webp" alt=""/></div>';
+  h+='<div class="stat"><div class="n">'+s.savedCount+'</div><div class="l">SAVED</div><img class="stat-deco" src="./other-pencil.webp" alt=""/></div>';
+  h+='<div class="stat"><div class="n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</div><div class="l">ACCURACY</div><img class="stat-deco" src="./other-shuttle.webp" alt=""/></div>';
   h+='</div>';
 
   h+='<div class="library-card"><img src="./decor-load-of-book.webp" alt=""/>'
@@ -1745,10 +1817,9 @@ async function renderInsights(){
 /* ---------- greeting hero ---------- */
 function timeOfDay(){
   const hr=new Date().getHours();
-  if(hr>=5  && hr<11) return 'morning';
-  if(hr>=11 && hr<16) return 'afternoon';
-  if(hr>=16 && hr<19) return 'evening';
-  return 'night';            // 19:00 → 05:00, so the moon + night fox really show up
+  if(hr>=1  && hr<12) return 'morning';    // 1:00 AM – 11:59 AM
+  if(hr>=12 && hr<18) return 'afternoon';  // 12:00 PM – 5:59 PM
+  return 'night';                          // 6:00 PM – 12:59 AM
 }
 /* In October, Focci dresses up — a small seasonal surprise. */
 function isSpookySeason(){ const d=new Date(); return d.getMonth()===9; }
@@ -1761,10 +1832,6 @@ const TIME_CONTENT={
     lines:["I spotted a new land on the map. Come see!",
            "Halfway through the day — a few more words?",
            "This trail looks promising. Follow me!"]},
-  evening:{bg:'evening', char:'take_note', sky:'decor-shiny-sun', greet:'Good evening',
-    lines:["Let's write down what we found today.",
-           "Camp is set. Time to review our discoveries.",
-           "Golden hour — the best time to remember things."]},
   night:{bg:'night', char:'night', sky:'decor-moon', greet:'Good night',
     lines:["The stars are out. One last word before bed?",
            "Focci is sleepy… but never too sleepy to learn.",
@@ -1782,10 +1849,10 @@ async function renderHero(){
   const heroEl=$('#hero'); if(!heroEl) return;
   const t=TIME_CONTENT[timeOfDay()];
   const name=getName();
-  heroEl.classList.remove('hero-morning','hero-afternoon','hero-evening','hero-night');
+  heroEl.classList.remove('hero-morning','hero-afternoon','hero-night');
   heroEl.classList.add('hero-'+t.bg);
   heroEl.classList.toggle('is-night', t.bg==='night');
-  const spooky = isSpookySeason() && (timeOfDay()==='evening' || timeOfDay()==='night');
+  const spooky = isSpookySeason() && timeOfDay()==='night';
   $('#hero-char').src='./mascot-'+(spooky?'halloween':t.char)+'.webp';
   // Sun and moon each get their own size, place and animation, and both sit
   // BEHIND the greeting now (z-index below the scrim), so nothing is covered.
