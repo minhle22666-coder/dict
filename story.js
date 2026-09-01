@@ -1171,22 +1171,22 @@ function renderPresenceEvent(scene, idx){
   const p = scene.presence[idx];
   let h='<div class="event-view" onclick="if(event.target===this) cancelWait(\''+scene.id+'\','+idx+')"><div class="event-bg" style="background-image:url(\''+assetUrl(scene.bg)+'\')"></div><div class="event-scrim"></div>';
   if(p.wait){
-    h+='<div class="event-card wait-card"><span class="glow-border"></span>'
+    h+='<div class="glow-wrap"><span class="glow-border"></span><div class="event-card wait-card">'
       +'<img class="wait-mascot" src="'+assetUrl('mascot-meditate')+'" alt="" onerror="this.style.display=\'none\'"/>'
       +'<div class="event-q">'+esc(p.text)+'</div>'
       +'<div class="wait-breath" id="wait-breath">Breathe in<span class="breathe-dots"><i></i><i></i><i></i></span></div>'
-      +'</div>';
+      +'</div></div>';
   } else {
     let seed=0; for(const ch of scene.id+idx) seed=(seed*31+ch.charCodeAt(0))>>>0;
     const declineText = pickVaried(PRESENCE_DECLINES, seed);
     const acceptText = pickVaried(PRESENCE_ACCEPTS, seed+7);
-    h+='<div class="event-card"><span class="glow-border"></span>'
+    h+='<div class="glow-wrap"><span class="glow-border"></span><div class="event-card">'
       +'<span class="event-ico">✿</span>'
       +'<div class="event-q">'+esc(p.text)+'</div>'
       +'<div class="event-actions">'
       +'<button class="event-btn go" onclick="resolvePresenceEvent(\''+scene.id+'\','+idx+',true)">'+esc(acceptText)+'</button>'
       +'<button class="event-btn skip" onclick="resolvePresenceEvent(\''+scene.id+'\','+idx+',false)">'+esc(declineText)+'</button>'
-      +'</div></div>';
+      +'</div></div></div>';
   }
   h+='</div>';
   area.innerHTML=h;
@@ -1505,14 +1505,14 @@ window.renderGameHub = function(){
 
   h+='<div class="hub-section-label">Quick Games</div>';
   h+='<div class="hub-row">';
-  h+='<button class="hub-card hub-mini mini-type" onclick="setPracticeMode(\'type\')">'
-    +'<span class="glow-border"></span>'
+  h+='<div class="glow-wrap"><span class="glow-border"></span>'
+    +'<button class="hub-card hub-mini mini-type" onclick="setPracticeMode(\'type\')">'
     +'<img class="hub-mini-deco" src="./decor-note-and-pen.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<span class="hub-mini-t">Type it</span><span class="hub-mini-s">Spell from memory</span></button>';
-  h+='<button class="hub-card hub-mini mini-match" onclick="setPracticeMode(\'match\')">'
-    +'<span class="glow-border"></span>'
+    +'<span class="hub-mini-t">Type it</span><span class="hub-mini-s">Spell from memory</span></button></div>';
+  h+='<div class="glow-wrap"><span class="glow-border"></span>'
+    +'<button class="hub-card hub-mini mini-match" onclick="setPracticeMode(\'match\')">'
     +'<img class="hub-mini-deco" src="./decor-magnifying-glass.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<span class="hub-mini-t">Match it</span><span class="hub-mini-s">Pick the right word</span></button>';
+    +'<span class="hub-mini-t">Match it</span><span class="hub-mini-s">Pick the right word</span></button></div>';
   h+='</div>';
 
   h+='<div class="hub-section-label">Bonus</div>';

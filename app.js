@@ -1101,55 +1101,55 @@ async function renderHistory(){
   box.innerHTML=h;
 }
 const FISH_STORIES=[
-['A boy asks his father, "Dad, are bugs good to eat?" "That\'s disgusting.','Don\'t talk about things like that over dinner," the dad replies.','After dinner the father asks, "Now, son, what did you want to ask me?" "Oh, nothing," the boy says.','"There was a bug in your soup, but now it\'s gone."'],
-['A man walks into a bank and asks to rob it.','The banker says, "Sir, that\'s illegal." The man responds, "I know, but I\'m tired of pretending to be employed.','You robbed me for 20 years with taxes."'],
-['A teacher asks her student, "Why didn\'t you do your homework?" The student says, "My dog ate it." The teacher replies, "That\'s the oldest excuse in the book." The student says, "Exactly.','He has very good taste in literature."'],
+['A boy asks his father, "Dad, are bugs good to eat?" "That\'s disgusting. Don\'t talk about things like that over dinner," the dad replies. After','dinner the father asks, "Now, son, what did you want to ask me?" "Oh, nothing," the boy says. "There was a bug in your soup, but now it\'s gone."'],
+['A man walks into a bank and asks to rob it. The banker says, "Sir, that\'s illegal." The man responds, "I know, but I\'m tired','of pretending to be employed. You robbed me for 20 years with taxes."'],
+['A teacher asks her student, "Why didn\'t you do your homework?" The student says, "My dog ate it." The teacher replies, "That\'s the oldest excuse','in the book." The student says, "Exactly. He has very good taste in literature."'],
 ['A woman tells her friend, "My husband never listens to me." Her friend asks, "What did he say when you told him?" The woman answers, "I don\'t know—he was asleep."'],
 ['A job interviewer asks, "What\'s your biggest weakness?" The candidate says, "Honesty." The interviewer responds, "I don\'t think honesty is a weakness." The candidate replies, "I don\'t care what you think."'],
-['A doctor tells his patient, "You need to cut back on sugar." The patient asks, "Or what?" The doctor says, "Or you\'ll die." The patient responds, "I\'m going to die anyway, so at least I\'ll enjoy it."'],
+['A doctor tells his patient, "You need to cut back on sugar." The patient asks, "Or what?" The doctor says, "Or you\'ll die." The patient','responds, "I\'m going to die anyway, so at least I\'ll enjoy it."'],
 ['A child asks his mother, "Why do people lie?" She answers, "To protect people\'s feelings." Later, he asks, "Do you think I\'m smart?" She says, "Of course, honey."'],
-['A man tells his friend, "I quit my job to pursue my dreams." His friend asks, "How\'s that going?" He replies, "Terrible.','Turns out my dream was just having a salary."'],
+['A man tells his friend, "I quit my job to pursue my dreams." His friend asks, "How\'s that going?" He replies, "Terrible. Turns out my dream was just having a salary."'],
 ['A woman asks her boss, "Can I leave early today?" He says, "Only if you leave better." She responds, "I\'ve been trying for five years."'],
 ['A student tells his teacher, "This math problem is impossible." The teacher responds, "There\'s always a solution." The student says, "Exactly—it\'s called dropping out."'],
-['A man walks into his house and finds his wife with another man.','He says calmly, "I\'m leaving you." She responds, "Is it because of him?" He says, "No, because you\'re still the same person who married me, and clearly your judgment is terrible."'],
+['A man walks into his house and finds his wife with another man. He says calmly, "I\'m leaving you." She responds, "Is it because of','him?" He says, "No, because you\'re still the same person who married me, and clearly your judgment is terrible."'],
 ['A therapist asks, "How do you feel about your childhood?" His patient responds, "I\'m paying you $150 an hour to talk to me about something I can\'t change."'],
 ['A politician says, "I\'m here to serve the people." A citizen asks, "How?" The politician responds, "I already am—I\'ve taken their money and their hope."'],
-['A woman tells a man at a bar, "I\'m a psychologist." He asks, "Can you read my mind?" She says, "You\'re thinking I\'m interested." He replies, "Actually I was wondering if you\'d buy me a drink." She says, "My diagnosis was correct."'],
-['A boy asks his father, "Why do you work so much?" His father says, "To provide for you." The boy responds, "But you\'re never here.','I\'d prefer the opposite."'],
-['A customer complains to a restaurant manager, "This food is cold." The manager replies, "That\'s impossible—we just made it." The customer says, "Exactly.','You\'ve been talking to me for 15 minutes."'],
-['A man tells his friend, "I\'m getting in shape." His friend asks, "For what?" He says, "For my wedding." His friend responds, "Congratulations!','Who\'s the lucky woman?" He answers, "Gym."'],
+['A woman tells a man at a bar, "I\'m a psychologist." He asks, "Can you read my mind?" She says, "You\'re thinking I\'m interested." He','replies, "Actually I was wondering if you\'d buy me a drink." She says, "My diagnosis was correct."'],
+['A boy asks his father, "Why do you work so much?" His father says, "To provide for you." The boy responds, "But you\'re never here. I\'d prefer the opposite."'],
+['A customer complains to a restaurant manager, "This food is cold." The manager replies, "That\'s impossible—we just made it." The customer says, "Exactly. You\'ve been talking to me for 15 minutes."'],
+['A man tells his friend, "I\'m getting in shape." His friend asks, "For what?" He says, "For my wedding." His friend responds, "Congratulations! Who\'s the lucky woman?" He answers, "Gym."'],
 ['A lawyer tells his client, "The truth will set you free." His client responds, "That\'s why I hired you—to lie."'],
-['A mother asks her son, "Did you finish your vegetables?" He says, "I\'m trying to eat healthy." She responds, "Then why is there pizza in your room?" He says, "So I don\'t eat it with the vegetables—that would be bad combinations."'],
-['A friend asks, "Why don\'t you ever admit you\'re wrong?" Another responds, "I\'m never wrong.','Remember when I thought I was wrong? I was wrong about that too."'],
-['A man tells a stranger, "I\'m trying to change my life." The stranger asks, "How?" He responds, "I moved to a different apartment." The stranger says, "That\'s not change." He replies, "Exactly—my problems followed me here too."'],
-['A girl tells her boyfriend, "I think we should see other people." He asks, "Why?" She says, "Because you\'re always on your phone." He puts his phone down and says, "I\'m not anymore." She replies, "Too late—I already called someone else."'],
+['A mother asks her son, "Did you finish your vegetables?" He says, "I\'m trying to eat healthy." She responds, "Then why is there pizza in','your room?" He says, "So I don\'t eat it with the vegetables—that would be bad combinations."'],
+['A friend asks, "Why don\'t you ever admit you\'re wrong?" Another responds, "I\'m never wrong. Remember when I thought I was wrong? I was wrong about that too."'],
+['A man tells a stranger, "I\'m trying to change my life." The stranger asks, "How?" He responds, "I moved to a different apartment." The stranger','says, "That\'s not change." He replies, "Exactly—my problems followed me here too."'],
+['A girl tells her boyfriend, "I think we should see other people." He asks, "Why?" She says, "Because you\'re always on your phone." He puts','his phone down and says, "I\'m not anymore." She replies, "Too late—I already called someone else."'],
 ['A parent asks their child, "Did you learn anything at school today?" The child responds, "Yes—that I should\'ve stayed home."'],
-['A man walks into a gym for the first time.','The trainer asks, "What\'s your goal?" He says, "To leave and never come back." The trainer replies, "Honestly, most people\'s goal by month two."'],
-['A woman asks her husband, "Do you love me?" He says, "Of course." She asks, "Then why don\'t you show it?" He responds, "Because showing it would be more expensive than saying it."'],
-['A student asks his teacher, "Will this be on the test?" The teacher says, "No." The student then stops paying attention.','The teacher adds, "Actually, that question will be."'],
-['A man tells his son, "Honesty is the best policy." Later, the son asks, "Do I look fat?" His father says, "Yes." His mother gets angry.','His father whispers, "You said honesty is the best policy."'],
-['A wealthy man tells a homeless person, "Have you tried getting a job?" The homeless person responds, "I had three." The man asks, "Then why are you homeless?" The homeless person says, "Because employers like you keep asking me stupid questions instead of paying me."'],
-['A pessimist tells an optimist, "Nothing ever works out." The optimist responds, "That\'s not true!','Look, we\'re both still alive." The pessimist says, "Exactly—we haven\'t even accomplished that yet."'],
-['A woman tells her therapist, "I have no self-control." Her therapist asks, "How long have you felt this way?" She responds, "Since the moment you asked—I was supposed to be on a diet."'],
-['A man asks a beggar, "Why don\'t you work for your money?" The beggar responds, "I tried that. Now I\'m here.','Apparently hard work doesn\'t guarantee success—just guarantees you\'re tired too."'],
+['A man walks into a gym for the first time. The trainer asks, "What\'s your goal?" He says, "To leave and never come back." The','trainer replies, "Honestly, most people\'s goal by month two."'],
+['A woman asks her husband, "Do you love me?" He says, "Of course." She asks, "Then why don\'t you show it?" He responds, "Because showing','it would be more expensive than saying it."'],
+['A student asks his teacher, "Will this be on the test?" The teacher says, "No." The student then stops paying attention. The teacher adds, "Actually, that question will be."'],
+['A man tells his son, "Honesty is the best policy." Later, the son asks, "Do I look fat?" His father says, "Yes." His mother gets','angry. His father whispers, "You said honesty is the best policy."'],
+['A wealthy man tells a homeless person, "Have you tried getting a job?" The homeless person responds, "I had three." The man asks, "Then why','are you homeless?" The homeless person says, "Because employers like you keep asking me stupid questions instead of paying me."'],
+['A pessimist tells an optimist, "Nothing ever works out." The optimist responds, "That\'s not true! Look, we\'re both still alive." The pessimist says, "Exactly—we haven\'t even accomplished that yet."'],
+['A woman tells her therapist, "I have no self-control." Her therapist asks, "How long have you felt this way?" She responds, "Since the moment you','asked—I was supposed to be on a diet."'],
+['A man asks a beggar, "Why don\'t you work for your money?" The beggar responds, "I tried that. Now I\'m here. Apparently hard work doesn\'t guarantee success—just guarantees you\'re tired too."'],
 ['A teenager tells his mom, "I need privacy." She asks, "Why?" He says, "Everyone deserves privacy." She responds, "I know—that\'s why I read your diary in private."'],
-['A customer asks a waiter, "Is this fish fresh?" The waiter replies, "It was swimming this morning." The customer says, "Then why does it smell like it died yesterday?" The waiter responds, "Because you caught it this morning, sir."'],
+['A customer asks a waiter, "Is this fish fresh?" The waiter replies, "It was swimming this morning." The customer says, "Then why does it smell','like it died yesterday?" The waiter responds, "Because you caught it this morning, sir."'],
 ['A man tells his boss, "I deserve a raise." His boss asks, "Why?" He says, "I\'ve been working here for 10 years." His boss responds, "Exactly—you\'re still learning."'],
-['A friend asks, "Why are you so tired?" Another replies, "I\'ve been trying to sleep, but I keep thinking about my problems." His friend says, "Just don\'t think about them." He responds, "Wow, I never thought of that—but I can\'t stop thinking."'],
-['A woman tells her date, "I\'m looking for someone honest." He says, "Great, I\'m very honest." She asks, "So how many people have you dated?" He responds, "Honestly?','I\'ve lost count." She says, "See, honesty works."'],
-['A child asks, "Dad, why do you drink so much coffee?" His father replies, "To stay awake at work." The child asks, "Why do you need to stay awake?" The father says, "To make money." The child asks, "To buy what?" The father responds, "More coffee."'],
+['A friend asks, "Why are you so tired?" Another replies, "I\'ve been trying to sleep, but I keep thinking about my problems." His friend says,','"Just don\'t think about them." He responds, "Wow, I never thought of that—but I can\'t stop thinking."'],
+['A woman tells her date, "I\'m looking for someone honest." He says, "Great, I\'m very honest." She asks, "So how many people have you dated?"','He responds, "Honestly? I\'ve lost count." She says, "See, honesty works."'],
+['A child asks, "Dad, why do you drink so much coffee?" His father replies, "To stay awake at work." The child asks, "Why do you','need to stay awake?" The father says, "To make money." The child asks, "To buy what?" The father responds, "More coffee."'],
 ['A man tells his doctor, "I snore too much." The doctor asks, "Does it bother you?" He says, "No, it bothers my wife." The doctor responds, "Then she should come see me."'],
-['A boss tells his employee, "You\'re fired." The employee asks, "Why?" The boss says, "You\'re not productive." The employee responds, "I know—that\'s why I never finished anything.','If I finished my work, you\'d fire me for being idle."'],
+['A boss tells his employee, "You\'re fired." The employee asks, "Why?" The boss says, "You\'re not productive." The employee responds, "I know—that\'s why I never','finished anything. If I finished my work, you\'d fire me for being idle."'],
 ['A woman tells her friend, "I\'m on a diet." Her friend asks, "Does it work?" She responds, "Yes—every diet works when you don\'t follow it."'],
-['A teenager tells his mom, "I failed my test." She asks, "How?" He says, "By not studying." She responds, "That\'s not how, that\'s why." He says, "Exactly—if I knew how, I would\'ve passed."'],
-['A man asks a fortune teller, "Can you predict my future?" She says, "Yes, you\'ll be very successful." He asks, "When?" She responds, "When you stop asking fortune tellers about your future and start working."'],
-['A friend asks, "Why did you quit your gym membership?" Another replies, "I was paying for exercise." His friend says, "So you could get healthy." He responds, "No, so I could feel guilty about not going—which is free."'],
+['A teenager tells his mom, "I failed my test." She asks, "How?" He says, "By not studying." She responds, "That\'s not how, that\'s why." He','says, "Exactly—if I knew how, I would\'ve passed."'],
+['A man asks a fortune teller, "Can you predict my future?" She says, "Yes, you\'ll be very successful." He asks, "When?" She responds, "When you','stop asking fortune tellers about your future and start working."'],
+['A friend asks, "Why did you quit your gym membership?" Another replies, "I was paying for exercise." His friend says, "So you could get healthy."','He responds, "No, so I could feel guilty about not going—which is free."'],
 ['A customer asks a used car salesman, "Is this car reliable?" The salesman says, "Absolutely." The customer asks, "Then why are you selling it?" The salesman responds, "Because I\'m reliable, not stupid."'],
-['A woman tells her therapist, "I have anxiety about the future." The therapist asks, "What worries you most?" She responds, "That I\'ll still be anxious about the future." The therapist says, "That\'s actually a sign of progress."'],
-['A man tells his friend, "I\'m finally debt-free." His friend asks, "How?" He says, "I stopped counting." His friend responds, "That\'s not how debt works." He says, "I know—that\'s why it\'s working so well."'],
-['A parent asks their child, "Why did you hit your brother?" The child responds, "He hit me first." The parent says, "That doesn\'t make it okay." The child replies, "Exactly—so we\'re both not okay now.','It\'s fair."'],
-['A musician tells someone, "I haven\'t made any money from my music." The person asks, "Why do you keep doing it?" The musician responds, "Because if I stop, it means my hobby was a waste of time.','If I keep going, there\'s still hope."'],
-['A man tells his wife, "I bought us a surprise vacation." She asks, "Where?" He says, "You\'ll see when we get there." She responds, "I hate surprises." He says, "Good, because we\'re going to my mother\'s house." She replies, "Perfect—I already knew."'],
+['A woman tells her therapist, "I have anxiety about the future." The therapist asks, "What worries you most?" She responds, "That I\'ll still be anxious','about the future." The therapist says, "That\'s actually a sign of progress."'],
+['A man tells his friend, "I\'m finally debt-free." His friend asks, "How?" He says, "I stopped counting." His friend responds, "That\'s not how debt works."','He says, "I know—that\'s why it\'s working so well."'],
+['A parent asks their child, "Why did you hit your brother?" The child responds, "He hit me first." The parent says, "That doesn\'t make it','okay." The child replies, "Exactly—so we\'re both not okay now. It\'s fair."'],
+['A musician tells someone, "I haven\'t made any money from my music." The person asks, "Why do you keep doing it?" The musician responds, "Because','if I stop, it means my hobby was a waste of time. If I keep going, there\'s still hope."'],
+['A man tells his wife, "I bought us a surprise vacation." She asks, "Where?" He says, "You\'ll see when we get there." She responds, "I','hate surprises." He says, "Good, because we\'re going to my mother\'s house." She replies, "Perfect—I already knew."'],
 ['A student asks his professor, "Will you teach us how to be successful?" The professor responds, "No, I\'m a teacher—if I knew how to be successful, I wouldn\'t be teaching."'],
 ];
 
@@ -2872,13 +2872,13 @@ function wireOnboarding(){
   wire();
   wireOnboarding();
   renderHero();
-  await syncSeedFiles();
   refreshStats();
-  renderDashboard();
+  renderDashboard();                    // paint the real screen immediately — never wait on background sync
   logEvent('open', null);
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
   buildWordIndex().catch(()=>{});
   buildViIndex().catch(()=>{});
+  syncSeedFiles().catch(()=>{});        // fire-and-forget — re-renders itself if it actually merged anything new
 })();
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;
 window.startReview=startReview; window.checkReview=checkReview; window.skipReview=skipReview; window.nextReview=nextReview;
