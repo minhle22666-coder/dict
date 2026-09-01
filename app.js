@@ -808,57 +808,25 @@ async function renderFamilyChips(word){
 }
 window.renderFamilyChips=renderFamilyChips;
 /* ============================================================
-   YOUGLISH — a real spoken-usage video, pulled in only when the
-   device actually has a connection. Offline (or on any failure),
-   the container is simply left empty — no black placeholder frame,
-   no spinner, nothing that could read as "broken" while the rest of
-   the offline-first entry works fine.
+   YOUGLISH — opens in the system browser instead of embedding inline.
+   Why: iOS WKWebView (what any "Add to Home Screen" PWA runs inside)
+   has a documented WebKit bug (#169846) where it doesn't send the
+   Referer header YouTube requires for embeds, and Google's "verify
+   you're not a robot" challenge is separately known to malfunction
+   inside WKWebView (the checkbox just loops and does nothing). Both
+   are WebKit/WKWebView-level limitations, not anything specific to
+   YouGlish's widget — embedding YouTube any other way would hit the
+   same wall. Opening in the real system browser (a normal Safari tab,
+   with normal cookies/Referer handling) sidesteps it entirely.
    ============================================================ */
-let _ygScriptLoading=false, _ygReady=false, _ygPendingWord=null, _ygWidget=null;
-function ensureYouglishScript(){
-  if(_ygReady || _ygScriptLoading) return;
-  _ygScriptLoading=true;
-  const tag=document.createElement('script');
-  tag.src='https://youglish.com/public/emb/widget.js';
-  tag.onerror=()=>{ _ygScriptLoading=false; };
-  document.head.appendChild(tag);
-}
-window.onYouglishAPIReady=function(){
-  _ygReady=true; _ygScriptLoading=false;
-  if(_ygPendingWord){ const w=_ygPendingWord; _ygPendingWord=null; renderYouglishWidget(w); }
-};
-function renderYouglishWidget(word){
-  const box=$('#youglish-box'); if(!box || currentWord!==word) return;   // navigated away while loading
-  box.innerHTML='<div class="yg-accent-row">'
-    +'<button class="yg-accent on" id="yg-accent-us" onclick="setYgAccent(\'us\')">🇺🇸 US</button>'
-    +'<button class="yg-accent" id="yg-accent-uk" onclick="setYgAccent(\'uk\')">🇬🇧 UK</button>'
-    +'</div>'
-    +'<div class="yg-clip"><div id="yg-slot" class="yg-slot"></div></div>'
-    +'<div class="yg-credit">YouGlish</div>';
-  window._ygWord=word;
-  try{
-    _ygWidget = new YG.Widget('yg-slot', {
-      autoStart:0, components:8+64,   // caption + the widget's own control row only — no title, no search box
-      events:{
-        onFetchDone:(e)=>{ if(!e||!e.totalResult) box.innerHTML=''; },
-        onError:()=>{ box.innerHTML=''; }
-      }
-    });
-    window._ygWidget=_ygWidget;
-    _ygWidget.fetch(word, 'english', 'us');
-  }catch(e){ box.innerHTML=''; }
-}
-window.setYgAccent=function(accent){
-  if(!window._ygWidget || !window._ygWord) return;
-  $('#yg-accent-us').classList.toggle('on', accent==='us');
-  $('#yg-accent-uk').classList.toggle('on', accent==='uk');
-  try{ window._ygWidget.fetch(window._ygWord, 'english', accent); }catch(e){}
-};
 function maybeLoadYouglish(word){
   const box=$('#youglish-box'); if(!box) return;
   if(!navigator.onLine) return;                    // offline — leave it empty, don't even try
-  if(_ygReady) renderYouglishWidget(word);
-  else { _ygPendingWord=word; ensureYouglishScript(); }
+  const url='https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
+  box.innerHTML='<a class="yg-link-btn" href="'+url+'" target="_blank" rel="noopener">'
+    +'<span class="yg-link-ico">▶</span>'
+    +'<span class="yg-link-text"><b>Nghe trong câu thật</b><span>Mở YouGlish trong trình duyệt</span></span>'
+    +'</a>';
 }
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
