@@ -17,7 +17,7 @@
 </head>
 <body>
 
-<h3>YouGlish widget test — từ "hello"</h3>
+<h3>YouGlish widget test v2 — id đầy đủ, từ "hello"</h3>
 
 <!-- đúng như ví dụ chính thức: container rỗng, id là yg-widget-0 -->
 <div id="yg-widget-0"></div>
@@ -40,7 +40,7 @@
     log('✓ onYouglishAPIReady đã chạy — widget.js OK');
     log('  typeof YG = ' + (typeof YG));
     try{
-      widget = new YG.Widget('widget-0', {
+      widget = new YG.Widget('yg-widget-0', {  // id ĐẦY ĐỦ
         width: Math.min(document.body.clientWidth - 32, 640),
         components: 9,
         events: {
@@ -49,7 +49,7 @@
           onError:       onYgError
         }
       });
-      log('✓ new YG.Widget("widget-0") thành công');
+      log('✓ new YG.Widget("yg-widget-0") thành công');
     }catch(e){
       log('✗ LỖI khi tạo widget: ' + (e && e.message ? e.message : e));
       return;
