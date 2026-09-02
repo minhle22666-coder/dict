@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hiệu chỉnh vùng che YouGlish</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;padding:16px;
+       background:#111a24;color:#e8eff7;line-height:1.5}
+  h3{margin:0 0 4px;font-size:16px}
+  p.hint{margin:0 0 14px;font-size:12.5px;color:#8fa8c0}
+  .row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  button{padding:9px 12px;border-radius:9px;border:1px solid #23394f;
+         background:#1b2a3a;color:#e8eff7;font-size:13.5px}
+  button.on{background:#2b6ef5;border-color:#2b6ef5}
+  .stage{position:relative;border-radius:12px;overflow:hidden;background:#0c1420;
+         border:1px solid #23394f;touch-action:none}
+  .stage .mask{position:absolute;left:0;right:0;bottom:0;
+        background:rgba(255,80,80,.28);border-top:2px dashed #ff5050;
+        pointer-events:none}
+  .stage .handle{position:absolute;left:0;right:0;height:34px;margin-top:-17px;
+        display:flex;align-items:center;justify-content:center;cursor:ns-resize}
+  .stage .handle .bar{width:64px;height:6px;border-radius:4px;background:#ff5050}
+  #readout{margin-top:12px;font-size:13.5px;background:#0c1420;border:1px solid #23394f;
+        border-radius:9px;padding:11px 13px}
+  #readout b{color:#ffcb6b}
+  #status{font-size:12.5px;color:#8fa8c0;margin-top:8px}
+</style>
+</head>
+<body>
+
+<h3>Hiệu chỉnh vùng che khung video YouGlish</h3>
+<p class="hint">1) Chọn components. 2) Kéo vạch đỏ xuống đúng mép trên của phần muốn che (quảng cáo / dòng powered by). 3) Đọc số % ở dưới rồi gửi cho mình.</p>
+
+<div class="row" id="comp-row">
+  <button type="button" data-c="0" onclick="pickComponents(0)">components 0</button>
+  <button type="button" data-c="1" onclick="pickComponents(1)">1</button>
+  <button type="button" data-c="8" onclick="pickComponents(8)">8</button>
+  <button type="button" data-c="9" onclick="pickComponents(9)" class="on">9</button>
+</div>
+
+<div class="stage" id="stage">
+  <div id="host"></div>
+  <div class="mask" id="mask" style="height:25%"></div>
+  <div class="handle" id="handle" style="top:75%"><div class="bar"></div></div>
+</div>
+
+<div id="readout">Kéo vạch đỏ để chọn vùng che… (mặc định 75% chiều cao)</div>
+<div id="status">đang chờ widget.js…</div>
+
+<script>
+  var ygReady = false, currentComponents = 9, widgetIdx = 0;
+  var stage = document.getElementById('stage');
+  var mask  = document.getElementById('mask');
+  var handle = document.getElementById('handle');
+
+  function onYouglishAPIReady(){
+    ygReady = true;
+    document.getElementById('status').textContent = '✓ sẵn sàng';
+    render(9);
+  }
+
+  function pickComponents(c){
+    currentComponents = c;
+    document.querySelectorAll('#comp-row button').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-c') == c);
+    });
+    render(c);
+  }
+
+  function render(components){
+    if(!ygReady) return;
+    widgetIdx++;
+    var id = 'yg-widget-cal' + widgetIdx;
+    document.getElementById('host').innerHTML = '<div id="' + id + '"></div>';
+    try{
+      var widget = new YG.Widget(id, {
+        width: stage.clientWidth,
+        components: components,
+        events: {}
+      });
+      widget.fetch('hello', 'english');
+    }catch(e){
+      document.getElementById('status').textContent = '✗ ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  function setPct(pct){
+    pct = Math.max(5, Math.min(95, pct));
+    mask.style.height = (100 - pct) + '%';
+    handle.style.top = pct + '%';
+    var h = stage.clientHeight;
+    document.getElementById('readout').innerHTML =
+      'Che từ <b>' + pct.toFixed(1) + '%</b> chiều cao trở xuống' +
+      ' &nbsp;·&nbsp; chiều cao khung hiện tại: <b>' + Math.round(h) + 'px</b>' +
+      ' &nbsp;·&nbsp; vùng che cao khoảng <b>' + Math.round(h * (100 - pct) / 100) + 'px</b>';
+  }
+
+  function pointerToPct(clientY){
+    var r = stage.getBoundingClientRect();
+    return (clientY - r.top) / r.height * 100;
+  }
+
+  var dragging = false;
+  handle.addEventListener('pointerdown', function(e){ dragging = true; e.preventDefault(); });
+  window.addEventListener('pointermove', function(e){
+    if(!dragging) return;
+    setPct(pointerToPct(e.clientY));
+  });
+  window.addEventListener('pointerup', function(){ dragging = false; });
+
+  setPct(75);
+
+  window.addEventListener('error', function(ev){
+    document.getElementById('status').textContent = '✗ JS error: ' + ev.message;
+  });
+</script>
+
+<script src="https://youglish.com/public/emb/widget.js" charset="utf-8"></script>
+
+</body>
+</html>
