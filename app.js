@@ -815,98 +815,129 @@ async function renderFamilyChips(word){
 }
 window.renderFamilyChips=renderFamilyChips;
 /* ============================================================
-   YOUGLISH v2 — the official widget is loaded DIRECTLY into this
-   page (no proxy iframe any more), so the YouTube player sits one
-   iframe level closer and actually starts inside the iOS PWA
-   WKWebView. The "hide part of the frame" masking is done with our
-   own overlay divs in this document, so it can never touch
-   cross-origin content and can never wedge the load again.
-   A watchdog gives up after YG_TIMEOUT ms and leaves only the
-   always-working link, so nothing ever sits on "loading" forever.
-   Tuning: YG_STAGE_H = visible height, YG_SHIFT_TOP = pull the
-   widget up to hide its top strip, YG_MASK_BOTTOM = how much of
-   the bottom (caption / answer text) is covered.
+   YOUGLISH v4 — thay TOÀN BỘ khối YouGlish đang có trong app.js
+   (từ dòng comment /* ==== ngay trên chữ "YOUGLISH v2" hoặc
+   "YOUGLISH v3", cho tới dấu } cuối hàm maybeLoadYouglish).
+
+   Sửa 3 lỗi so với v2/v3 — đây là lý do video không lên:
+   1. fetch(word, lang) — ĐÚNG 2 tham số như tài liệu YouGlish.
+      v2/v3 truyền thêm accent làm tham số thứ 3 (sai).
+   2. Đọc event.totalResult (v2/v3 đọc r.total → luôn undefined).
+   3. Mỗi lần tra từ dùng MỘT id mới (yg-widget-0, yg-widget-1, …)
+      như quy ước của widget.js, thay vì lặp lại "widget-0" khiến
+      instance thứ hai trở đi bị bỏ qua.
+   Ngoài ra: script nạp không async, đặt vào body, giống ví dụ gốc.
+
+   Về điều khoản YouGlish: mask chỉ che vùng CHỮ (caption) phía
+   dưới, KHÔNG che logo YouGlish và không che quảng cáo YouTube.
+   Muốn ẩn thanh tìm kiếm của YouGlish thì đổi YG_COMPONENTS chứ
+   đừng lấy mask phủ lên.
    ============================================================ */
 const YG_SCRIPT      = 'https://youglish.com/public/emb/widget.js';
 const YG_LANG        = 'english';
-const YG_ACCENT      = 'us';      // 'us' | 'uk' | 'aus' | 'all'
-const YG_TIMEOUT     = 9000;      // ms to wait for a real video frame
-const YG_STAGE_H     = 300;       // px — keep in sync with .yg-stage
-const YG_SHIFT_TOP   = 0;         // px — negative pulls the widget up
-const YG_MASK_BOTTOM = 92;        // px — keep in sync with .yg-mask
+const YG_COMPONENTS  = 9;         // 9 = search box + caption (ví dụ chính thức)
+const YG_TIMEOUT     = 12000;     // ms chờ player xuất hiện
+const YG_DEBUG       = true;      // false = thất bại thì ẩn khung im lặng
+const YG_SHIFT_TOP   = 0;         // px — số âm để giấu thanh trên
+const YG_MASK_BOTTOM = 92;        // px — khớp .yg-mask trong index.html
 
-let _ygScriptP = null;   // widget.js is fetched once per session
-let _ygSeq     = 0;      // guards against fast consecutive lookups
+let _ygScriptP = null;
+let _ygIdx     = 0;      // 0, 1, 2… → id widget khác nhau mỗi lần
+let _ygSeq     = 0;
+let _ygDiag    = {};
 
+/* nạp widget.js một lần, đúng kiểu ví dụ gốc: hàm global được gán
+   TRƯỚC khi thẻ script được thêm vào trang. */
 function ygLoadScript(){
   if(_ygScriptP) return _ygScriptP;
   _ygScriptP = new Promise((resolve, reject)=>{
-    if(window.YG && window.YG.Widget) return resolve();
-    const prev = window.onYouglishAPIReady;
+    if(window.YG && window.YG.Widget){ _ygDiag.script='YG đã có sẵn'; return resolve(); }
     window.onYouglishAPIReady = function(){
-      if(typeof prev==='function'){ try{ prev(); }catch(e){} }
+      _ygDiag.script = 'onYouglishAPIReady đã chạy';
       resolve();
     };
     const s = document.createElement('script');
-    s.src = YG_SCRIPT; s.async = true; s.charset = 'utf-8';
-    s.onerror = ()=>reject(new Error('yg-script-failed'));
-    document.head.appendChild(s);
-    // some builds never fire the callback — poll for the global too
+    s.src = YG_SCRIPT; s.charset = 'utf-8';
+    s.onerror = ()=>{ _ygDiag.script='không tải được widget.js';
+                      reject(new Error('widget.js bị chặn')); };
+    document.body.appendChild(s);
     let n = 0;
     const poll = setInterval(()=>{
-      if(window.YG && window.YG.Widget){ clearInterval(poll); resolve(); }
-      else if(++n > 40){ clearInterval(poll); reject(new Error('yg-script-timeout')); }
+      if(window.YG && window.YG.Widget){
+        clearInterval(poll);
+        _ygDiag.script = _ygDiag.script || 'thấy window.YG qua polling';
+        resolve();
+      }else if(++n > 48){
+        clearInterval(poll);
+        _ygDiag.script = 'hết 12s vẫn không có YG.Widget';
+        reject(new Error('không thấy YG.Widget'));
+      }
     }, 250);
   });
   return _ygScriptP;
 }
 
-/* The most reliable success signal, independent of YouGlish's own
-   callbacks: a real <iframe> (the YouTube player) shows up inside
-   the mount with a non-zero height. */
-function ygWaitForFrame(mount, timeout){
+/* Tín hiệu thành công đáng tin nhất: có <iframe> thật, cao > 40px.
+   Cũng quét cả trang phòng khi widget chèn player ra ngoài mount. */
+function ygWaitForFrame(wrap, timeout){
   return new Promise((resolve)=>{
     const t0 = Date.now();
     const tick = setInterval(()=>{
-      const f = mount.querySelector('iframe');
-      if(f && f.clientHeight > 40){ clearInterval(tick); resolve(true); }
-      else if(Date.now()-t0 > timeout){ clearInterval(tick); resolve(false); }
+      let f = wrap.querySelector('iframe');
+      if(!f){
+        const out = document.querySelectorAll('iframe[src*="youtube"],iframe[src*="youglish"]');
+        for(const cand of out){
+          if(!wrap.contains(cand)){
+            _ygDiag.rescue = 'player nằm ngoài mount → đã kéo vào khung';
+            const inner = wrap.querySelector('.yg-inner');
+            if(inner){ inner.appendChild(cand); f = cand; }
+            break;
+          }
+        }
+      }
+      if(f && f.clientHeight > 40){
+        clearInterval(tick);
+        _ygDiag.frame = 'thấy player sau ' + (Date.now()-t0) + 'ms';
+        resolve(true);
+      }else if(Date.now()-t0 > timeout){
+        clearInterval(tick);
+        const mount = wrap.querySelector('.yg-mount');
+        _ygDiag.frame      = 'KHÔNG có player sau ' + timeout + 'ms';
+        _ygDiag.mountNodes = mount ? mount.querySelectorAll('*').length : 'mount mất';
+        _ygDiag.mountHTML  = mount ? (mount.innerHTML.slice(0,140) || '(rỗng)') : '-';
+        resolve(false);
+      }
     }, 300);
   });
 }
 
-/* Fallback path: YouGlish's declarative embed markup, with the
-   script re-injected under a cache-buster so it rescans the DOM.
-   Used only if new YG.Widget(...) throws. */
-function ygDeclarative(mount, word){
-  mount.innerHTML =
-    '<a id="yg-widget-0" class="youglish-widget" href="#" rel="nofollow"'
-    + ' data-query="'+esc(word)+'" data-lang="'+YG_LANG+'" data-accent="'+YG_ACCENT+'"'
-    + ' data-components="8415" data-bkg-color="theme_dark">YouGlish</a>';
-  const s = document.createElement('script');
-  s.src = YG_SCRIPT + '?_=' + Date.now();
-  s.async = true; s.charset = 'utf-8';
-  document.body.appendChild(s);
-}
+/* gõ ygDiag() trong console để xem lại lần nạp gần nhất */
+function ygDiag(){ console.log(_ygDiag); return _ygDiag; }
+window.ygDiag = ygDiag;
 
 function maybeLoadYouglish(word){
   const box = document.getElementById('youglish-box');
   if(!box) return;
   const seq = ++_ygSeq;
+  const idx = _ygIdx++;                 // id riêng cho lần tra này
+  const elId = 'yg-widget-' + idx;      // phần tử:      yg-widget-N
+  const wId  = 'widget-' + idx;         // constructor:  widget-N
+  _ygDiag = { word: word, online: navigator.onLine, host: location.host, widgetId: wId };
 
   const directUrl = 'https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
   const linkBtn =
       '<a class="yg-link-btn yg-fallback-btn" href="'+directUrl+'" target="_blank" rel="noopener">'
-    + '<span class="yg-link-ico">&#9654;</span>'
+    + '<span class="yg-link-ico">\u25B6</span>'
     + '<span class="yg-link-text"><b>Nghe trong c\u00e2u th\u1eadt</b>'
     + '<span>Kh\u00f4ng th\u1ea5y video? M\u1edf trong tr\u00ecnh duy\u1ec7t</span></span></a>';
 
-  // offline — just the link, don't even try to fetch the widget
   if(!navigator.onLine){ box.innerHTML = linkBtn; return; }
 
   box.innerHTML =
       '<div class="yg-wrap" id="yg-wrap">'
-    +   '<div class="yg-stage"><div class="yg-inner"><div id="yg-widget-0"></div></div></div>'
+    +   '<div class="yg-stage"><div class="yg-inner">'
+    +     '<div class="yg-mount" id="'+elId+'"></div>'
+    +   '</div></div>'
     +   '<div class="yg-mask" aria-hidden="true"></div>'
     +   '<button class="yg-peek" type="button" aria-label="Hi\u1ec7n ph\u1ea7n b\u1ecb che">\u{1F441}</button>'
     +   '<div class="yg-veil"><span class="yg-dot"></span>\u0110ang m\u1edf video\u2026</div>'
@@ -914,37 +945,54 @@ function maybeLoadYouglish(word){
     + linkBtn;
 
   const wrap  = document.getElementById('yg-wrap');
-  const mount = document.getElementById('yg-widget-0');
+  const mount = document.getElementById(elId);
   const inner = wrap.querySelector('.yg-inner');
   const peek  = wrap.querySelector('.yg-peek');
   if(YG_SHIFT_TOP) inner.style.transform = 'translateY('+YG_SHIFT_TOP+'px)';
   peek.addEventListener('click', ()=>wrap.classList.toggle('yg-peeking'));
 
-  const finish = (ok)=>{
-    if(seq !== _ygSeq) return;                  // a newer word took over
-    if(!document.body.contains(wrap)) return;   // entry was re-rendered
-    wrap.classList.add(ok ? 'yg-ready' : 'yg-failed');
+  const finish = (ok, why)=>{
+    if(seq !== _ygSeq) return;                  // đã tra từ khác
+    if(!document.body.contains(wrap)) return;   // entry đã render lại
+    if(ok){ wrap.classList.add('yg-ready'); return; }
+    if(why) _ygDiag.stop = why;
+    if(!YG_DEBUG){ wrap.classList.add('yg-failed'); return; }
+    let rows = '';
+    for(const k in _ygDiag) rows += k + ': ' + _ygDiag[k] + '\n';
+    wrap.className = 'yg-wrap yg-diag';
+    wrap.innerHTML = '<b>YouGlish ch\u01b0a d\u1ee5ng \u0111\u01b0\u1ee3c video</b><pre>'+esc(rows)+'</pre>';
   };
 
   ygLoadScript().then(()=>{
     if(seq !== _ygSeq) return;
+    _ygDiag.YG = typeof window.YG;
     try{
-      // element id is "yg-widget-0"; the constructor takes "widget-0"
-      const w = new YG.Widget('widget-0', {
+      const w = new YG.Widget(wId, {
         width: wrap.clientWidth || 340,
-        components: 9,
+        components: YG_COMPONENTS,
         events: {
-          onFetchDone: (r)=>{ if(r && r.total === 0) finish(false); },
-          onError: ()=>finish(false)
+          onFetchDone: (e)=>{
+            _ygDiag.totalResult = e ? e.totalResult : '?';
+            if(e && e.totalResult === 0) finish(false, 'YouGlish kh\u00f4ng c\u00f3 video cho t\u1eeb n\u00e0y');
+          },
+          onError: (e)=>{
+            try{ _ygDiag.ygError = JSON.stringify(e); }catch(x){ _ygDiag.ygError = 'onError'; }
+            finish(false, 'widget b\u00e1o l\u1ed7i');
+          }
         }
       });
-      w.fetch(word, YG_LANG, YG_ACCENT);
+      _ygDiag.ctor = 'new YG.Widget OK';
+      w.fetch(word, YG_LANG);            // ĐÚNG 2 tham số
+      _ygDiag.fetchCall = 'đã gọi fetch()';
     }catch(e){
-      ygDeclarative(mount, word);
+      _ygDiag.ctor = 'THROW: ' + (e && e.message ? e.message : e);
+      finish(false, 'kh\u00f4ng t\u1ea1o \u0111\u01b0\u1ee3c widget');
+      return;
     }
-    ygWaitForFrame(mount, YG_TIMEOUT).then(finish);
-  }).catch(()=>finish(false));
+    ygWaitForFrame(wrap, YG_TIMEOUT).then((ok)=>finish(ok, 'kh\u00f4ng c\u00f3 player n\u00e0o xu\u1ea5t hi\u1ec7n'));
+  }).catch((e)=>finish(false, 'widget.js: ' + (e && e.message)));
 }
+
 
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;

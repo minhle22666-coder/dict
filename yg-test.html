@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YouGlish widget test</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:16px;
+       background:#111a24;color:#e8eff7;line-height:1.5}
+  h3{margin:0 0 12px;font-size:16px}
+  #yg-widget-0{background:#1b2a3a;border-radius:10px;min-height:60px}
+  #log{white-space:pre-wrap;font-size:12.5px;background:#0c1420;color:#9fb6cd;
+       padding:11px 12px;border-radius:10px;margin-top:14px;border:1px solid #23394f}
+  button{margin-top:12px;padding:10px 14px;border-radius:9px;border:1px solid #23394f;
+         background:#1b2a3a;color:#e8eff7;font-size:14px}
+</style>
+</head>
+<body>
+
+<h3>YouGlish widget test — từ "hello"</h3>
+
+<!-- đúng như ví dụ chính thức: container rỗng, id là yg-widget-0 -->
+<div id="yg-widget-0"></div>
+
+<button type="button" onclick="tryFetch('world')">Thử từ khác: world</button>
+
+<div id="log">đang chờ widget.js…</div>
+
+<script>
+  var widget = null;
+
+  function log(msg){
+    var el = document.getElementById('log');
+    el.textContent += '\n' + msg;
+  }
+
+  /* widget.js gọi hàm global này khi API sẵn sàng.
+     Hàm PHẢI được định nghĩa trước khi thẻ script bên dưới chạy. */
+  function onYouglishAPIReady(){
+    log('✓ onYouglishAPIReady đã chạy — widget.js OK');
+    log('  typeof YG = ' + (typeof YG));
+    try{
+      widget = new YG.Widget('widget-0', {
+        width: Math.min(document.body.clientWidth - 32, 640),
+        components: 9,
+        events: {
+          onFetchDone:   onFetchDone,
+          onVideoChange: onVideoChange,
+          onError:       onYgError
+        }
+      });
+      log('✓ new YG.Widget("widget-0") thành công');
+    }catch(e){
+      log('✗ LỖI khi tạo widget: ' + (e && e.message ? e.message : e));
+      return;
+    }
+    tryFetch('hello');
+  }
+
+  function tryFetch(word){
+    if(!widget){ log('✗ chưa có widget, không fetch được'); return; }
+    try{
+      widget.fetch(word, 'english');     // đúng 2 tham số như tài liệu
+      log('→ đã gọi fetch("' + word + '", "english")');
+    }catch(e){
+      log('✗ LỖI khi fetch: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  function onFetchDone(e){
+    log('✓ onFetchDone — totalResult = ' + (e ? e.totalResult : '?'));
+    try{ log('  payload: ' + JSON.stringify(e)); }catch(x){}
+  }
+  function onVideoChange(e){ log('✓ onVideoChange — video đã đổi'); }
+  function onYgError(e){
+    log('✗ onError từ YouGlish: ' + (function(){ try{ return JSON.stringify(e); }catch(x){ return e; } })());
+  }
+
+  window.addEventListener('error', function(ev){
+    log('✗ JS error: ' + ev.message + ' @ ' + (ev.filename||'') + ':' + (ev.lineno||''));
+  });
+
+  /* chốt hạ sau 10 giây: có iframe player thật hay không */
+  setTimeout(function(){
+    var f = document.querySelector('#yg-widget-0 iframe');
+    log('--- sau 10s ---');
+    log('typeof YG          : ' + (typeof YG));
+    log('có iframe player?  : ' + (f ? 'CÓ (' + f.clientWidth + '×' + f.clientHeight + ')' : 'KHÔNG'));
+    log('số node trong mount: ' + document.querySelectorAll('#yg-widget-0 *').length);
+    log('iframe trong trang : ' + document.querySelectorAll('iframe').length);
+  }, 10000);
+</script>
+
+<!-- thẻ script đặt SAU các định nghĩa hàm, đúng như tài liệu YouGlish -->
+<script src="https://youglish.com/public/emb/widget.js" charset="utf-8"></script>
+
+</body>
+</html>

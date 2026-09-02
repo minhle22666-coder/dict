@@ -473,6 +473,12 @@
 
   .yg-wrap.yg-failed{display:none}
 
+  /* bảng chẩn đoán khi YouGlish không dựng được video (YG_DEBUG=true) */
+  .yg-diag{padding:13px 15px;font-size:12px;color:var(--muted);line-height:1.5}
+  .yg-diag b{display:block;color:var(--coral);font-size:12.5px;margin-bottom:7px}
+  .yg-diag pre{margin:0;white-space:pre-wrap;word-break:break-word;
+    font-size:11px;color:var(--muted-2)}
+
   .yg-link-btn{display:flex;align-items:center;gap:12px;width:100%;padding:13px 15px;
     background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
   .yg-link-btn:active{transform:scale(.98);background:var(--surface-2)}
@@ -1887,7 +1893,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v42 · YouGlish widget nhúng trực tiếp</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v44 · YouGlish v4 · fetch 2 tham số, id widget riêng</b></p>
   </section>
 </main>
 
