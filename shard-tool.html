@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Focci — chia shard từ điển</title>
+<style>
+  :root{--bg:#0E1B2A;--surface:#16283C;--surface2:#1E3550;--line:#254159;
+        --text:#EAF2FA;--muted:#93AAC4;--primary:#FF9F45;--mint:#4ADE80;--coral:#FF6B7A}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;padding:18px;
+       background:var(--bg);color:var(--text);line-height:1.55;max-width:820px}
+  h1{font-size:19px;margin:0 0 4px}
+  p.sub{margin:0 0 18px;font-size:13px;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+        padding:15px;margin-bottom:14px}
+  .card h2{font-size:14.5px;margin:0 0 10px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  input[type=number],input[type=text]{width:100%;padding:10px 12px;border-radius:9px;
+        border:1px solid var(--line);background:var(--surface2);color:var(--text);font-size:14px}
+  input[type=file]{font-size:13px;color:var(--muted)}
+  button{padding:10px 14px;border-radius:9px;border:1px solid var(--line);
+         background:var(--surface2);color:var(--text);font-size:13.5px;margin:4px 6px 0 0}
+  button.go{background:var(--primary);border-color:var(--primary);color:#3A1E00;font-weight:700}
+  button:active{transform:scale(.98)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  #log{white-space:pre-wrap;font-size:12px;background:#0A1420;color:var(--muted);
+       padding:11px 12px;border-radius:10px;border:1px solid var(--line);margin-top:12px;
+       max-height:260px;overflow:auto}
+  .ok{color:var(--mint)}.bad{color:var(--coral)}.warn{color:var(--primary)}
+  #dl button{display:block;width:100%;text-align:left;margin:6px 0}
+  .note{font-size:12px;color:var(--muted);margin-top:10px}
+  code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>Chia shard từ điển Focci</h1>
+<p class="sub">Gộp mọi file seed JSON đang có, loại trùng, chia thành nhiều shard nhỏ và sinh <code>dict-manifest.json</code>. Đây là bước tạo ra nguồn dữ liệu duy nhất có version cho app.</p>
+
+<div class="card">
+  <h2>1 · Chọn các file seed JSON</h2>
+  <label for="files">Chọn được nhiều file cùng lúc (seed.json, seed-idioms.json…)</label>
+  <input id="files" type="file" accept="application/json,.json" multiple />
+  <div class="note">Nhận cả mảng bản ghi đầy đủ (<code>[{word, data}]</code>) và mảng data thuần (<code>[{word, senses…}]</code>) — kiểu nào cũng đọc được.</div>
+</div>
+
+<div class="card">
+  <h2>2 · Cấu hình</h2>
+  <div class="grid">
+    <div>
+      <label for="size">Số từ mỗi shard</label>
+      <input id="size" type="number" min="200" step="100" value="2000" />
+    </div>
+    <div>
+      <label for="ver">Version (để trống = tự lấy theo ngày)</label>
+      <input id="ver" type="text" placeholder="2026-09-02.1" />
+    </div>
+  </div>
+  <div class="note">2.000 từ/shard là mức cân bằng tốt: đủ nhỏ để một shard lỗi không mất nhiều, đủ lớn để không tạo hàng trăm request.</div>
+</div>
+
+<div class="card">
+  <h2>3 · Tạo file</h2>
+  <button class="go" id="build">Gộp và chia shard</button>
+  <button id="clear">Xoá log</button>
+  <div id="log">Chờ chọn file…</div>
+  <div id="dl"></div>
+</div>
+
+<div class="card">
+  <h2>4 · Upload lên repo</h2>
+  <div class="note">
+    Tải hết các file ở trên rồi upload vào repo <code>dict</code> (Add file → Upload files → commit).
+    Cần đủ: <code>dict-manifest.json</code>, tất cả <code>dict-XXX.json</code>, và <code>words.txt</code> (danh sách toàn bộ từ, để đối chiếu về sau).
+    Trong app: Settings → Dictionary Data → <b>Đồng bộ từ repo</b>.
+  </div>
+</div>
+
+<script>
+  const $ = s => document.querySelector(s);
+  let built = null;
+
+  function log(m, c){
+    const d = document.createElement('div');
+    if(c) d.className = c;
+    d.textContent = m;
+    $('#log').appendChild(d);
+    $('#log').scrollTop = $('#log').scrollHeight;
+  }
+
+  function norm(s){ return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+
+  /* Đọc một file, trả về mảng object data (thứ app cần) */
+  function extract(json){
+    const arr = Array.isArray(json) ? json : [json];
+    const out = [];
+    for(const item of arr){
+      if(!item) continue;
+      // bản ghi đầy đủ từ generate.html: { word, data, source… }
+      if(item.data && item.data.word) out.push(item.data);
+      // hoặc data thuần: { word, senses, vi_equivalent… }
+      else if(item.word) out.push(item);
+    }
+    return out;
+  }
+
+  $('#build').addEventListener('click', async () => {
+    const files = Array.from($('#files').files || []);
+    if(!files.length){ log('✕ chưa chọn file nào', 'bad'); return; }
+
+    $('#log').innerHTML = '';
+    $('#dl').innerHTML = '';
+    built = null;
+
+    const map = new Map();      // word → data (bản đầu tiên thắng)
+    let dup = 0, junk = 0;
+
+    for(const f of files){
+      try{
+        const json = JSON.parse(await f.text());
+        const list = extract(json);
+        let add = 0;
+        for(const data of list){
+          const w = norm(data.word);
+          if(!w){ junk++; continue; }
+          if(map.has(w)){ dup++; continue; }
+          map.set(w, data);
+          add++;
+        }
+        log('✓ ' + f.name + ' — đọc ' + list.length + ', thêm mới ' + add, 'ok');
+      }catch(e){
+        log('✕ ' + f.name + ' — JSON lỗi: ' + (e.message || e), 'bad');
+      }
+    }
+
+    const words = [...map.keys()].sort();
+    if(!words.length){ log('✕ không gộp được từ nào', 'bad'); return; }
+    log('Tổng sau khi loại trùng: ' + words.length + ' từ (trùng ' + dup + (junk ? ', bỏ ' + junk : '') + ')');
+
+    const size = Math.max(200, +$('#size').value || 2000);
+    const ver  = ($('#ver').value || '').trim()
+              || new Date().toISOString().slice(0, 10) + '.1';
+
+    const shards = [];
+    for(let i = 0; i < words.length; i += size){
+      const chunk = words.slice(i, i + size);
+      const n = String(shards.length + 1).padStart(3, '0');
+      shards.push({
+        file: 'dict-' + n + '.json',
+        words: chunk.length,
+        payload: chunk.map(w => map.get(w))
+      });
+    }
+
+    const manifest = {
+      version: ver,
+      words: words.length,
+      policy: 'fill-gaps',
+      built: new Date().toISOString(),
+      shards: shards.map(s => ({ file: s.file, words: s.words }))
+    };
+
+    built = { manifest, shards, words };
+    log('Đã chia ' + shards.length + ' shard, version ' + ver + '. Tải từng file bên dưới:', 'ok');
+
+    const mk = (name, text, mime) => {
+      const b = document.createElement('button');
+      b.textContent = '⬇ ' + name;
+      b.addEventListener('click', () => {
+        const blob = new Blob([text], { type: mime || 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        b.style.opacity = .5;
+      });
+      $('#dl').appendChild(b);
+    };
+
+    mk('dict-manifest.json', JSON.stringify(manifest, null, 2));
+    shards.forEach(s => mk(s.file, JSON.stringify(s.payload)));
+    mk('words.txt', words.map((w, i) => (i + 1) + '. ' + w).join('\n'), 'text/plain;charset=utf-8');
+  });
+
+  $('#clear').addEventListener('click', () => { $('#log').innerHTML = 'Đã xoá.'; });
+</script>
+
+</body>
+</html>

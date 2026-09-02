@@ -1866,6 +1866,32 @@
           <div class="mnt-log" id="miss-log" style="display:none"></div>
         </div>
       </details>
+
+      <details class="acc">
+        <summary><span class="acc-t">Dictionary data (nguồn duy nhất)</span><span class="acc-x">▾</span></summary>
+        <div class="acc-body">
+          <div class="hint" style="margin-bottom:11px">Nguồn chân lý là <code>dict-manifest.json</code> trong repo. App chỉ tải shard chưa áp dụng và gộp bằng một transaction cho mỗi shard. Từ đã có nghĩa sẽ được giữ nguyên, không ghi đè.</div>
+          <div class="mnt-state" id="ds-state">Loading…</div>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn sm" id="ds-sync-btn" style="margin-top:0">Đồng bộ từ repo</button>
+            <button class="btn ghost sm" id="ds-resync-btn" style="margin-top:0">Áp dụng lại tất cả</button>
+          </div>
+
+          <div class="hint" style="margin:14px 0 8px">Sàng lọc hàng đợi từ thiếu bằng từ điển miễn phí — không tốn token. Chỉ bỏ những từ xác nhận không tồn tại; lỗi mạng thì giữ lại.</div>
+          <div class="field"><label for="ds-screen-count">Số từ kiểm tra mỗi lần</label><input id="ds-screen-count" type="number" min="20" step="20" value="300"/></div>
+          <button class="btn ghost sm" id="ds-screen-btn">Sàng lọc miễn phí</button>
+
+          <div class="hint" style="margin:14px 0 8px">Xuất / nhập danh sách từ còn thiếu dạng <code>.txt</code> có số index, để chạy tay nhiều đợt mà không phải quét lại từ đầu.</div>
+          <div class="btn-row">
+            <button class="btn ghost sm" id="ds-export-btn" style="margin-top:0">Xuất .txt</button>
+            <button class="btn ghost sm" id="ds-import-btn" style="margin-top:0">Nhập .txt</button>
+          </div>
+          <input id="ds-import-file" type="file" accept=".txt,text/plain" style="display:none"/>
+
+          <div class="mnt-bar"><i id="ds-bar"></i></div>
+          <div class="mnt-log" id="ds-log" style="display:none"></div>
+        </div>
+      </details>
     </div>
 
     <!-- 6 · device housekeeping -->
@@ -1898,7 +1924,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v48 · YouGlish nạp theo yêu cầu, sửa 2 lỗi hiệu năng</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v49 · hệ thống dữ liệu từ điển có version</b></p>
   </section>
 </main>
 
@@ -1921,5 +1947,6 @@
 <script src="./app.js"></script>
 <script src="./story-content.js"></script>
 <script src="./story.js"></script>
+<script src="./dict-system.js"></script>
 </body>
 </html>
