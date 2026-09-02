@@ -815,26 +815,137 @@ async function renderFamilyChips(word){
 }
 window.renderFamilyChips=renderFamilyChips;
 /* ============================================================
-   YOUGLISH — tries an inline iframe embed (via the proxy page on a
-   real HTTPS domain, to work around the WKWebView Referer bug), with
-   a guaranteed-working fallback link always shown alongside it. This
-   embed has failed to load reliably in testing before (possibly
-   widget.js getting stuck when doubly-nested in iframes) — the link
-   is the one thing confirmed to work every time, so it's never
-   hidden or conditional; both are just shown together.
+   YOUGLISH v2 — the official widget is loaded DIRECTLY into this
+   page (no proxy iframe any more), so the YouTube player sits one
+   iframe level closer and actually starts inside the iOS PWA
+   WKWebView. The "hide part of the frame" masking is done with our
+   own overlay divs in this document, so it can never touch
+   cross-origin content and can never wedge the load again.
+   A watchdog gives up after YG_TIMEOUT ms and leaves only the
+   always-working link, so nothing ever sits on "loading" forever.
+   Tuning: YG_STAGE_H = visible height, YG_SHIFT_TOP = pull the
+   widget up to hide its top strip, YG_MASK_BOTTOM = how much of
+   the bottom (caption / answer text) is covered.
    ============================================================ */
-const YOUGLISH_PROXY = 'https://minhle22666-coder.github.io/test-api/youglish-embed.html';
-function maybeLoadYouglish(word){
-  const box=$('#youglish-box'); if(!box) return;
-  if(!navigator.onLine) return;                    // offline — leave it empty, don't even try
-  const embedUrl=YOUGLISH_PROXY+'?word='+encodeURIComponent(word)+'&accent=us';
-  const directUrl='https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
-  box.innerHTML='<iframe class="yg-frame" src="'+embedUrl+'" loading="lazy" allow="autoplay; encrypted-media"></iframe>'
-    +'<a class="yg-link-btn yg-fallback-btn" href="'+directUrl+'" target="_blank" rel="noopener">'
-    +'<span class="yg-link-ico">▶</span>'
-    +'<span class="yg-link-text"><b>Nghe trong câu thật</b><span>Không thấy video? Mở trong trình duyệt</span></span>'
-    +'</a>';
+const YG_SCRIPT      = 'https://youglish.com/public/emb/widget.js';
+const YG_LANG        = 'english';
+const YG_ACCENT      = 'us';      // 'us' | 'uk' | 'aus' | 'all'
+const YG_TIMEOUT     = 9000;      // ms to wait for a real video frame
+const YG_STAGE_H     = 300;       // px — keep in sync with .yg-stage
+const YG_SHIFT_TOP   = 0;         // px — negative pulls the widget up
+const YG_MASK_BOTTOM = 92;        // px — keep in sync with .yg-mask
+
+let _ygScriptP = null;   // widget.js is fetched once per session
+let _ygSeq     = 0;      // guards against fast consecutive lookups
+
+function ygLoadScript(){
+  if(_ygScriptP) return _ygScriptP;
+  _ygScriptP = new Promise((resolve, reject)=>{
+    if(window.YG && window.YG.Widget) return resolve();
+    const prev = window.onYouglishAPIReady;
+    window.onYouglishAPIReady = function(){
+      if(typeof prev==='function'){ try{ prev(); }catch(e){} }
+      resolve();
+    };
+    const s = document.createElement('script');
+    s.src = YG_SCRIPT; s.async = true; s.charset = 'utf-8';
+    s.onerror = ()=>reject(new Error('yg-script-failed'));
+    document.head.appendChild(s);
+    // some builds never fire the callback — poll for the global too
+    let n = 0;
+    const poll = setInterval(()=>{
+      if(window.YG && window.YG.Widget){ clearInterval(poll); resolve(); }
+      else if(++n > 40){ clearInterval(poll); reject(new Error('yg-script-timeout')); }
+    }, 250);
+  });
+  return _ygScriptP;
 }
+
+/* The most reliable success signal, independent of YouGlish's own
+   callbacks: a real <iframe> (the YouTube player) shows up inside
+   the mount with a non-zero height. */
+function ygWaitForFrame(mount, timeout){
+  return new Promise((resolve)=>{
+    const t0 = Date.now();
+    const tick = setInterval(()=>{
+      const f = mount.querySelector('iframe');
+      if(f && f.clientHeight > 40){ clearInterval(tick); resolve(true); }
+      else if(Date.now()-t0 > timeout){ clearInterval(tick); resolve(false); }
+    }, 300);
+  });
+}
+
+/* Fallback path: YouGlish's declarative embed markup, with the
+   script re-injected under a cache-buster so it rescans the DOM.
+   Used only if new YG.Widget(...) throws. */
+function ygDeclarative(mount, word){
+  mount.innerHTML =
+    '<a id="yg-widget-0" class="youglish-widget" href="#" rel="nofollow"'
+    + ' data-query="'+esc(word)+'" data-lang="'+YG_LANG+'" data-accent="'+YG_ACCENT+'"'
+    + ' data-components="8415" data-bkg-color="theme_dark">YouGlish</a>';
+  const s = document.createElement('script');
+  s.src = YG_SCRIPT + '?_=' + Date.now();
+  s.async = true; s.charset = 'utf-8';
+  document.body.appendChild(s);
+}
+
+function maybeLoadYouglish(word){
+  const box = document.getElementById('youglish-box');
+  if(!box) return;
+  const seq = ++_ygSeq;
+
+  const directUrl = 'https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
+  const linkBtn =
+      '<a class="yg-link-btn yg-fallback-btn" href="'+directUrl+'" target="_blank" rel="noopener">'
+    + '<span class="yg-link-ico">&#9654;</span>'
+    + '<span class="yg-link-text"><b>Nghe trong c\u00e2u th\u1eadt</b>'
+    + '<span>Kh\u00f4ng th\u1ea5y video? M\u1edf trong tr\u00ecnh duy\u1ec7t</span></span></a>';
+
+  // offline — just the link, don't even try to fetch the widget
+  if(!navigator.onLine){ box.innerHTML = linkBtn; return; }
+
+  box.innerHTML =
+      '<div class="yg-wrap" id="yg-wrap">'
+    +   '<div class="yg-stage"><div class="yg-inner"><div id="yg-widget-0"></div></div></div>'
+    +   '<div class="yg-mask" aria-hidden="true"></div>'
+    +   '<button class="yg-peek" type="button" aria-label="Hi\u1ec7n ph\u1ea7n b\u1ecb che">\u{1F441}</button>'
+    +   '<div class="yg-veil"><span class="yg-dot"></span>\u0110ang m\u1edf video\u2026</div>'
+    + '</div>'
+    + linkBtn;
+
+  const wrap  = document.getElementById('yg-wrap');
+  const mount = document.getElementById('yg-widget-0');
+  const inner = wrap.querySelector('.yg-inner');
+  const peek  = wrap.querySelector('.yg-peek');
+  if(YG_SHIFT_TOP) inner.style.transform = 'translateY('+YG_SHIFT_TOP+'px)';
+  peek.addEventListener('click', ()=>wrap.classList.toggle('yg-peeking'));
+
+  const finish = (ok)=>{
+    if(seq !== _ygSeq) return;                  // a newer word took over
+    if(!document.body.contains(wrap)) return;   // entry was re-rendered
+    wrap.classList.add(ok ? 'yg-ready' : 'yg-failed');
+  };
+
+  ygLoadScript().then(()=>{
+    if(seq !== _ygSeq) return;
+    try{
+      // element id is "yg-widget-0"; the constructor takes "widget-0"
+      const w = new YG.Widget('widget-0', {
+        width: wrap.clientWidth || 340,
+        components: 9,
+        events: {
+          onFetchDone: (r)=>{ if(r && r.total === 0) finish(false); },
+          onError: ()=>finish(false)
+        }
+      });
+      w.fetch(word, YG_LANG, YG_ACCENT);
+    }catch(e){
+      ygDeclarative(mount, word);
+    }
+    ygWaitForFrame(mount, YG_TIMEOUT).then(finish);
+  }).catch(()=>finish(false));
+}
+
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
   const badge = rec.source==='ai' ? '<span class="badge ai">✦ AI · saved offline</span>' : '<span class="badge off">◆ offline</span>';
