@@ -439,20 +439,17 @@
 
   #youglish-box:not(:empty){margin-top:14px}
 
-  /* YouGlish v2 — .yg-stage is the crop window, .yg-inner can be pulled
-     up to hide the widget's top strip, .yg-mask covers the bottom text.
-     The mask is pointer-events:none so play/pause still works. */
+  /* YouGlish — thu gọn chiều cao khung để giấu phần dưới (quảng cáo,
+     transcript, thanh tìm kiếm) thay vì phủ lớp che lên khoảng trống.
+     Vì nội dung nằm trong iframe cross-origin, đây là cách duy nhất
+     giấu được mà không để lại khoảng trống xấu trên màn hình. */
   .yg-wrap{position:relative;border-radius:16px;overflow:hidden;
     background:var(--surface-2);border:1px solid var(--line)}
-  .yg-stage{position:relative;height:300px;overflow:hidden}
-  .yg-inner{transform:translateY(0)}
+  .yg-stage{position:relative;overflow:hidden;transition:height .25s ease;height:200px}
   .yg-stage iframe{width:100%;border:0;display:block}
-
-  .yg-mask{position:absolute;left:0;right:0;bottom:0;height:92px;pointer-events:none;
-    background:linear-gradient(180deg,rgba(22,40,60,.55),var(--surface-2) 34%);
-    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-    transition:opacity .18s ease}
-  .yg-peeking .yg-mask{opacity:0}
+  .yg-fade{position:absolute;left:0;right:0;bottom:0;height:34px;pointer-events:none;
+    background:linear-gradient(180deg,rgba(22,40,60,0),var(--surface-2))}
+  .yg-peeking .yg-fade{opacity:0;transition:opacity .2s ease}
 
   .yg-peek{position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;
     border:1px solid var(--line);background:var(--surface);color:var(--text);
@@ -471,14 +468,14 @@
   @keyframes ygPulse{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
   @media (prefers-reduced-motion:reduce){.yg-dot{animation:none;opacity:.8}}
 
-  .yg-nomask .yg-stage{height:auto;overflow:visible}
   .yg-wrap.yg-failed{display:none}
-
-  /* bảng chẩn đoán khi YouGlish không dựng được video (YG_DEBUG=true) */
   .yg-diag{padding:13px 15px;font-size:12px;color:var(--muted);line-height:1.5}
   .yg-diag b{display:block;color:var(--coral);font-size:12.5px;margin-bottom:7px}
   .yg-diag pre{margin:0;white-space:pre-wrap;word-break:break-word;
     font-size:11px;color:var(--muted-2)}
+
+  .yg-credit{display:flex;align-items:center;gap:5px;margin-top:8px;font-size:11px;color:var(--muted-2)}
+  .yg-credit a{color:var(--muted-2);text-decoration:underline}
 
   .yg-link-btn{display:flex;align-items:center;gap:12px;width:100%;padding:13px 15px;
     background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
@@ -1894,7 +1891,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v46 · YouGlish v6 · chỉ còn video, bỏ thanh tìm kiếm</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v47 · YouGlish · components 0, thu gọn 58% chiều cao</b></p>
   </section>
 </main>
 
