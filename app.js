@@ -815,22 +815,24 @@ async function renderFamilyChips(word){
 }
 window.renderFamilyChips=renderFamilyChips;
 /* ============================================================
-   YOUGLISH — opens in the system browser. An inline iframe embed
-   (even via a same-origin proxy page meant to fix the WKWebView
-   Referer bug) was tried extensively but never worked reliably —
-   widget.js appears to get stuck when doubly-nested in iframes, and
-   it was also a real performance cost on every word view (a second
-   HTML document + widget.js + a YouTube player, loading every time).
-   A plain link that opens in the real system browser is the one
-   thing that's actually worked every time it's been tested.
+   YOUGLISH — tries an inline iframe embed (via the proxy page on a
+   real HTTPS domain, to work around the WKWebView Referer bug), with
+   a guaranteed-working fallback link always shown alongside it. This
+   embed has failed to load reliably in testing before (possibly
+   widget.js getting stuck when doubly-nested in iframes) — the link
+   is the one thing confirmed to work every time, so it's never
+   hidden or conditional; both are just shown together.
    ============================================================ */
+const YOUGLISH_PROXY = 'https://minhle22666-coder.github.io/test-api/youglish-embed.html';
 function maybeLoadYouglish(word){
   const box=$('#youglish-box'); if(!box) return;
   if(!navigator.onLine) return;                    // offline — leave it empty, don't even try
-  const url='https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
-  box.innerHTML='<a class="yg-link-btn" href="'+url+'" target="_blank" rel="noopener">'
+  const embedUrl=YOUGLISH_PROXY+'?word='+encodeURIComponent(word)+'&accent=us';
+  const directUrl='https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
+  box.innerHTML='<iframe class="yg-frame" src="'+embedUrl+'" loading="lazy" allow="autoplay; encrypted-media"></iframe>'
+    +'<a class="yg-link-btn yg-fallback-btn" href="'+directUrl+'" target="_blank" rel="noopener">'
     +'<span class="yg-link-ico">▶</span>'
-    +'<span class="yg-link-text"><b>Nghe trong câu thật</b><span>Mở YouGlish trong trình duyệt</span></span>'
+    +'<span class="yg-link-text"><b>Nghe trong câu thật</b><span>Không thấy video? Mở trong trình duyệt</span></span>'
     +'</a>';
 }
 function renderEntry(rec, queriedAs){
