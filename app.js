@@ -68,6 +68,12 @@ function tx(mode){ return db().then(d=>d.transaction(STORE,mode).objectStore(STO
 function idbGet(word){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.get(word);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})); }
 function idbPut(obj){ return tx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.put(obj);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})); }
 function idbAll(){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})); }
+let _allRecordsCache=null;
+async function idbAllCached(){
+  if(_allRecordsCache) return _allRecordsCache;
+  _allRecordsCache = await idbAll();
+  return _allRecordsCache;
+}
 function idbCount(){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.count();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})); }
 function idbPrefix(prefix){
   return tx('readonly').then(s=>new Promise((res,rej)=>{
@@ -385,7 +391,7 @@ function looksVietnamese(s){
 let _viIndex=null;
 async function buildViIndex(){
   if(_viIndex) return _viIndex;
-  const all=await idbAll();
+  const all=await idbAllCached();
   const idx=new Map();                    // term -> [{word, primary}]
   const add=(term, word, primary)=>{
     const t=term.trim().toLowerCase(); if(!t) return;
@@ -753,7 +759,7 @@ function posChip(p){ if(!p) return '';
 let _wordIndex=null;
 async function buildWordIndex(){
   if(_wordIndex) return _wordIndex;
-  const all = await idbAll();
+  const all = await idbAllCached();
   const out=[];
   for(const r of all){
     if(r.alias) continue;

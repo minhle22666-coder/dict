@@ -1524,11 +1524,11 @@ window.renderGameHub = function(){
   h+='<div class="hub-section-label">Quick Games</div>';
   h+='<div class="hub-row">';
   h+='<button class="hub-card hub-mini mini-type" onclick="setPracticeMode(\'type\')">'
-    +'<span class="glow-border"></span>'
+    +'<span class="glow-border blue"></span>'
     +'<img class="hub-mini-deco" src="./decor-note-and-pen.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<span class="hub-mini-t">Type it</span><span class="hub-mini-s">Spell from memory</span></button>';
   h+='<button class="hub-card hub-mini mini-match" onclick="setPracticeMode(\'match\')">'
-    +'<span class="glow-border"></span>'
+    +'<span class="glow-border mint"></span>'
     +'<img class="hub-mini-deco" src="./decor-magnifying-glass.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<span class="hub-mini-t">Match it</span><span class="hub-mini-s">Pick the right word</span></button>';
   h+='</div>';
