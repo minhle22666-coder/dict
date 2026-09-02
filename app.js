@@ -809,23 +809,23 @@ async function renderFamilyChips(word){
 }
 window.renderFamilyChips=renderFamilyChips;
 /* ============================================================
-   YOUGLISH — embedded via a two-layer proxy iframe.
-   Why: iOS WKWebView (what any "Add to Home Screen" PWA runs inside)
-   has a documented WebKit bug (#169846) where it doesn't send the
-   Referer header YouTube/YouGlish expects for a direct embed. Routing
-   through a plain page hosted on a real HTTPS domain (GitHub Pages)
-   fixes that: THAT page is a normal top-level document, not running
-   inside WKWebView, so it sends a proper Referer when it loads the
-   real YouGlish widget itself.
+   YOUGLISH — opens in the system browser. An inline iframe embed
+   (even via a same-origin proxy page meant to fix the WKWebView
+   Referer bug) was tried extensively but never worked reliably —
+   widget.js appears to get stuck when doubly-nested in iframes, and
+   it was also a real performance cost on every word view (a second
+   HTML document + widget.js + a YouTube player, loading every time).
+   A plain link that opens in the real system browser is the one
+   thing that's actually worked every time it's been tested.
    ============================================================ */
-const YOUGLISH_PROXY = 'https://minhle22666-coder.github.io/test-api/youglish-embed.html';
 function maybeLoadYouglish(word){
   const box=$('#youglish-box'); if(!box) return;
   if(!navigator.onLine) return;                    // offline — leave it empty, don't even try
-  const embedUrl=YOUGLISH_PROXY+'?word='+encodeURIComponent(word)+'&accent=us';
-  const directUrl='https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
-  box.innerHTML='<iframe class="yg-frame" src="'+embedUrl+'" loading="lazy" allow="autoplay; encrypted-media"></iframe>'
-    +'<a class="yg-fallback" href="'+directUrl+'" target="_blank" rel="noopener">Không thấy video? Mở trong trình duyệt →</a>';
+  const url='https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
+  box.innerHTML='<a class="yg-link-btn" href="'+url+'" target="_blank" rel="noopener">'
+    +'<span class="yg-link-ico">▶</span>'
+    +'<span class="yg-link-text"><b>Nghe trong câu thật</b><span>Mở YouGlish trong trình duyệt</span></span>'
+    +'</a>';
 }
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;

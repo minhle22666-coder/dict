@@ -1349,7 +1349,6 @@ function renderStory(){
   const passageText = getSceneText(scene, chapter.id);
   h+='<div class="story-stage mood-'+mood+'" style="background-image:url(\''+assetUrl(bg)+'\')">';
   h+=ambientLayerHTML(mood);
-  h+=stageHotspotsHTML(scene);
   h+='<div class="story-mascot-bubble" id="story-mascot-bubble"></div>';
   h+='<div class="story-npc-bubble" id="story-npc-bubble"></div>';
   if(scene.npc) h+='<img class="story-npc" src="'+assetUrl(scene.npc)+'" alt="" onclick="tapNpc()" onerror="this.style.display=\'none\'"/>';
@@ -1378,7 +1377,9 @@ function renderStory(){
   }
   h+='</div></div>';
 
+  const _scrollY = window.scrollY;
   area.innerHTML=h;
+  window.scrollTo(0, _scrollY);
   wireWordTaps();
 }
 function wireWordTaps(){
