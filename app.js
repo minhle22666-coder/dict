@@ -617,15 +617,15 @@ async function search(rawWord, forceAI){
     const local=await idbGet(word);
     if(local && local.alias){
       const canon=await idbGet(local.alias);
-      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); logEvent('search',canon.word); addXP(2); return; }
+      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); maybeLoadYouglish(canon.word); logEvent('search',canon.word); addXP(2); return; }
     }
-    if(local){ currentWord=word; box.innerHTML=renderEntry(local); logEvent('search',word); addXP(2); return; }
+    if(local){ currentWord=word; box.innerHTML=renderEntry(local); maybeLoadYouglish(word); logEvent('search',word); addXP(2); return; }
 
     const guess=await fuzzyLocalSearch(word);
     if(guess && guess.exact){
       const rec=await idbGet(guess.target);
       if(rec){
-        currentWord=rec.word; box.innerHTML=renderEntry(rec);
+        currentWord=rec.word; box.innerHTML=renderEntry(rec); maybeLoadYouglish(rec.word);
         logEvent('search',rec.word); addXP(2);
         flashPhraseMatch(guess.label);
         return;
@@ -671,6 +671,7 @@ async function search(rawWord, forceAI){
     }
     currentWord=canon;
     box.innerHTML=renderEntry(rec, canon!==word?word:null);
+    maybeLoadYouglish(canon);
     logEvent('search',canon);
     addXP(2);
     refreshStats();
@@ -687,7 +688,7 @@ async function toggleSave(word){
   rec.saved=rec.saved?0:1;
   rec.savedAt=rec.saved?now():0;
   await idbPut(rec);
-  if(currentWord===word){ const b=$('#result'); if(b && b.innerHTML) b.innerHTML=renderEntry(rec); }
+  if(currentWord===word){ const b=$('#result'); if(b && b.innerHTML){ b.innerHTML=renderEntry(rec); maybeLoadYouglish(word); } }
   toast(rec.saved?'Saved ⭐':'Removed from saved');
   logEvent(rec.saved?'save':'unsave', word);
   if(rec.saved) addXP(1);
@@ -879,7 +880,6 @@ function renderEntry(rec, queriedAs){
   }
 
   h+='<div id="youglish-box"></div>';
-  maybeLoadYouglish(w);
 
   const f=d.forms;
   if(f && (f.v2||f.v3||f.ving)){
@@ -2487,7 +2487,7 @@ async function rewriteMeaning(word){
     try{ const m=scanLoad(); if(m[w]&&m[w].r){ m[w]={r:''}; scanSave(m); } }catch(e){}
     currentWord=w;
     const box=$('#result');
-    if(box){ box.innerHTML=renderEntry(saved); window.scrollTo({top:0,behavior:'smooth'}); }
+    if(box){ box.innerHTML=renderEntry(saved); maybeLoadYouglish(w); window.scrollTo({top:0,behavior:'smooth'}); }
     toast('Meaning refreshed ✓');
   }catch(e){
     const msg=String(e.message||e);

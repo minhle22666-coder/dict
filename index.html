@@ -1073,15 +1073,15 @@
     backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     overflow:visible;cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px 16px 14px 16px}
   .fish-footer:active{transform:scale(.99)}
-  .fish-anim{position:relative;z-index:2;flex:none;width:76px;height:76px;margin-top:-26px;
+  .fish-anim{position:relative;z-index:2;flex:none;width:76px;height:76px;margin-top:-50px;
     transform:scale(1.02);transition:transform .15s}
   .fish-footer:active .fish-anim{transform:scale(.97)}
   .fish-f{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;
     filter:drop-shadow(0 10px 16px rgba(0,0,0,.32))}
   .fish-f1{animation:ff1 7.5s steps(1) infinite}
   .fish-f2{animation:ff2 7.5s steps(1) infinite}
-  .fish-f3{animation:ff3 7.5s steps(1) infinite}
-  .fish-f4{animation:ff4 7.5s steps(1) infinite}
+  .fish-f3{animation:ff3 7.5s steps(1) infinite;transform:scale(1.18)}
+  .fish-f4{animation:ff4 7.5s steps(1) infinite;transform:scale(1.18)}
   @keyframes ff1{0%{opacity:1}17%{opacity:1}17.1%{opacity:0}100%{opacity:0}}
   @keyframes ff2{0%{opacity:0}17%{opacity:0}17.1%{opacity:1}55%{opacity:1}55.1%{opacity:0}100%{opacity:0}}
   @keyframes ff3{0%{opacity:0}55%{opacity:0}55.1%{opacity:1}68%{opacity:1}68.1%{opacity:0}100%{opacity:0}}
@@ -1091,8 +1091,7 @@
     color:var(--primary);margin-bottom:4px;height:11px;opacity:0;transition:opacity .3s;
     display:flex;align-items:center;gap:4px}
   .fish-footer-tag.show{opacity:1}
-  .fish-footer-bubble{color:var(--text);font-size:12.5px;font-weight:700;line-height:1.5;
-    display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .fish-footer-bubble{color:var(--text);font-size:12.5px;font-weight:700;line-height:1.5}
   .fish-footer-bubble::before{content:'“';opacity:.5}
   .fish-footer-bubble::after{content:'”';opacity:.5}
   .fish-footer-ripple{position:absolute;inset:0;overflow:hidden;border-radius:20px;pointer-events:none;z-index:1}
@@ -1347,21 +1346,23 @@
   /* ---- rotating glow-border: a light chasing clockwise around a rounded
      rectangle's edge. Reused on the Focci Story card and every event card
      (choice + wait) — the same "something's alive here" cue everywhere. */
-  .glow-wrap{position:relative;margin-bottom:16px;max-width:340px;width:100%}
-  .glow-border{position:absolute;inset:-5px;z-index:0;border-radius:30px;pointer-events:none;
+  .glow-border{position:absolute;inset:0;z-index:0;border-radius:inherit;pointer-events:none;padding:2px;
     background:conic-gradient(from 0deg,
       transparent 0%,
-      rgba(255,60,10,.1) 6%,
-      rgba(255,90,20,.28) 16%,
-      rgba(255,140,30,.6) 28%,
-      rgba(255,190,60,.88) 38%,
+      rgba(255,60,10,.15) 6%,
+      rgba(255,90,20,.4) 16%,
+      rgba(255,140,30,.75) 28%,
+      rgba(255,190,60,.95) 38%,
       rgba(255,235,150,1) 46%,
-      rgba(255,190,60,.85) 51%,
-      rgba(255,110,25,.35) 60%,
+      rgba(255,190,60,.9) 51%,
+      rgba(255,110,25,.45) 60%,
       transparent 72%,
       transparent 100%);
     animation:glow-spin 5.5s linear infinite;
-    filter:blur(3px)}
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;
+    mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    mask-composite:exclude}
   @keyframes glow-spin{to{transform:rotate(360deg)}}
 
   .story-continue{margin-top:4px}
@@ -1410,7 +1411,6 @@
     border-radius:var(--r);box-shadow:var(--shadow);transition:transform .12s}
   .hub-card:active{transform:scale(.98)}
   .hub-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
-  .hub-row .glow-wrap{margin-bottom:0}
   .hub-mini{position:relative;overflow:hidden;padding:18px 14px;text-align:left;min-height:88px}
   .hub-mini-deco{position:absolute;right:-10px;bottom:-10px;width:64px;opacity:.16;pointer-events:none}
   .hub-mini-t{position:relative;z-index:1;font-size:14.5px;font-weight:900;display:block}
@@ -1593,17 +1593,15 @@
         </div>
       </div>
 
-      <div class="glow-wrap">
+      <button class="story-cta" onclick="showStoryIntro()">
         <span class="glow-border"></span>
-        <button class="story-cta" onclick="showStoryIntro()">
-          <img class="story-cta-char" src="./mascot-explore.webp" alt="" />
-          <div class="story-cta-text">
-            <div class="story-cta-title">Focci's story</div>
-            <div class="story-cta-sub">An adventure that grows with your words</div>
-          </div>
-          <span class="story-cta-go">→</span>
-        </button>
-      </div>
+        <img class="story-cta-char" src="./mascot-explore.webp" alt="" />
+        <div class="story-cta-text">
+          <div class="story-cta-title">Focci's story</div>
+          <div class="story-cta-sub">An adventure that grows with your words</div>
+        </div>
+        <span class="story-cta-go">→</span>
+      </button>
 
       <div class="hub-section-label">Your Progress</div>
       <div class="progress-card">
@@ -1846,7 +1844,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v37 · Back-button history fix, YouGlish fallback link</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v38 · YouGlish timing bug fixed, review redesigned, thin glow</b></p>
   </section>
 </main>
 
