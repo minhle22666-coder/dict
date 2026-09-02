@@ -9,90 +9,90 @@
        background:#111a24;color:#e8eff7;line-height:1.5}
   h3{margin:0 0 4px;font-size:16px}
   p.hint{margin:0 0 12px;font-size:12.5px;color:#8fa8c0}
-  #host{background:#1b2a3a;border-radius:10px;min-height:60px}
+  .box{border:1px solid #23394f;border-radius:10px;margin:14px 0;overflow:hidden}
+  .box .lbl{background:#1b2a3a;padding:8px 12px;font-size:13px;font-weight:600}
+  .box .host{background:#0c1420}
+  .box .dom{white-space:pre-wrap;font-size:11px;color:#9fb6cd;
+            background:#0c1420;padding:8px 12px;border-top:1px solid #23394f}
   .row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
   button{padding:10px 13px;border-radius:9px;border:1px solid #23394f;
          background:#1b2a3a;color:#e8eff7;font-size:14px}
   button:active{background:#254159}
-  #log{white-space:pre-wrap;font-size:12px;background:#0c1420;color:#9fb6cd;
-       padding:11px 12px;border-radius:10px;border:1px solid #23394f}
+  #status{font-size:12.5px;color:#8fa8c0;margin-top:6px}
 </style>
 </head>
 <body>
 
-<h3>YouGlish — thử giá trị components</h3>
-<p class="hint">Bấm từng nút để xem giá trị nào cho ra video mà không có thanh tìm kiếm và không có caption.</p>
-
-<div id="host"></div>
+<h3>YouGlish — so sánh components 0 / 1 / 8 / 9</h3>
+<p class="hint">Bấm nút bên dưới, đợi vài giây cho từng khung load xong rồi <b>nhìn bằng mắt</b> khung nào KHÔNG có thanh tìm kiếm và KHÔNG có dòng caption. Chụp ảnh cả trang gửi lại.</p>
 
 <div class="row">
-  <button type="button" onclick="render(0)">components 0</button>
-  <button type="button" onclick="render(1)">1</button>
-  <button type="button" onclick="render(8)">8</button>
-  <button type="button" onclick="render(9)">9 (mặc định)</button>
+  <button type="button" onclick="renderAll()">Dựng cả 4 khung để so sánh</button>
 </div>
-<div class="row">
-  <button type="button" onclick="dump()">In cấu trúc DOM</button>
-  <button type="button" onclick="document.getElementById('log').textContent='log:'">Xoá log</button>
-</div>
+<div id="status">đang chờ widget.js…</div>
 
-<div id="log">log:</div>
+<div id="boxes"></div>
 
 <script>
-  var ygIdx = 0, widget = null, ygReady = false;
-
-  function log(m){
-    var el = document.getElementById('log');
-    el.textContent += '\n' + m;
-  }
+  var ygReady = false;
+  var values = [0, 1, 8, 9];
 
   function onYouglishAPIReady(){
     ygReady = true;
-    log('✓ widget.js sẵn sàng — đang dựng với components=9');
-    render(9);
+    document.getElementById('status').textContent = '✓ widget.js sẵn sàng — bấm nút để dựng 4 khung';
   }
 
-  function render(components){
-    if(!ygReady){ log('✗ widget.js chưa sẵn sàng'); return; }
-    ygIdx++;
-    var id = 'yg-widget-' + ygIdx;
-    document.getElementById('host').innerHTML = '<div id="' + id + '"></div>';
-    log('\n=== components=' + components + ' (id ' + id + ') ===');
-    try{
-      widget = new YG.Widget(id, {
-        width: Math.min(document.body.clientWidth - 32, 640),
-        components: components,
-        events: {
-          onFetchDone: function(e){ log('  onFetchDone — totalResult=' + (e ? e.totalResult : '?')); },
-          onError:     function(e){ log('  onError từ YouGlish'); }
-        }
-      });
-      widget.fetch('hello', 'english');
-      log('  đã fetch("hello","english")');
-    }catch(e){
-      log('  ✗ THROW: ' + (e && e.message ? e.message : e));
-    }
+  function renderAll(){
+    if(!ygReady){ document.getElementById('status').textContent = '✗ widget.js chưa sẵn sàng, đợi thêm'; return; }
+    var wrap = document.getElementById('boxes');
+    wrap.innerHTML = '';
+    values.forEach(function(components, i){
+      var id = 'yg-widget-c' + components;
+      var box = document.createElement('div');
+      box.className = 'box';
+      box.innerHTML =
+        '<div class="lbl">components = ' + components + '</div>' +
+        '<div class="host"><div id="' + id + '"></div></div>' +
+        '<div class="dom" id="dom-' + components + '">đang load…</div>';
+      wrap.appendChild(box);
+
+      try{
+        var widget = new YG.Widget(id, {
+          width: Math.min(document.body.clientWidth - 40, 640),
+          components: components,
+          events: {
+            onFetchDone: function(){
+              setTimeout(function(){ dumpInto(id, 'dom-' + components); }, 600);
+            }
+          }
+        });
+        widget.fetch('hello', 'english');
+      }catch(e){
+        document.getElementById('dom-' + components).textContent = 'LỖI: ' + (e && e.message ? e.message : e);
+      }
+    });
   }
 
-  /* In ra cây DOM mà YouGlish dựng, kèm class và chiều cao —
-     dùng để viết CSS chính xác nếu cần. */
-  function dump(){
-    var host = document.getElementById('host');
+  function dumpInto(hostId, domId){
+    var host = document.getElementById(hostId);
+    var container = host ? host.parentNode : null; // widget.js thay outerHTML của host
+    var target = document.querySelector('#' + domId).previousElementSibling; // .host div
+    var root = target ? target.firstElementChild : null;
     var out = [];
     (function walk(el, d){
+      if(!el) return;
       for(var i = 0; i < el.children.length; i++){
         var c = el.children[i];
         var cls = (typeof c.className === 'string' && c.className) ? ' .' + c.className.trim().replace(/\s+/g, '.') : '';
-        var sid = c.id ? ' #' + c.id : '';
-        out.push(Array(d * 2 + 1).join(' ') + c.tagName.toLowerCase() + sid + cls + '  h=' + c.offsetHeight);
+        out.push(Array(d * 2 + 1).join(' ') + c.tagName.toLowerCase() + cls + '  h=' + c.offsetHeight);
         if(d < 4) walk(c, d + 1);
       }
-    })(host, 0);
-    log('\n=== cấu trúc DOM ===\n' + (out.join('\n') || '(rỗng)'));
+    })(root, 0);
+    document.getElementById(domId).textContent = out.join('\n') || '(rỗng)';
   }
 
   window.addEventListener('error', function(ev){
-    log('✗ JS error: ' + ev.message);
+    document.getElementById('status').textContent = '✗ JS error: ' + ev.message;
   });
 </script>
 
