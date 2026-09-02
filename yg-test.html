@@ -3,95 +3,99 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>YouGlish widget test</title>
+<title>YouGlish components test</title>
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:16px;
        background:#111a24;color:#e8eff7;line-height:1.5}
-  h3{margin:0 0 12px;font-size:16px}
-  #yg-widget-0{background:#1b2a3a;border-radius:10px;min-height:60px}
-  #log{white-space:pre-wrap;font-size:12.5px;background:#0c1420;color:#9fb6cd;
-       padding:11px 12px;border-radius:10px;margin-top:14px;border:1px solid #23394f}
-  button{margin-top:12px;padding:10px 14px;border-radius:9px;border:1px solid #23394f;
+  h3{margin:0 0 4px;font-size:16px}
+  p.hint{margin:0 0 12px;font-size:12.5px;color:#8fa8c0}
+  #host{background:#1b2a3a;border-radius:10px;min-height:60px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+  button{padding:10px 13px;border-radius:9px;border:1px solid #23394f;
          background:#1b2a3a;color:#e8eff7;font-size:14px}
+  button:active{background:#254159}
+  #log{white-space:pre-wrap;font-size:12px;background:#0c1420;color:#9fb6cd;
+       padding:11px 12px;border-radius:10px;border:1px solid #23394f}
 </style>
 </head>
 <body>
 
-<h3>YouGlish widget test v2 — id đầy đủ, từ "hello"</h3>
+<h3>YouGlish — thử giá trị components</h3>
+<p class="hint">Bấm từng nút để xem giá trị nào cho ra video mà không có thanh tìm kiếm và không có caption.</p>
 
-<!-- đúng như ví dụ chính thức: container rỗng, id là yg-widget-0 -->
-<div id="yg-widget-0"></div>
+<div id="host"></div>
 
-<button type="button" onclick="tryFetch('world')">Thử từ khác: world</button>
+<div class="row">
+  <button type="button" onclick="render(0)">components 0</button>
+  <button type="button" onclick="render(1)">1</button>
+  <button type="button" onclick="render(8)">8</button>
+  <button type="button" onclick="render(9)">9 (mặc định)</button>
+</div>
+<div class="row">
+  <button type="button" onclick="dump()">In cấu trúc DOM</button>
+  <button type="button" onclick="document.getElementById('log').textContent='log:'">Xoá log</button>
+</div>
 
-<div id="log">đang chờ widget.js…</div>
+<div id="log">log:</div>
 
 <script>
-  var widget = null;
+  var ygIdx = 0, widget = null, ygReady = false;
 
-  function log(msg){
+  function log(m){
     var el = document.getElementById('log');
-    el.textContent += '\n' + msg;
+    el.textContent += '\n' + m;
   }
 
-  /* widget.js gọi hàm global này khi API sẵn sàng.
-     Hàm PHẢI được định nghĩa trước khi thẻ script bên dưới chạy. */
   function onYouglishAPIReady(){
-    log('✓ onYouglishAPIReady đã chạy — widget.js OK');
-    log('  typeof YG = ' + (typeof YG));
+    ygReady = true;
+    log('✓ widget.js sẵn sàng — đang dựng với components=9');
+    render(9);
+  }
+
+  function render(components){
+    if(!ygReady){ log('✗ widget.js chưa sẵn sàng'); return; }
+    ygIdx++;
+    var id = 'yg-widget-' + ygIdx;
+    document.getElementById('host').innerHTML = '<div id="' + id + '"></div>';
+    log('\n=== components=' + components + ' (id ' + id + ') ===');
     try{
-      widget = new YG.Widget('yg-widget-0', {  // id ĐẦY ĐỦ
+      widget = new YG.Widget(id, {
         width: Math.min(document.body.clientWidth - 32, 640),
-        components: 9,
+        components: components,
         events: {
-          onFetchDone:   onFetchDone,
-          onVideoChange: onVideoChange,
-          onError:       onYgError
+          onFetchDone: function(e){ log('  onFetchDone — totalResult=' + (e ? e.totalResult : '?')); },
+          onError:     function(e){ log('  onError từ YouGlish'); }
         }
       });
-      log('✓ new YG.Widget("yg-widget-0") thành công');
+      widget.fetch('hello', 'english');
+      log('  đã fetch("hello","english")');
     }catch(e){
-      log('✗ LỖI khi tạo widget: ' + (e && e.message ? e.message : e));
-      return;
-    }
-    tryFetch('hello');
-  }
-
-  function tryFetch(word){
-    if(!widget){ log('✗ chưa có widget, không fetch được'); return; }
-    try{
-      widget.fetch(word, 'english');     // đúng 2 tham số như tài liệu
-      log('→ đã gọi fetch("' + word + '", "english")');
-    }catch(e){
-      log('✗ LỖI khi fetch: ' + (e && e.message ? e.message : e));
+      log('  ✗ THROW: ' + (e && e.message ? e.message : e));
     }
   }
 
-  function onFetchDone(e){
-    log('✓ onFetchDone — totalResult = ' + (e ? e.totalResult : '?'));
-    try{ log('  payload: ' + JSON.stringify(e)); }catch(x){}
-  }
-  function onVideoChange(e){ log('✓ onVideoChange — video đã đổi'); }
-  function onYgError(e){
-    log('✗ onError từ YouGlish: ' + (function(){ try{ return JSON.stringify(e); }catch(x){ return e; } })());
+  /* In ra cây DOM mà YouGlish dựng, kèm class và chiều cao —
+     dùng để viết CSS chính xác nếu cần. */
+  function dump(){
+    var host = document.getElementById('host');
+    var out = [];
+    (function walk(el, d){
+      for(var i = 0; i < el.children.length; i++){
+        var c = el.children[i];
+        var cls = (typeof c.className === 'string' && c.className) ? ' .' + c.className.trim().replace(/\s+/g, '.') : '';
+        var sid = c.id ? ' #' + c.id : '';
+        out.push(Array(d * 2 + 1).join(' ') + c.tagName.toLowerCase() + sid + cls + '  h=' + c.offsetHeight);
+        if(d < 4) walk(c, d + 1);
+      }
+    })(host, 0);
+    log('\n=== cấu trúc DOM ===\n' + (out.join('\n') || '(rỗng)'));
   }
 
   window.addEventListener('error', function(ev){
-    log('✗ JS error: ' + ev.message + ' @ ' + (ev.filename||'') + ':' + (ev.lineno||''));
+    log('✗ JS error: ' + ev.message);
   });
-
-  /* chốt hạ sau 10 giây: có iframe player thật hay không */
-  setTimeout(function(){
-    var f = document.querySelector('#yg-widget-0 iframe');
-    log('--- sau 10s ---');
-    log('typeof YG          : ' + (typeof YG));
-    log('có iframe player?  : ' + (f ? 'CÓ (' + f.clientWidth + '×' + f.clientHeight + ')' : 'KHÔNG'));
-    log('số node trong mount: ' + document.querySelectorAll('#yg-widget-0 *').length);
-    log('iframe trong trang : ' + document.querySelectorAll('iframe').length);
-  }, 10000);
 </script>
 
-<!-- thẻ script đặt SAU các định nghĩa hàm, đúng như tài liệu YouGlish -->
 <script src="https://youglish.com/public/emb/widget.js" charset="utf-8"></script>
 
 </body>

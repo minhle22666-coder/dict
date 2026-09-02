@@ -815,7 +815,7 @@ async function renderFamilyChips(word){
 }
 window.renderFamilyChips=renderFamilyChips;
 /* ============================================================
-   YOUGLISH v5 — bản đã chạy được nguyên nhân thật.
+   YOUGLISH v6 — id đầy đủ + components để bỏ thanh tìm kiếm/caption.
 
    Log từ trang test cho thấy widget.js làm:
        document.getElementById(y).outerHTML = d
@@ -834,11 +834,11 @@ window.renderFamilyChips=renderFamilyChips;
    ============================================================ */
 const YG_SCRIPT      = 'https://youglish.com/public/emb/widget.js';
 const YG_LANG        = 'english';
-const YG_COMPONENTS  = 9;         // 9 = thanh tìm kiếm + caption
+const YG_COMPONENTS  = 0;         // 0 = chỉ video (9 = có thanh tìm kiếm + caption)
 const YG_TIMEOUT     = 12000;
 const YG_DEBUG       = true;      // false = thất bại thì ẩn khung im lặng
 const YG_SHIFT_TOP   = 0;         // px — số âm để giấu thanh trên
-const YG_MASK_BOTTOM = 92;        // px — khớp .yg-mask trong index.html
+const YG_MASK_BOTTOM = 0;         // px che đáy khung; 0 = không che (khớp .yg-mask)
 
 let _ygScriptP = null;
 let _ygIdx     = 0;
@@ -925,11 +925,14 @@ function maybeLoadYouglish(word){
 
   if(!navigator.onLine){ box.innerHTML = linkBtn; return; }
 
+  const masked = YG_MASK_BOTTOM > 0;
   box.innerHTML =
-      '<div class="yg-wrap" id="yg-wrap">'
+      '<div class="yg-wrap'+(masked?'':' yg-nomask')+'" id="yg-wrap">'
     +   '<div class="yg-stage"><div class="yg-inner"></div></div>'
-    +   '<div class="yg-mask" aria-hidden="true"></div>'
-    +   '<button class="yg-peek" type="button" aria-label="Hi\u1ec7n ph\u1ea7n b\u1ecb che">\u{1F441}</button>'
+    +   (masked
+        ? '<div class="yg-mask" style="height:'+YG_MASK_BOTTOM+'px" aria-hidden="true"></div>'
+          + '<button class="yg-peek" type="button" aria-label="Hi\u1ec7n ph\u1ea7n b\u1ecb che">\u{1F441}</button>'
+        : '')
     +   '<div class="yg-veil"><span class="yg-dot"></span>\u0110ang m\u1edf video\u2026</div>'
     + '</div>'
     + linkBtn;
@@ -938,7 +941,7 @@ function maybeLoadYouglish(word){
   const inner = wrap.querySelector('.yg-inner');
   const peek  = wrap.querySelector('.yg-peek');
   if(YG_SHIFT_TOP) inner.style.transform = 'translateY('+YG_SHIFT_TOP+'px)';
-  peek.addEventListener('click', ()=>wrap.classList.toggle('yg-peeking'));
+  if(peek) peek.addEventListener('click', ()=>wrap.classList.toggle('yg-peeking'));
 
   const finish = (ok, why)=>{
     if(seq !== _ygSeq) return;
