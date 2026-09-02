@@ -339,7 +339,7 @@ window.goBackScene = function(){
     if(log){ unwindSceneEffects(e.scene, log); delete st.storyLog[sid]; }
     st.decisions = st.decisions.filter(d=>d.sceneId!==sid);
   }
-  st.arcHistory = hist.slice(0, targetIdx);
+  st.arcHistory = hist.slice(0, targetIdx+1);
   st.pos = hist[targetIdx];
   st.pendingGoto = null;
   saveState();
@@ -833,7 +833,7 @@ function reviewGoBack(){
     if(log){ unwindSceneEffects(e.scene, log); delete st.storyLog[sid]; }
     st.decisions = st.decisions.filter(d=>d.sceneId!==sid);
   }
-  _reviewHistory = hist.slice(0, targetIdx);
+  _reviewHistory = hist.slice(0, targetIdx+1);
   _reviewPos = hist[targetIdx];
   st.pendingGoto=null;
   saveState();

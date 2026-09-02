@@ -821,8 +821,10 @@ const YOUGLISH_PROXY = 'https://minhle22666-coder.github.io/test-api/youglish-em
 function maybeLoadYouglish(word){
   const box=$('#youglish-box'); if(!box) return;
   if(!navigator.onLine) return;                    // offline — leave it empty, don't even try
-  const url=YOUGLISH_PROXY+'?word='+encodeURIComponent(word)+'&accent=us';
-  box.innerHTML='<iframe class="yg-frame" src="'+url+'" loading="lazy" allow="autoplay; encrypted-media"></iframe>';
+  const embedUrl=YOUGLISH_PROXY+'?word='+encodeURIComponent(word)+'&accent=us';
+  const directUrl='https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
+  box.innerHTML='<iframe class="yg-frame" src="'+embedUrl+'" loading="lazy" allow="autoplay; encrypted-media"></iframe>'
+    +'<a class="yg-fallback" href="'+directUrl+'" target="_blank" rel="noopener">Không thấy video? Mở trong trình duyệt →</a>';
 }
 function renderEntry(rec, queriedAs){
   const d=rec.data||{}; const w=rec.word;
