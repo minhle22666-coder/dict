@@ -815,26 +815,32 @@ async function renderFamilyChips(word){
 }
 window.renderFamilyChips=renderFamilyChips;
 /* ============================================================
-   YOUGLISH — bản chốt sau khi test trực tiếp trên domain của app:
-   - components=0, không cần domain key (theo xác nhận của YouGlish).
-   - Mọi UI của YouGlish (thanh tìm kiếm, transcript, quảng cáo,
-     "powered by") nằm BÊN TRONG một iframe cross-origin duy nhất —
-     trình duyệt không cho phép chọn/style từng phần bên trong, nên
-     cách duy nhất để giấu phần dưới là THU GỌN chiều cao khung
-     hiển thị (crop bằng overflow:hidden), không phải dán lớp phủ.
-   - YG_MASK_TOP_PCT = 0.58 → chỉ hiện 58% chiều cao trên cùng
-     (đo bằng công cụ hiệu chỉnh yg-calib.html), phần còn lại co
-     gọn mất, không chừa khoảng trống. Nút 👁 cho xem lại toàn bộ.
-   - Vì đo trên video "hello" cụ thể, tỉ lệ video/transcript/quảng
-     cáo có thể khác đôi chút giữa các từ — chỉnh YG_MASK_TOP_PCT
-     nếu thấy lệch nhiều với từ khác.
+   YOUGLISH — bản chốt + tối ưu hiệu năng.
+
+   HIỆU NĂNG: iframe của YouGlish kéo theo YouTube player, quảng
+   cáo và reCAPTCHA của họ. Trước đây nó nạp mỗi lần tra từ, làm
+   nghẽn main thread cho toàn app. Giờ YG_LAZY=true → chỉ hiện một
+   nút gọn, bấm mới nạp. Đổi thành false nếu muốn tự nạp như cũ
+   (đánh đổi: app sẽ nặng lại như trước).
+
+   Đã sửa 2 lỗi hiệu năng:
+   - Bỏ ResizeObserver (nó sửa height → layout đổi → tự kích hoạt
+     lại → vòng lặp reflow). Thay bằng 3 lần đo mốc thời gian.
+   - Veil loading giờ bị display:none khi xong, để animation của
+     đốm sáng dừng hẳn thay vì chạy vô hạn dưới opacity:0.
+
+   Mọi UI của YouGlish nằm trong một iframe cross-origin, không thể
+   style từng phần bên trong, nên giấu phần dưới bằng cách THU GỌN
+   chiều cao khung (YG_MASK_TOP_PCT). Nút mũi tên góc phải mở lại
+   toàn bộ khung.
    ============================================================ */
 const YG_SCRIPT       = 'https://youglish.com/public/emb/widget.js';
 const YG_LANG         = 'english';
-const YG_COMPONENTS   = 0;        // đã chọn qua yg-calib.html
-const YG_MASK_TOP_PCT = 0.58;     // hiện 58% trên, co gọn 42% dưới
-const YG_TIMEOUT      = 12000;    // ms chờ player xuất hiện
-const YG_DEBUG        = false;    // true = hiện bảng lỗi thay vì ẩn khung
+const YG_COMPONENTS   = 0;        // chọn qua yg-calib.html
+const YG_MASK_TOP_PCT = 0.58;     // hiện 58% trên, thu gọn 42% dưới
+const YG_LAZY         = true;     // true = bấm mới nạp video
+const YG_TIMEOUT      = 12000;
+const YG_DEBUG        = false;
 
 let _ygScriptP = null;
 let _ygIdx     = 0;
@@ -860,18 +866,18 @@ function ygLoadScript(){
         clearInterval(poll);
         _ygDiag.script = _ygDiag.script || 'thấy window.YG qua polling';
         resolve();
-      }else if(++n > 48){
+      }else if(++n > 40){
         clearInterval(poll);
         _ygDiag.script = 'hết 12s vẫn không có YG.Widget';
         reject(new Error('không thấy YG.Widget'));
       }
-    }, 250);
+    }, 300);
   });
   return _ygScriptP;
 }
 
 function ygFindFrame(wrap){
-  let f = wrap.querySelector('iframe');
+  const f = wrap.querySelector('iframe');
   if(f) return f;
   const out = document.querySelectorAll('iframe[src*="youtube"],iframe[src*="youglish"]');
   for(const cand of out){
@@ -898,43 +904,37 @@ function ygWaitForFrame(wrap, timeout){
         _ygDiag.frame = 'KHÔNG có player sau ' + timeout + 'ms';
         resolve(null);
       }
-    }, 300);
+    }, 400);
   });
 }
 
-/* gõ ygDiag() trong console Safari nếu sau này cần điều tra lại */
+/* gõ ygDiag() trong console Safari nếu cần soi lại lần nạp gần nhất */
 function ygDiag(){ console.log(_ygDiag); return _ygDiag; }
 window.ygDiag = ygDiag;
 
-function maybeLoadYouglish(word){
-  const box = document.getElementById('youglish-box');
-  if(!box) return;
-  const seq = ++_ygSeq;
-  const idx = _ygIdx++;
-  _ygDiag = { word: word, online: navigator.onLine, host: location.host };
+const YG_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+  + 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 
-  const directUrl = 'https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
-  const linkBtn =
-      '<a class="yg-link-btn yg-fallback-btn" href="'+directUrl+'" target="_blank" rel="noopener">'
-    + '<span class="yg-link-ico">\u25B6</span>'
-    + '<span class="yg-link-text"><b>Nghe trong c\u00e2u th\u1eadt</b>'
-    + '<span>Kh\u00f4ng th\u1ea5y video? M\u1edf trong tr\u00ecnh duy\u1ec7t</span></span></a>';
+function ygLinkBtn(word){
+  const url = 'https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
+  return '<a class="yg-link-btn" href="'+url+'" target="_blank" rel="noopener">'
+    + '<span class="yg-link-ico">\u2197</span>'
+    + '<span class="yg-link-text"><b>Open With Browser</b></span></a>';
+}
 
-  if(!navigator.onLine){ box.innerHTML = linkBtn; return; }
+/* Nạp widget thật vào khung. Chỉ được gọi khi người dùng chủ động
+   yêu cầu (chế độ lazy) hoặc ngay lập tức nếu YG_LAZY=false. */
+function ygMount(word, wrap, seq, idx){
+  wrap.className = 'yg-wrap yg-loading';
+  wrap.innerHTML =
+      '<div class="yg-stage" id="yg-stage"><div class="yg-inner"></div><div class="yg-fade"></div></div>'
+    + '<button class="yg-peek" type="button" aria-label="Xem to\u00e0n b\u1ed9 khung">'+YG_CHEVRON+'</button>'
+    + '<div class="yg-veil"><span class="yg-dot"></span>\u0110ang m\u1edf video\u2026</div>';
 
-  box.innerHTML =
-      '<div class="yg-wrap" id="yg-wrap">'
-    +   '<div class="yg-stage" id="yg-stage"><div class="yg-inner"></div><div class="yg-fade"></div></div>'
-    +   '<button class="yg-peek" type="button" aria-label="Xem to\u00e0n b\u1ed9 khung">\u{1F441}</button>'
-    +   '<div class="yg-veil"><span class="yg-dot"></span>\u0110ang m\u1edf video\u2026</div>'
-    + '</div>'
-    + '<div class="yg-credit">\u{1F3A7} Video t\u1eeb <a href="https://youglish.com" target="_blank" rel="noopener">YouGlish</a></div>'
-    + linkBtn;
-
-  const wrap  = document.getElementById('yg-wrap');
-  const stage = document.getElementById('yg-stage');
+  const stage = wrap.querySelector('.yg-stage');
   const inner = wrap.querySelector('.yg-inner');
   const peek  = wrap.querySelector('.yg-peek');
+  const veil  = wrap.querySelector('.yg-veil');
 
   let fullH = 0, peeking = false;
   const applyHeight = ()=>{
@@ -948,31 +948,28 @@ function maybeLoadYouglish(word){
   });
 
   const finish = (frame)=>{
-    if(seq !== _ygSeq) return;
-    if(!document.body.contains(wrap)) return;
+    if(seq !== _ygSeq || !document.body.contains(wrap)) return;
     if(!frame){
       if(YG_DEBUG){
         let rows = ''; for(const k in _ygDiag) rows += k + ': ' + _ygDiag[k] + '\n';
         wrap.className = 'yg-wrap yg-diag';
         wrap.innerHTML = '<b>YouGlish ch\u01b0a d\u1ee5ng \u0111\u01b0\u1ee3c video</b><pre>'+esc(rows)+'</pre>';
       }else{
-        wrap.classList.add('yg-failed');
+        wrap.className = 'yg-wrap yg-failed';
       }
       return;
     }
-    wrap.classList.add('yg-ready');
-    // đợi layout ổn định rồi mới đo — tránh đọc lúc video còn đang co giãn
-    setTimeout(()=>{
-      fullH = frame.clientHeight || inner.scrollHeight || 0;
-      applyHeight();
-      // theo dõi nếu nội dung bên trong đổi kích thước sau đó
-      if(window.ResizeObserver){
-        new ResizeObserver(()=>{
-          const h = frame.clientHeight || inner.scrollHeight || 0;
-          if(h && Math.abs(h - fullH) > 4){ fullH = h; applyHeight(); }
-        }).observe(inner);
-      }
-    }, 250);
+    wrap.className = 'yg-wrap yg-ready';
+    if(veil) veil.remove();     // bỏ hẳn khỏi DOM → animation dừng, hết composite vô ích
+    // Đo 3 mốc thay cho ResizeObserver: đủ để bắt lúc layout ổn định
+    // mà không tạo vòng lặp đo ↔ sửa height.
+    [250, 1200, 3000].forEach((ms)=>{
+      setTimeout(()=>{
+        if(seq !== _ygSeq || !document.body.contains(wrap)) return;
+        const h = frame.clientHeight || inner.scrollHeight || 0;
+        if(h && Math.abs(h - fullH) > 6){ fullH = h; applyHeight(); }
+      }, ms);
+    });
   };
 
   ygLoadScript().then(()=>{
@@ -996,6 +993,34 @@ function maybeLoadYouglish(word){
     }
     ygWaitForFrame(wrap, YG_TIMEOUT).then(finish);
   }).catch(()=>finish(null));
+}
+
+function maybeLoadYouglish(word){
+  const box = document.getElementById('youglish-box');
+  if(!box) return;
+  const seq = ++_ygSeq;
+  const idx = _ygIdx++;
+  _ygDiag = { word: word, online: navigator.onLine, host: location.host };
+
+  if(!navigator.onLine){ box.innerHTML = ygLinkBtn(word); return; }
+
+  box.innerHTML =
+      '<div class="yg-wrap yg-idle" id="yg-wrap">'
+    +   '<button class="yg-start" type="button">'
+    +     '<span class="yg-start-ico">\u25B6</span>'
+    +     '<span class="yg-start-text">Nghe trong c\u00e2u th\u1eadt</span>'
+    +   '</button>'
+    + '</div>'
+    + '<div class="yg-credit">\u{1F3A7} Video t\u1eeb <a href="https://youglish.com" target="_blank" rel="noopener">YouGlish</a></div>'
+    + ygLinkBtn(word);
+
+  const wrap = document.getElementById('yg-wrap');
+  if(YG_LAZY){
+    wrap.querySelector('.yg-start')
+        .addEventListener('click', ()=>ygMount(word, wrap, seq, idx), { once: true });
+  }else{
+    ygMount(word, wrap, seq, idx);
+  }
 }
 
 function renderEntry(rec, queriedAs){
