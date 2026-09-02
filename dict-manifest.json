@@ -1,0 +1,44 @@
+{
+  "version": "2026-09-02.1",
+  "words": 16310,
+  "policy": "fill-gaps",
+  "built": "2026-09-02T06:36:58.095Z",
+  "shards": [
+    {
+      "file": "dict-001.json",
+      "words": 2000
+    },
+    {
+      "file": "dict-002.json",
+      "words": 2000
+    },
+    {
+      "file": "dict-003.json",
+      "words": 2000
+    },
+    {
+      "file": "dict-004.json",
+      "words": 2000
+    },
+    {
+      "file": "dict-005.json",
+      "words": 2000
+    },
+    {
+      "file": "dict-006.json",
+      "words": 2000
+    },
+    {
+      "file": "dict-007.json",
+      "words": 2000
+    },
+    {
+      "file": "dict-008.json",
+      "words": 2000
+    },
+    {
+      "file": "dict-009.json",
+      "words": 310
+    }
+  ]
+}
