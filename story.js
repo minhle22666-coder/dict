@@ -1666,19 +1666,21 @@ window.renderGameHub = function(){
 
   h+=renderWorldMap(); // banner is itself the Play/Continue button, plus the 12-land strip
 
-  h+='<div class="hub-section-label">Quick Games</div>';
-  h+='<div class="hub-row">';
-  h+='<button class="hub-card hub-mini mini-type" onclick="setPracticeMode(\'type\')">'
+  /* Không còn nhãn "Quick Games": hai ô này tự nói rõ chúng là gì, và
+     bỏ nhãn đi thì bản đồ phía trên giữ được vị trí hành động chính. */
+  h+='<div class="gm-pair">';
+  h+='<button class="gm-tile is-type" onclick="setPracticeMode(\'type\')">'
     +'<span class="glow-border blue"></span>'
-    +'<img class="hub-mini-deco" src="./decor-note-and-pen.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<span class="hub-mini-t">Type it</span><span class="hub-mini-s">Spell from memory</span></button>';
-  h+='<button class="hub-card hub-mini mini-match" onclick="setPracticeMode(\'match\')">'
+    +'<img class="gm-tile-deco" src="./decor-note-and-pen.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<span class="gm-tile-t">Type it</span>'
+    +'<span class="gm-tile-s">Spell your saved words from memory</span></button>';
+  h+='<button class="gm-tile is-match" onclick="setPracticeMode(\'match\')">'
     +'<span class="glow-border mint"></span>'
-    +'<img class="hub-mini-deco" src="./decor-magnifying-glass.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<span class="hub-mini-t">Match it</span><span class="hub-mini-s">Pick the right word</span></button>';
+    +'<img class="gm-tile-deco" src="./decor-magnifying-glass.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<span class="gm-tile-t">Match it</span>'
+    +'<span class="gm-tile-s">Pick the word that fits the meaning</span></button>';
   h+='</div>';
 
-  h+='<div class="hub-section-label">Bonus</div>';
   h+=renderBonusStrip();
   h+='</div>';
   area.innerHTML=h;
@@ -1885,17 +1887,32 @@ function bonusUnlockedToday(){
     return (window.__todaysCountCache||0) >= getState().dailyWordTarget;
   }catch(e){ return false; }
 }
+/* MỘT dòng nói thật trạng thái, thay cho ba thẻ "Coming soon" giống hệt
+   nhau. Khi còn khoá thì hiện luôn tiến độ thật của hôm nay — biết còn
+   thiếu mấy từ thì hữu ích hơn hẳn một cái ổ khoá. */
 function renderBonusStrip(){
   const unlocked = bonusUnlockedToday();
-  let h='<div class="bonus-strip'+(unlocked?' unlocked':'')+'">';
-  h+='<div class="bonus-head"><span class="bonus-ico">'+(unlocked?'🔓':'🔒')+'</span><span class="bonus-t">'
-    +(unlocked?'Unlocked for today':'Locked')+'</span></div>';
-  h+='<div class="bonus-s">'+(unlocked
-      ? 'A short sequel to an arc you\'ve finished.'
-      : 'Hit today\'s word goal to unlock a short sequel scene.')+'</div>';
-  h+='<div class="bonus-cards">';
-  for(let i=1;i<=3;i++){
-    h+='<div class="bonus-card'+(unlocked?'':' locked')+'"><span class="bc-ico">'+(unlocked?'▶':'🔒')+'</span><span class="bc-t">Coming soon</span></div>';
+  let target=0, done=0;
+  try{ target=getState().dailyWordTarget||0; }catch(e){}
+  done = window.__todaysCountCache||0;
+  const left = Math.max(0, target-done);
+
+  let h='<div class="gm-bonus'+(unlocked?' is-open':'')+'">';
+  h+='<div class="gm-bonus-ico">'+(unlocked?'▶':'🔒')+'</div>';
+  h+='<div class="gm-bonus-txt">';
+  if(unlocked){
+    h+='<b>Bonus scene ready</b>';
+    h+='<span>A short sequel to an arc you have finished. Still being written — it lands here when it does.</span>';
+  }else{
+    h+='<b>Bonus scene locked</b>';
+    if(target>0){
+      h+='<span>'+done+' of '+target+' words today'
+        +(left?' — '+left+' more to unlock':'')+'</span>';
+      h+='<div class="gm-bonus-track"><i style="width:'
+        +Math.min(100, target?Math.round(done/target*100):0)+'%"></i></div>';
+    }else{
+      h+='<span>Hit today\'s word goal to unlock a short sequel scene.</span>';
+    }
   }
   h+='</div></div>';
   return h;
