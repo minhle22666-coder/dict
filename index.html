@@ -1912,7 +1912,7 @@
      rõ ràng, và Bonus thu về MỘT dòng nói thật trạng thái.
      ============================================================ */
   #v-review{padding-bottom:8px}
-  .gm-pair{display:flex;gap:11px;margin-bottom:16px}
+  .gm-pair{display:flex;gap:10px}
   .gm-tile{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;
     align-items:flex-start;gap:3px;padding:15px 14px 16px;border-radius:20px;overflow:hidden;
     background:linear-gradient(158deg,var(--surface-2),var(--surface) 76%);
@@ -1948,16 +1948,26 @@
      Ở đây mỗi vùng có tiêu đề riêng và một dải thông tin dưới bản đồ
      nói rõ bạn đang ở đâu.
      ============================================================ */
-  .gm-zone{display:flex;align-items:center;gap:10px;margin:22px 2px 11px}
+  /* Tiêu đề vùng: tên + vạch kéo hết chỗ trống + một chip DỮ LIỆU.
+     Không câu mô tả — nó chỉ nói lại cái đang thấy. */
+  .gm-zone{display:flex;align-items:center;gap:9px;margin:24px 2px 10px}
   .gm-zone-t{flex:none;font-size:12.5px;font-weight:800;letter-spacing:-.01em;color:var(--text)}
-  .gm-zone-s{flex:1;min-width:0;font-size:11px;color:var(--muted-2);line-height:1.35}
-  .gm-zone-rule{flex:none;width:26px;height:1px;background:var(--line)}
+  .gm-zone-rule{flex:1;min-width:12px;height:1px;
+    background:linear-gradient(90deg,var(--line),transparent)}
+  .gm-zone-chip{flex:none;font-size:10.5px;font-weight:700;color:var(--muted-2);
+    padding:3px 9px;border-radius:99px;background:var(--surface-2);border:1px solid var(--line);
+    transition:color .2s,border-color .2s,background .2s}
+  .gm-zone-chip.on{color:var(--primary);border-color:rgba(255,159,69,.34);
+    background:var(--primary-bg)}
 
-  /* Tiến độ land: một sợi mảnh và một dòng chữ, không khung, không cục số. */
-  .gm-thru{margin:-2px 2px 0}
-  .gm-thru-line{height:3px;border-radius:99px;background:var(--surface-2);overflow:hidden}
-  .gm-thru-line i{display:block;height:100%;border-radius:99px;background:var(--grad-hero)}
-  .gm-thru-txt{margin-top:6px;font-size:11px;font-weight:600;color:var(--muted-2)}
+  /* Panel lõm — ĐÂY là thứ tách vùng, không phải chữ. */
+  .gm-pair-wrap{padding:11px;border-radius:24px;margin-bottom:2px;
+    background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.05));
+    border:1px solid var(--line);box-shadow:inset 0 2px 9px rgba(0,0,0,.24)}
+  :root[data-theme="light"] .gm-pair-wrap{
+    background:linear-gradient(180deg,rgba(30,60,90,.07),rgba(30,60,90,.02));
+    box-shadow:inset 0 2px 9px rgba(30,60,90,.08)}
+
 
 
   /* ============================================================
@@ -2043,6 +2053,20 @@
   /* icon hai game: asset thật thay cho emoji hệ thống */
   .gt-ico-img{width:26px;height:26px;object-fit:contain;display:block;margin:0 auto 2px}
   .game-tab.on .gt-ico-img{filter:drop-shadow(0 2px 5px rgba(0,0,0,.35))}
+
+
+  /* Khung "dạng biến đổi" — cố ý KHÁC màu với .corrected (hổ phách, nghĩa
+     là app đã sửa gì đó). Ở đây bạn tra đúng, app chỉ suy về từ gốc, nên
+     dùng màu mint mang nghĩa "ổn cả, không ai sửa gì bạn". */
+  .inflect{font-size:12.5px;color:var(--mint);background:rgba(74,222,128,.1);
+    border:1px solid rgba(74,222,128,.24);border-radius:12px;padding:9px 13px;margin-bottom:12px;
+    line-height:1.5}
+  .inflect b{color:var(--text);font-weight:800}
+  .inflect span{display:block;margin-top:2px;font-size:11px;color:var(--muted-2)}
+
+  .ws-inflect{font-size:11.5px;color:var(--mint);background:rgba(74,222,128,.1);
+    border-radius:10px;padding:7px 11px;margin-bottom:10px;line-height:1.45}
+  .ws-inflect b{color:var(--text);font-weight:800}
 
 </style>
 </head>
@@ -2438,7 +2462,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v60 · back về đúng trang đọc, lesson kính, icon game thật</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v62 · Game phân vùng bằng dữ liệu, bỏ thanh trùng</b></p>
   </section>
 </main>
 

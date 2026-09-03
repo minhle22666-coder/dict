@@ -610,10 +610,16 @@ function showWordSheet(html){
   el.querySelector('#ws-body').innerHTML=html;
   requestAnimationFrame(()=>el.classList.add('show'));
 }
-function condensedEntryHTML(rec){
+function condensedEntryHTML(rec, formNote){
   const d=rec.data||{}; const w=rec.word;
   const safeW = esc(w).replace(/'/g,"\\'");
-  let h='<div class="ws-head"><div class="ws-word">'+esc(d.word||w)+'</div>';
+  let h='';
+  if(formNote){
+    h+='<div class="ws-inflect">“<b>'+esc(formNote.form)+'</b>” \u2192 '
+      +esc((window.FORM_LABEL&&window.FORM_LABEL[formNote.kind])||'dạng của')
+      +' <b>'+esc(w)+'</b></div>';
+  }
+  h+='<div class="ws-head"><div class="ws-word">'+esc(d.word||w)+'</div>';
   if(typeof levelTag==='function') h+=levelTag(d.word||w);
   h+='<button class="ws-star'+(rec.saved?' on':'')+'" onclick="wordPopupToggleSave(\''+safeW+'\')" aria-label="Save word">'+(rec.saved?'★':'☆')+'</button>';
   h+='</div>';
@@ -948,6 +954,17 @@ async function openWordPopup(rawWord){
     // NO fuzzy fallback here. This word came straight out of the passage text,
     // so its spelling is correct by construction — guessing a "near" word turns
     // "shone" into "phone" and looks up something the reader never tapped.
+    /* Dạng biến đổi trước đã: tap "walked" trong bài đọc thì lấy nghĩa
+       của "walk" ngay trong máy, không tiêu token cho một nghĩa đã có. */
+    if(!rec && typeof lemmaLookup==='function'){
+      const lem=await lemmaLookup(word);
+      if(lem){
+        await logEvent('search', lem.rec.word);
+        addXP(1);
+        showWordSheet(condensedEntryHTML(lem.rec, {form:word, kind:lem.kind}));
+        return;
+      }
+    }
     if(!rec){
       if(!getKey()){ showWordSheet(needKeySheetHTML(word)); return; }
       if(!navigator.onLine){ showWordSheet(offlineSheetHTML(word)); return; }
@@ -1794,10 +1811,14 @@ window.renderGameHub = function(){
   /* Ba vùng của trang trước đây nằm liền nhau không nhãn, nên The Map
      trông như một game thứ ba ngang hàng với Type it / Match it. Mỗi
      vùng giờ có tiêu đề và một câu nói rõ nó là gì. */
+  /* Phân vùng bằng SỐ LIỆU THẬT, không bằng câu mô tả. Câu kiểu "Short
+     drills on words you saved" chỉ nói lại cái đang thấy — đọc như app
+     mẫu. Giờ mỗi tiêu đề mang một chip dữ liệu sống, và cặp game nằm
+     trong một panel lõm để mắt thấy ngay đây là vùng khác với bản đồ. */
   h+='<div class="gm-zone"><span class="gm-zone-t">Mini games</span>'
     +'<span class="gm-zone-rule"></span>'
-    +'<span class="gm-zone-s">Short drills on words you saved — no story, no consequences</span></div>';
-  h+='<div class="gm-pair">';
+    +'<span class="gm-zone-chip" id="gm-ready">…</span></div>';
+  h+='<div class="gm-pair-wrap"><div class="gm-pair">';
   h+='<button class="gm-tile is-type" onclick="setPracticeMode(\'type\')">'
     +'<span class="glow-border blue"></span>'
     +'<img class="gm-tile-deco" src="./decor-note-and-pen.webp" alt="" onerror="this.style.display=\'none\'"/>'
@@ -1808,15 +1829,40 @@ window.renderGameHub = function(){
     +'<img class="gm-tile-deco" src="./decor-magnifying-glass.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<span class="gm-tile-t">Match it</span>'
     +'<span class="gm-tile-s">Pick the word that fits the meaning</span></button>';
-  h+='</div>';
+  h+='</div></div>';
 
-  h+='<div class="gm-zone"><span class="gm-zone-t">Daily bonus</span>'
-    +'<span class="gm-zone-rule"></span>'
-    +'<span class="gm-zone-s">Earned by hitting today\'s word goal</span></div>';
+  {
+    let target=0; try{ target=getState().dailyWordTarget||0; }catch(e){}
+    const done=window.__todaysCountCache||0;
+    const hit=target>0 && done>=target;
+    h+='<div class="gm-zone"><span class="gm-zone-t">Daily bonus</span>'
+      +'<span class="gm-zone-rule"></span>'
+      +'<span class="gm-zone-chip'+(hit?' on':'')+'">'
+      +(target?done+'/'+target:'—')+'</span></div>';
+  }
   h+=renderBonusStrip();
   h+='</div>';
   area.innerHTML=h;
+  fillGameCounts();
 };
+
+/* Chip "bao nhiêu từ sẵn để luyện" phải đọc IndexedDB, nên điền SAU khi
+   khung đã hiện — màn hub không phải chờ nó. */
+async function fillGameCounts(){
+  const el=document.getElementById('gm-ready'); if(!el) return;
+  try{
+    const all=await idbAllCached();
+    const saved=all.filter(r=>r.saved && !r.alias).length;
+    const total=all.filter(r=>r.data && !r.alias).length;
+    const n=saved||total;
+    const still=document.getElementById('gm-ready');
+    if(!still) return;                                  // đã rời hub trước khi xong
+    still.textContent = n
+      ? n.toLocaleString()+(saved?' saved':' words')
+      : 'none yet';
+    still.classList.toggle('on', n>0);
+  }catch(e){ el.textContent=''; }
+}
 
 /* ============================================================
    THE MAP — reuses the app's existing "Territory" banner+strip
@@ -1943,22 +1989,13 @@ function renderWorldMap(){
   h+='</div></button>';
 
   if(nextMeta && CONTENT.find(a=>a.id===nextMeta.id)){
-    h+='<div class="sb-progress"><span>🔒 Finish this land to reach <b>'+esc(nextMeta.name)+'</b></span>'
-      +'<div class="sb-bar"><i style="width:'+pct+'%"></i></div></div>';
+    // Bỏ <div class="sb-bar"> — banner ngay trên đã có dải thanh .sb-bars,
+    // hai thanh chồng nhau trong một khối chỉ làm loãng.
+    h+='<div class="sb-progress"><span>🔒 Finish this land to reach <b>'+esc(nextMeta.name)+'</b></span></div>';
   } else if(nextMeta){
     h+='<div class="sb-progress"><span>🛠️ More lands are still being drawn.</span></div>';
   } else {
     h+='<div class="sb-progress"><span>🏆 Every built land explored.</span></div>';
-  }
-
-  /* Một dòng chữ mảnh với một sợi tiến độ, thay cho khối có cục số
-     "1/12" — cục đó vừa xấu vừa lặp lại thông tin banner đã nói. */
-  if(cur){
-    const chName = cur.chapter ? (cur.chapter.title||('Chapter '+cur.chapter.id)) : null;
-    h+='<div class="gm-thru">';
-    h+='<div class="gm-thru-line"><i style="width:'+Math.max(2,pct)+'%"></i></div>';
-    h+='<div class="gm-thru-txt">'+(chName?esc(chName)+' · ':'')+pct+'% through</div>';
-    h+='</div>';
   }
 
   h+='<button class="lesson-entry" onclick="showLifeLessons()">'
