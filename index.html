@@ -1401,8 +1401,13 @@
     -webkit-touch-callout:none;
     -webkit-tap-highlight-color:transparent}
 
-  /* trong lúc quét thì khoá cuộn, nếu không ngón tay vừa chọn vừa kéo trang */
+  /* Giữ lại cho trình duyệt nào tôn trọng việc đổi touch-action giữa cử
+     chỉ; iOS thì không, nên story.js còn chặn thêm bằng touchmove. */
   .story-passage.selecting,.dlg-line.selecting{touch-action:none}
+
+  /* Nới vùng chạm mỗi từ ra trên/dưới 3px mà KHÔNG đổi khoảng dòng, để
+     ngón tay lệch nhẹ vẫn còn trúng chữ. */
+  .wtap{padding:3px 0;margin:-3px 0}
 
   /* vùng đang chọn: một dải liền mạch, bo hai đầu mút */
   .wtap.wsel{background:rgba(255,159,69,.28);box-shadow:0 0 0 2px rgba(255,159,69,.28);
@@ -2462,7 +2467,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v62 · Game phân vùng bằng dữ liệu, bỏ thanh trùng</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v63 · bôi đen chịu được nghiêng tay</b></p>
   </section>
 </main>
 

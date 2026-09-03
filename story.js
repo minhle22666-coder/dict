@@ -756,11 +756,12 @@ window.wordPopupForceAI = async function(rawWord){
    · Nhấc ngón trước 340ms, hoặc kéo quá 12px trước khi hết 340ms, thì đó
      là cuộn trang chứ không phải chọn — huỷ, không cản việc cuộn.
    ============================================================ */
-const SEL_HOLD_MS = 340;    // giữ bao lâu thì vào chế độ chọn
-const SEL_SLOP    = 12;     // px xê dịch còn được coi là "đang giữ yên"
+const SEL_HOLD_MS = 320;    // giữ bao lâu thì vào chế độ chọn
+const SEL_SLOP    = 20;     // px xê dịch dọc còn được coi là "đang giữ yên"
 
 let _selBtn=null, _selWords=[], _selAnchor=-1, _selHost=null;
 let _selHoldTimer=null, _selActive=false, _selStart=null, _selSuppressTapUntil=0;
+let _selLastWord=null;   // mốc để dính dòng khi ngón tay chệch
 
 function clearSelBtn(){ if(_selBtn){ _selBtn.remove(); _selBtn=null; } }
 
@@ -771,9 +772,50 @@ function selWordsIn(host){
   return host ? Array.from(host.querySelectorAll('.wtap')) : [];
 }
 
+/* Ngón tay không bao giờ đi thẳng tuyệt đối. Đòi điểm chạm phải trúng
+   đúng một <span> thì chỉ cần nghiêng nhẹ xuống khoảng trống giữa hai
+   dòng là mất dấu. Hàm này luôn trả về MỘT từ:
+     · ưu tiên từ có ô chữ nhật phủ đúng toạ độ y (cùng dòng) → gần nhất
+       theo chiều ngang, kể cả khi ngón đã ra ngoài lề trái/phải;
+     · không dòng nào phủ y thì lấy từ có tâm gần nhất, nhân trọng số
+       chiều dọc để vẫn ưu tiên dòng đang quét.
+   Nhờ vậy kéo ngang thoải mái, chệch lên/xuống vẫn bám đúng. */
+function selNearestWord(all, x, y, sticky){
+  /* DÍNH DÒNG: nếu đang quét trên một dòng, ngón tay chệch lên/xuống trong
+     phạm vi 90% chiều cao dòng thì vẫn coi như còn ở dòng đó. Không có nó,
+     một cú nghiêng nhẹ vào khoảng trống giữa hai dòng sẽ nhảy sang dòng
+     dưới và quét luôn cả đoạn — đúng lỗi khó chịu nhất khi kéo bằng tay. */
+  let pool=all;
+  if(sticky){
+    const sr=sticky.getBoundingClientRect();
+    if(sr.height){
+      const band=sr.height*0.9;
+      if(y>=sr.top-band && y<=sr.bottom+band){
+        const same=all.filter(w=>{
+          const r=w.getBoundingClientRect();
+          return r.height && r.bottom>sr.top+1 && r.top<sr.bottom-1;   // phủ dọc = cùng dòng
+        });
+        if(same.length) pool=same;
+      }
+    }
+  }
+  let best=null, bestD=Infinity;
+  for(const w of pool){
+    const r=w.getBoundingClientRect();
+    if(!r.width && !r.height) continue;
+    const onLine = y>=r.top-2 && y<=r.bottom+2;
+    const dx = x<r.left ? r.left-x : (x>r.right ? x-r.right : 0);
+    const cy = (r.top+r.bottom)/2;
+    // cùng dòng thì chỉ tính lệch ngang; khác dòng thì lệch dọc nặng gấp 3
+    const d = onLine ? dx : dx + Math.abs(y-cy)*3;
+    if(d<bestD){ bestD=d; best=w; }
+  }
+  return best;
+}
+
 function selClear(){
   for(const w of _selWords) w.classList.remove('wsel','wsel-a','wsel-z');
-  _selWords=[]; _selAnchor=-1;
+  _selWords=[]; _selAnchor=-1; _selLastWord=null;
   if(_selHost) _selHost.classList.remove('selecting');
   _selHost=null; _selActive=false;
   clearSelBtn();
@@ -837,6 +879,7 @@ document.addEventListener('pointerdown',(e)=>{
     if(idx<0) return;
     _selActive=true; _selHost=host; _selAnchor=idx;
     host.classList.add('selecting');           // tắt cuộn trong lúc quét
+    _selLastWord=word;
     _selWords=selPaint(all, idx, idx);
     if(navigator.vibrate) { try{ navigator.vibrate(8); }catch(_){ } }
   }, SEL_HOLD_MS);
@@ -847,17 +890,25 @@ document.addEventListener('pointermove',(e)=>{
     // chưa vào chế độ chọn: xê dịch nhiều = người ta đang cuộn → huỷ giữ
     if(_selStart && _selHoldTimer){
       const dx=Math.abs(e.clientX-_selStart.x), dy=Math.abs(e.clientY-_selStart.y);
-      if(dx>SEL_SLOP || dy>SEL_SLOP){ clearTimeout(_selHoldTimer); _selHoldTimer=null; }
+      // Chỉ vuốt DỌC rõ rệt mới là ý định cuộn trang. Trượt ngang là dấu
+      // hiệu người ta đang định quét chữ — huỷ hẹn giữ ở đó là sai, đó là
+      // lý do trước đây cứ phải giữ lại từ đầu.
+      if(dy>SEL_SLOP && dy>dx*1.4){ clearTimeout(_selHoldTimer); _selHoldTimer=null; }
     }
     return;
   }
   e.preventDefault();                          // đang quét thì không cuộn
-  const el=document.elementFromPoint(e.clientX, e.clientY);
-  const word=el && el.closest ? el.closest('.wtap') : null;
-  if(!word || selHostOf(word)!==_selHost) return;
   const all=selWordsIn(_selHost);
-  const idx=all.indexOf(word);
+  if(!all.length) return;
+  // Trúng chữ thì dùng luôn, không thì bám từ gần nhất — không bao giờ
+  // "mất dấu" chỉ vì ngón tay lệch khỏi hàng chữ.
+  const el=document.elementFromPoint(e.clientX, e.clientY);
+  let word=el && el.closest ? el.closest('.wtap') : null;
+  if(!word || selHostOf(word)!==_selHost)
+    word=selNearestWord(all, e.clientX, e.clientY, _selLastWord);
+  const idx=word?all.indexOf(word):-1;
   if(idx<0) return;
+  _selLastWord=word;
   _selWords=selPaint(all, _selAnchor, idx);
 }, { passive:false, capture:true });
 
@@ -879,9 +930,26 @@ document.addEventListener('pointerup',(e)=>{
   }
 }, true);
 
+/* iOS chốt "cử chỉ này có được cuộn không" NGAY LÚC ngón tay chạm, nên
+   thêm touch-action:none sau 320ms là vô hiệu. Cách duy nhất chặn cuộn
+   giữa cử chỉ là preventDefault trên touchmove, và listener phải
+   non-passive mới có tác dụng. */
+document.addEventListener('touchmove',(e)=>{
+  if(_selActive) e.preventDefault();
+}, { passive:false });
+
+/* Safari vẫn có thể bắn pointercancel (đa điểm, cử chỉ hệ thống, cuộn đà).
+   Trước đây ta xoá sạch vùng chọn — người dùng mất công quét lại từ đầu.
+   Giờ coi như nhả ngón: CHỐT lại phần đã chọn được. */
 document.addEventListener('pointercancel',()=>{
   clearTimeout(_selHoldTimer); _selHoldTimer=null; _selStart=null;
-  if(_selActive) selClear();
+  if(!_selActive) return;
+  const list=_selWords.slice();
+  if(_selHost) _selHost.classList.remove('selecting');
+  _selActive=false;
+  _selSuppressTapUntil=Date.now()+450;
+  if(list.length>=2) selShowButton(list);
+  else selClear();
 }, true);
 
 document.addEventListener('scroll',()=>{ if(!_selActive) clearSelBtn(); }, { passive:true });
