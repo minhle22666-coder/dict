@@ -621,15 +621,50 @@ function condensedEntryHTML(rec){
   const pos=[...new Set((d.senses||[]).map(s=>s.pos).filter(Boolean))];
   if(pos.length) h+='<div class="ws-pos">'+pos.map(posChip).join('')+'</div>';
   h+='<div class="ws-vi">'+(d.vi_equivalent?esc(d.vi_equivalent):'<i>no direct equivalent yet</i>')+'</div>';
-  const s0=(d.senses||[])[0];
-  if(s0&&s0.vi && s0.vi!==d.vi_equivalent) h+='<div class="ws-sense">'+esc(s0.vi)+'</div>';
+  /* One meaning per part of speech, not just the first sense overall — a word
+     that is both a noun and a verb has two different meanings, and showing only
+     one of them is the wrong half of the answer half the time. */
+  const byPos = new Map();
+  for(const s of (d.senses||[])){
+    if(!s || !s.vi) continue;
+    const key = s.pos || '—';
+    if(!byPos.has(key)) byPos.set(key, s);
+  }
+  if(byPos.size){
+    h+='<div class="ws-senses">';
+    for(const [posName, s] of byPos){
+      h+='<div class="ws-sense-row">'
+        +(posName!=='—' ? '<span class="ws-sense-pos">'+esc(posName)+'</span>' : '')
+        +'<span class="ws-sense-vi">'+esc(s.vi)+'</span></div>';
+    }
+    h+='</div>';
+  }
   if(d.collocations&&d.collocations.length) h+='<div class="ws-colloc">'+esc(d.collocations[0].text)+'</div>';
   h+='<div class="ws-actions">';
-  h+='<button class="ws-full" onclick="closeWordSheet(); showView(\'home\'); search(\''+safeW+'\');">See full entry →</button>';
+  h+='<button class="ws-full" onclick="openFullEntry(\''+safeW+'\')">See full entry →</button>';
   h+='<button class="ws-ai-retry" onclick="wordPopupForceAI(\''+safeW+'\')">Not quite right? Ask AI</button>';
   h+='</div>';
   return h;
 }
+/* Remember the passage (view + scroll position) before jumping to the full
+   word page, so the top-bar back button returns here instead of home. */
+window.openFullEntry = function(word){
+  const active = document.querySelector('.view.active');
+  const view = active ? active.id.replace(/^v-/,'') : 'review';
+  window._returnTo = { view, scroll: window.scrollY || 0 };
+  closeWordSheet();
+  showView('home');
+  search(word);
+};
+
+function notFoundSheetHTML(w, suggestion){
+  const safeS=(suggestion||'').replace(/'/g,"\\'");
+  let h='<div class="ws-word">'+esc(w)+'</div>'
+    +'<div class="ws-loading">Không phải từ tiếng Anh mà Focci biết. Không có chữ nào bị tự sửa.</div>';
+  if(suggestion) h+='<button class="ws-full" onclick="openWordPopup(\''+safeS+'\')">Có phải bạn muốn tra “'+esc(suggestion)+'”?</button>';
+  return h;
+}
+
 function loadingSheetHTML(w){ return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Focci is charting this one…</div>'; }
 function needKeySheetHTML(w){
   const safeW=esc(w).replace(/'/g,"\\'");
@@ -658,7 +693,8 @@ window.wordPopupForceAI = async function(rawWord){
   try{
     if(!getKey()){ showWordSheet(needKeySheetHTML(word)); return; }
     if(!navigator.onLine){ showWordSheet(offlineSheetHTML(word)); return; }
-    const data = await askGemini(word);
+    const data = await askGemini(word, { exact:true });
+    if(data && data.not_found){ showWordSheet(notFoundSheetHTML(word, data.suggestion)); return; }
     const canon = norm(data.word||word);
     const existing = await idbGet(canon);
     const rec = { word:canon, data, source:'ai', firstSeen:Date.now(),
@@ -673,6 +709,115 @@ window.wordPopupForceAI = async function(rawWord){
   }
 };
 
+/* ============================================================
+   PHRASE SELECTION — hold and drag across a passage to select more than
+   one word, then ask about the whole chunk instead of a single word.
+   The floating button is positioned from the selection rectangle and
+   removed the moment the selection collapses.
+   ============================================================ */
+let _selBtn = null;
+function clearSelBtn(){ if(_selBtn){ _selBtn.remove(); _selBtn=null; } }
+
+function selectedPassageText(){
+  const sel = window.getSelection();
+  if(!sel || sel.isCollapsed) return null;
+  const txt = sel.toString().replace(/\s+/g,' ').trim();
+  if(txt.length < 2) return null;
+  if(txt.split(/\s+/).length < 2) return null;        // single word → the tap handler already covers it
+  // only offer this inside passage text, not across the whole app
+  const node = sel.anchorNode;
+  const host = node && (node.nodeType===1 ? node : node.parentElement);
+  if(!host || !host.closest('.story-passage, .dlg-line')) return null;
+  return { text: txt, rect: sel.getRangeAt(0).getBoundingClientRect() };
+}
+
+function onPassageSelection(){
+  const s = selectedPassageText();
+  if(!s){ clearSelBtn(); return; }
+  clearSelBtn();
+  const b = document.createElement('button');
+  b.className = 'sel-ask';
+  b.type = 'button';
+  const words = s.text.split(/\s+/).length;
+  b.innerHTML = '<span>✦</span> Hỏi Focci về ' + words + ' từ này';
+  b.style.top  = (s.rect.top + window.scrollY - 46) + 'px';
+  b.style.left = Math.max(10, Math.min(s.rect.left + window.scrollX, window.innerWidth - 210)) + 'px';
+  b.addEventListener('click', (e)=>{
+    e.preventDefault(); e.stopPropagation();
+    const t = s.text;
+    clearSelBtn();
+    try{ window.getSelection().removeAllRanges(); }catch(_){}
+    openPhrasePopup(t);
+  });
+  document.body.appendChild(b);
+  _selBtn = b;
+}
+
+document.addEventListener('selectionchange', ()=>{
+  clearTimeout(window._selTimer);
+  window._selTimer = setTimeout(onPassageSelection, 220);
+});
+/* A tap that lands on a .wtap while a multi-word selection is open must not
+   fire the single-word popup — the selection button is the intended target. */
+document.addEventListener('click', (e)=>{
+  if(_selBtn && !e.target.closest('.sel-ask')) clearSelBtn();
+}, true);
+document.addEventListener('scroll', clearSelBtn, { passive:true });
+
+function phraseSheetHTML(text, result, saved){
+  const safeT = esc(text).replace(/'/g,"\\'");
+  const primary = (result && result.primary) || {};
+  const alts = ((result&&result.alternatives)||[]).filter(a=>a&&a.text&&a.text!==primary.text).slice(0,2);
+  let h='<div class="ws-head"><div class="ws-word ws-word-phrase">'+esc(text)+'</div>';
+  h+='<button class="ws-star'+(saved?' on':'')+'" onclick="phrasePopupSave(\''+safeT+'\')" aria-label="Save phrase">'+(saved?'★':'☆')+'</button>';
+  h+='</div>';
+  h+='<div class="ws-vi">'+esc(primary.text||'')+'</div>';
+  if(primary.why) h+='<div class="ws-sense-row"><span class="ws-sense-vi">'+esc(primary.why)+'</span></div>';
+  if(alts.length){
+    h+='<div class="ws-senses">';
+    for(const a of alts){
+      h+='<div class="ws-sense-row">'
+        +(a.register?'<span class="ws-sense-pos">'+esc(a.register)+'</span>':'')
+        +'<span class="ws-sense-vi">'+esc(a.text)+'</span></div>';
+    }
+    h+='</div>';
+  }
+  if(result && result.note) h+='<div class="ws-colloc">'+esc(result.note)+'</div>';
+  h+='<div class="ws-actions">';
+  h+='<button class="ws-full" onclick="openFullEntry(\''+safeT+'\')">Xem đầy đủ →</button>';
+  h+='</div>';
+  return h;
+}
+
+let _phraseCache = {};
+window.phrasePopupSave = async function(text){
+  const rec = await idbGet(norm(text));
+  if(rec && rec.saved){ await toggleSave(norm(text)); showWordSheet(phraseSheetHTML(text, _phraseCache[text], false)); return; }
+  const r = _phraseCache[text] || {};
+  await savePhraseRecord(text, (r.primary&&r.primary.text)||'', r.primary);
+  if(typeof toast==='function') toast('Đã lưu cụm từ');
+  showWordSheet(phraseSheetHTML(text, r, true));
+};
+
+async function openPhrasePopup(text){
+  const t = String(text||'').trim();
+  if(!t) return;
+  showWordSheet(loadingSheetHTML(t));
+  try{
+    if(!getKey()){ showWordSheet(needKeySheetHTML(t)); return; }
+    if(!navigator.onLine){ showWordSheet(offlineSheetHTML(t)); return; }
+    const existing = await idbGet(norm(t));
+    const result = await translatePhrase(t);
+    _phraseCache[t] = result;
+    await logEvent('search', null);
+    addXP(1);
+    showWordSheet(phraseSheetHTML(t, result, !!(existing&&existing.saved)));
+  }catch(err){
+    showWordSheet(errorSheetHTML(t, err.message||''));
+  }
+}
+window.openPhrasePopup = openPhrasePopup;
+
 async function openWordPopup(rawWord){
   let word = norm(normalizeSpelling(rawWord||''));
   if(!word) return;
@@ -680,14 +825,14 @@ async function openWordPopup(rawWord){
   try{
     let rec = await idbGet(word);
     if(rec && rec.alias) rec = await idbGet(rec.alias);
-    if(!rec){
-      const guess = await fuzzyLocalSearch(word);
-      if(guess) rec = await idbGet(guess.target);
-    }
+    // NO fuzzy fallback here. This word came straight out of the passage text,
+    // so its spelling is correct by construction — guessing a "near" word turns
+    // "shone" into "phone" and looks up something the reader never tapped.
     if(!rec){
       if(!getKey()){ showWordSheet(needKeySheetHTML(word)); return; }
       if(!navigator.onLine){ showWordSheet(offlineSheetHTML(word)); return; }
-      const data = await askGemini(word);
+      const data = await askGemini(word, { exact:true });
+      if(data && data.not_found){ showWordSheet(notFoundSheetHTML(word, data.suggestion)); return; }
       const canon = norm(data.word||word);
       rec = { word:canon, data, source:'ai', firstSeen:Date.now(), saved:0, savedAt:0 };
       await idbPut(rec);

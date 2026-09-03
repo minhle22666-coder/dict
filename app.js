@@ -310,12 +310,22 @@ function wireJar(){
 /* ============================================================
    GEMINI PROMPT (kept in sync with generate.html)
    ============================================================ */
-function buildPrompt(word){
+function buildPrompt(word, exact){
 return `You are a bilingual English→Vietnamese lexicographer building a rich, practical dictionary entry. For the English word or phrase "${word}", return a single JSON object (no markdown, no commentary) with EXACTLY this shape:
 
 {
-  "word": "corrected/canonical form — fix typos, complete a partial idiom, or normalize slang spelling",
-  "query_note": "if you corrected/completed the input, one short Vietnamese phrase like 'Ý bạn là: rain cats and dogs'; else empty string",
+  "word": ${exact
+      ? '"echo the input EXACTLY as given (only trim whitespace / lowercase) — never a different word"'
+      : '"corrected/canonical form — fix typos, complete a partial idiom, or normalize slang spelling"'},
+  "query_note": ${exact
+      ? '"always an empty string in this mode"'
+      : `"if you corrected/completed the input, one short Vietnamese phrase like 'Ý bạn là: rain cats and dogs'; else empty string"`},
+  "not_found": ${exact
+      ? 'true only if the input is genuinely NOT a real English word/phrase; otherwise false'
+      : 'always false'},
+  "suggestion": ${exact
+      ? '"if the input looks like a misspelling of a common word, the word you think they meant — as a SUGGESTION only, never substituted into \"word\". Else empty string."'
+      : '"always an empty string"'},
   "phonetic": "IPA, e.g. /stɛp/ — omit for multi-word phrases/idioms",
   "vi_equivalent": "1–3 từ tiếng Việt gần nhất, cách nhau bằng ', '. Nếu tiếng Việt KHÔNG có từ nào thật sự khớp, để chuỗi rỗng \"\" — tuyệt đối không đưa một từ gần đúng cho có.",
   "vi_note": "1 short Vietnamese sentence explaining the core feeling/usage",
@@ -352,7 +362,8 @@ return `You are a bilingual English→Vietnamese lexicographer building a rich, 
   "antonyms": ["useful common ones only"]
 }
 
-INPUT MAY BE MESSY: a typo, a partial/incomplete idiom (e.g. "rain dogs" → "it's raining cats and dogs"), or casual slang spelling. Silently resolve it to the real, common English word/idiom/slang term and put THAT corrected form in "word". Fill "query_note" only when you actually corrected something.
+${exact ? `THE INPUT IS EXACT. The user tapped or typed "${word}" deliberately and it is spelled the way they want it. Analyse THAT word or phrase and nothing else. NEVER substitute a similar-looking word ("shone" is NOT "phone", "flour" is NOT "floor"). Echo the input into "word". If — and only if — it is genuinely not a real English word, expression or name, set "not_found": true and put your best guess of the intended word in "suggestion"; the app will offer it as a suggestion the user can decline. Leave "query_note" empty.`
+: `INPUT MAY BE MESSY: a typo, a partial/incomplete idiom (e.g. "rain dogs" → "it's raining cats and dogs"), or casual slang spelling. Silently resolve it to the real, common English word/idiom/slang term and put THAT corrected form in "word". Fill "query_note" only when you actually corrected something.`}
 
 GOAL: extract AS MUCH genuinely common, real-world usage as you know for this word — a learner should almost never need to look elsewhere. Prioritize BREADTH across every category below over padding just one of them:
 - senses: up to 8. For an idiom/slang entry, pos can be "idiom" or "slang". Four HARD rules:
@@ -475,8 +486,18 @@ async function translatePhrase(text){
   if(!navigator.onLine) throw new Error('OFFLINE');
   const model=getModel();
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
-  const prompt='Translate the text below between English and Vietnamese — detect which language it\'s already in, and translate it into the other one. Return ONLY this JSON, no commentary, no markdown fences:\n'
-    +'{"source_lang":"en or vi","translation":"the natural translation","note":"one short Vietnamese sentence on tone/register — ONLY if genuinely useful, otherwise an empty string"}\n\n'
+  const prompt='You are a bilingual EN↔VI translator. Detect which language the text below is in and translate it into the other one. Give the BEST option first, then genuinely DIFFERENT alternatives — not reworded near-duplicates. Return ONLY this JSON, no commentary, no markdown fences:\n'
+    +'{'
+    +'"source_lang":"en or vi",'
+    +'"primary":{"text":"the most natural, closest translation","register":"neutral | formal | casual | literal | idiomatic","why":"one short Vietnamese clause on why this is the closest fit"},'
+    +'"alternatives":[{"text":"a real alternative a native speaker might use instead","register":"formal | casual | literal | idiomatic | regional","why":"one short Vietnamese clause on when to use this one instead"}],'
+    +'"literal":"word-for-word rendering, ONLY when it differs usefully from primary; else empty string",'
+    +'"gloss":[{"src":"a key word/chunk from the source","dst":"what it maps to in the translation"}],'
+    +'"note":"one short Vietnamese sentence on tone, formality or a grammar trap — empty string if nothing useful"'
+    +'}\n\n'
+    +'RULES: 2 to 3 items in "alternatives" (never 0 unless the text is a fixed proper noun). '
+    +'"gloss" up to 6 pairs, covering the words a learner would want to isolate; empty array for very short input. '
+    +'Every "why" must be in Vietnamese and under 12 words.\n\n'
     +'TEXT:\n'+text;
   const body={ contents:[{parts:[{text:prompt}]}], generationConfig:{ temperature:0.2, responseMimeType:"application/json" } };
   const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -491,25 +512,95 @@ async function translatePhrase(text){
   let obj; try{ obj=JSON.parse(raw); }catch(e){ throw new Error('PARSE'); }
   return obj;
 }
+/* One boxed translation reads like a guess. Several labelled options, with the
+   closest one marked and the rest explained, reads like a dictionary — so the
+   primary is flagged explicitly and every option carries its register. */
 function phraseResultState(original, result){
-  const dirLbl = result.source_lang==='vi' ? 'Vietnamese → English' : 'English → Vietnamese';
-  let h='';
-  h+='<div class="tr-card"><div class="tr-dir">'+esc(dirLbl)+'</div>';
+  const toEN = result.source_lang==='vi';
+  const dirLbl = toEN ? 'Tiếng Việt → English' : 'English → Tiếng Việt';
+  const primary = result.primary || { text: result.translation || '' };
+  const alts = (result.alternatives||[]).filter(a=>a && a.text && a.text!==primary.text).slice(0,3);
+  const regLbl = (r)=>({neutral:'trung tính',formal:'trang trọng',casual:'thân mật',
+                        literal:'dịch sát chữ',idiomatic:'nói kiểu bản ngữ',regional:'vùng miền'})[r]||r||'';
+
+  const optRow = (o, isPrimary)=>{
+    const safe = (o.text||'').replace(/'/g,"\\'");
+    let r='<div class="tr-opt'+(isPrimary?' tr-opt-best':'')+'">';
+    r+='<div class="tr-opt-top">';
+    if(isPrimary) r+='<span class="tr-badge">Sát nhất</span>';
+    if(o.register) r+='<span class="tr-reg">'+esc(regLbl(o.register))+'</span>';
+    r+='<button class="tr-copy" onclick="trCopy(this,\''+safe+'\')" aria-label="Copy">⧉</button>';
+    r+='</div>';
+    r+='<div class="tr-opt-text">'+esc(o.text||'')+'</div>';
+    if(o.why) r+='<div class="tr-opt-why">'+esc(o.why)+'</div>';
+    // Translating INTO English → every option is a lookup target.
+    if(toEN && o.text && o.text.split(/\s+/).length<=4)
+      r+='<button class="tr-lookup" onclick="jump(\''+safe+'\')">Tra từ này →</button>';
+    r+='</div>';
+    return r;
+  };
+
+  let h='<div class="tr-card">';
+  h+='<div class="tr-dir">'+esc(dirLbl)+'</div>';
   h+='<div class="tr-src">'+esc(original)+'</div>';
-  h+='<div class="tr-arrow">↓</div>';
-  h+='<div class="tr-out">'+esc(result.translation||'')+'</div>';
+  h+='<div class="tr-opts">'+optRow(primary,true)+alts.map(a=>optRow(a,false)).join('')+'</div>';
+
+  if(result.literal && result.literal!==primary.text)
+    h+='<div class="tr-lit"><span>Dịch sát chữ</span>'+esc(result.literal)+'</div>';
+
+  const gloss=(result.gloss||[]).filter(g=>g&&g.src&&g.dst).slice(0,6);
+  if(gloss.length){
+    h+='<div class="tr-gloss"><div class="tr-gloss-h">Từng phần</div>';
+    for(const g of gloss){
+      const safeG=String(toEN?g.dst:g.src).replace(/'/g,"\\'");
+      h+='<div class="tr-gloss-row" onclick="jump(\''+safeG+'\')">'
+        +'<span class="tg-src">'+esc(g.src)+'</span>'
+        +'<span class="tg-arw">→</span>'
+        +'<span class="tg-dst">'+esc(g.dst)+'</span></div>';
+    }
+    h+='</div>';
+  }
+
   if(result.note) h+='<div class="tr-note">'+esc(result.note)+'</div>';
   h+='</div>';
   return h;
 }
+function trCopy(btn, text){
+  const done=()=>{ const o=btn.textContent; btn.textContent='✓'; setTimeout(()=>btn.textContent=o,1100); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(()=>{});
+  else done();
+}
 
-async function askGemini(word){
+/* opts.exact = true  → the input is known-correct (tapped in a passage, or
+   typed deliberately in the search bar). The model must analyse exactly that
+   word and is forbidden from silently swapping in a similar one; anything it
+   suspects goes into data.suggestion for the user to accept or ignore. */
+/* A highlighted phrase is saved as a first-class record so it shows up in
+   Saved alongside single words, with the translation as its meaning. */
+async function savePhraseRecord(text, translation, extra){
+  const w = norm(text||''); if(!w) return null;
+  const ex = await idbGet(w);
+  const data = (ex && ex.data) ? ex.data : {};
+  data.word = text;
+  data.phrase = true;
+  if(translation) data.vi_equivalent = translation;
+  if(!Array.isArray(data.senses) || !data.senses.length)
+    data.senses = [{ pos:'phrase', vi: translation||'', en: extra&&extra.why ? extra.why : '' }];
+  const rec = { word:w, data, source:'phrase',
+    firstSeen: ex?ex.firstSeen:now(), saved:1, savedAt:now() };
+  await idbPut(rec);
+  return rec;
+}
+window.savePhraseRecord = savePhraseRecord;
+
+async function askGemini(word, opts){
+  const exact = !!(opts && opts.exact);
   const key=getKey(); if(!key) throw new Error('NO_KEY');
   if(!navigator.onLine) throw new Error('OFFLINE');
   const model=getModel();
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   const body={
-    contents:[{parts:[{text:buildPrompt(word)}]}],
+    contents:[{parts:[{text:buildPrompt(word, exact)}]}],
     generationConfig:{ temperature:0.3, responseMimeType:"application/json" }
   };
   const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -637,6 +728,8 @@ async function search(rawWord, forceAI){
         return;
       }
     }
+    // A near-miss is only ever OFFERED. suggestState's primary button sends
+    // the word the user actually typed to the AI — it never rewrites it.
     if(guess && !hasSpace){ box.innerHTML=suggestState(word, guess); return; }
   }
 
@@ -686,7 +779,23 @@ async function search(rawWord, forceAI){
   }
 }
 function forceAI(word){ search(word,true); }
-function backToHome(){ currentWord=null; $('#result').innerHTML=''; $('#dashboard').style.display='block'; $('#topbar-back').style.display='none'; $('#q').value=''; $('#clearx').style.display='none'; renderDashboard(); window.scrollTo(0,0); }
+/* Set by story.js before it sends you from a passage to a full word page, so
+   the back button returns you to the passage instead of dumping you on home. */
+window._returnTo = null;
+function backToHome(){
+  const r = window._returnTo;
+  if(r){
+    window._returnTo = null;
+    currentWord=null; $('#result').innerHTML=''; $('#q').value='';
+    $('#clearx').style.display='none'; $('#topbar-back').style.display='none';
+    $('#dashboard').style.display='block';
+    showView(r.view||'review');
+    if(typeof r.scroll==='number') setTimeout(()=>window.scrollTo(0, r.scroll), 60);
+    return;
+  }
+  return _backToHomePlain();
+}
+function _backToHomePlain(){ currentWord=null; $('#result').innerHTML=''; $('#dashboard').style.display='block'; $('#topbar-back').style.display='none'; $('#q').value=''; $('#clearx').style.display='none'; renderDashboard(); window.scrollTo(0,0); }
 
 /* ---------- toggle save ---------- */
 async function toggleSave(word){
@@ -1186,6 +1295,22 @@ function jump(w){
 }
 
 /* ---------- empty / error / loading states ---------- */
+/* The AI reports the input isn't a real word. We show that plainly and offer
+   its guess as a tap target — we never silently search the guess instead. */
+function notFoundState(word, suggestion){
+  const safeS=(suggestion||'').replace(/'/g,"\\'");
+  let h='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/>'
+    +'<h3>“'+esc(word)+'” isn\'t an English word Focci knows</h3>'
+    +'<p>Spelling checked as-is — nothing was auto-corrected.</p>';
+  if(suggestion){
+    h+='<button class="btn sm" style="margin:14px auto 0" onclick="jump(\''+safeS+'\')">'
+      +'Did you mean “'+esc(suggestion)+'”?</button>';
+  }
+  h+='<button class="btn ghost sm" style="margin:9px auto 0" onclick="forceAI(\''+word.replace(/'/g,"\\'")+'\')">Look it up anyway</button>';
+  h+='</div>';
+  return h;
+}
+
 function suggestState(query,guess){
   const label=esc(guess.label), target=guess.target, safeT=target.replace(/'/g,"\\'"), safeQ=query.replace(/'/g,"\\'");
   const kind = guess.type==='expr' ? ' <span style="opacity:.72">(inside “'+esc(target)+'”)</span>' : '';
