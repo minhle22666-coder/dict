@@ -1635,6 +1635,7 @@ function renderStoryTBC(){
 window.showStoryIntro = function(){
   const ov=document.createElement('div'); ov.className='info-ov';
   ov.innerHTML='<div class="info-card story-intro-card">'
+    +(typeof sparkLayer==='function'?sparkLayer(12):'')
     +'<img src="./mascot-wonder.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<div class="info-t">Before you begin</div>'
     +'<div class="info-b story-intro-b">'
@@ -1666,8 +1667,12 @@ window.renderGameHub = function(){
 
   h+=renderWorldMap(); // banner is itself the Play/Continue button, plus the 12-land strip
 
-  /* Không còn nhãn "Quick Games": hai ô này tự nói rõ chúng là gì, và
-     bỏ nhãn đi thì bản đồ phía trên giữ được vị trí hành động chính. */
+  /* Ba vùng của trang trước đây nằm liền nhau không nhãn, nên The Map
+     trông như một game thứ ba ngang hàng với Type it / Match it. Mỗi
+     vùng giờ có tiêu đề và một câu nói rõ nó là gì. */
+  h+='<div class="gm-zone"><span class="gm-zone-t">Mini games</span>'
+    +'<span class="gm-zone-rule"></span>'
+    +'<span class="gm-zone-s">Short drills on words you saved — no story, no consequences</span></div>';
   h+='<div class="gm-pair">';
   h+='<button class="gm-tile is-type" onclick="setPracticeMode(\'type\')">'
     +'<span class="glow-border blue"></span>'
@@ -1681,6 +1686,9 @@ window.renderGameHub = function(){
     +'<span class="gm-tile-s">Pick the word that fits the meaning</span></button>';
   h+='</div>';
 
+  h+='<div class="gm-zone"><span class="gm-zone-t">Daily bonus</span>'
+    +'<span class="gm-zone-rule"></span>'
+    +'<span class="gm-zone-s">Earned by hitting today\'s word goal</span></div>';
   h+=renderBonusStrip();
   h+='</div>';
   area.innerHTML=h;
@@ -1813,6 +1821,20 @@ function renderWorldMap(){
     h+='<div class="sb-progress"><span>🛠️ More lands are still being drawn.</span></div>';
   } else {
     h+='<div class="sb-progress"><span>🏆 Every built land explored.</span></div>';
+  }
+
+  /* Bản đồ cần nói rõ bạn đang ở đâu: land nào, chương nào, bao nhiêu
+     phần trăm. Trước đây chỉ có tên land trên banner, không có mốc. */
+  {
+    const chName = cur && cur.chapter ? (cur.chapter.title||('Chapter '+cur.chapter.id)) : null;
+    const builtArcs = CONTENT.length;
+    h+='<div class="gm-where">';
+    h+='<div class="gm-where-n">'+curArcId+'/'+ARC_LANDS.length+'</div>';
+    h+='<div class="gm-where-txt">';
+    h+='<b>'+esc(curMeta.name)+(chName?' · '+esc(chName):'')+'</b>';
+    h+='<span>'+(cur ? pct+'% through this land' : 'Not started yet')
+      +' · '+builtArcs+' of '+ARC_LANDS.length+' lands built</span>';
+    h+='</div></div>';
   }
 
   h+='<button class="lesson-entry" onclick="showLifeLessons()">'

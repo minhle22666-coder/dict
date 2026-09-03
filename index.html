@@ -1026,9 +1026,29 @@
   .info-ov{position:fixed;inset:0;background:rgba(8,16,28,.62);display:flex;align-items:center;justify-content:center;
     z-index:998;opacity:0;transition:opacity .25s;pointer-events:none;padding:26px}
   .info-ov.show{opacity:1;pointer-events:auto}
-  .info-card{background:var(--surface);border:1.5px solid var(--line);border-radius:26px;padding:26px 24px 20px;
-    text-align:center;max-width:330px;box-shadow:0 22px 54px rgba(0,0,0,.5);
+  /* Kính mờ thay vì khối đặc: nền phía sau vẫn thấy lờ mờ nên thẻ trông
+     nổi trên bản đồ chứ không phải một cục tối dán lên. */
+  .info-card{position:relative;overflow:hidden;
+    background:linear-gradient(150deg,rgba(255,255,255,.13),rgba(255,255,255,.05) 46%,rgba(255,159,69,.07));
+    backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);
+    border:1px solid rgba(255,255,255,.22);border-top-color:rgba(255,255,255,.4);
+    border-radius:26px;padding:26px 24px 20px;
+    text-align:center;max-width:330px;box-shadow:0 22px 54px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.14);
     transform:scale(.85) translateY(10px);transition:transform .32s cubic-bezier(.34,1.56,.64,1)}
+  .info-card > *{position:relative;z-index:1}
+
+  /* hạt sáng li ti trôi lên trong thẻ */
+  .info-sparks{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+    border-radius:inherit}
+  .info-sparks i{position:absolute;bottom:-8px;width:3px;height:3px;border-radius:50%;
+    background:#FFCB6B;opacity:0;box-shadow:0 0 6px 1px rgba(255,203,107,.7);
+    animation:spark-rise linear infinite}
+  @keyframes spark-rise{
+    0%{transform:translateY(0) scale(.6);opacity:0}
+    14%{opacity:.9}
+    72%{opacity:.75}
+    100%{transform:translateY(-330px) scale(1.1);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.info-sparks{display:none}}
   .info-ov.show .info-card{transform:scale(1) translateY(0)}
   .info-card img{width:84px;margin:0 auto 12px;filter:drop-shadow(0 8px 14px rgba(0,0,0,.35));animation:sway 4s ease-in-out infinite}
   .info-t{font-size:18px;font-weight:800;background:var(--grad-hero);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -1665,9 +1685,13 @@
     box-shadow:none;border:none}
   .jhead .hero-glow{right:4px;bottom:6px}
   .jhead .hero-sky{right:6px;bottom:8px}
-  .jhead .hero-bubble{position:absolute;top:58px;right:10px;left:auto;
-    bottom:auto;margin-bottom:0;                 /* huỷ bottom:100% của rule gốc */
-    width:max-content;max-width:min(74%,260px);
+  /* Bong bóng nằm ngoài .jhead nên không bị overflow:hidden cắt, và nổi
+     hẳn phía trên thẻ — không còn đè lên mascot ở góc phải. */
+  .jhead-wrap{position:relative;margin-bottom:16px}
+  .jhead-wrap > .jhead{margin-bottom:0}
+  .jhead-wrap > .hero-bubble{position:absolute;bottom:100%;margin-bottom:9px;
+    top:auto;right:8px;left:auto;
+    width:max-content;max-width:min(76%,268px);
     white-space:normal;overflow-wrap:anywhere;text-align:left;z-index:46}
 
   .jgauge{display:flex;align-items:stretch;gap:2px;margin-top:15px}
@@ -1704,8 +1728,8 @@
   /* ba con số: hàng ngang, vạch mảnh, nhãn viết thường */
   .jfigs{display:flex;align-items:stretch;margin-bottom:18px}
   .jfig{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;
-    align-items:flex-start;gap:3px;padding:4px 6px;background:none;border:none;
-    text-align:left;overflow:hidden}
+    align-items:flex-start;gap:3px;padding:8px 9px;background:none;border:none;
+    text-align:left;overflow:hidden;border-radius:14px}
   .jfig:active{transform:scale(.96)}
   .jfig-rule{flex:none;width:1px;background:var(--line);margin:5px 2px}
   .jfig-n{font-size:23px;font-weight:800;letter-spacing:-.03em;color:var(--primary);line-height:1}
@@ -1879,6 +1903,74 @@
     overflow:hidden}
   .gm-bonus-track i{display:block;height:100%;background:var(--primary);border-radius:99px}
 
+
+  /* ============================================================
+     GAME — bản trước không phân vùng: The Map, hai mini game và dải
+     Bonus nằm liền nhau nên nhìn vào tưởng ba game ngang hàng.
+     Ở đây mỗi vùng có tiêu đề riêng và một dải thông tin dưới bản đồ
+     nói rõ bạn đang ở đâu.
+     ============================================================ */
+  .gm-zone{display:flex;align-items:center;gap:10px;margin:22px 2px 11px}
+  .gm-zone-t{flex:none;font-size:12.5px;font-weight:800;letter-spacing:-.01em;color:var(--text)}
+  .gm-zone-s{flex:1;min-width:0;font-size:11px;color:var(--muted-2);line-height:1.35}
+  .gm-zone-rule{flex:none;width:26px;height:1px;background:var(--line)}
+
+  /* dải thông tin ngay dưới bản đồ: bạn đang ở land nào, chương mấy */
+  .gm-where{display:flex;align-items:center;gap:11px;padding:11px 13px;margin-top:-4px;
+    border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}
+  .gm-where-n{flex:none;min-width:34px;height:34px;border-radius:10px;display:flex;
+    align-items:center;justify-content:center;font-size:12.5px;font-weight:800;
+    color:#3A1E00;background:var(--grad-hero)}
+  .gm-where-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .gm-where-txt b{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .gm-where-txt span{font-size:11px;color:var(--muted-2)}
+
+
+  /* ============================================================
+     BỘ SƯU TẬP MASCOT — popup nhỏ trên thẻ chào, cố ý KHÔNG giống
+     trang thành tích: không phần trăm, không huy hiệu, không thanh
+     tiến độ. Chỉ là chọn xem hôm nay ai đi cùng.
+     ============================================================ */
+  .mascot-btn{position:absolute;left:-4px;bottom:-2px;z-index:3;
+    padding:2px 7px;border-radius:99px;font-size:9.5px;font-weight:800;
+    color:var(--text);background:rgba(8,16,28,.62);border:1px solid rgba(255,255,255,.2);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);line-height:1.5}
+  .mascot-btn:active{transform:scale(.92)}
+
+  .mp-ov{position:fixed;inset:0;z-index:999;display:flex;align-items:flex-start;
+    justify-content:center;padding:80px 18px 24px;background:rgba(8,16,28,.6);
+    opacity:0;pointer-events:none;transition:opacity .22s}
+  .mp-ov.show{opacity:1;pointer-events:auto}
+  .mp-card{position:relative;overflow:hidden;width:100%;max-width:340px;max-height:74vh;
+    display:flex;flex-direction:column;border-radius:24px;padding:17px 15px 13px;
+    background:linear-gradient(152deg,rgba(255,255,255,.14),rgba(255,255,255,.05) 48%,rgba(255,159,69,.08));
+    backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);
+    border:1px solid rgba(255,255,255,.22);border-top-color:rgba(255,255,255,.4);
+    box-shadow:0 22px 54px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.14);
+    transform:translateY(-12px) scale(.94);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+  .mp-ov.show .mp-card{transform:translateY(0) scale(1)}
+  .mp-card > *{position:relative;z-index:1}
+
+  .mp-head{margin-bottom:13px}
+  .mp-head b{display:block;font-size:15.5px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+  .mp-head span{display:block;margin-top:3px;font-size:11.5px;line-height:1.4;color:var(--muted-2)}
+
+  .mp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px}
+  .mp-cell{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;
+    padding:11px 5px 8px;border-radius:15px;background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.12)}
+  .mp-cell img{width:44px;height:44px;object-fit:contain}
+  .mp-n{font-size:9.5px;font-weight:700;color:var(--muted);text-align:center;line-height:1.25}
+  .mp-cell.on{border-color:var(--primary);background:var(--primary-bg)}
+  .mp-cell.on .mp-n{color:var(--primary)}
+  .mp-cell:active{transform:scale(.95)}
+  .mp-cell.locked{background:rgba(255,255,255,.03);border-style:dashed}
+  .mp-cell.locked img{filter:grayscale(1) brightness(.42);opacity:.5}
+  .mp-cell.locked .mp-n{color:var(--muted-2)}
+  .mp-lock{position:absolute;top:5px;right:6px;font-size:9px;opacity:.75}
+
 </style>
 </head>
 <body>
@@ -1917,6 +2009,7 @@
     <div id="dashboard">
       <!-- Trang sổ tay: lời chào, Focci, và các chỉ số hôm nay nằm chung
            MỘT khối thay vì ba thẻ bo góc giống nhau xếp dọc. -->
+      <div class="jhead-wrap">
       <div class="jhead" id="hero">
         <div class="jhead-row">
           <div class="jhead-date" id="home-date"></div>
@@ -1935,10 +2028,10 @@
             <img class="hero-char" id="hero-char" src="./mascot-avatar.webp" alt="" onclick="tapFocci()" />
             <div class="hero-glow is-sun" id="hero-glow"></div>
             <img class="hero-sky is-sun" id="hero-sky" src="./decor-shiny-sun.webp" alt="" />
+            <button class="mascot-btn" id="mascot-btn" type="button" onclick="openMascotPicker()"
+                    aria-label="Choose your companion">1/22</button>
           </div>
         </div>
-        <div class="hero-bubble" id="hero-bubble"></div>
-
         <div class="jgauge">
           <button class="jgauge-cell" id="jar-card" type="button">
             <svg class="jar-svg" id="jar-svg" viewBox="0 0 60 68">
@@ -1968,6 +2061,8 @@
           </button>
         </div>
         <div class="jgauge-track"><div id="goal-bar" class="goal-fill"></div></div>
+      </div>
+      <div class="hero-bubble" id="hero-bubble"></div>
       </div>
 
       <!-- Hành động chính của trang: to nhất, ồn nhất, mọi thứ khác im lặng -->
@@ -2270,7 +2365,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v55 · Game dựng lại, sửa nút tràn ở Settings</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v57 · bộ sưu tập mascot mở theo streak</b></p>
   </section>
 </main>
 

@@ -1646,10 +1646,26 @@ function statInsight(which){
   }
   showInfoCard(img,title,body);
 }
+/* Hạt sáng cho thẻ kính. Vị trí/thời lượng rải bằng JS thay vì viết 12
+   rule CSS, và mỗi lần mở thẻ lại có một hình khác. */
+function sparkLayer(n){
+  let s='<div class="info-sparks" aria-hidden="true">';
+  for(let i=0;i<(n||14);i++){
+    const left=Math.round(Math.random()*100);
+    const dur=(5+Math.random()*5).toFixed(1);
+    const delay=(Math.random()*6).toFixed(1);
+    const size=(2+Math.random()*2.4).toFixed(1);
+    s+='<i style="left:'+left+'%;width:'+size+'px;height:'+size+'px;'
+      +'animation-duration:'+dur+'s;animation-delay:'+delay+'s"></i>';
+  }
+  return s+'</div>';
+}
+window.sparkLayer = sparkLayer;
+
 function showInfoCard(img,title,body,actionLabel,actionOnclick){
   const ov=document.createElement('div'); ov.className='info-ov';
   const action = actionLabel ? '<button class="info-action" onclick="this.closest(\'.info-ov\').remove();'+actionOnclick+'">'+esc(actionLabel)+'</button>' : '';
-  ov.innerHTML='<div class="info-card"><img src="./'+img+'.webp" alt=""/>'
+  ov.innerHTML='<div class="info-card">'+sparkLayer(14)+'<img src="./'+img+'.webp" alt=""/>'
     +'<div class="info-t">'+esc(title)+'</div><div class="info-b">'+esc(body)+'</div>'
     +action+'</div>';
   document.body.appendChild(ov);
@@ -2326,73 +2342,140 @@ async function computeInsights(){
   const savedCount=entries.filter(e=>e.saved).length;
   const savedNotReviewed=entries.filter(e=>e.saved&&!e.lastReviewedAt).length;
 
+  /* Chuỗi 28 ngày cho biểu đồ. Đếm một lượt vào Map rồi mới dựng mảng,
+     thay vì lọc lại toàn bộ log cho từng ngày (28 × 2500 phép so sánh). */
+  const byDay=new Map();
+  for(const l of logs){
+    if(l.type!=='search') continue;
+    const d=dayStart(l.ts);
+    byDay.set(d,(byDay.get(d)||0)+1);
+  }
+  const days28=[];
+  for(let i=27;i>=0;i--){
+    const d=today-i*DAY;
+    days28.push({ts:d, n:byDay.get(d)||0});
+  }
+  const periodTotal=days28.reduce((t,d)=>t+d.n,0);
+  const peakDay=days28.reduce((b,d)=>d.n>b.n?d:b, days28[0]);
+  const activeDays=days28.filter(d=>d.n>0).length;
+
   return {streak, hasToday, peakRange, peakPct, totalHourEvents,
     accuracy, totalReview, forgetful, thisWeekSearches, lastWeekSearches,
-    totalWords:entries.length, savedCount, savedNotReviewed};
+    totalWords:entries.length, savedCount, savedNotReviewed,
+    days28, periodTotal, peakDay, activeDays};
 }
-function insightCard(color, icon, title, body){
-  return '<div class="ins-card"><div class="tile '+color+'">'+icon+'</div><div><div class="ins-title">'+title+'</div><div class="ins-body">'+body+'</div></div></div>';
+/* Một quan sát là MỘT DÒNG có số liệu bên trái, không phải một thẻ bo góc
+   kèm tile emoji. Năm thẻ giống hệt nhau xếp dọc thì không có thẻ nào được
+   đọc; một danh sách có nhịp thì đọc được hết. */
+function insightRow(figure, title, body){
+  return '<div class="pg-note">'
+    + '<div class="pg-note-fig">'+figure+'</div>'
+    + '<div class="pg-note-txt"><b>'+title+'</b><span>'+body+'</span></div>'
+    + '</div>';
 }
+
+/* Biểu đồ 28 ngày — thứ đặc trưng nhất của một trang Progress là HÌNH DÁNG
+   nỗ lực theo thời gian, nên nó là phần lớn nhất trên trang. Ngày hôm nay và
+   ngày cao nhất được đánh dấu riêng; ngày trống vẫn để một mẩu 2px để thấy
+   được khoảng nghỉ thay vì mất hút. */
+function progressChart(s){
+  const max=Math.max(1, s.peakDay ? s.peakDay.n : 1);
+  const today=dayStart(now());
+  let bars='';
+  for(const d of s.days28){
+    const pct = d.n ? Math.max(7, Math.round(d.n/max*100)) : 0;
+    const cls = d.ts===today ? ' is-today' : (d.n===max && d.n>0 ? ' is-peak' : '');
+    const label = new Date(d.ts).toLocaleDateString(undefined,{day:'numeric',month:'short'});
+    bars += '<i class="pg-bar'+cls+'" style="height:'+pct+'%" title="'+esc(label)+': '+d.n+'"></i>';
+  }
+  const peakLbl = s.peakDay && s.peakDay.n
+    ? new Date(s.peakDay.ts).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})
+    : null;
+
+  let h='<div class="pg-chart">';
+  h+='<div class="pg-chart-head">';
+  h+='<div class="pg-chart-sum"><b>'+s.periodTotal.toLocaleString()+'</b>'
+    +'<span>words looked up in 28 days</span></div>';
+  h+='<div class="pg-chart-side">'+s.activeDays+' active days</div>';
+  h+='</div>';
+  h+='<div class="pg-bars">'+bars+'</div>';
+  h+='<div class="pg-axis"><span>4 weeks ago</span><span>2 weeks</span><span>today</span></div>';
+  if(peakLbl && s.peakDay.n>1)
+    h+='<div class="pg-chart-peak">Busiest day was '+esc(peakLbl)+' with '+s.peakDay.n+' words.</div>';
+  h+='</div>';
+  return h;
+}
+
 async function renderInsights(){
   const area=$('#insights-area');
   const s=await computeInsights();
   if(!s.totalHourEvents){
-    area.innerHTML='<div class="empty"><img class="ill" src="./mascot-read_map.webp" alt=""/><h3>Not enough data yet</h3><p>Search and practice a few more words to see your habits here.</p></div>';
+    area.innerHTML='<div class="empty"><img class="ill" src="./mascot-read_map.webp" alt=""/><h3>Nothing to chart yet</h3><p>Look up a few words and play a round — your habits show up here once there is something to measure.</p></div>';
     return;
   }
   const lvl=levelFromXP(getXP()), xp=getXP();
   const xpInLvl=xp%100;
-  // Focci's rank grows with your level — the explorer levels up with you
   const RANKS=[[1,'run','Rookie Explorer'],[3,'explore','Scout'],[5,'read_map','Pathfinder'],
                [8,'badass','Veteran Explorer'],[12,'champion','Legend of the Map']];
   let rank=RANKS[0];
   for(const r of RANKS) if(lvl>=r[0]) rank=r;
 
   let h='';
-  h+='<div class="prog-hero">';
-  h+='<div class="prog-rays"></div>';
-  h+='<img class="prog-char" src="./mascot-'+rank[1]+'.webp" alt=""/>';
-  h+='<div class="prog-info">';
-  h+='<div class="prog-rank">'+esc(rank[2])+'</div>';
-  h+='<div class="prog-lvl">Level '+lvl+'</div>';
-  h+='<div class="prog-xpbar"><i style="width:'+xpInLvl+'%"></i></div>';
-  h+='<div class="prog-xptxt">'+xpInLvl+' / 100 XP to level '+(lvl+1)+'</div>';
-  h+='</div></div>';
 
-  h+='<div class="streak-card'+(s.hasToday?' lit':'')+'">';
-  h+='<div class="streak-flame">🔥</div>';
-  h+='<div><div class="streak-n">'+s.streak+'<span> day'+(s.streak===1?'':'s')+'</span></div>';
-  h+='<div class="streak-l">'+(s.hasToday?'Streak alive — nice work today!':'Explore one word to keep it going')+'</div></div>';
-  h+='<img class="streak-deco" src="./decor-alarm.webp" alt=""/>';
+  /* Rank co lại thành MỘT dòng: nó là phần thưởng, không phải thông tin
+     chính của trang. Vòng tròn XP thay cho thanh ngang để nó không tranh
+     chấp thị giác với biểu đồ cột bên dưới. */
+  h+='<div class="pg-rank">';
+  h+='<div class="pg-ring" style="--p:'+xpInLvl+'">';
+  h+='<img src="./mascot-'+rank[1]+'.webp" alt=""/>';
+  h+='</div>';
+  h+='<div class="pg-rank-txt">';
+  h+='<b>'+esc(rank[2])+'</b>';
+  h+='<span>Level '+lvl+' · '+xpInLvl+'/100 XP to level '+(lvl+1)+'</span>';
+  h+='</div>';
+  h+='<div class="pg-streak'+(s.hasToday?' lit':'')+'">'
+    +'<b>'+s.streak+'</b><span>day'+(s.streak===1?'':'s')+'</span></div>';
   h+='</div>';
 
-  h+='<div class="stat-grid">';
-  h+='<div class="stat"><div class="n">'+s.totalWords+'</div><div class="l">WORDS</div><img class="stat-deco" src="./other-puzzle.webp" alt=""/></div>';
-  h+='<div class="stat"><div class="n">'+s.savedCount+'</div><div class="l">SAVED</div><img class="stat-deco" src="./other-pencil.webp" alt=""/></div>';
-  h+='<div class="stat"><div class="n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</div><div class="l">ACCURACY</div><img class="stat-deco" src="./other-shuttle.webp" alt=""/></div>';
+  h+=progressChart(s);
+
+  h+='<div class="jfigs pg-figs">';
+  h+='<div class="jfig"><span class="jfig-n">'+s.totalWords.toLocaleString()+'</span>'
+    +'<span class="jfig-l">words in library</span></div>';
+  h+='<span class="jfig-rule"></span>';
+  h+='<div class="jfig"><span class="jfig-n">'+s.savedCount+'</span>'
+    +'<span class="jfig-l">saved</span></div>';
+  h+='<span class="jfig-rule"></span>';
+  h+='<div class="jfig"><span class="jfig-n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</span>'
+    +'<span class="jfig-l">practice accuracy</span></div>';
   h+='</div>';
 
-  h+='<div class="library-card"><img src="./decor-load-of-book.webp" alt=""/>'
-    +'<div><div class="lib-n">'+s.totalWords.toLocaleString()+'</div>'
-    +'<div class="lib-l">words charted in Focci\'s library</div></div></div>';
-  h+='<div class="sec"><div class="sec-h">What Focci noticed</div>';
-  if(s.peakRange && s.peakPct>=20) h+=insightCard('blue','🕒','You\'re most active in the '+s.peakRange.name, 'About '+s.peakPct+'% of your activity happens then.');
-  if(s.totalReview>=5 && s.accuracy!=null){
-    const tone = s.accuracy>=80 ? 'Really solid!' : s.accuracy>=50 ? 'Good, and still room to grow.' : 'A bit more practice will help fast.';
-    h+=insightCard('mint','🎯','Practice accuracy: '+s.accuracy+'%', tone+' ('+s.totalReview+' answers)');
-  }
+  /* Tối đa 3 quan sát. Bản cũ có thể đổ ra 5 thẻ một lúc, đọc thành một
+     bức tường. Ưu tiên thứ có thể HÀNH ĐỘNG được trước. */
+  const notes=[];
   if(s.forgetful.length){
-    const list=s.forgetful.map(f=>'<b>'+esc(f.word)+'</b> ('+f.reviewWrong+' misses)').join(', ');
-    h+=insightCard('coral','🧠','Words you keep missing', list);
+    const list=s.forgetful.map(f=>'<b>'+esc(f.word)+'</b>').join(', ');
+    notes.push(insightRow(s.forgetful.length, 'Words that keep slipping', list+' — worth a round of practice.'));
   }
+  if(s.savedNotReviewed>0)
+    notes.push(insightRow(s.savedNotReviewed, 'Saved but never practiced', 'Start your next round with these.'));
   if(s.lastWeekSearches>0){
     const diff=s.thisWeekSearches-s.lastWeekSearches;
     const pct=Math.round(Math.abs(diff)/s.lastWeekSearches*100);
-    if(diff>0) h+=insightCard('amber','📈','Up '+pct+'% from last week', s.thisWeekSearches+' words this week vs '+s.lastWeekSearches+' last week.');
-    else if(diff<0) h+=insightCard('amber','📉','Down '+pct+'% from last week', s.thisWeekSearches+' words this week vs '+s.lastWeekSearches+' last week — explore a bit more!');
+    if(diff!==0) notes.push(insightRow(
+      (diff>0?'+':'−')+pct+'%',
+      diff>0 ? 'Busier than last week' : 'Quieter than last week',
+      s.thisWeekSearches+' words this week against '+s.lastWeekSearches+' last week.'));
   }
-  if(s.savedNotReviewed>0) h+=insightCard('blue','📌', s.savedNotReviewed+' saved words never practiced', 'Head to Practice to start with these.');
-  h+='</div>';
+  if(s.peakRange && s.peakPct>=20)
+    notes.push(insightRow(s.peakPct+'%', 'You work in the '+esc(s.peakRange.name), 'That is when most of your activity lands.'));
+  if(s.totalReview>=5 && s.accuracy!=null)
+    notes.push(insightRow(s.totalReview, 'Answers recorded', 'Accuracy sits at '+s.accuracy+'% so far.'));
+
+  if(notes.length){
+    h+='<div class="pg-notes-h">What Focci noticed</div>';
+    h+=notes.slice(0,3).join('');
+  }
 
   const {list, unlocked}=await checkAchievements();
   h+=renderBadges(list, unlocked);
@@ -2473,7 +2556,150 @@ async function renderHero(){
   subEl.textContent=heroLine(t, streak, hasToday, getDailyXP(), getDailyGoal());
   const lvl=levelFromXP(getXP());
   if(levelEl) levelEl.innerHTML='⚡ Level '+lvl;
+  try{ mascotSync(streak); }catch(e){}
 }
+
+
+/* ============================================================
+   BỘ SƯU TẬP MASCOT — mỗi 2 ngày liên tục mở thêm một bạn đồng hành.
+
+   Đây KHÔNG phải achievement: không có điểm, không xếp hạng, không
+   đo lường gì cả. Nó chỉ là chuyện "hôm nay Focci mặc bộ nào" — thứ
+   duy nhất nó làm là đổi hình con vật trên thẻ chào. Trang Progress
+   đã lo phần thành tích rồi, ở đây cố ý không nhắc tới số liệu.
+
+   Mở khoá KHÔNG BAO GIỜ mất: mốc tính theo streak hiện tại, nhưng
+   danh sách đã mở được ghi vào localStorage và chỉ thêm, không bớt.
+   Streak tụt về 0 thì các bạn đã mở vẫn còn đó.
+
+   DANH SÁCH: mọi asset bắt đầu bằng "mascot", trừ "mascot-owen*".
+   File nào không tồn tại trong repo sẽ tự bị loại khỏi lưới nhờ
+   onerror — nên thêm tên mới vào đây là an toàn, không sợ ô trống.
+   ============================================================ */
+const MASCOT_LS='sd_mascot_pick', MASCOT_SEEN_LS='sd_mascot_seen';
+const MASCOTS=[
+  {f:'mascot-avatar',           n:'Focci'},
+  {f:'mascot-wander',           n:'Wanderer'},
+  {f:'mascot-explore',          n:'Explorer'},
+  {f:'mascot-read_map',         n:'Navigator'},
+  {f:'mascot-take_note',        n:'Note Taker'},
+  {f:'mascot-investigate',      n:'Investigator'},
+  {f:'mascot-wonder',           n:'Daydreamer'},
+  {f:'mascot-fishing',          n:'Angler'},
+  {f:'mascot-fishing-dreamy',   n:'Patient Angler'},
+  {f:'mascot-fishing-realize',  n:'Surprised Angler'},
+  {f:'mascot-fishing-catch-it', n:'Lucky Angler'},
+  {f:'mascot-drink_tea_cup',    n:'Tea Break'},
+  {f:'mascot-meditate',         n:'Stillness'},
+  {f:'mascot-tired',            n:'Long Day'},
+  {f:'mascot-run',              n:'Runner'},
+  {f:'mascot-jump',             n:'Leaper'},
+  {f:'mascot-fighting',         n:'Scrapper'},
+  {f:'mascot-badass',           n:'Unbothered'},
+  {f:'mascot-withflag-1',       n:'Flag Bearer'},
+  {f:'mascot-withflag-2',       n:'Summit'},
+  {f:'mascot-withflag-3',       n:'Planted Flag'},
+  {f:'mascot-champion',         n:'Champion'}
+];
+const MASCOT_EVERY=2;   // số ngày streak cho mỗi lần mở khoá
+
+/* Số bạn được mở ở một streak nhất định. Con đầu luôn có sẵn. */
+function mascotUnlockedCount(streak){
+  return Math.min(MASCOTS.length, 1 + Math.floor((streak||0)/MASCOT_EVERY));
+}
+function mascotSeen(){
+  try{ const v=JSON.parse(localStorage.getItem(MASCOT_SEEN_LS)||'[]');
+       return Array.isArray(v)?v:[]; }catch(e){ return []; }
+}
+function mascotSaveSeen(list){
+  try{ localStorage.setItem(MASCOT_SEEN_LS, JSON.stringify(list)); }catch(e){}
+}
+function mascotPick(){
+  const p=localStorage.getItem(MASCOT_LS);
+  return (p && MASCOTS.some(m=>m.f===p)) ? p : MASCOTS[0].f;
+}
+function mascotDaysToNext(streak){
+  const c=mascotUnlockedCount(streak);
+  if(c>=MASCOTS.length) return 0;
+  return (c*MASCOT_EVERY) - (streak||0);
+}
+
+/* Gọi từ renderHero, nơi streak vừa được tính — tránh đọc lại log. */
+function mascotSync(streak){
+  const count=mascotUnlockedCount(streak);
+  const seen=mascotSeen();
+  const nowUnlocked=MASCOTS.slice(0,count).map(m=>m.f);
+  const fresh=nowUnlocked.filter(f=>!seen.includes(f));
+  if(fresh.length){
+    // Chỉ thông báo khi KHÔNG phải lần đầu mở app (con đầu tiên không
+    // đáng ăn mừng), và mỗi lần chỉ mừng con mới nhất.
+    const isFirstEver = seen.length===0;
+    mascotSaveSeen([...new Set([...seen, ...nowUnlocked])]);
+    if(!isFirstEver){
+      const m=MASCOTS.find(x=>x.f===fresh[fresh.length-1]);
+      if(m) celebrate('./'+m.f+'.webp', m.n+' joined you!',
+                      streak+' days in a row — tap your greeting to switch', 'gold');
+    }
+  }
+  const img=$('#hero-char');
+  if(img){
+    const pickf=mascotPick();
+    if(!img.src.endsWith(pickf+'.webp')) img.src='./'+pickf+'.webp';
+  }
+  const badge=$('#mascot-btn');
+  if(badge) badge.textContent = count+'/'+MASCOTS.length;
+}
+
+/* Bảng chọn: một popup nhỏ trên thẻ chào, không phải một trang. */
+async function openMascotPicker(){
+  let streak=0;
+  try{
+    const logs=await logAll();
+    ({streak}=computeStreak(new Set(logs.map(l=>dayStart(l.ts)))));
+  }catch(e){}
+  const count=mascotUnlockedCount(streak);
+  const cur=mascotPick();
+  const left=mascotDaysToNext(streak);
+
+  let grid='';
+  MASCOTS.forEach((m,i)=>{
+    const open=i<count;
+    const on=open && m.f===cur;
+    grid+='<button class="mp-cell'+(open?'':' locked')+(on?' on':'')+'" type="button"'
+      + (open?' onclick="chooseMascot(\''+m.f+'\')"':' disabled')+'>'
+      + '<img src="./'+m.f+'.webp" alt="" onerror="this.closest(\'.mp-cell\').style.display=\'none\'"/>'
+      + '<span class="mp-n">'+esc(open?m.n:'Day '+(i*MASCOT_EVERY))+'</span>'
+      + (open?'':'<span class="mp-lock">🔒</span>')
+      + '</button>';
+  });
+
+  const ov=document.createElement('div');
+  ov.className='mp-ov'; ov.id='mascot-ov';
+  ov.innerHTML='<div class="mp-card">'
+    + (typeof sparkLayer==='function'?sparkLayer(10):'')
+    + '<div class="mp-head"><b>Who is coming along?</b>'
+    + '<span>'+(left ? left+' more day'+(left===1?'':'s')+' in a row opens the next one'
+                     : 'Everyone is here')+'</span></div>'
+    + '<div class="mp-grid">'+grid+'</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  requestAnimationFrame(()=>ov.classList.add('show'));
+  ov.addEventListener('click',(e)=>{
+    if(e.target!==ov) return;
+    ov.classList.remove('show'); setTimeout(()=>ov.remove(),240);
+  });
+}
+function chooseMascot(f){
+  if(!MASCOTS.some(m=>m.f===f)) return;
+  localStorage.setItem(MASCOT_LS, f);
+  const img=$('#hero-char'); if(img) img.src='./'+f+'.webp';
+  const ov=$('#mascot-ov');
+  if(ov){ ov.classList.remove('show'); setTimeout(()=>ov.remove(),240); }
+  const c=$('#hero-char');
+  if(c){ c.classList.remove('hop'); void c.offsetWidth; c.classList.add('hop'); }
+}
+window.openMascotPicker=openMascotPicker;
+window.chooseMascot=chooseMascot;
 
 /* ============================================================
    SETTINGS actions
