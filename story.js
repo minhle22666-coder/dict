@@ -646,12 +646,34 @@ function condensedEntryHTML(rec){
   h+='</div>';
   return h;
 }
-/* Remember the passage (view + scroll position) before jumping to the full
-   word page, so the top-bar back button returns here instead of home. */
+/* Back từ trang từ đầy đủ phải về ĐÚNG cảnh đang đọc.
+
+   Lỗi cũ: chỉ ghi lại tên view rồi gọi showView('review'), nhưng showView
+   cho tab review lại gọi renderGameHub(), và hàm đó xoá _reviewArcId /
+   _reviewPos rồi vẽ lại màn hub — nên người đọc bị đẩy hẳn ra ngoài game.
+   Giờ chụp lại cả trạng thái engine truyện và tự vẽ lại cảnh sau khi
+   showView đã chạy, ghi đè lên màn hub mà nó vừa dựng. */
 window.openFullEntry = function(word){
   const active = document.querySelector('.view.active');
   const view = active ? active.id.replace(/^v-/,'') : 'review';
-  window._returnTo = { view, scroll: window.scrollY || 0 };
+  const area = document.getElementById('review-area');
+  const inStory = !!(area && area.querySelector('.story-view'));
+
+  // chụp trạng thái engine — chế độ xem lại arc cũ nằm ở ba biến này
+  const snap = { arcId:_reviewArcId, pos:_reviewPos, hist:(_reviewHistory||[]).slice() };
+
+  window._returnTo = {
+    view,
+    scroll: window.scrollY || 0,
+    restore: inStory ? function(){
+      _reviewArcId = snap.arcId;
+      _reviewPos   = snap.pos;
+      _reviewHistory = snap.hist;
+      _pageDir = 0;                    // đừng chạy lại hiệu ứng lật trang
+      renderStory();
+    } : null
+  };
+
   closeWordSheet();
   showView('home');
   search(word);
@@ -1863,17 +1885,21 @@ window.showLifeLessons = function(){
   const ov=document.createElement('div'); ov.className='lesson-ov';
   let h='<div class="lesson-scroll">';
   h+='<button class="lesson-close" onclick="hideLifeLessons()">✕</button>';
-  h+='<div class="lesson-head"><span class="lesson-head-orn">❦</span><div class="lesson-head-t">What Focci Has Learned</div><span class="lesson-head-orn">❦</span></div>';
+  /* Bỏ hai dấu ❦ hai bên tiêu đề, bỏ lá và hoa ở góc mỗi khung, bỏ cặp
+     ngoặc kép cỡ lớn. Chúng là trang trí, không mang thông tin, và ở cỡ
+     nhỏ trên nền pastel thì trông rối. Màu riêng của từng arc vẫn giữ,
+     nhưng chuyển thành một lớp kính mờ có sắc chứ không phải khối đặc. */
+  h+='<div class="lesson-head"><div class="lesson-head-t">What Focci Has Learned</div>'
+    +'<div class="lesson-head-s">Every lesson he reflects on, in the order he found them</div></div>';
   if(!data.length){
     h+='<div class="lesson-empty">Nothing written yet. Keep walking.</div>';
   } else {
     data.forEach(d=>{
       const [c1,c2]=arcTint(d.arcId);
-      h+='<div class="lesson-arc-frame" style="background:linear-gradient(155deg,'+c1+','+c2+')">';
-      h+='<span class="lesson-arc-deco tl">'+LEAF_SVG+'</span><span class="lesson-arc-deco tr">'+FLOWER_SVG+'</span>';
+      h+='<div class="lesson-arc-frame" style="--t1:'+c1+';--t2:'+c2+'">';
       h+='<div class="lesson-arc-t">'+esc(d.arcName)+'</div>';
       d.lessons.forEach(l=>{
-        h+='<div class="lesson-quote"><span class="lq-mark">“</span>'+tokenizeForTap(l)+'<span class="lq-mark">”</span></div>';
+        h+='<div class="lesson-quote">'+tokenizeForTap(l)+'</div>';
       });
       h+='</div>';
     });

@@ -790,6 +790,9 @@ function backToHome(){
     $('#clearx').style.display='none'; $('#topbar-back').style.display='none';
     $('#dashboard').style.display='block';
     showView(r.view||'review');
+    // showView('review') vừa dựng lại màn hub — nếu lúc đi ta đang đọc một
+    // cảnh thì vẽ lại cảnh đó, ghi đè lên hub.
+    if(typeof r.restore==='function'){ try{ r.restore(); }catch(e){} }
     if(typeof r.scroll==='number') setTimeout(()=>window.scrollTo(0, r.scroll), 60);
     return;
   }
@@ -1884,16 +1887,19 @@ window.setPracticeMode=setPracticeMode;
 
 /* the two games, presented as cards you switch between */
 function gameSwitch(){
-  const g=(id,icon,name,tag)=>'<button class="game-tab'+(practiceMode===id?' on':'')+'" onclick="setPracticeMode(\''+id+'\')">'
-    +'<span class="gt-ico">'+icon+'</span><span class="gt-name">'+name+'</span><span class="gt-tag">'+tag+'</span></button>';
+  // Dùng asset của chính hai game thay cho emoji ✍️ / 🎯 — hai emoji đó
+  // render khác nhau trên mỗi hệ máy và không khớp với phần còn lại của app.
+  const g=(id,asset,name,tag)=>'<button class="game-tab'+(practiceMode===id?' on':'')+'" onclick="setPracticeMode(\''+id+'\')">'
+    +'<img class="gt-ico-img" src="./'+asset+'.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<span class="gt-name">'+name+'</span><span class="gt-tag">'+tag+'</span></button>';
   // Hub back-link: only shows once the story engine has actually taken over
   // this tab (renderGameHub defined) — the mini-games still work standalone
   // if story.js ever fails to load.
   const back=(typeof renderGameHub==='function')
     ? '<button class="hub-back" onclick="renderGameHub()">← Games</button>' : '';
   return back+'<div class="game-switch">'
-    +g('type','✍️','Type it','spell from memory')
-    +g('match','🎯','Match it','pick the right word')
+    +g('type','decor-note-and-pen','Type it','spell from memory')
+    +g('match','decor-magnifying-glass','Match it','pick the right word')
     +'</div>';
 }
 function chipRow(label, note, opts){
