@@ -1647,8 +1647,6 @@
       radial-gradient(120% 90% at 88% 0%, rgba(255,159,69,.13), transparent 62%),
       linear-gradient(168deg,var(--surface-2),var(--surface) 72%);
     border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
-  .jhead::after{content:'';position:absolute;left:16px;right:16px;bottom:47px;height:1px;
-    background:repeating-linear-gradient(90deg,var(--line) 0 5px,transparent 5px 11px)}
 
   .jhead-row{display:flex;align-items:center;gap:10px;margin-bottom:11px}
   .jhead-date{flex:1;min-width:0;font-size:11.5px;font-weight:600;color:var(--muted-2)}
@@ -1667,7 +1665,10 @@
     box-shadow:none;border:none}
   .jhead .hero-glow{right:4px;bottom:6px}
   .jhead .hero-sky{right:6px;bottom:8px}
-  .jhead .hero-bubble{position:absolute;right:12px;top:52px;left:auto;max-width:62%;z-index:6}
+  .jhead .hero-bubble{position:absolute;top:58px;right:10px;left:auto;
+    bottom:auto;margin-bottom:0;                 /* huỷ bottom:100% của rule gốc */
+    width:max-content;max-width:min(74%,260px);
+    white-space:normal;overflow-wrap:anywhere;text-align:left;z-index:46}
 
   .jgauge{display:flex;align-items:stretch;gap:2px;margin-top:15px}
   .jgauge-cell{flex:1;min-width:0;display:flex;align-items:center;gap:9px;
@@ -1722,6 +1723,55 @@
     .jhead .hero-char{width:66px;height:66px}
     .jfig-n{font-size:20px}
   }
+
+
+  /* ============================================================
+     SETTINGS — bản cũ có 7 khối cùng trọng lượng: cùng viền, cùng
+     tile emoji màu, cùng nhãn in hoa, nên API key ngang hàng với
+     công cụ mỗi tháng dùng một lần. Ở đây phân cấp theo TẦN SUẤT
+     DÙNG: dải trạng thái → Setup mở sẵn → phần còn lại gập lại →
+     nhóm không hoàn tác được xuống cuối và đổi màu.
+     ============================================================ */
+  #v-settings{padding-bottom:8px}
+
+  .sx-status{display:flex;align-items:stretch;padding:13px 6px;margin-bottom:22px;
+    border-radius:16px;background:var(--surface);border:1px solid var(--line)}
+  .sx-stat{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
+  .sx-stat b{font-size:19px;font-weight:800;letter-spacing:-.02em;color:var(--primary);line-height:1}
+  .sx-stat i{font-size:10.5px;font-style:normal;font-weight:600;color:var(--muted-2)}
+  .sx-vrule{flex:none;width:1px;background:var(--line)}
+
+  /* nhãn nhóm: chữ thường, không tile màu, không in hoa */
+  .sx-lbl{font-size:12.5px;font-weight:700;color:var(--muted);margin:0 4px 8px;
+    letter-spacing:0;text-transform:none}
+  .sx-lbl-danger{color:var(--coral);margin-top:22px}
+
+  .sx-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    padding:4px 14px;margin-bottom:20px}
+  .sx-card-danger{border-color:rgba(255,107,122,.34)}
+  .sx-sep{height:1px;background:var(--line);margin:0 -14px}
+
+  .sx-field{padding:13px 0}
+  .sx-field > label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px}
+  .sx-field input,.sx-field textarea{width:100%;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:11px;color:var(--text);
+    padding:11px 13px;font-size:15px;outline:none;font-family:inherit}
+  .sx-field input:focus,.sx-field textarea:focus{border-color:var(--primary)}
+  .sx-field textarea{line-height:1.5;resize:vertical}
+  .sx-hint{margin:7px 0 0;font-size:11.5px;line-height:1.5;color:var(--muted-2)}
+  .sx-hint code{background:var(--surface-2);padding:1px 5px;border-radius:4px;font-size:11px}
+  .sx-foot{padding:13px 0 15px;border-top:1px solid var(--line);margin:0 -14px;padding-left:14px;padding-right:14px}
+
+  .sx-row{display:flex;align-items:center;gap:12px;padding:13px 0}
+  .sx-row-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .sx-row-txt b{font-size:13.5px;font-weight:700;color:var(--text)}
+  .sx-row-txt span{font-size:11.5px;line-height:1.45;color:var(--muted-2)}
+
+  /* các panel gập nằm trong .sx-card nên bỏ viền riêng của .acc */
+  .sx-card > .acc{border:none;border-radius:0;margin:0;background:none}
+  .sx-card > .acc + .acc{border-top:1px solid var(--line)}
+  .sx-card > .acc > summary{padding:14px 0}
+  .sx-card > .acc .acc-body{padding:0 0 14px}
 
 </style>
 </head>
@@ -1908,31 +1958,31 @@
 
   <!-- SETTINGS -->
   <section class="view" id="v-settings">
-    <div class="stat-grid">
-      <div class="stat"><div class="tile primary">📖</div><div class="n" id="st-total">0</div><div class="l">WORDS IN LIBRARY</div></div>
-      <div class="stat"><div class="tile amber">⭐</div><div class="n" id="st-saved">0</div><div class="l">SAVED</div></div>
+
+    <!-- Dải trạng thái: ba con số cần biết ngay, không phải hai thẻ lớn -->
+    <div class="sx-status">
+      <div class="sx-stat"><b id="st-total">0</b><i>words in library</i></div>
+      <span class="sx-vrule"></span>
+      <div class="sx-stat"><b id="st-saved">0</b><i>saved</i></div>
+      <span class="sx-vrule"></span>
+      <div class="sx-stat"><b id="sx-ai">—</b><i>AI connection</i></div>
     </div>
 
-    <!-- 1 · the two things that must be set for the app to work at all -->
-    <div class="set-group">
-      <div class="sg-h"><span class="tile tile-sm primary">🔌</span><div><b>AI Connection</b><i>Focci needs this to look up new words</i></div></div>
-      <div class="field">
+    <!-- ============ 1 · thứ bạn thật sự chạm tới ============ -->
+    <div class="sx-lbl">Setup</div>
+    <div class="sx-card">
+      <div class="sx-field">
         <label for="key">Gemini API key</label>
         <input id="key" type="password" placeholder="AIza…" autocapitalize="none" autocorrect="off" spellcheck="false"/>
-        <div class="hint">Stored <b>only on this device</b>, never sent anywhere except Google. Free key at aistudio.google.com → Get API key.</div>
+        <p class="sx-hint">Stored only on this device. Get a free key at aistudio.google.com.</p>
       </div>
-      <div class="field">
+      <div class="sx-sep"></div>
+      <div class="sx-field">
         <label for="model">Model</label>
         <input id="model" type="text" placeholder="gemini-2.5-flash-lite" autocapitalize="none" autocorrect="off" spellcheck="false"/>
       </div>
-      <button class="btn sm" id="save-settings">Save</button>
-      <div class="saved-flash" id="settings-flash"></div>
-    </div>
-
-    <!-- 2 · everyday preferences -->
-    <div class="set-group">
-      <div class="sg-h"><span class="tile tile-sm blue">🎨</span><div><b>Preferences</b><i>How Focci looks and how hard you push</i></div></div>
-      <div class="field">
+      <div class="sx-sep"></div>
+      <div class="sx-field">
         <label>Theme</label>
         <div class="seg" id="theme-seg">
           <button data-theme="auto" class="active">Auto</button>
@@ -1940,105 +1990,76 @@
           <button data-theme="dark">Dark</button>
         </div>
       </div>
-      <div class="field">
+      <div class="sx-sep"></div>
+      <div class="sx-field">
         <label for="goal">Daily XP goal</label>
         <input id="goal" type="number" min="5" step="5" placeholder="20"/>
-        <div class="hint">Search +2 · save +1 · correct answer +2–3 · finish a round +8–10. Saved with the button above.</div>
+        <p class="sx-hint">Search +2 · save +1 · correct answer +2–3 · finish a round +8–10.</p>
       </div>
-      <div class="field">
-        <label>Vocabulary goals</label>
+      <div class="sx-sep"></div>
+      <div class="sx-field">
+        <label>Vocabulary level</label>
         <div id="level-goals-field"></div>
-        <div class="hint">Sets the difficulty of the words woven into story chapters — the story's own plot words never change.</div>
+        <p class="sx-hint">Sets how hard the words woven into story chapters are. Plot words never change.</p>
+      </div>
+      <div class="sx-foot">
+        <button class="btn sm" id="save-settings" style="margin-top:0">Save setup</button>
+        <div class="saved-flash" id="settings-flash"></div>
       </div>
     </div>
 
-    <!-- 3 · growing the library -->
-    <div class="set-group">
-      <div class="sg-h"><span class="tile tile-sm coral">➕</span><div><b>Add Vocabulary</b><i>Look words up in bulk and keep them offline</i></div></div>
-      <div class="field">
-        <label for="gen-text">Words to add</label>
-        <textarea id="gen-text" rows="4" placeholder="resilient, mitigate, plausible…&#10;One per line, or comma-separated."></textarea>
-        <div class="hint">Up to 60 at a time. For hundreds, use the separate generator tool on desktop.</div>
-      </div>
-      <input id="gen-file" type="file" accept=".txt,text/plain" style="display:none"/>
-      <div class="btn-row">
-        <button class="btn ghost sm" id="gen-upload-btn" style="margin-top:0">Upload .txt</button>
-        <button class="btn sm" id="gen-run-btn" style="margin-top:0">Generate</button>
-      </div>
-      <div class="gen-progress" id="gen-progress"></div>
-    </div>
-
-    <!-- 4 · backup, first among the "occasionally" tools because it's the one
-             that saves you when something goes wrong -->
-    <div class="set-group">
-      <div class="sg-h"><span class="tile tile-sm mint">💾</span><div><b>Backup &amp; Export</b><i>Your library lives only on this device</i></div></div>
-      <div class="exp-row">
-        <div class="exp-txt"><b>Dictionary</b><span>Every word, refreshed meanings included</span></div>
-        <button class="btn ghost sm" id="export-btn" style="margin-top:0">JSON</button>
-      </div>
-      <div class="exp-row">
-        <div class="exp-txt"><b>Search history</b><span>Every search, save and answer, with dates</span></div>
-        <div class="exp-btns">
-          <button class="btn ghost sm" id="export-hist-json" style="margin-top:0">JSON</button>
-          <button class="btn ghost sm" id="export-hist-csv" style="margin-top:0">CSV</button>
-        </div>
-      </div>
-      <div class="exp-row">
-        <div class="exp-txt"><b>Import seed file</b><span>Load a seed.json from the generator</span></div>
-        <button class="btn ghost sm" id="import-btn" style="margin-top:0">Choose</button>
-      </div>
-      <input id="import-file" type="file" accept="application/json,.json" style="display:none"/>
-      <div class="hint" style="margin-top:12px">The activity log keeps roughly the last 2,500 events — older history is already gone.</div>
-    </div>
-
-    <!-- 5 · the power tools, folded away so they stop shouting -->
-    <div class="set-group">
-      <div class="sg-h"><span class="tile tile-sm amber">🛠</span><div><b>Dictionary Maintenance</b><i>Occasional clean-up jobs. Each one costs tokens.</i></div></div>
+    <!-- ============ 2 · thư viện: mở khi cần ============ -->
+    <div class="sx-lbl">Library</div>
+    <div class="sx-card">
 
       <details class="acc">
-        <summary><span class="acc-t">Scan for weak meanings</span><span class="acc-x">▾</span></summary>
+        <summary><span class="acc-t">Add words by hand</span><span class="acc-x">&#9662;</span></summary>
         <div class="acc-body">
-          <div class="hint" style="margin-bottom:11px">Flags entries whose Vietnamese carries the wrong feeling or reads like machine translation. Only the word and its Vietnamese are sent, 40 per call — cheap, resumable.</div>
-          <div class="mnt-state" id="scan-state">Loading…</div>
-          <div class="field"><label for="scan-count">Words to scan this run</label><input id="scan-count" type="number" min="40" step="40" value="500"/></div>
-          <div class="btn-row">
-            <button class="btn sm" id="scan-btn" style="margin-top:0">Scan</button>
-            <button class="btn ghost sm" id="scan-reset" style="margin-top:0">Reset</button>
+          <div class="sx-field">
+            <label for="gen-text">Words to add</label>
+            <textarea id="gen-text" rows="4" placeholder="resilient, mitigate, plausible…&#10;One per line, or comma-separated."></textarea>
+            <p class="sx-hint">Up to 60 at a time. Costs tokens.</p>
           </div>
-          <div class="mnt-bar"><i id="scan-bar"></i></div>
-          <div class="mnt-log" id="scan-log" style="display:none"></div>
+          <input id="gen-file" type="file" accept=".txt,text/plain" style="display:none"/>
+          <div class="btn-row">
+            <button class="btn ghost sm" id="gen-upload-btn" style="margin-top:0">Upload .txt</button>
+            <button class="btn sm" id="gen-run-btn" style="margin-top:0">Generate</button>
+          </div>
+          <div class="gen-progress" id="gen-progress"></div>
         </div>
       </details>
 
       <details class="acc">
-        <summary><span class="acc-t">Rewrite flagged meanings</span><span class="acc-x">▾</span></summary>
+        <summary><span class="acc-t">Sync from repo</span><span class="acc-x">&#9662;</span></summary>
         <div class="acc-body">
-          <div class="hint" style="margin-bottom:11px">Regenerates <b>only the Vietnamese side</b> — collocations, idioms, phonetics and examples are kept, so each word costs about a quarter of a full rebuild.</div>
-          <div class="mnt-state" id="refresh-state">Loading…</div>
-          <div class="field">
-            <label for="queue-text">Add words to the queue</label>
-            <textarea id="queue-text" rows="3" placeholder="One per line, or comma-separated…"></textarea>
+          <p class="sx-hint" style="margin-bottom:11px">Single source of truth is <code>dict-manifest.json</code> in the repo. Only shards you haven't applied are downloaded; words that already have a meaning are kept.</p>
+          <div class="mnt-state" id="ds-state">Loading…</div>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn sm" id="ds-sync-btn" style="margin-top:0">Sync now</button>
+            <button class="btn ghost sm" id="ds-resync-btn" style="margin-top:0">Re-apply all</button>
           </div>
-          <input id="queue-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" style="display:none"/>
+          <div class="sx-sep"></div>
+          <p class="sx-hint" style="margin-bottom:8px">Screen the missing-word queue against a free dictionary — no tokens. Only words confirmed not to exist are dropped.</p>
+          <div class="sx-field"><label for="ds-screen-count">Words to check per run</label><input id="ds-screen-count" type="number" min="20" step="20" value="300"/></div>
+          <button class="btn ghost sm" id="ds-screen-btn">Screen for free</button>
+          <div class="sx-sep"></div>
+          <p class="sx-hint" style="margin-bottom:8px">Export / import the missing-word list as numbered <code>.txt</code>, to work through it in batches.</p>
           <div class="btn-row">
-            <button class="btn ghost sm" id="queue-paste-btn" style="margin-top:0">Add pasted</button>
-            <button class="btn ghost sm" id="queue-upload-btn" style="margin-top:0">Upload file</button>
+            <button class="btn ghost sm" id="ds-export-btn" style="margin-top:0">Export .txt</button>
+            <button class="btn ghost sm" id="ds-import-btn" style="margin-top:0">Import .txt</button>
           </div>
-          <button class="btn ghost sm" id="queue-clear-btn">Clear queue</button>
-          <div class="hint" style="margin:11px 0">Accepts a <code>.txt</code> (one word per line), an <code>audit.csv</code> (word,reason), or a JSON array. Words not in your library are skipped.</div>
-          <div class="field"><label for="refresh-count">Words to rewrite this run</label><input id="refresh-count" type="number" min="1" value="50"/></div>
-          <button class="btn sm" id="refresh-btn">Rewrite meanings</button>
-          <div class="mnt-bar"><i id="refresh-bar"></i></div>
-          <div class="mnt-log" id="refresh-log" style="display:none"></div>
+          <input id="ds-import-file" type="file" accept=".txt,text/plain" style="display:none"/>
+          <div class="mnt-bar"><i id="ds-bar"></i></div>
+          <div class="mnt-log" id="ds-log" style="display:none"></div>
         </div>
       </details>
 
       <details class="acc">
-        <summary><span class="acc-t">Find missing common words</span><span class="acc-x">▾</span></summary>
+        <summary><span class="acc-t">Find missing common words</span><span class="acc-x">&#9662;</span></summary>
         <div class="acc-body">
-          <div class="hint" style="margin-bottom:11px">Compares your library against a frequency list, drops what you already have (including verb forms and word families), then screens the rest with AI to remove names and junk.</div>
+          <p class="sx-hint" style="margin-bottom:11px">Compares your library against a frequency list, drops what you already have including verb forms, then screens the rest.</p>
           <div class="mnt-state" id="miss-state">No queue yet.</div>
-          <div class="field" style="margin-top:12px"><label for="miss-count">How many to add this run</label><input id="miss-count" type="number" min="1" value="25"/></div>
+          <div class="sx-field" style="margin-top:12px"><label for="miss-count">How many to add this run</label><input id="miss-count" type="number" min="1" value="25"/></div>
           <div class="btn-row">
             <button class="btn ghost sm" id="miss-btn" style="margin-top:0">Find words</button>
             <button class="btn sm" id="topup-btn" style="margin-top:0">Add words</button>
@@ -2049,63 +2070,101 @@
       </details>
 
       <details class="acc">
-        <summary><span class="acc-t">Dictionary data (nguồn duy nhất)</span><span class="acc-x">▾</span></summary>
+        <summary><span class="acc-t">Scan for weak meanings</span><span class="acc-x">&#9662;</span></summary>
         <div class="acc-body">
-          <div class="hint" style="margin-bottom:11px">Nguồn chân lý là <code>dict-manifest.json</code> trong repo. App chỉ tải shard chưa áp dụng và gộp bằng một transaction cho mỗi shard. Từ đã có nghĩa sẽ được giữ nguyên, không ghi đè.</div>
-          <div class="mnt-state" id="ds-state">Loading…</div>
-          <div class="btn-row" style="margin-top:12px">
-            <button class="btn sm" id="ds-sync-btn" style="margin-top:0">Đồng bộ từ repo</button>
-            <button class="btn ghost sm" id="ds-resync-btn" style="margin-top:0">Áp dụng lại tất cả</button>
-          </div>
-
-          <div class="hint" style="margin:14px 0 8px">Sàng lọc hàng đợi từ thiếu bằng từ điển miễn phí — không tốn token. Chỉ bỏ những từ xác nhận không tồn tại; lỗi mạng thì giữ lại.</div>
-          <div class="field"><label for="ds-screen-count">Số từ kiểm tra mỗi lần</label><input id="ds-screen-count" type="number" min="20" step="20" value="300"/></div>
-          <button class="btn ghost sm" id="ds-screen-btn">Sàng lọc miễn phí</button>
-
-          <div class="hint" style="margin:14px 0 8px">Xuất / nhập danh sách từ còn thiếu dạng <code>.txt</code> có số index, để chạy tay nhiều đợt mà không phải quét lại từ đầu.</div>
+          <p class="sx-hint" style="margin-bottom:11px">Flags entries whose Vietnamese reads like machine translation. Only the word and its Vietnamese are sent, 40 per call — cheap and resumable.</p>
+          <div class="mnt-state" id="scan-state">Loading…</div>
+          <div class="sx-field"><label for="scan-count">Words to scan this run</label><input id="scan-count" type="number" min="40" step="40" value="500"/></div>
           <div class="btn-row">
-            <button class="btn ghost sm" id="ds-export-btn" style="margin-top:0">Xuất .txt</button>
-            <button class="btn ghost sm" id="ds-import-btn" style="margin-top:0">Nhập .txt</button>
+            <button class="btn sm" id="scan-btn" style="margin-top:0">Scan</button>
+            <button class="btn ghost sm" id="scan-reset" style="margin-top:0">Reset</button>
           </div>
-          <input id="ds-import-file" type="file" accept=".txt,text/plain" style="display:none"/>
-
-          <div class="mnt-bar"><i id="ds-bar"></i></div>
-          <div class="mnt-log" id="ds-log" style="display:none"></div>
+          <div class="mnt-bar"><i id="scan-bar"></i></div>
+          <div class="mnt-log" id="scan-log" style="display:none"></div>
         </div>
       </details>
+
+      <details class="acc">
+        <summary><span class="acc-t">Rewrite flagged meanings</span><span class="acc-x">&#9662;</span></summary>
+        <div class="acc-body">
+          <p class="sx-hint" style="margin-bottom:11px">Regenerates only the Vietnamese side — collocations, idioms, phonetics and examples are kept, so it costs about a quarter of a full rebuild.</p>
+          <div class="mnt-state" id="refresh-state">Loading…</div>
+          <div class="sx-field">
+            <label for="queue-text">Add words to the queue</label>
+            <textarea id="queue-text" rows="3" placeholder="One per line, or comma-separated…"></textarea>
+          </div>
+          <input id="queue-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" style="display:none"/>
+          <div class="btn-row">
+            <button class="btn ghost sm" id="queue-paste-btn" style="margin-top:0">Add pasted</button>
+            <button class="btn ghost sm" id="queue-upload-btn" style="margin-top:0">Upload file</button>
+          </div>
+          <button class="btn ghost sm" id="queue-clear-btn">Clear queue</button>
+          <p class="sx-hint" style="margin:11px 0">Accepts <code>.txt</code> (one word per line), <code>audit.csv</code> (word,reason), or a JSON array. Words not in your library are skipped.</p>
+          <div class="sx-field"><label for="refresh-count">Words to rewrite this run</label><input id="refresh-count" type="number" min="1" value="50"/></div>
+          <button class="btn sm" id="refresh-btn">Rewrite meanings</button>
+          <div class="mnt-bar"><i id="refresh-bar"></i></div>
+          <div class="mnt-log" id="refresh-log" style="display:none"></div>
+        </div>
+      </details>
+
     </div>
 
-    <!-- 6 · device housekeeping -->
-    <div class="set-group">
-      <div class="sg-h"><span class="tile tile-sm violet">🔒</span><div><b>Device &amp; Privacy</b><i>Everything lives on this device only</i></div></div>
-      <div class="exp-row">
-        <div class="exp-txt"><b>Keep app data</b><span>Ask iOS not to evict your library</span></div>
+    <!-- ============ 3 · sao lưu ============ -->
+    <div class="sx-lbl">Backup</div>
+    <div class="sx-card">
+      <div class="sx-row">
+        <div class="sx-row-txt"><b>Dictionary</b><span>Every word, refreshed meanings included</span></div>
+        <button class="btn ghost sm" id="export-btn" style="margin-top:0">JSON</button>
+      </div>
+      <div class="sx-sep"></div>
+      <div class="sx-row">
+        <div class="sx-row-txt"><b>Search history</b><span>Every search, save and answer, with dates</span></div>
+        <div class="exp-btns">
+          <button class="btn ghost sm" id="export-hist-json" style="margin-top:0">JSON</button>
+          <button class="btn ghost sm" id="export-hist-csv" style="margin-top:0">CSV</button>
+        </div>
+      </div>
+      <div class="sx-sep"></div>
+      <div class="sx-row">
+        <div class="sx-row-txt"><b>Import seed file</b><span>Load a seed.json from the generator</span></div>
+        <button class="btn ghost sm" id="import-btn" style="margin-top:0">Choose</button>
+      </div>
+      <input id="import-file" type="file" accept="application/json,.json" style="display:none"/>
+      <p class="sx-hint" style="margin:12px 2px 0">The activity log keeps roughly the last 2,500 events — older history is already gone.</p>
+    </div>
+
+    <!-- ============ 4 · thiết bị, và các hành động không hoàn tác được ============ -->
+    <div class="sx-lbl">Device</div>
+    <div class="sx-card">
+      <div class="sx-row">
+        <div class="sx-row-txt"><b>Keep app data</b><span>Ask iOS not to evict your library</span></div>
         <button class="btn ghost sm" id="persist-btn" style="margin-top:0">Ask</button>
       </div>
       <div class="saved-flash" id="persist-flash"></div>
-      <div class="exp-row">
-        <div class="exp-txt"><b>Clear activity log</b><span>Resets stats and streaks. Saved words stay.</span></div>
-        <button class="btn ghost sm danger" id="clear-log-btn" style="margin-top:0">Clear</button>
-      </div>
-      <div class="saved-flash" id="clearlog-flash"></div>
-      <div class="exp-row">
-        <div class="exp-txt"><b>Check for updates</b><span>iOS home-screen apps can hold onto an old version — use this if something looks out of date</span></div>
+      <div class="sx-sep"></div>
+      <div class="sx-row">
+        <div class="sx-row-txt"><b>Check for updates</b><span>Home-screen apps can hold on to an old version</span></div>
         <button class="btn ghost sm" id="update-btn" style="margin-top:0">Update</button>
       </div>
       <div class="saved-flash" id="update-flash"></div>
     </div>
 
-    <!-- 7 · the story is separate save data from the dictionary, so it gets its own reset -->
-    <div class="set-group">
-      <div class="sg-h"><span class="tile tile-sm coral">🔄</span><div><b>Story Progress</b><i>Your dictionary and saved words are never touched by this</i></div></div>
-      <div class="exp-row">
-        <div class="exp-txt"><b>Restart the story</b><span>Wipes Focci's journey — decisions, stats, chapters — back to Arc 1</span></div>
+    <div class="sx-lbl sx-lbl-danger">Cannot be undone</div>
+    <div class="sx-card sx-card-danger">
+      <div class="sx-row">
+        <div class="sx-row-txt"><b>Clear activity log</b><span>Resets stats and streaks. Saved words stay.</span></div>
+        <button class="btn ghost sm danger" id="clear-log-btn" style="margin-top:0">Clear</button>
+      </div>
+      <div class="saved-flash" id="clearlog-flash"></div>
+      <div class="sx-sep"></div>
+      <div class="sx-row">
+        <div class="sx-row-txt"><b>Restart the story</b><span>Wipes decisions, stats and chapters back to Arc 1. Your dictionary is untouched.</span></div>
         <button class="btn ghost sm danger" id="restart-story-btn" style="margin-top:0">Restart</button>
       </div>
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v52 · Home mới, cáo nhỏ lại, cây nói nhiều hơn</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v53 · Settings dựng lại, sửa bong bóng mascot</b></p>
   </section>
 </main>
 

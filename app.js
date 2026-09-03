@@ -2480,7 +2480,13 @@ async function renderHero(){
    ============================================================ */
 async function refreshStats(){
   try{ const total=await idbCount(); const saved=(await idbAll()).filter(r=>r.saved).length;
-    $('#st-total').textContent=total; $('#st-saved').textContent=saved; }catch(e){}
+    $('#st-total').textContent=total.toLocaleString(); $('#st-saved').textContent=saved; }catch(e){}
+  const ai=$('#sx-ai');
+  if(ai){
+    const on=!!getKey();
+    ai.textContent = on ? 'On' : 'Off';
+    ai.style.color = on ? 'var(--mint)' : 'var(--muted-2)';
+  }
 }
 async function importSeedFile(file){
   try{
