@@ -710,59 +710,157 @@ window.wordPopupForceAI = async function(rawWord){
 };
 
 /* ============================================================
-   PHRASE SELECTION — hold and drag across a passage to select more than
-   one word, then ask about the whole chunk instead of a single word.
-   The floating button is positioned from the selection rectangle and
-   removed the moment the selection collapses.
+   CHỌN CỤM TỪ — cơ chế của riêng app, không dùng bôi đen của hệ thống.
+
+   VÌ SAO PHẢI TỰ LÀM: iOS không cho tắt riêng cái menu Copy / Look Up /
+   Share khi vẫn bật bôi đen gốc — hai thứ đó đi liền nhau. Cách duy nhất
+   để giữ được thao tác "giữ và quét" mà không bị menu đó che là tắt hẳn
+   bôi đen gốc (-webkit-user-select:none + -webkit-touch-callout:none) rồi
+   tự dựng lại. May là mỗi từ trong passage đã là một <span class="wtap">
+   riêng, nên chọn theo TỪ chính xác hơn cả chọn theo ký tự: không bao giờ
+   cắt giữa một từ, và cụm lấy ra luôn sạch dấu câu.
+
+   CÁCH HOẠT ĐỘNG
+   · Giữ 340ms trên một từ → vào chế độ chọn, từ đó thành mốc neo.
+   · Kéo ngón sang các từ khác → tô cả khoảng từ mốc neo tới từ hiện tại.
+   · Nhả ngón: từ 2 từ trở lên thì hiện nút hỏi AI; đúng 1 từ thì coi như
+     tap thường và mở nghĩa ngắn của từ đó.
+   · Nhấc ngón trước 340ms, hoặc kéo quá 12px trước khi hết 340ms, thì đó
+     là cuộn trang chứ không phải chọn — huỷ, không cản việc cuộn.
    ============================================================ */
-let _selBtn = null;
+const SEL_HOLD_MS = 340;    // giữ bao lâu thì vào chế độ chọn
+const SEL_SLOP    = 12;     // px xê dịch còn được coi là "đang giữ yên"
+
+let _selBtn=null, _selWords=[], _selAnchor=-1, _selHost=null;
+let _selHoldTimer=null, _selActive=false, _selStart=null, _selSuppressTapUntil=0;
+
 function clearSelBtn(){ if(_selBtn){ _selBtn.remove(); _selBtn=null; } }
 
-function selectedPassageText(){
-  const sel = window.getSelection();
-  if(!sel || sel.isCollapsed) return null;
-  const txt = sel.toString().replace(/\s+/g,' ').trim();
-  if(txt.length < 2) return null;
-  if(txt.split(/\s+/).length < 2) return null;        // single word → the tap handler already covers it
-  // only offer this inside passage text, not across the whole app
-  const node = sel.anchorNode;
-  const host = node && (node.nodeType===1 ? node : node.parentElement);
-  if(!host || !host.closest('.story-passage, .dlg-line')) return null;
-  return { text: txt, rect: sel.getRangeAt(0).getBoundingClientRect() };
+function selHostOf(el){ return el ? el.closest('.story-passage, .dlg-line') : null; }
+
+/* Danh sách từ theo đúng thứ tự DOM trong khối đang chọn. */
+function selWordsIn(host){
+  return host ? Array.from(host.querySelectorAll('.wtap')) : [];
 }
 
-function onPassageSelection(){
-  const s = selectedPassageText();
-  if(!s){ clearSelBtn(); return; }
+function selClear(){
+  for(const w of _selWords) w.classList.remove('wsel','wsel-a','wsel-z');
+  _selWords=[]; _selAnchor=-1;
+  if(_selHost) _selHost.classList.remove('selecting');
+  _selHost=null; _selActive=false;
   clearSelBtn();
-  const b = document.createElement('button');
-  b.className = 'sel-ask';
-  b.type = 'button';
-  const words = s.text.split(/\s+/).length;
-  b.innerHTML = '<span>✦</span> Hỏi Focci về ' + words + ' từ này';
-  b.style.top  = (s.rect.top + window.scrollY - 46) + 'px';
-  b.style.left = Math.max(10, Math.min(s.rect.left + window.scrollX, window.innerWidth - 210)) + 'px';
-  b.addEventListener('click', (e)=>{
+}
+
+/* Tô khoảng từ mốc neo tới chỉ số hiện tại. Kéo ngược cũng đúng vì
+   khoảng được chuẩn hoá lại theo min/max. */
+function selPaint(all, from, to){
+  const a=Math.min(from,to), z=Math.max(from,to);
+  all.forEach((w,i)=>{
+    const on = i>=a && i<=z;
+    w.classList.toggle('wsel', on);
+    w.classList.toggle('wsel-a', on && i===a);
+    w.classList.toggle('wsel-z', on && i===z);
+  });
+  return all.slice(a,z+1);
+}
+
+function selText(list){
+  return list.map(w=>w.textContent).join(' ').replace(/\s+/g,' ').trim();
+}
+
+function selShowButton(list){
+  clearSelBtn();
+  if(list.length<2) return;
+  const first=list[0].getBoundingClientRect();
+  const last=list[list.length-1].getBoundingClientRect();
+  const top=Math.min(first.top,last.top);
+  const left=Math.min(first.left,last.left);
+
+  const b=document.createElement('button');
+  b.className='sel-ask'; b.type='button';
+  b.innerHTML='<span>✦</span> Hỏi Focci về '+list.length+' từ này';
+  b.style.top =(top + window.scrollY - 46)+'px';
+  b.style.left=Math.max(10, Math.min(left + window.scrollX, window.innerWidth-210))+'px';
+  b.addEventListener('pointerdown',(e)=>{ e.preventDefault(); e.stopPropagation(); });
+  b.addEventListener('click',(e)=>{
     e.preventDefault(); e.stopPropagation();
-    const t = s.text;
-    clearSelBtn();
-    try{ window.getSelection().removeAllRanges(); }catch(_){}
+    const t=selText(list);
+    selClear();
     openPhrasePopup(t);
   });
   document.body.appendChild(b);
-  _selBtn = b;
+  _selBtn=b;
 }
 
-document.addEventListener('selectionchange', ()=>{
-  clearTimeout(window._selTimer);
-  window._selTimer = setTimeout(onPassageSelection, 220);
-});
-/* A tap that lands on a .wtap while a multi-word selection is open must not
-   fire the single-word popup — the selection button is the intended target. */
-document.addEventListener('click', (e)=>{
-  if(_selBtn && !e.target.closest('.sel-ask')) clearSelBtn();
+document.addEventListener('pointerdown',(e)=>{
+  // bấm vào chính cái nút thì để nút tự xử lý
+  if(e.target.closest && e.target.closest('.sel-ask')) return;
+  if(_selActive || _selBtn) selClear();
+
+  const word=e.target.closest && e.target.closest('.wtap');
+  const host=selHostOf(word);
+  if(!word || !host) return;
+
+  _selStart={x:e.clientX, y:e.clientY};
+  clearTimeout(_selHoldTimer);
+  _selHoldTimer=setTimeout(()=>{
+    const all=selWordsIn(host);
+    const idx=all.indexOf(word);
+    if(idx<0) return;
+    _selActive=true; _selHost=host; _selAnchor=idx;
+    host.classList.add('selecting');           // tắt cuộn trong lúc quét
+    _selWords=selPaint(all, idx, idx);
+    if(navigator.vibrate) { try{ navigator.vibrate(8); }catch(_){ } }
+  }, SEL_HOLD_MS);
 }, true);
-document.addEventListener('scroll', clearSelBtn, { passive:true });
+
+document.addEventListener('pointermove',(e)=>{
+  if(!_selActive){
+    // chưa vào chế độ chọn: xê dịch nhiều = người ta đang cuộn → huỷ giữ
+    if(_selStart && _selHoldTimer){
+      const dx=Math.abs(e.clientX-_selStart.x), dy=Math.abs(e.clientY-_selStart.y);
+      if(dx>SEL_SLOP || dy>SEL_SLOP){ clearTimeout(_selHoldTimer); _selHoldTimer=null; }
+    }
+    return;
+  }
+  e.preventDefault();                          // đang quét thì không cuộn
+  const el=document.elementFromPoint(e.clientX, e.clientY);
+  const word=el && el.closest ? el.closest('.wtap') : null;
+  if(!word || selHostOf(word)!==_selHost) return;
+  const all=selWordsIn(_selHost);
+  const idx=all.indexOf(word);
+  if(idx<0) return;
+  _selWords=selPaint(all, _selAnchor, idx);
+}, { passive:false, capture:true });
+
+document.addEventListener('pointerup',(e)=>{
+  clearTimeout(_selHoldTimer); _selHoldTimer=null; _selStart=null;
+  if(!_selActive) return;
+
+  const list=_selWords.slice();
+  if(_selHost) _selHost.classList.remove('selecting');
+  _selActive=false;
+  _selSuppressTapUntil=Date.now()+450;         // chặn click nổi lên sau khi nhả
+
+  if(list.length>=2){
+    selShowButton(list);                       // giữ phần tô cho thấy đang chọn gì
+  }else{
+    const only=list[0];
+    selClear();
+    if(only && only.dataset && only.dataset.w) openWordPopup(only.dataset.w);
+  }
+}, true);
+
+document.addEventListener('pointercancel',()=>{
+  clearTimeout(_selHoldTimer); _selHoldTimer=null; _selStart=null;
+  if(_selActive) selClear();
+}, true);
+
+document.addEventListener('scroll',()=>{ if(!_selActive) clearSelBtn(); }, { passive:true });
+
+/* Sau một lần quét, cú click nổi lên không được mở popup từ đơn. */
+window.selTapSuppressed = function(){ return Date.now() < _selSuppressTapUntil; };
+
 
 function phraseSheetHTML(text, result, saved){
   const safeT = esc(text).replace(/'/g,"\\'");
@@ -1532,6 +1630,10 @@ function wireWordTaps(){
   area._wtapWired=true;
 
   area.addEventListener('click', (e)=>{
+    // vừa quét chọn cụm xong thì bỏ qua cú click nổi lên, kẻo nó mở
+    // nghĩa của từ cuối cùng đè lên nút hỏi cụm
+    if(typeof selTapSuppressed==='function' && selTapSuppressed()) return;
+    if(e.target.closest('.sel-ask')) return;
     const t=e.target.closest('.wtap'); if(!t) return;
     t.classList.remove('tap-flash'); void t.offsetWidth; t.classList.add('tap-flash');
     openWordPopup(t.dataset.w);
@@ -1823,18 +1925,14 @@ function renderWorldMap(){
     h+='<div class="sb-progress"><span>🏆 Every built land explored.</span></div>';
   }
 
-  /* Bản đồ cần nói rõ bạn đang ở đâu: land nào, chương nào, bao nhiêu
-     phần trăm. Trước đây chỉ có tên land trên banner, không có mốc. */
-  {
-    const chName = cur && cur.chapter ? (cur.chapter.title||('Chapter '+cur.chapter.id)) : null;
-    const builtArcs = CONTENT.length;
-    h+='<div class="gm-where">';
-    h+='<div class="gm-where-n">'+curArcId+'/'+ARC_LANDS.length+'</div>';
-    h+='<div class="gm-where-txt">';
-    h+='<b>'+esc(curMeta.name)+(chName?' · '+esc(chName):'')+'</b>';
-    h+='<span>'+(cur ? pct+'% through this land' : 'Not started yet')
-      +' · '+builtArcs+' of '+ARC_LANDS.length+' lands built</span>';
-    h+='</div></div>';
+  /* Một dòng chữ mảnh với một sợi tiến độ, thay cho khối có cục số
+     "1/12" — cục đó vừa xấu vừa lặp lại thông tin banner đã nói. */
+  if(cur){
+    const chName = cur.chapter ? (cur.chapter.title||('Chapter '+cur.chapter.id)) : null;
+    h+='<div class="gm-thru">';
+    h+='<div class="gm-thru-line"><i style="width:'+Math.max(2,pct)+'%"></i></div>';
+    h+='<div class="gm-thru-txt">'+(chName?esc(chName)+' · ':'')+pct+'% through</div>';
+    h+='</div>';
   }
 
   h+='<button class="lesson-entry" onclick="showLifeLessons()">'

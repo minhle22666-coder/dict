@@ -40,6 +40,7 @@
     --grad-hero:linear-gradient(135deg,#FF9F45,#FFCB6B);
     --grad-cool:linear-gradient(135deg,#3DD9D6,#5AA9FF);
     --r:26px; --r-sm:18px;
+    --safe-t:env(safe-area-inset-top,0px);
     --safe-b:env(safe-area-inset-bottom,0px);
     --shadow:0 12px 32px rgba(0,0,0,.42);
     --glow:0 0 26px rgba(255,159,69,.28);
@@ -825,12 +826,24 @@
     background:rgba(14,27,42,.93);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
     border-top:1px solid var(--line);padding-bottom:var(--safe-b)}
   :root[data-theme="light"] .tabs{background:rgba(255,255,255,.94)}
-  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 9px;color:var(--muted-2);font-size:9.5px;font-weight:700;letter-spacing:.03em}
-  .tab-ico{width:40px;height:33px;border-radius:13px;display:flex;align-items:center;justify-content:center;transition:all .24s}
-  .tab svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
+  /* Tab: viên gradient cam + glow + nhảy lên 3px của bản cũ quá ồn cho một
+     thanh luôn hiện trên màn hình. Ở đây trạng thái active nói bằng MỘT
+     thứ — vạch chỉ mục phía trên — cộng đổi màu icon, không nhảy, không đổ
+     bóng. Icon vẽ nét mảnh 1.7 cho khớp với Raleway. */
+  .tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+    padding:11px 0 10px;color:var(--muted-2);font-size:9.5px;font-weight:700;letter-spacing:.02em;
+    transition:color .2s}
+  .tab::before{content:'';position:absolute;top:0;left:50%;width:0;height:2px;border-radius:0 0 3px 3px;
+    background:var(--grad-hero);transform:translateX(-50%);transition:width .26s cubic-bezier(.34,1.4,.64,1)}
+  .tab.active::before{width:26px}
+  .tab-ico{width:34px;height:30px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+    transition:background .22s}
+  .tab svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;
+    transition:stroke-width .2s}
   .tab.active{color:var(--primary)}
-  .tab.active .tab-ico{background:var(--grad-hero);color:#3A1E00;box-shadow:var(--glow);transform:translateY(-3px)}
-  .tab.active svg{stroke:#3A1E00}
+  .tab.active .tab-ico{background:var(--primary-bg)}
+  .tab.active svg{stroke-width:2.1}
+  .tab:active .tab-ico{background:var(--surface-2)}
   .toast{position:fixed;left:50%;bottom:calc(94px + var(--safe-b));transform:translateX(-50%);
     background:var(--surface-3);border:1px solid var(--line);color:var(--text);padding:11px 18px;
     border-radius:99px;font-size:14px;z-index:50;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow)}
@@ -1380,10 +1393,27 @@
     color:var(--primary);display:inline;margin-right:1px}
   .story-page.paper-bg .dlg-speaker{color:#8a5a20}
   .wtap{cursor:pointer;border-radius:3px;transition:background .12s}
-  /* passages must stay selectable so a phrase can be highlighted; the rest of
-     the app keeps its default non-selectable, app-like feel */
+  /* Bôi đen gốc bị TẮT trong passage — trên iOS nó luôn kéo theo menu
+     Copy / Look Up / Share che mất nút hỏi AI, và menu đó không tắt riêng
+     được. Thao tác giữ-và-quét được dựng lại bằng JS ở story.js. */
   .story-passage,.story-passage *,.dlg-line,.dlg-line *{
-    -webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+    -webkit-user-select:none;user-select:none;
+    -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent}
+
+  /* trong lúc quét thì khoá cuộn, nếu không ngón tay vừa chọn vừa kéo trang */
+  .story-passage.selecting,.dlg-line.selecting{touch-action:none}
+
+  /* vùng đang chọn: một dải liền mạch, bo hai đầu mút */
+  .wtap.wsel{background:rgba(255,159,69,.28);box-shadow:0 0 0 2px rgba(255,159,69,.28);
+    color:var(--text)}
+  .wtap.wsel-a{border-radius:5px 0 0 5px;box-shadow:-3px 0 0 3px rgba(255,159,69,.28),
+    0 0 0 2px rgba(255,159,69,.28)}
+  .wtap.wsel-z{border-radius:0 5px 5px 0;box-shadow:3px 0 0 3px rgba(255,159,69,.28),
+    0 0 0 2px rgba(255,159,69,.28)}
+  .wtap.wsel-a.wsel-z{border-radius:5px;box-shadow:0 0 0 3px rgba(255,159,69,.28)}
+  .story-page.paper-bg .wtap.wsel{background:rgba(200,120,20,.3);
+    box-shadow:0 0 0 2px rgba(200,120,20,.3);color:#2a1d0c}
   .wtap:active{background:var(--primary-bg)}
   .wtap.tap-flash{animation:wtap-flash .35s ease}
   @keyframes wtap-flash{0%{background:var(--primary-bg)}100%{background:transparent}}
@@ -1467,11 +1497,19 @@
   @keyframes hs-hint-pulse{0%,100%{opacity:.3;transform:scale(.92)}50%{opacity:.9;transform:scale(1.08)}}
 
   /* ---- presence event: a distinct full screen, not a card stitched onto the passage ---- */
-  .event-view{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
-    padding:24px;animation:event-fade-in .35s ease}
+  /* Trước đây z-index:50 và padding phẳng: trên iPhone thanh tab và dải
+     safe-area dưới cùng không bị phủ, nên đáy màn hình lộ ra nền gốc.
+     Nâng lên trên thanh tab, dùng 100dvh cho viewport động của iOS, và
+     đặt luôn background-color để không khe nào lọt màu nền ra được. */
+  .event-view{position:fixed;inset:0;z-index:997;display:flex;align-items:center;justify-content:center;
+    min-height:100dvh;background:var(--bg);
+    padding:calc(24px + var(--safe-t)) 24px calc(24px + var(--safe-b));
+    animation:event-fade-in .35s ease}
   @keyframes event-fade-in{0%{opacity:0}100%{opacity:1}}
-  .event-bg{position:fixed;inset:0;background-size:cover;background-position:center;filter:blur(1.5px) brightness(.55)}
-  .event-scrim{position:fixed;inset:0;background:linear-gradient(160deg,rgba(20,14,30,.72),rgba(10,8,16,.88))}
+  .event-bg{position:fixed;inset:-2px;min-height:100dvh;background-size:cover;
+    background-position:center;background-color:var(--bg);filter:blur(1.5px) brightness(.55)}
+  .event-scrim{position:fixed;inset:-2px;min-height:100dvh;
+    background:linear-gradient(160deg,rgba(20,14,30,.72),rgba(10,8,16,.88))}
   .event-card{position:relative;z-index:1;max-width:340px;width:100%;padding:26px 22px 22px;border-radius:22px;
     text-align:center;background:linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.05));
     border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(10px);
@@ -1915,16 +1953,11 @@
   .gm-zone-s{flex:1;min-width:0;font-size:11px;color:var(--muted-2);line-height:1.35}
   .gm-zone-rule{flex:none;width:26px;height:1px;background:var(--line)}
 
-  /* dải thông tin ngay dưới bản đồ: bạn đang ở land nào, chương mấy */
-  .gm-where{display:flex;align-items:center;gap:11px;padding:11px 13px;margin-top:-4px;
-    border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}
-  .gm-where-n{flex:none;min-width:34px;height:34px;border-radius:10px;display:flex;
-    align-items:center;justify-content:center;font-size:12.5px;font-weight:800;
-    color:#3A1E00;background:var(--grad-hero)}
-  .gm-where-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-  .gm-where-txt b{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;
-    overflow:hidden;text-overflow:ellipsis}
-  .gm-where-txt span{font-size:11px;color:var(--muted-2)}
+  /* Tiến độ land: một sợi mảnh và một dòng chữ, không khung, không cục số. */
+  .gm-thru{margin:-2px 2px 0}
+  .gm-thru-line{height:3px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+  .gm-thru-line i{display:block;height:100%;border-radius:99px;background:var(--grad-hero)}
+  .gm-thru-txt{margin-top:6px;font-size:11px;font-weight:600;color:var(--muted-2)}
 
 
   /* ============================================================
@@ -1970,6 +2003,9 @@
   .mp-cell.locked img{filter:grayscale(1) brightness(.42);opacity:.5}
   .mp-cell.locked .mp-n{color:var(--muted-2)}
   .mp-lock{position:absolute;top:5px;right:6px;font-size:9px;opacity:.75}
+  .mp-auto{justify-content:center}
+  .mp-auto-ico{width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+    font-size:22px;color:var(--primary)}
 
 </style>
 </head>
@@ -2365,22 +2401,22 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v57 · bộ sưu tập mascot mở theo streak</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v59 · tự làm thao tác giữ-và-quét, bỏ menu iOS</b></p>
   </section>
 </main>
 
 <!-- Bottom nav -->
 <nav class="tabs">
   <button class="tab active" data-view="home">
-    <span class="tab-ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>Home</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.6 12 3.5l9 7.1"/><path d="M5.5 9.4V20h13V9.4"/><path d="M9.8 20v-5.4h4.4V20"/></svg></span>Home</button>
   <button class="tab" data-view="saved">
-    <span class="tab-ico"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg></span>Saved</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.6h11a1 1 0 0 1 1 1v15.3l-6.5-4-6.5 4V4.6a1 1 0 0 1 1-1Z"/></svg></span>Saved</button>
   <button class="tab" data-view="review">
-    <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>Game</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="6.6" width="18.8" height="10.8" rx="4.4"/><path d="M7.4 10.4v3.2M5.8 12h3.2"/><circle cx="16" cy="11.3" r="1"/><circle cx="18.2" cy="13.6" r="1"/></svg></span>Game</button>
   <button class="tab" data-view="stats">
-    <span class="tab-ico"><svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-6"/></svg></span>Progress</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 19.2h17.2"/><path d="M6.6 19.2v-5.6"/><path d="M11.4 19.2V8.4"/><path d="M16.2 19.2v-8"/><path d="m5.6 9.6 4.2-4 3.6 2.6 5.4-4.6"/></svg></span>Progress</button>
   <button class="tab" data-view="settings">
-    <span class="tab-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>Settings</button>
+    <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.4h9.2M17.6 7.4H20"/><circle cx="15.4" cy="7.4" r="2.2"/><path d="M4 16.6h3.2M11.6 16.6H20"/><circle cx="9.4" cy="16.6" r="2.2"/></svg></span>Settings</button>
 </nav>
 
 <div class="toast" id="toast"></div>

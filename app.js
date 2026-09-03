@@ -2614,9 +2614,13 @@ function mascotSeen(){
 function mascotSaveSeen(list){
   try{ localStorage.setItem(MASCOT_SEEN_LS, JSON.stringify(list)); }catch(e){}
 }
+/* Trả về lựa chọn CỦA NGƯỜI DÙNG, hoặc null nếu họ chưa chọn gì.
+   Chưa chọn = để renderHero quyết theo giờ trong ngày — nghĩa là buổi
+   tối vẫn là con đi ngủ như trước. mascotSync chỉ ghi đè khi có pick
+   thật, nếu không nó sẽ đè mất mascot theo giờ (đúng lỗi vừa rồi). */
 function mascotPick(){
   const p=localStorage.getItem(MASCOT_LS);
-  return (p && MASCOTS.some(m=>m.f===p)) ? p : MASCOTS[0].f;
+  return (p && MASCOTS.some(m=>m.f===p)) ? p : null;
 }
 function mascotDaysToNext(streak){
   const c=mascotUnlockedCount(streak);
@@ -2641,11 +2645,9 @@ function mascotSync(streak){
                       streak+' days in a row — tap your greeting to switch', 'gold');
     }
   }
+  const pickf=mascotPick();
   const img=$('#hero-char');
-  if(img){
-    const pickf=mascotPick();
-    if(!img.src.endsWith(pickf+'.webp')) img.src='./'+pickf+'.webp';
-  }
+  if(img && pickf && !img.src.endsWith(pickf+'.webp')) img.src='./'+pickf+'.webp';
   const badge=$('#mascot-btn');
   if(badge) badge.textContent = count+'/'+MASCOTS.length;
 }
@@ -2662,6 +2664,12 @@ async function openMascotPicker(){
   const left=mascotDaysToNext(streak);
 
   let grid='';
+  /* Ô đầu tiên là "theo giờ": sáng / chiều / tối mỗi lúc một con, tối là
+     con đi ngủ. Đây là mặc định, và là đường quay lại sau khi đã chọn tay. */
+  grid+='<button class="mp-cell mp-auto'+(cur?'':' on')+'" type="button" onclick="chooseMascot(\'\')">'
+    + '<span class="mp-auto-ico">◐</span>'
+    + '<span class="mp-n">By time of day</span>'
+    + '</button>';
   MASCOTS.forEach((m,i)=>{
     const open=i<count;
     const on=open && m.f===cur;
@@ -2690,6 +2698,13 @@ async function openMascotPicker(){
   });
 }
 function chooseMascot(f){
+  if(f==='' || f==null){                       // quay về mặc định theo giờ
+    localStorage.removeItem(MASCOT_LS);
+    const ov0=$('#mascot-ov');
+    if(ov0){ ov0.classList.remove('show'); setTimeout(()=>ov0.remove(),240); }
+    renderHero();
+    return;
+  }
   if(!MASCOTS.some(m=>m.f===f)) return;
   localStorage.setItem(MASCOT_LS, f);
   const img=$('#hero-char'); if(img) img.src='./'+f+'.webp';
