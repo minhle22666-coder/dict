@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-<title>Focci — Explore English</title>
+<title>Focci&rsquo;s Little Tales</title>
 
 <link rel="manifest" href="./manifest.json" />
 <meta name="theme-color" content="#0E1B2A" />
@@ -139,7 +139,7 @@
   :root[data-theme="light"] .topbar{background:rgba(243,247,251,.9)}
   .brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   .brand img{width:32px;height:32px;border-radius:10px;box-shadow:var(--glow)}
-  .brand h1{font-size:19px;font-weight:800;margin:0;letter-spacing:-.02em;
+  .brand h1{font-size:15.5px;line-height:1.15;font-weight:800;margin:0;letter-spacing:-.02em;
     background:var(--grad-hero);-webkit-background-clip:text;background-clip:text;color:transparent}
   .searchwrap{position:relative;display:flex;align-items:center;gap:8px}
   .searchbox{flex:1;min-width:0}
@@ -887,8 +887,9 @@
     70%{opacity:1;transform:translateY(126px) rotate(220deg)}
     82%{transform:translateY(112px) rotate(250deg)}
     100%{opacity:0;transform:translateY(136px) rotate(300deg)}}
-  .tree-bubble{position:absolute;left:16px;top:16px;max-width:60%;z-index:4;
-    color:var(--text);font-size:13px;font-weight:700;line-height:1.4;
+  /* sang phải: góc trên-trái đã có nút "Tap the tree" chiếm chỗ */
+  .tree-bubble{position:absolute;right:14px;left:auto;top:15px;max-width:56%;z-index:4;
+    text-align:right;color:var(--text);font-size:13px;font-weight:700;line-height:1.4;
     text-shadow:0 2px 8px var(--surface),0 1px 3px var(--surface);
     opacity:0;transform:translateY(6px);transition:all .26s cubic-bezier(.34,1.56,.64,1)}
   .tree-bubble.show{opacity:1;transform:translateY(0)}
@@ -1207,7 +1208,7 @@
   .fish-f1{animation:ff1 7.5s steps(1) infinite}
   .fish-f2{animation:ff2 7.5s steps(1) infinite}
   .fish-f3{animation:ff3 7.5s steps(1) infinite;transform:scale(1.08)}
-  .fish-f4{animation:ff4 7.5s steps(1) infinite;transform:scale(1.08)}
+  .fish-f4{animation:ff4 7.5s steps(1) infinite;transform:scale(.94)}
   @keyframes ff1{0%{opacity:1}17%{opacity:1}17.1%{opacity:0}100%{opacity:0}}
   @keyframes ff2{0%{opacity:0}17%{opacity:0}17.1%{opacity:1}55%{opacity:1}55.1%{opacity:0}100%{opacity:0}}
   @keyframes ff3{0%{opacity:0}55%{opacity:0}55.1%{opacity:1}68%{opacity:1}68.1%{opacity:0}100%{opacity:0}}
@@ -1634,6 +1635,94 @@
     10%{opacity:1}90%{opacity:.8}100%{transform:translateY(-160px) translateX(14px);opacity:0}}
   /* (old prop-layer rules removed — see renderExploreBlock in story.js) */
 
+
+  /* ============================================================
+     HOME — "trang sổ tay hành trình". Bố cục cũ là bốn thẻ bo góc
+     giống nhau xếp dọc, đọc như trang cài đặt. Ở đây chữ là nhân
+     vật chính: lời chào lớn, Focci tràn ra mép phải, các chỉ số
+     hôm nay thành một dải đồng hồ đo chung một khối.
+     ============================================================ */
+  .jhead{position:relative;margin-bottom:16px;padding:15px 16px 14px;
+    border-radius:22px 22px 20px 20px;background:
+      radial-gradient(120% 90% at 88% 0%, rgba(255,159,69,.13), transparent 62%),
+      linear-gradient(168deg,var(--surface-2),var(--surface) 72%);
+    border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+  .jhead::after{content:'';position:absolute;left:16px;right:16px;bottom:47px;height:1px;
+    background:repeating-linear-gradient(90deg,var(--line) 0 5px,transparent 5px 11px)}
+
+  .jhead-row{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .jhead-date{flex:1;min-width:0;font-size:11.5px;font-weight:600;color:var(--muted-2)}
+  .jhead-chips{flex:none;display:flex;align-items:center;gap:6px}
+  .jhead .hero-chip{margin:0}
+  .jhead-lvl:empty{display:none}
+
+  .jhead-main{display:flex;align-items:flex-start;gap:10px}
+  .jhead-words{flex:1;min-width:0}
+  .jhead-greet{margin:0;font-size:25px;line-height:1.08;font-weight:800;
+    letter-spacing:-.028em;color:var(--text)}
+  .jhead-sub{margin:7px 0 0;font-size:13px;line-height:1.5;color:var(--muted);max-width:34ch}
+  /* Focci tràn qua mép phải: cố ý không đóng khung tròn như avatar cũ */
+  .jhead-focci{position:relative;flex:none;width:78px;height:78px;margin:-6px -10px 0 0}
+  .jhead .hero-char{width:78px;height:78px;border-radius:0;padding:0;background:none;
+    box-shadow:none;border:none}
+  .jhead .hero-glow{right:4px;bottom:6px}
+  .jhead .hero-sky{right:6px;bottom:8px}
+  .jhead .hero-bubble{position:absolute;right:12px;top:52px;left:auto;max-width:62%;z-index:6}
+
+  .jgauge{display:flex;align-items:stretch;gap:2px;margin-top:15px}
+  .jgauge-cell{flex:1;min-width:0;display:flex;align-items:center;gap:9px;
+    padding:7px 4px;text-align:left;background:none;border:none}
+  .jgauge-cell:active{transform:scale(.97)}
+  .jgauge-rule{flex:none;width:1px;background:var(--line);margin:6px 4px}
+  .jgauge .jar-svg{flex:none;width:30px;height:34px}
+  .jgauge-cell.shaking .jar-svg{animation:jarshake .5s ease}
+  .jgauge-ico{flex:none;width:28px;height:28px;object-fit:contain}
+  .jgauge-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .jgauge-txt b{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .jgauge-txt i{font-size:10.5px;font-style:normal;color:var(--muted-2);font-weight:600}
+  .jgauge-track{height:4px;margin:8px 16px 0;background:var(--surface-2);
+    border-radius:99px;overflow:hidden}
+
+  /* hành động chính — chỗ duy nhất được phép ồn */
+  .jstory{position:relative;display:flex;align-items:center;gap:13px;width:100%;
+    text-align:left;padding:17px 17px 17px 15px;margin-bottom:18px;
+    border-radius:26px 26px 26px 8px;overflow:hidden;
+    background:linear-gradient(112deg,#20364E,#16283C 58%);
+    border:1px solid rgba(255,159,69,.34);box-shadow:0 12px 26px rgba(0,0,0,.34),var(--glow)}
+  .jstory:active{transform:scale(.985)}
+  .jstory::before{content:'';position:absolute;right:-40px;top:-52px;width:158px;height:158px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,159,69,.2),transparent 68%);
+    pointer-events:none}
+  .jstory-char{position:relative;z-index:1;flex:none;width:62px;height:62px;object-fit:contain;
+    filter:drop-shadow(0 6px 12px rgba(0,0,0,.42))}
+  .jstory-text{position:relative;z-index:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+  .jstory-title{font-size:17px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+  .jstory-sub{font-size:12.5px;color:var(--muted);line-height:1.4}
+
+  /* ba con số: hàng ngang, vạch mảnh, nhãn viết thường */
+  .jfigs{display:flex;align-items:stretch;margin-bottom:18px}
+  .jfig{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;
+    align-items:flex-start;gap:3px;padding:4px 6px;background:none;border:none;
+    text-align:left;overflow:hidden}
+  .jfig:active{transform:scale(.96)}
+  .jfig-rule{flex:none;width:1px;background:var(--line);margin:5px 2px}
+  .jfig-n{font-size:23px;font-weight:800;letter-spacing:-.03em;color:var(--primary);line-height:1}
+  .jfig-l{font-size:10.5px;font-weight:600;color:var(--muted-2);line-height:1.3}
+  .jfig-deco{position:absolute;right:-4px;top:-3px;width:26px;height:26px;object-fit:contain;
+    opacity:.13;pointer-events:none}
+
+  .jweek{margin-bottom:20px}
+  .jweek-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .jweek-label{flex:1;text-align:center;font-size:11.5px;font-weight:700;color:var(--muted)}
+
+  @media (max-width:360px){
+    .jhead-greet{font-size:22px}
+    .jhead-focci{width:66px;height:66px}
+    .jhead .hero-char{width:66px;height:66px}
+    .jfig-n{font-size:20px}
+  }
+
 </style>
 </head>
 <body>
@@ -1651,7 +1740,7 @@
 <div class="topbar">
   <div class="brand" onclick="backToHome()" title="Back to home">
     <img src="./icon-192.png" alt="" />
-    <h1>Focci</h1>
+    <h1>Focci&rsquo;s Little Tales</h1>
   </div>
   <div class="searchwrap">
     <button class="topbar-back" id="topbar-back" onclick="backToHome()" style="display:none" aria-label="Back">‹</button>
@@ -1670,84 +1759,102 @@
   <section class="view active" id="v-home">
     <div id="result"></div>
     <div id="dashboard">
-      <div class="hero" id="hero">
+      <!-- Trang sổ tay: lời chào, Focci, và các chỉ số hôm nay nằm chung
+           MỘT khối thay vì ba thẻ bo góc giống nhau xếp dọc. -->
+      <div class="jhead" id="hero">
+        <div class="jhead-row">
+          <div class="jhead-date" id="home-date"></div>
+          <div class="jhead-chips">
+            <span class="hero-chip" id="hero-streak" style="display:none"></span>
+            <span class="hero-chip jhead-lvl" id="hero-level"></span>
+          </div>
+        </div>
+
+        <div class="jhead-main">
+          <div class="jhead-words">
+            <h2 class="jhead-greet" id="hero-greet" onclick="openProfilePanel()">Good morning!</h2>
+            <p class="jhead-sub" id="hero-sub">Ready to discover new words today?</p>
+          </div>
+          <div class="jhead-focci">
+            <img class="hero-char" id="hero-char" src="./mascot-avatar.webp" alt="" onclick="tapFocci()" />
+            <div class="hero-glow is-sun" id="hero-glow"></div>
+            <img class="hero-sky is-sun" id="hero-sky" src="./decor-shiny-sun.webp" alt="" />
+          </div>
+        </div>
         <div class="hero-bubble" id="hero-bubble"></div>
-        <div class="hero-avatar-wrap">
-          <img class="hero-char" id="hero-char" src="./mascot-avatar.webp" alt="" onclick="tapFocci()" />
-          <div class="hero-glow is-sun" id="hero-glow"></div>
-          <img class="hero-sky is-sun" id="hero-sky" src="./decor-shiny-sun.webp" alt="" />
+
+        <div class="jgauge">
+          <button class="jgauge-cell" id="jar-card" type="button">
+            <svg class="jar-svg" id="jar-svg" viewBox="0 0 60 68">
+              <defs>
+                <clipPath id="jarClip"><path d="M14 20 h32 v34 a16 16 0 0 1 -32 0 Z"/></clipPath>
+                <radialGradient id="jarGlow">
+                  <stop offset="0%" stop-color="#FFCB6B" stop-opacity=".75"/>
+                  <stop offset="55%" stop-color="#FF9F45" stop-opacity=".22"/>
+                  <stop offset="100%" stop-color="#FF9F45" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="jarLiquid" x1="0" y1="1" x2="0" y2="0">
+                  <stop offset="0%" stop-color="#F2711C"/><stop offset="100%" stop-color="#FFCB6B"/>
+                </linearGradient>
+              </defs>
+              <circle class="jar-halo" cx="30" cy="40" r="28" fill="url(#jarGlow)"/>
+              <path d="M14 20 h32 v34 a16 16 0 0 1 -32 0 Z" fill="var(--surface-2)" stroke="var(--line)" stroke-width="2"/>
+              <rect id="jar-fill" x="14" y="54" width="32" height="0" fill="url(#jarLiquid)" clip-path="url(#jarClip)"/>
+              <path d="M19 30 v20" stroke="rgba(255,255,255,.35)" stroke-width="2.4" stroke-linecap="round"/>
+              <rect x="20" y="10" width="20" height="10" rx="3" fill="var(--muted-2)"/>
+            </svg>
+            <span class="jgauge-txt"><b id="jar-title">0 words today</b><i>tap for your total</i></span>
+          </button>
+          <span class="jgauge-rule"></span>
+          <button class="jgauge-cell" id="goal-card" type="button">
+            <img class="jgauge-ico" src="./decor-goal.webp" alt="" />
+            <span class="jgauge-txt"><b id="goal-title">0 / 20 XP today</b><i>daily goal</i></span>
+          </button>
         </div>
-        <div class="hero-text">
-          <div class="hero-greet" id="hero-greet" onclick="openProfilePanel()">Good morning!</div>
-          <div class="hero-sub" id="hero-sub">Ready to discover new words today?</div>
-        </div>
-        <div class="hero-chips">
-          <span class="hero-chip" id="hero-streak" style="display:none"></span>
-        </div>
+        <div class="jgauge-track"><div id="goal-bar" class="goal-fill"></div></div>
       </div>
 
-      <div class="hub-section-label">Today</div>
-      <div class="today-grid">
-        <div class="today-card" id="jar-card">
-          <svg class="jar-svg" id="jar-svg" viewBox="0 0 60 68">
-            <defs>
-              <clipPath id="jarClip"><path d="M14 20 h32 v34 a16 16 0 0 1 -32 0 Z"/></clipPath>
-              <radialGradient id="jarGlow">
-                <stop offset="0%" stop-color="#FFCB6B" stop-opacity=".75"/>
-                <stop offset="55%" stop-color="#FF9F45" stop-opacity=".22"/>
-                <stop offset="100%" stop-color="#FF9F45" stop-opacity="0"/>
-              </radialGradient>
-              <linearGradient id="jarLiquid" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stop-color="#F2711C"/><stop offset="100%" stop-color="#FFCB6B"/>
-              </linearGradient>
-            </defs>
-            <!-- glow drawn inside the SVG on purpose: a CSS drop-shadow on an
-                 SVG root is painted around its bounding box in WebKit, which
-                 showed up on iOS as a lit rectangle around the jar -->
-            <circle class="jar-halo" cx="30" cy="40" r="28" fill="url(#jarGlow)"/>
-            <path d="M14 20 h32 v34 a16 16 0 0 1 -32 0 Z" fill="var(--surface-2)" stroke="var(--line)" stroke-width="2"/>
-            <rect id="jar-fill" x="14" y="54" width="32" height="0" fill="url(#jarLiquid)" clip-path="url(#jarClip)"/>
-            <path d="M19 30 v20" stroke="rgba(255,255,255,.35)" stroke-width="2.4" stroke-linecap="round"/>
-            <rect x="20" y="10" width="20" height="10" rx="3" fill="var(--muted-2)"/>
-          </svg>
-          <div class="jar-title" id="jar-title">0 words today</div>
-          <div class="jar-tap">Tap for your total ✨</div>
-        </div>
-
-        <div class="today-card" id="goal-card">
-          <img class="today-goal-ico" src="./decor-goal.webp" alt="" />
-          <div class="jar-title" id="goal-title">0 / 20 XP today</div>
-          <div class="goal-track"><div id="goal-bar" class="goal-fill"></div></div>
-        </div>
-      </div>
-
-      <button class="story-cta" onclick="showStoryIntro()">
+      <!-- Hành động chính của trang: to nhất, ồn nhất, mọi thứ khác im lặng -->
+      <button class="jstory" onclick="showStoryIntro()">
         <span class="glow-border"></span>
-        <img class="story-cta-char" src="./mascot-explore.webp" alt="" />
-        <div class="story-cta-text">
-          <div class="story-cta-title">Focci's story</div>
-          <div class="story-cta-sub">An adventure that grows with your words</div>
-        </div>
-        <span class="story-cta-go">→</span>
+        <img class="jstory-char" src="./mascot-explore.webp" alt="" />
+        <span class="jstory-text">
+          <span class="jstory-title">Continue the story</span>
+          <span class="jstory-sub">Focci goes further as your words grow</span>
+        </span>
       </button>
 
-      <div class="hub-section-label">Your Progress</div>
-      <div class="progress-card">
-        <div class="stat-grid">
-          <div class="stat" onclick="statInsight('learned')"><div class="n" id="d-total">0</div><div class="l">WORDS EXPLORED</div><span class="stat-more">tap</span><img class="stat-deco" src="./other-book.webp" alt=""/></div>
-          <div class="stat" onclick="statInsight('avg')"><div class="n" id="d-avg">0</div><div class="l">NEW PER DAY</div><span class="stat-more">tap</span><img class="stat-deco" src="./other-puzzle.webp" alt=""/></div>
-          <div class="stat" onclick="statInsight('time')"><div class="n" id="d-time">0m</div><div class="l">TIME IN APP</div><span class="stat-more">tap</span><img class="stat-deco" src="./decor-alarm.webp" alt=""/></div>
-        </div>
-        <div class="progress-divider"></div>
-        <div class="week-nav">
-          <button class="week-nav-btn" id="week-prev" aria-label="Previous week">‹</button>
-          <div class="progress-week-label" id="week-range-label">This week</div>
-          <button class="week-nav-btn" id="week-next" aria-label="Next week">›</button>
+      <!-- Ba con số đặt trên một hàng, phân cách bằng vạch mảnh -->
+      <div class="jfigs">
+        <button class="jfig" type="button" onclick="statInsight('learned')">
+          <span class="jfig-n" id="d-total">0</span>
+          <span class="jfig-l">words explored</span>
+          <img class="jfig-deco" src="./other-book.webp" alt=""/>
+        </button>
+        <span class="jfig-rule"></span>
+        <button class="jfig" type="button" onclick="statInsight('avg')">
+          <span class="jfig-n" id="d-avg">0</span>
+          <span class="jfig-l">new per day</span>
+          <img class="jfig-deco" src="./other-puzzle.webp" alt=""/>
+        </button>
+        <span class="jfig-rule"></span>
+        <button class="jfig" type="button" onclick="statInsight('time')">
+          <span class="jfig-n" id="d-time">0m</span>
+          <span class="jfig-l">time in app</span>
+          <img class="jfig-deco" src="./decor-alarm.webp" alt=""/>
+        </button>
+      </div>
+
+      <!-- Tuần: dải mảnh, không khung thẻ -->
+      <div class="jweek">
+        <div class="jweek-head">
+          <button class="week-nav-btn" id="week-prev" aria-label="Previous week">&lsaquo;</button>
+          <div class="jweek-label" id="week-range-label">This week</div>
+          <button class="week-nav-btn" id="week-next" aria-label="Next week">&rsaquo;</button>
         </div>
         <div class="bars" id="week-bars"></div>
       </div>
 
-      <div class="hub-section-label">Word Orchard</div>
       <div class="tree-widget" id="tree-widget" onclick="shakeTree()">
         <div class="tree-hint"><span class="tree-hint-ico">🌳</span>Tap the tree</div>
         <img class="tree-img" id="tree-img" src="./decor-tree.webp" alt="" />
@@ -1998,7 +2105,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v51 · Raleway toàn app</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v52 · Home mới, cáo nhỏ lại, cây nói nhiều hơn</b></p>
   </section>
 </main>
 

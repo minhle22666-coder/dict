@@ -1050,6 +1050,16 @@ function ygMount(word, wrap, seq, idx){
     if(!fullH) return;
     stage.style.height = Math.round(fullH * (peeking ? 1 : YG_MASK_TOP_PCT)) + 'px';
   };
+  /* Chiều cao khung video do YouGlish đặt sau khi nội dung tải xong, và nó
+     còn đổi lại khi phần nghĩa tiếng Việt phía trên xuống dòng làm reflow.
+     Đo một lần rồi thôi thì khung bị lẹm mất video và nút. Quan sát trực
+     tiếp CHÍNH cái iframe: ta chỉ set height cho .yg-stage (khác phần tử,
+     có overflow:hidden) nên không tạo vòng lặp đo ↔ sửa. */
+  const remeasure = (frame)=>{
+    if(!frame) return;
+    const h = frame.getBoundingClientRect().height || frame.clientHeight || 0;
+    if(h > 40 && Math.abs(h - fullH) > 4){ fullH = h; applyHeight(); }
+  };
   peek.addEventListener('click', ()=>{
     peeking = !peeking;
     wrap.classList.toggle('yg-peeking', peeking);
@@ -1070,15 +1080,29 @@ function ygMount(word, wrap, seq, idx){
     }
     wrap.className = 'yg-wrap yg-ready';
     if(veil) veil.remove();     // bỏ hẳn khỏi DOM → animation dừng, hết composite vô ích
-    // Đo 3 mốc thay cho ResizeObserver: đủ để bắt lúc layout ổn định
-    // mà không tạo vòng lặp đo ↔ sửa height.
-    [250, 1200, 3000].forEach((ms)=>{
-      setTimeout(()=>{
-        if(seq !== _ygSeq || !document.body.contains(wrap)) return;
-        const h = frame.clientHeight || inner.scrollHeight || 0;
-        if(h && Math.abs(h - fullH) > 6){ fullH = h; applyHeight(); }
-      }, ms);
-    });
+
+    [250, 900, 2200].forEach((ms)=>setTimeout(()=>{
+      if(seq !== _ygSeq || !document.body.contains(wrap)) return;
+      remeasure(frame);
+    }, ms));
+
+    if(window.ResizeObserver){
+      const ro = new ResizeObserver(()=>{
+        if(seq !== _ygSeq || !document.body.contains(wrap)){ ro.disconnect(); return; }
+        remeasure(frame);
+      });
+      ro.observe(frame);                     // iframe, KHÔNG phải .yg-inner
+    }
+    const onWinResize = ()=>{
+      if(seq !== _ygSeq || !document.body.contains(wrap)){
+        window.removeEventListener('resize', onWinResize);
+        window.removeEventListener('orientationchange', onWinResize);
+        return;
+      }
+      remeasure(frame);
+    };
+    window.addEventListener('resize', onWinResize);
+    window.addEventListener('orientationchange', onWinResize);
   };
 
   ygLoadScript().then(()=>{
@@ -1660,8 +1684,20 @@ const TREE_LINES=[
   "That tickles. Take a word, then.",
   "Alright, alright — here's another one!",
   "You again? Fine. Last one… probably.",
-  "I'm a tree, not a vending machine!"
+  "I'm a tree, not a vending machine!",
+  "Two hundred years I stood here. Then you arrived.",
+  "Shake harder, why don't you. I've only got roots.",
+  "In my day, learners waited for fruit to fall.",
+  "Oh good, the woodpecker's back. With hands.",
+  "I photosynthesise for a living. What's your excuse?"
 ];
+let _lastTreeLine=-1;
+function nextTreeLine(){
+  if(TREE_LINES.length<2) return TREE_LINES[0]||'';
+  let i; do{ i=Math.floor(Math.random()*TREE_LINES.length); }while(i===_lastTreeLine);
+  _lastTreeLine=i;
+  return TREE_LINES[i];
+}
 let treeShakes=0;
 async function shakeTree(){
   const wrap=$('#tree-widget'); if(!wrap) return;
@@ -1681,7 +1717,7 @@ async function shakeTree(){
     wrap.appendChild(f);
     setTimeout(()=>f.remove(),1500+delay*1000);
   }
-  bubble.textContent=TREE_LINES[Math.min(treeShakes-1,TREE_LINES.length-1)];
+  bubble.textContent=nextTreeLine();
   bubble.classList.add('show');
   clearTimeout(bubble._t); bubble._t=setTimeout(()=>bubble.classList.remove('show'),2600);
 
@@ -2417,6 +2453,11 @@ async function renderHero(){
     glow.classList.toggle('is-moon', isNight);
   }
   $('#hero-greet').textContent=t.greet+(name?', '+name:'')+'!';
+  const dEl=$('#home-date');
+  if(dEl){
+    const now2=new Date();
+    dEl.textContent=now2.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
+  }
 
   const streakEl=$('#hero-streak'), subEl=$('#hero-sub'), levelEl=$('#hero-level');
   let streak=0, hasToday=false;
