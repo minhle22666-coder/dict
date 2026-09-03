@@ -975,41 +975,68 @@
 
 
   /* ---- Life Lessons journal — an old scroll, not a modal list ---- */
-  .lesson-ov{position:fixed;inset:0;background:rgba(10,6,2,.78);z-index:996;display:flex;align-items:center;
-    justify-content:center;padding:20px;opacity:0;transition:opacity .3s;pointer-events:none}
+  /* ============================================================
+     WHAT FOCCI HAS LEARNED — một hệ màu duy nhất: kính tối, chữ sáng.
+
+     Bản trước khung ngoài là giấy màu kem #f6ecd2 với chữ nâu, trong khi
+     các khung arc bên trong lại là kính mờ chữ trắng — hai hệ đối nghịch
+     nhau nên chỗ nào cũng có chữ khó đọc. Nâu bị bỏ hẳn vì cả app là nền
+     tối; không còn chỗ nào trong trang này dùng chữ nâu hay chữ trắng
+     tuyệt đối, tất cả đi theo bảng màu chung của app.
+     ============================================================ */
+  .lesson-ov{position:fixed;inset:0;background:rgba(6,10,16,.72);z-index:996;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+    opacity:0;transition:opacity .3s;pointer-events:none;
+    backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
   .lesson-ov.show{opacity:1;pointer-events:auto}
-  .lesson-scroll{position:relative;max-width:380px;width:100%;max-height:82vh;overflow-y:auto;padding:32px 22px 26px;
-    border-radius:16px;
-    background:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E"),
-      radial-gradient(ellipse 240px 160px at 50% 0%, rgba(120,90,50,.16), transparent 62%),
-      linear-gradient(175deg, #f6ecd2 0%, #ecdcb3 55%, #ddc691 100%);
-    background-blend-mode:multiply, normal, normal;
-    border:3px double rgba(110,80,40,.4);
-    box-shadow:0 30px 70px rgba(0,0,0,.5);
-    color:#4a3418;
-    transform:scale(.9) translateY(10px);transition:transform .35s cubic-bezier(.22,.9,.34,1.1)}
+
+  .lesson-scroll{position:relative;max-width:380px;width:100%;max-height:82vh;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;padding:26px 20px 22px;
+    border-radius:24px;
+    background:linear-gradient(158deg,rgba(255,255,255,.13),rgba(255,255,255,.045) 52%,rgba(255,159,69,.07));
+    backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);
+    border:1px solid rgba(255,255,255,.2);border-top-color:rgba(255,255,255,.38);
+    box-shadow:0 26px 64px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.14);
+    color:var(--text);
+    transform:scale(.92) translateY(10px);transition:transform .35s cubic-bezier(.22,.9,.34,1.1)}
   .lesson-ov.show .lesson-scroll{transform:scale(1) translateY(0)}
-  .lesson-close{position:sticky;top:0;float:right;width:28px;height:28px;border-radius:50%;
-    background:rgba(110,80,40,.16);color:#4a3418;font-weight:800;font-size:13px;margin-left:8px}
-  .lesson-head{text-align:center;margin-bottom:20px;clear:both}
-  .lesson-head-t{font-size:15.5px;font-weight:800;letter-spacing:.02em;margin:4px 0;color:#3a2812}
-  .lesson-head-orn{font-size:13px;opacity:.55;display:block}
-  .lesson-arc-frame{position:relative;overflow:hidden;border-radius:16px;padding:16px 16px 14px;
-    margin-bottom:16px;box-shadow:0 6px 16px rgba(60,40,15,.18)}
+
+  .lesson-close{position:sticky;top:0;float:right;width:30px;height:30px;border-radius:50%;
+    background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);
+    color:var(--text);font-weight:800;font-size:13px;margin-left:8px;z-index:2}
+  .lesson-close:active{transform:scale(.92)}
+
+  .lesson-head{text-align:center;margin-bottom:18px;clear:both}
+  .lesson-head-t{font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);margin:0}
+  .lesson-head-s{margin-top:5px;font-size:11.5px;line-height:1.45;color:var(--muted)}
+
+  /* Khung mỗi arc: kính mang sắc riêng của arc, truyền qua --t1/--t2. */
+  .lesson-arc-frame{position:relative;overflow:hidden;padding:15px 15px 13px;
+    margin-bottom:13px;border-radius:18px;
+    background:
+      linear-gradient(155deg,
+        color-mix(in srgb, var(--t1,#e4ddc9) 20%, transparent),
+        color-mix(in srgb, var(--t2,#b8ac86) 12%, transparent)),
+      linear-gradient(155deg,rgba(255,255,255,.1),rgba(255,255,255,.035));
+    border:1px solid rgba(255,255,255,.16);border-top-color:rgba(255,255,255,.28);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
   .lesson-arc-frame:last-child{margin-bottom:0}
-  .lesson-arc-deco{position:absolute;width:26px;height:26px;opacity:.85;pointer-events:none;
-    filter:drop-shadow(0 2px 3px rgba(0,0,0,.2))}
-  .lesson-arc-deco.tl{top:8px;left:10px;transform:rotate(-12deg)}
-  .lesson-arc-deco.tr{top:8px;right:10px;transform:rotate(10deg)}
-  .lesson-arc-t{position:relative;text-align:center;font-size:13.5px;font-weight:800;letter-spacing:.02em;
-    color:#3a2812;text-shadow:0 1px 0 rgba(255,255,255,.3);margin:0 0 12px}
-  .lesson-quote{font-style:italic;font-size:13px;line-height:1.65;margin-bottom:12px;padding-left:11px;
-    border-left:2px solid rgba(60,40,15,.3);color:#3a2812}
-  .lesson-quote:last-child{margin-bottom:0}
-  .lesson-quote b{font-style:normal;color:#6b3f10}
-  .lq-mark{font-style:normal;font-weight:800;opacity:.4;font-size:15px}
-  .lesson-empty{text-align:center;font-size:13px;color:rgba(74,52,24,.6);padding:20px 0}
+  @supports not (background: color-mix(in srgb, red 50%, transparent)){
+    .lesson-arc-frame{background:linear-gradient(155deg,rgba(255,255,255,.11),rgba(255,255,255,.04))}
+  }
+
+  .lesson-arc-t{font-size:11px;font-weight:800;letter-spacing:.04em;
+    color:var(--primary);margin:0 0 10px}
+
+  /* Bỏ border-left 2px của bản cũ — đó chính là vạch dọc chen vào chữ.
+     Trước đây nó bị cặp ngoặc kép cỡ lớn che nên không ai để ý. */
+  .lesson-quote{font-size:14px;line-height:1.62;color:var(--text);
+    border-left:none;padding:9px 0;margin:0;font-style:normal}
+  .lesson-quote + .lesson-quote{border-top:1px solid rgba(255,255,255,.13)}
+  .lesson-quote b{font-style:normal;font-weight:800;color:var(--primary)}
+  .lesson-quote i{font-style:italic;color:var(--text)}
+
+  .lesson-empty{text-align:center;font-size:13px;color:var(--muted);padding:22px 0}
   .sb-progress b{color:var(--primary)}
   .sb-progress .sb-bar{height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-top:6px;max-width:220px}
   .sb-progress .sb-bar i{display:block;height:100%;background:var(--grad-hero);border-radius:99px;transition:width .6s}
@@ -2023,38 +2050,6 @@
     font-size:22px;color:var(--primary)}
 
 
-  /* ============================================================
-     WHAT FOCCI HAS LEARNED — khung mỗi arc từ khối pastel đặc chuyển
-     thành kính mờ mang sắc riêng của arc (--t1/--t2 truyền từ arcTint).
-     Bỏ hết lá, hoa, dấu ❦ và ngoặc kép cỡ lớn: trang trí không mang
-     thông tin, ở cỡ nhỏ chỉ làm rối.
-     ============================================================ */
-  .lesson-head{text-align:center;margin-bottom:18px}
-  .lesson-head-t{font-size:18px;font-weight:800;letter-spacing:-.02em;color:#f6ead2}
-  .lesson-head-s{margin-top:5px;font-size:11.5px;line-height:1.45;color:rgba(246,234,210,.6)}
-
-  .lesson-arc-frame{position:relative;overflow:hidden;padding:16px 16px 14px;margin-bottom:14px;
-    border-radius:20px;
-    background:
-      linear-gradient(155deg,
-        color-mix(in srgb, var(--t1,#e4ddc9) 26%, transparent),
-        color-mix(in srgb, var(--t2,#b8ac86) 18%, transparent)),
-      linear-gradient(155deg,rgba(255,255,255,.13),rgba(255,255,255,.04));
-    backdrop-filter:blur(20px) saturate(1.35);-webkit-backdrop-filter:blur(20px) saturate(1.35);
-    border:1px solid rgba(255,255,255,.2);border-top-color:rgba(255,255,255,.34);
-    box-shadow:0 12px 30px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.14)}
-
-  /* Safari cũ không có color-mix: nền vẫn là kính, chỉ mất phần sắc arc. */
-  @supports not (background: color-mix(in srgb, red 50%, transparent)){
-    .lesson-arc-frame{background:linear-gradient(155deg,rgba(255,255,255,.15),rgba(255,255,255,.05))}
-  }
-
-  .lesson-arc-t{font-size:12px;font-weight:800;letter-spacing:.02em;
-    color:rgba(255,255,255,.92);margin-bottom:11px}
-  .lesson-quote{font-size:14px;line-height:1.62;color:#fff;
-    text-shadow:0 1px 3px rgba(0,0,0,.35);padding:9px 0}
-  .lesson-quote + .lesson-quote{border-top:1px solid rgba(255,255,255,.14)}
-
   /* icon hai game: asset thật thay cho emoji hệ thống */
   .gt-ico-img{width:26px;height:26px;object-fit:contain;display:block;margin:0 auto 2px}
   .game-tab.on .gt-ico-img{filter:drop-shadow(0 2px 5px rgba(0,0,0,.35))}
@@ -2467,7 +2462,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v63 · bôi đen chịu được nghiêng tay</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v64 · trang lesson về một hệ màu, bỏ chữ nâu</b></p>
   </section>
 </main>
 
