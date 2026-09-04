@@ -127,6 +127,7 @@ async function logEvent(type, word){
     // Every search — whether typed in the search bar or tapped inside a
     // story passage — lands here, so this is the one place the word-bank's
     // "new word" detector needs to watch.
+    if(type==='search' && word) histPush(word);
     if(type==='search' && word && typeof window.onWordSearched==='function'){
       try{ window.onWordSearched(word); }catch(e){}
     }
@@ -1837,16 +1838,77 @@ async function removeFromSuggest(word, btn){
 /* ============================================================
    HOME DASHBOARD
    ============================================================ */
-async function renderHistory(){
-  const logs=await logAll();
-  const seen=new Set(); const recent=[];
-  for(let i=logs.length-1;i>=0 && recent.length<8;i--){
-    const l=logs[i]; if(l.type!=='search'||!l.word||seen.has(l.word)) continue;
-    seen.add(l.word); recent.push(l.word);
+/* ============================================================
+   SỔ LỊCH SỬ TRA TỪ — giữ được lâu dài.
+
+   Trước đây danh sách này dựng từ bảng log, mà log bị logTrim() cắt còn
+   2.500 sự kiện mới nhất khi vượt 3.000 — và log đếm CẢ lượt luyện tập,
+   lượt lưu sao, nên phần tra từ bị đẩy ra rất nhanh. Cộng thêm giới hạn
+   cứng 8 mục khi hiển thị. Kết quả: lịch sử trông như "tự xoá theo ngày".
+
+   Giờ có một sổ riêng trong localStorage: mảng {w, t} theo thứ tự cũ →
+   mới, chỉ chứa lượt TRA TỪ, không bị logTrim động tới. Mỗi mục khoảng
+   30 byte nên 5.000 lượt chỉ tốn ~150KB, thoải mái trong hạn 5MB.
+   ============================================================ */
+const HIST_LS='sd_search_hist', HIST_MAX=5000;
+
+function histLoad(){
+  try{
+    const v=JSON.parse(localStorage.getItem(HIST_LS)||'[]');
+    return Array.isArray(v)?v:[];
+  }catch(e){ return []; }
+}
+function histSave(list){
+  try{ localStorage.setItem(HIST_LS, JSON.stringify(list)); }
+  catch(e){
+    // hết chỗ thì cắt còn nửa rồi thử lại, chứ không mất trắng
+    try{ localStorage.setItem(HIST_LS, JSON.stringify(list.slice(-Math.floor(HIST_MAX/2)))); }catch(_){}
   }
+}
+/* Ghi một lượt tra. Tra lại từ cũ thì đẩy nó lên đầu chứ không nhân bản. */
+function histPush(word){
+  const w=norm(word||''); if(!w) return;
+  const list=histLoad().filter(e=>e && e.w!==w);
+  list.push({w, t:now()});
+  histSave(list.length>HIST_MAX ? list.slice(-HIST_MAX) : list);
+}
+/* Chuyển một lần từ bảng log sang sổ mới, để lịch sử đang có không mất. */
+async function histMigrateOnce(){
+  if(localStorage.getItem(HIST_LS)) return;
+  try{
+    const logs=await logAll();
+    const seen=new Set(); const out=[];
+    for(const l of logs){
+      if(l.type!=='search' || !l.word) continue;
+      if(seen.has(l.word)) { const i=out.findIndex(e=>e.w===l.word); if(i>=0) out.splice(i,1); }
+      seen.add(l.word); out.push({w:l.word, t:l.ts||now()});
+    }
+    histSave(out.slice(-HIST_MAX));
+  }catch(e){ histSave([]); }
+}
+window.histPush=histPush;
+
+let _histShown=12;              // hiện bao nhiêu mục lúc này
+const HIST_PAGE=60;             // mỗi lần "Xem thêm" mở thêm bấy nhiêu
+window.histMore=function(){
+  _histShown+=HIST_PAGE;
+  renderHistory();
+};
+
+async function renderHistory(){
+  await histMigrateOnce();
+  const store=histLoad();
+  const seen=new Set(); const recent=[];
+  for(let i=store.length-1;i>=0;i--){                 // mới nhất trước
+    const e=store[i]; if(!e||!e.w||seen.has(e.w)) continue;
+    seen.add(e.w); recent.push(e.w);
+  }
+  const totalAll=recent.length;
   const box=$('#history-list');
+  const slotEl=$('#hist-more-slot'); if(slotEl) slotEl.innerHTML='';
   if(!recent.length){ box.innerHTML='<div class="empty" style="padding:20px 10px"><img class="ill" style="width:110px" src="./mascot-explore.webp" alt=""/><h3>No discoveries yet</h3><p>Search a word above — Focci will chart it on the map.</p></div>'; return; }
-  const recs=await Promise.all(recent.map(w=>idbGet(w)));
+  const slice=recent.slice(0, _histShown);
+  const recs=await Promise.all(slice.map(w=>idbGet(w)));
   let h='';
   for(const r of recs){ if(!r) continue; const d=r.data||{}; const w=esc(r.word);
     const safeW=w.replace(/'/g,"\\'");
@@ -1862,6 +1924,23 @@ async function renderHistory(){
       +'</div>';
   }
   box.innerHTML=h;
+
+  /* Nút mở thêm nằm NGOÀI hộp cuộn. Để trong thì nó tụt xuống đáy danh
+     sách và phải cuộn hết mới bấm được — mở dần mà vẫn phải cuộn tay thì
+     mất ý nghĩa. Mẻ 60 một lần: dựng vài nghìn thẻ cùng lúc sẽ treo UI. */
+  const slot=$('#hist-more-slot');
+  if(slot){
+    const left=totalAll-slice.length;
+    if(left>0){
+      slot.innerHTML='<button class="hist-more" onclick="histMore()">Xem th\u00eam '
+        +Math.min(left,HIST_PAGE)+' m\u1ee5c \u00b7 c\u00f2n '+left.toLocaleString()+'</button>';
+    }else if(totalAll>12){
+      slot.innerHTML='<div class="hist-count">'+totalAll.toLocaleString()
+        +' t\u1eeb \u0111\u00e3 tra \u00b7 \u0111\u00e3 hi\u1ec7n h\u1ebft</div>';
+    }else{
+      slot.innerHTML='';
+    }
+  }
 }
 const FISH_STORIES=[
 ['A boy asks his father, "Dad, are bugs good to eat?" "That\'s disgusting. Don\'t talk about things like that over dinner," the dad replies. After','dinner the father asks, "Now, son, what did you want to ask me?" "Oh, nothing," the boy says. "There was a bug in your soup, but now it\'s gone."'],
@@ -1957,6 +2036,8 @@ let _statCache={learned:0,avg:0,mins:0,activeDays:0,todayNew:0,bestDay:0};
 
 async function removeFromHistory(word){
   await logDeleteWord(word);
+  const w=norm(word||'');
+  histSave(histLoad().filter(e=>e && e.w!==w));   // xoá khỏi sổ, không chỉ khỏi log
   renderHistory();
 }
 /* Star a word straight from a list without leaving the page. */
