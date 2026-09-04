@@ -1252,7 +1252,18 @@
   .hist-del{font-size:15px;color:var(--muted-2);padding:0;flex:none;line-height:1;
     width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center}
   .hist-del:active{background:var(--coral-bg);color:var(--coral);transform:scale(.9)}
-  .history-scroll{max-height:440px;overflow-y:auto}
+  /* Hộp cuộn riêng cho lịch sử: dù có mở tới vài trăm mục thì phần dưới
+     trang (Focci fishing) vẫn ở ngay dưới, không bị đẩy xuống mất hút.
+     overscroll-behavior:contain để cuộn hết danh sách không kéo theo trang. */
+  .hist-box{position:relative}
+  .history-scroll{max-height:min(52vh,420px);overflow-y:auto;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+    padding-right:2px}
+  /* mép dưới mờ dần — dấu hiệu còn nội dung bên dưới */
+  .hist-box::after{content:'';position:absolute;left:0;right:0;bottom:0;height:26px;
+    pointer-events:none;border-radius:0 0 14px 14px;
+    background:linear-gradient(180deg,transparent,var(--bg))}
+  .hist-box:has(.empty)::after{display:none}
 
   /* ---- Focci fishing — a little interactive footer under Recent Searches ---- */
   .fish-footer{position:relative;min-height:100px;margin-top:26px;border-radius:20px;
@@ -2233,7 +2244,10 @@
 
       <div class="sec">
         <div class="sec-h"><span class="tile tile-sm primary">🕘</span>Recent Searches</div>
-        <div id="history-list" class="history-scroll"></div>
+        <div class="hist-box">
+          <div id="history-list" class="history-scroll"></div>
+        </div>
+        <div id="hist-more-slot"></div>
       </div>
 
       <div class="fish-footer" id="fish-footer" onclick="tapFishMascot()">
@@ -2482,7 +2496,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v68 · Sep 04 2026 ·</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v69 · Focci's Learning App - Sep 04 2026 · </b></p>
   </section>
 </main>
 
