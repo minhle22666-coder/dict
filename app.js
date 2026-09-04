@@ -811,7 +811,13 @@ async function search(rawWord, forceAI){
       if(elapsed<1800) await new Promise(r=>setTimeout(r,1800-elapsed));
       currentWord=null;
       box.innerHTML=phraseResultState(word, result);
-      logEvent('search', null);
+      /* Lưu bản dịch (saved:0) rồi log CHÍNH cụm đó → hiện ở Recent, và
+         bấm lại là ra ngay vì idbGet tìm thấy, không gọi AI lần hai. */
+      try{
+        const prim=(result&&result.primary&&result.primary.text)||result.translation||'';
+        if(prim) await phraseHistoryRecord(word, prim, result);
+        logEvent('search', norm(word));
+      }catch(e){ logEvent('search', null); }
       addXP(1);
     }catch(err){ box.innerHTML=errorState(word,err.message||''); }
     return;

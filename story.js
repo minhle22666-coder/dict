@@ -1005,7 +1005,14 @@ async function openPhrasePopup(text){
     const existing = await idbGet(norm(t));
     const result = await translatePhrase(t);
     _phraseCache[t] = result;
-    await logEvent('search', null);
+    /* Cụm bôi đen trong bài đọc cũng phải vào Recent như cụm tra ở thanh
+       tìm kiếm — trước đây log word:null nên nó biến mất không dấu vết. */
+    try{
+      const prim=(result&&result.primary&&result.primary.text)||result.translation||'';
+      if(prim && typeof phraseHistoryRecord==='function')
+        await phraseHistoryRecord(t, prim, result);
+      await logEvent('search', norm(t));
+    }catch(e){ await logEvent('search', null); }
     addXP(1);
     showWordSheet(phraseSheetHTML(t, result, !!(existing&&existing.saved)));
   }catch(err){
