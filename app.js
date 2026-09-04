@@ -1582,16 +1582,11 @@ function renderEntry(rec, queriedAs, formNote){
   const safeW=esc(w).replace(/'/g,"\\'");
   h+='<div class="head"><div class="head-main">';
   h+='<div class="headword">'+esc(d.word||w)+'</div>';
-  // Nhãn trình độ đọc từ levels.txt (đã có sẵn levelTag()) — dạng biến đổi
-  // thì tra theo TỪ GỐC, vì levels.txt chỉ liệt kê từ gốc.
-  {
-    const lvWord = d._inflectedFrom || d.word || w;
-    const lv = (typeof levelTag==='function') ? levelTag(lvWord) : '';
-    if(lv) h+='<div class="head-lv">'+lv+'</div>';
-  }
   h+='<div class="head-meta">';
   if(d.phonetic) h+='<span class="phon">'+esc(d.phonetic)+'</span>';
-  h+=(typeof levelTag==='function'?levelTag(d.word||w):'');
+  // Nhãn trình độ: với dạng biến đổi thì tra theo TỪ GỐC, vì levels.txt
+  // chỉ liệt kê từ gốc — "walked" không có trong đó, "walk" thì có.
+  h+=(typeof levelTag==='function'?levelTag(d._inflectedFrom||d.word||w):'');
   h+='</div>';
   const posSet=[...new Set((d.senses||[]).map(s=>s.pos).filter(Boolean))];
   if(posSet.length){ h+='<div class="pos-row">'+posSet.map(posChip).join('')+'</div>'; }

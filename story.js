@@ -621,7 +621,8 @@ function condensedEntryHTML(rec, formNote){
       +' of <b>'+esc(baseW)+'</b></div>';
   }
   h+='<div class="ws-head"><div class="ws-word">'+esc(d.word||w)+'</div>';
-  if(typeof levelTag==='function') h+=levelTag(d.word||w);
+  // dạng biến đổi tra nhãn theo TỪ GỐC, giống trang từ đầy đủ
+  if(typeof levelTag==='function') h+=levelTag(d._inflectedFrom||d.word||w);
   h+='<button class="ws-star'+(rec.saved?' on':'')+'" onclick="wordPopupToggleSave(\''+safeW+'\')" aria-label="Save word">'+(rec.saved?'★':'☆')+'</button>';
   h+='</div>';
   if(d.phonetic) h+='<div class="ws-phon">'+esc(d.phonetic)+'</div>';
