@@ -615,9 +615,10 @@ function condensedEntryHTML(rec, formNote){
   const safeW = esc(w).replace(/'/g,"\\'");
   let h='';
   if(formNote){
-    h+='<div class="ws-inflect">“<b>'+esc(formNote.form)+'</b>” \u2192 '
-      +esc((window.FORM_LABEL&&window.FORM_LABEL[formNote.kind])||'dạng của')
-      +' <b>'+esc(w)+'</b></div>';
+    const baseW=formNote.base||w;
+    h+='<div class="ws-inflect"><b>'+esc(formNote.form)+'</b> \u2192 '
+      +esc((window.EN_FORM_NOTE&&window.EN_FORM_NOTE[formNote.kind])||'form')
+      +' of <b>'+esc(baseW)+'</b></div>';
   }
   h+='<div class="ws-head"><div class="ws-word">'+esc(d.word||w)+'</div>';
   if(typeof levelTag==='function') h+=levelTag(d.word||w);
@@ -1024,12 +1025,16 @@ async function openWordPopup(rawWord){
     // "shone" into "phone" and looks up something the reader never tapped.
     /* Dạng biến đổi trước đã: tap "walked" trong bài đọc thì lấy nghĩa
        của "walk" ngay trong máy, không tiêu token cho một nghĩa đã có. */
-    if(!rec && typeof lemmaLookup==='function'){
-      const lem=await lemmaLookup(word);
+    if(!rec && typeof lemmaResolve==='function'){
+      const lem=await lemmaResolve(word);
       if(lem){
         await logEvent('search', lem.rec.word);
         addXP(1);
-        showWordSheet(condensedEntryHTML(lem.rec, {form:word, kind:lem.kind}));
+        const shown={ word:word, saved:lem.rec.saved,
+          data:(typeof inflectedData==='function')
+                 ? inflectedData(lem.rec.data, lem.kind, word) : lem.rec.data };
+        showWordSheet(condensedEntryHTML(shown,
+          {form:word, kind:lem.kind, base:lem.rec.word}));
         return;
       }
     }

@@ -473,7 +473,14 @@ async function forceViTranslate(word){
     if(elapsed<1800) await new Promise(r=>setTimeout(r,1800-elapsed));
     currentWord=null;
     box.innerHTML=phraseResultState(word, result);
-    logEvent('search', null); addXP(1);
+    /* Lưu bản dịch (saved:0) rồi log CHÍNH cụm từ đó, nên nó hiện trong
+       Recent searches và bấm lại là ra ngay — không gọi AI lần hai. */
+    try{
+      const prim=(result&&result.primary&&result.primary.text)||result.translation||'';
+      if(prim) await phraseHistoryRecord(word, prim, result);
+      logEvent('search', norm(word));
+    }catch(e){ logEvent('search', null); }
+    addXP(1);
   }catch(err){ box.innerHTML=errorState(word,err.message||''); }
 }
 
@@ -577,6 +584,27 @@ function trCopy(btn, text){
    suspects goes into data.suggestion for the user to accept or ignore. */
 /* A highlighted phrase is saved as a first-class record so it shows up in
    Saved alongside single words, with the translation as its meaning. */
+/* Bản ghi cụm từ cho lịch sử: saved:0 nên không nằm trong Saved, nhưng
+   vẫn tra được offline và hiện ở Recent. Không ghi đè nếu đã lưu sao. */
+async function phraseHistoryRecord(text, translation, result){
+  const w=norm(text||''); if(!w) return null;
+  const ex=await idbGet(w);
+  if(ex && ex.saved) return ex;
+  const alts=((result&&result.alternatives)||[]).filter(x=>x&&x.text).slice(0,3);
+  const data={
+    word:text, phrase:true, vi_equivalent:translation,
+    senses:[{pos:'phrase', vi:translation,
+             en:(result&&result.primary&&result.primary.why)||''}]
+      .concat(alts.map(x=>({pos:x.register||'alt', vi:x.text, en:x.why||''})))
+  };
+  const rec={ word:w, data, source:'phrase',
+              firstSeen: ex?ex.firstSeen:now(), saved:0, savedAt:0 };
+  await idbPut(rec);
+  if(typeof lemmaResetKeys==='function') lemmaResetKeys();
+  return rec;
+}
+window.phraseHistoryRecord=phraseHistoryRecord;
+
 async function savePhraseRecord(text, translation, extra){
   const w = norm(text||''); if(!w) return null;
   const ex = await idbGet(w);
@@ -710,13 +738,48 @@ async function search(rawWord, forceAI){
     return;
   }
 
+  if(typeof loadLevels==='function'){ try{ await loadLevels(); }catch(e){} }
+
   if(!forceAI){
     const local=await idbGet(word);
     if(local && local.alias){
       const canon=await idbGet(local.alias);
-      if(canon){ currentWord=canon.word; box.innerHTML=renderEntry(canon, word); maybeLoadYouglish(canon.word); logEvent('search',canon.word); addXP(2); return; }
+      if(canon){
+        currentWord=canon.word;
+        // alias do lemma sinh ra thì hiện khung "dạng biến đổi", không phải "đã sửa"
+        if(local.formKind){
+          const shown={ word:word, data:inflectedData(canon.data, local.formKind, word),
+                        source:canon.source, saved:canon.saved,
+                        firstSeen:canon.firstSeen, savedAt:canon.savedAt };
+          box.innerHTML=renderEntry(shown, null,
+            {form:word, kind:local.formKind, base:canon.word});
+        }else{
+          box.innerHTML=renderEntry(canon, word);
+        }
+        maybeLoadYouglish(canon.word); logEvent('search',canon.word); addXP(2); return;
+      }
     }
     if(local){ currentWord=word; box.innerHTML=renderEntry(local); maybeLoadYouglish(word); logEvent('search',word); addXP(2); return; }
+
+    /* Dạng biến đổi của một từ đã có trong máy: went→go, walked→walk,
+       studies→study. Phải đứng TRƯỚC fuzzyLocalSearch, vì fuzzy chấm
+       điểm theo ký tự và sẽ đoán "went"→"want" — sai hẳn nghĩa. */
+    if(!hasSpace){
+      const lem=await lemmaResolve(word);
+      if(lem){
+        currentWord=word;
+        // Hiện nghĩa CỦA CHÍNH DẠNG NÀY, suy cơ học từ nghĩa gốc.
+        const shown={ word:word, data:inflectedData(lem.rec.data, lem.kind, word),
+                      source:lem.rec.source, saved:lem.rec.saved,
+                      firstSeen:lem.rec.firstSeen, savedAt:lem.rec.savedAt };
+        box.innerHTML=renderEntry(shown, null, {form:word, kind:lem.kind, base:lem.rec.word});
+        maybeLoadYouglish(word);
+        logEvent('search', lem.rec.word);
+        addXP(2);
+        lemmaSaveAlias(word, lem.rec, lem.kind);
+        return;
+      }
+    }
 
     const guess=await fuzzyLocalSearch(word);
     if(guess && guess.exact){
@@ -858,6 +921,337 @@ function posLabel(p){ const k=posKey(p); return k==='other' ? String(p||'') : k;
 function posChip(p){ if(!p) return '';
   const k=posKey(p), c=POS_COLOR[k];
   return '<span class="pos-chip pos-'+c+'">'+esc(posLabel(p))+'</span>'; }
+
+
+/* ============================================================
+   DẠNG BIẾN ĐỔI CỦA TỪ — tra ngược về từ gốc, hoàn toàn OFFLINE.
+
+   VẤN ĐỀ: tra "went", "gone", "walked", "running", "studies" thì
+   idbGet() không thấy gì (thư viện chỉ chứa từ gốc "go", "walk"…),
+   nên app rơi xuống nhánh gọi Gemini — tốn token cho một nghĩa đã
+   nằm sẵn trong máy.
+
+   CÁCH LÀM: sinh danh sách từ gốc CÓ THỂ, rồi tra từng cái trong
+   IndexedDB. Không có bảng từ điển ngoài, không gọi mạng.
+     · Bảng bất quy tắc cho động từ và số nhiều thường gặp.
+     · Luật hậu tố cho các dạng đều: -s/-es/-ies, -ed/-ied/-ped,
+       -ing (kèm phục hồi "e" và phụ âm nhân đôi), -er/-est.
+   Trúng thì hiện nghĩa của từ gốc NHƯNG nói rõ bạn vừa tra dạng
+   nào, và ghi một alias vào IndexedDB để lần sau tra là ra ngay.
+
+   GIỚI HẠN CÓ Ý: đây là luật hình thái, không phải phân tích ngữ
+   pháp. "left" ra "leave" dù trong câu nó có thể là tính từ; "saw"
+   ra "see" dù cũng là cái cưa. Cả hai vẫn tốt hơn gọi API, và từ
+   gốc luôn được nêu rõ nên bạn thấy ngay nó suy ra từ đâu.
+   ============================================================ */
+const IRREGULAR_FORMS = {
+  // động từ — quá khứ
+  was:['be','past'], were:['be','past'], been:['be','pastp'], am:['be','s3'], is:['be','s3'], are:['be','s3'],
+  had:['have','past'], has:['have','s3'], did:['do','past'], does:['do','s3'], done:['do','pastp'],
+  went:['go','past'], gone:['go','pastp'], goes:['go','s3'],
+  said:['say','past'], made:['make','past'], took:['take','past'], taken:['take','pastp'],
+  came:['come','past'], saw:['see','past'], seen:['see','pastp'], knew:['know','past'], known:['know','pastp'],
+  got:['get','past'], gotten:['get','pastp'], gave:['give','past'], given:['give','pastp'],
+  found:['find','past'], thought:['think','past'], told:['tell','past'], became:['become','past'],
+  left:['leave','past'], felt:['feel','past'], brought:['bring','past'], began:['begin','past'], begun:['begin','pastp'],
+  kept:['keep','past'], held:['hold','past'], wrote:['write','past'], written:['write','pastp'],
+  stood:['stand','past'], heard:['hear','past'], let:['let','past'], meant:['mean','past'],
+  met:['meet','past'], ran:['run','past'], paid:['pay','past'], sat:['sit','past'], spoke:['speak','past'],
+  spoken:['speak','pastp'], lay:['lie','past'], led:['lead','past'], grew:['grow','past'], grown:['grow','pastp'],
+  lost:['lose','past'], fell:['fall','past'], fallen:['fall','pastp'], sent:['send','past'],
+  built:['build','past'], understood:['understand','past'], drew:['draw','past'], drawn:['draw','pastp'],
+  broke:['break','past'], broken:['break','pastp'], spent:['spend','past'], chose:['choose','past'],
+  chosen:['choose','pastp'], drove:['drive','past'], driven:['drive','pastp'], bought:['buy','past'],
+  wore:['wear','past'], worn:['wear','pastp'], caught:['catch','past'], taught:['teach','past'],
+  sold:['sell','past'], flew:['fly','past'], flown:['fly','pastp'], threw:['throw','past'], thrown:['throw','pastp'],
+  ate:['eat','past'], eaten:['eat','pastp'], drank:['drink','past'], drunk:['drink','pastp'],
+  rose:['rise','past'], risen:['rise','pastp'], wrote_:['write','past'], slept:['sleep','past'],
+  swam:['swim','past'], swum:['swim','pastp'], rode:['ride','past'], ridden:['ride','pastp'],
+  shone:['shine','past'], shot:['shoot','past'], sang:['sing','past'], sung:['sing','pastp'],
+  sank:['sink','past'], stole:['steal','past'], stolen:['steal','pastp'], struck:['strike','past'],
+  swore:['swear','past'], sworn:['swear','pastp'], tore:['tear','past'], torn:['tear','pastp'],
+  woke:['wake','past'], woken:['wake','pastp'], hid:['hide','past'], hidden:['hide','pastp'],
+  bit:['bite','past'], bitten:['bite','pastp'], blew:['blow','past'], blown:['blow','pastp'],
+  froze:['freeze','past'], frozen:['freeze','pastp'], forgot:['forget','past'], forgotten:['forget','pastp'],
+  forgave:['forgive','past'], forgiven:['forgive','pastp'], hung:['hang','past'], dug:['dig','past'],
+  fed:['feed','past'], fought:['fight','past'], hurt:['hurt','past'], laid:['lay','past'],
+  lent:['lend','past'], lit:['light','past'], rang:['ring','past'], rung:['ring','pastp'],
+  sought:['seek','past'], shook:['shake','past'], shaken:['shake','pastp'], shut:['shut','past'],
+  spread:['spread','past'], sprang:['spring','past'], stuck:['stick','past'], stung:['sting','past'],
+  wept:['weep','past'], won:['win','past'], wound:['wind','past'], withdrew:['withdraw','past'],
+  withdrawn:['withdraw','pastp'], arose:['arise','past'], arisen:['arise','pastp'],
+  awoke:['awake','past'], bore:['bear','past'], borne:['bear','pastp'], beat:['beat','past'],
+  bent:['bend','past'], bound:['bind','past'], bred:['breed','past'], burnt:['burn','past'],
+  burst:['burst','past'], cast:['cast','past'], clung:['cling','past'], cost:['cost','past'],
+  crept:['creep','past'], dealt:['deal','past'], dreamt:['dream','past'], fled:['flee','past'],
+  ground:['grind','past'], knelt:['kneel','past'], knit:['knit','past'], leant:['lean','past'],
+  leapt:['leap','past'], meant_:['mean','past'], mistook:['mistake','past'], mistaken:['mistake','pastp'],
+  overcame:['overcome','past'], put:['put','past'], quit:['quit','past'], read:['read','past'],
+  rid:['rid','past'], set:['set','past'], sewn:['sew','pastp'], shed:['shed','past'],
+  slid:['slide','past'], slit:['slit','past'], smelt:['smell','past'], sowed:['sow','past'],
+  spat:['spit','past'], split:['split','past'], spoilt:['spoil','past'], spun:['spin','past'],
+  strode:['stride','past'], strung:['string','past'], strove:['strive','past'], sweat:['sweat','past'],
+  swept:['sweep','past'], swelled:['swell','past'], swung:['swing','past'], thrust:['thrust','past'],
+  trod:['tread','past'], upset:['upset','past'], wed:['wed','past'], wept_:['weep','past'],
+  wrung:['wring','past'],
+  // số nhiều bất quy tắc
+  children:['child','plural'], feet:['foot','plural'], teeth:['tooth','plural'],
+  men:['man','plural'], women:['woman','plural'], mice:['mouse','plural'], geese:['goose','plural'],
+  people:['person','plural'], lives:['life','plural'], knives:['knife','plural'],
+  wolves:['wolf','plural'], leaves:['leaf','plural'], halves:['half','plural'],
+  shelves:['shelf','plural'], thieves:['thief','plural'], wives:['wife','plural'],
+  loaves:['loaf','plural'], selves:['self','plural'], calves:['calf','plural'],
+  oxen:['ox','plural'], dice:['die','plural'], criteria:['criterion','plural'],
+  phenomena:['phenomenon','plural'], data:['datum','plural'], analyses:['analysis','plural'],
+  crises:['crisis','plural'], theses:['thesis','plural'], indices:['index','plural'],
+  matrices:['matrix','plural'], appendices:['appendix','plural'], cacti:['cactus','plural'],
+  fungi:['fungus','plural'], nuclei:['nucleus','plural'], stimuli:['stimulus','plural'],
+  // so sánh bất quy tắc
+  better:['good','comparative'], best:['good','superlative'],
+  worse:['bad','comparative'], worst:['bad','superlative'],
+  further:['far','comparative'], furthest:['far','superlative'],
+  farther:['far','comparative'], farthest:['far','superlative'],
+  more:['many','comparative'], most:['many','superlative'], less:['little','comparative'],
+  least:['little','superlative']
+};
+
+const FORM_LABEL = {
+  past:'past form of', pastp:'past participle of', ing:'-ing form of',
+  s3:'-s form of', plural:'plural of',
+  comparative:'comparative of', superlative:'superlative of'
+};
+
+/* Sinh các từ gốc CÓ THỂ, xếp theo mức khả dĩ giảm dần. */
+function lemmaCandidates(word){
+  const w=(word||'').trim().toLowerCase();
+  const out=[];
+  const push=(base,kind)=>{
+    if(!base || base.length<2 || base===w) return;
+    if(out.some(c=>c.base===base && c.kind===kind)) return;
+    out.push({base,kind});
+  };
+
+  const irr=IRREGULAR_FORMS[w];
+  if(irr) push(irr[0], irr[1]);
+
+  const dbl = w.length>3 && w[w.length-3]===w[w.length-4];   // stopped / running
+
+  if(w.endsWith('ies') && w.length>4){ push(w.slice(0,-3)+'y','s3'); push(w.slice(0,-3)+'y','plural'); }
+  if(w.endsWith('ves') && w.length>4){ push(w.slice(0,-3)+'f','plural'); push(w.slice(0,-3)+'fe','plural'); }
+  if(w.endsWith('es') && w.length>3){ push(w.slice(0,-2),'s3'); push(w.slice(0,-2),'plural');
+                                      push(w.slice(0,-1),'s3'); push(w.slice(0,-1),'plural'); }
+  if(w.endsWith('s') && !w.endsWith('ss') && !w.endsWith('us') && w.length>2){
+    push(w.slice(0,-1),'s3'); push(w.slice(0,-1),'plural'); }
+
+  if(w.endsWith('ied') && w.length>4) push(w.slice(0,-3)+'y','past');
+  if(w.endsWith('ed') && w.length>3){
+    push(w.slice(0,-2),'past'); push(w.slice(0,-2),'pastp');
+    push(w.slice(0,-1),'past'); push(w.slice(0,-1),'pastp');          // liked → like
+    if(dbl){ push(w.slice(0,-3),'past'); push(w.slice(0,-3),'pastp'); } // stopped → stop
+  }
+  if(w.endsWith('ing') && w.length>4){
+    push(w.slice(0,-3),'ing');
+    push(w.slice(0,-3)+'e','ing');                                     // making → make
+    if(w.length>5 && w[w.length-4]===w[w.length-5]) push(w.slice(0,-4),'ing'); // running → run
+    if(w.endsWith('ying') && w.length>5) push(w.slice(0,-4)+'ie','ing');       // dying → die
+    if(w.endsWith('cking')) push(w.slice(0,-5)+'c','ing');                     // panicking → panic
+  }
+  if(w.endsWith('cked')){ push(w.slice(0,-4)+'c','past'); push(w.slice(0,-4)+'c','pastp'); }
+  if(w.endsWith('iest') && w.length>5) push(w.slice(0,-4)+'y','superlative');
+  if(w.endsWith('ier') && w.length>4)  push(w.slice(0,-3)+'y','comparative');
+  if(w.endsWith('est') && w.length>4){
+    const b=w.slice(0,-3);
+    push(b,'superlative'); push(w.slice(0,-2),'superlative');
+    // biggest → bigg → big
+    if(b.length>2 && b[b.length-1]===b[b.length-2]) push(b.slice(0,-1),'superlative');
+  }
+  if(w.endsWith('er') && w.length>3){
+    const b=w.slice(0,-2);
+    push(b,'comparative'); push(w.slice(0,-1),'comparative');
+    // bigger → bigg → big
+    if(b.length>2 && b[b.length-1]===b[b.length-2]) push(b.slice(0,-1),'comparative');
+  }
+
+  return out;
+}
+
+/* ------------------------------------------------------------------
+   LƯỚI AN TOÀN: QUÉT NGƯỢC.
+   Luật xuôi bao giờ cũng còn kẽ hở (referred, panicked, dying, modelled…).
+   Thay vì đoán mãi, hỏi câu ngược lại: "từ nào TRONG THƯ VIỆN có thể sinh
+   ra dạng này?" — quét một lượt toàn bộ khoá của IndexedDB. 16 nghìn phép
+   so chuỗi rẻ tiền, chạy dưới 5ms, và có cache nên chỉ quét lần đầu.
+   Nhờ vậy MỌI dạng đều của MỌI từ trong thư viện đều tra được.
+   ------------------------------------------------------------------ */
+let _lemKeys=null;
+async function lemmaKeys(){
+  if(_lemKeys) return _lemKeys;
+  _lemKeys=await db().then(d=>new Promise((res,rej)=>{
+    const r=d.transaction(STORE,'readonly').objectStore(STORE).getAllKeys();
+    r.onsuccess=()=>res(r.result||[]);
+    r.onerror=()=>rej(r.error);
+  })).catch(()=>[]);
+  return _lemKeys;
+}
+window.lemmaResetKeys=()=>{ _lemKeys=null; };
+
+/* base có sinh ra được form không? Trả về loại dạng, hoặc null. */
+function lemmaDerives(base, form){
+  if(base===form || base.length<2) return null;
+  const dbl = base + base[base.length-1];          // stop → stopp
+  const noE = base.endsWith('e') ? base.slice(0,-1) : null;
+  const yToI = base.endsWith('y') ? base.slice(0,-1)+'i' : null;
+
+  if(form===base+'s') return 's3';
+  if(form===base+'es') return 's3';
+  if(yToI && form===yToI+'es') return 's3';
+  if(base.endsWith('f')  && form===base.slice(0,-1)+'ves') return 'plural';
+  if(base.endsWith('fe') && form===base.slice(0,-2)+'ves') return 'plural';
+
+  if(form===base+'ed' || form===base+'d') return 'past';
+  if(form===dbl+'ed') return 'past';
+  if(yToI && form===yToI+'ed') return 'past';
+  if(base.endsWith('c') && form===base+'ked') return 'past';
+
+  if(form===base+'ing') return 'ing';
+  if(noE && form===noE+'ing') return 'ing';
+  if(form===dbl+'ing') return 'ing';
+  if(base.endsWith('ie') && form===base.slice(0,-2)+'ying') return 'ing';
+  if(base.endsWith('c') && form===base+'king') return 'ing';
+
+  if(form===base+'er' || (noE&&form===noE+'er') || form===dbl+'er'
+     || (yToI&&form===yToI+'er')) return 'comparative';
+  if(form===base+'est' || (noE&&form===noE+'est') || form===dbl+'est'
+     || (yToI&&form===yToI+'est')) return 'superlative';
+  return null;
+}
+
+async function lemmaReverse(form){
+  const keys=await lemmaKeys();
+  if(!keys.length) return null;
+  const head=form.slice(0,2);
+  let best=null;
+  for(const k of keys){
+    if(typeof k!=='string') continue;
+    if(k.length>=form.length) continue;            // gốc luôn ngắn hơn dạng
+    if(k.slice(0,2)!==head) continue;              // sàng thô cho nhanh
+    const kind=lemmaDerives(k, form);
+    if(!kind) continue;
+    // gốc dài hơn thì sát hơn: "referred" ưu tiên "refer" hơn "ref"
+    if(!best || k.length>best.base.length) best={base:k, kind};
+  }
+  return best;
+}
+
+/* Tra từng ứng viên trong thư viện. Ưu tiên bản ghi có LOẠI TỪ khớp
+   với dạng đang tra (dạng động từ thì từ gốc phải có nghĩa verb), còn
+   không thì vẫn nhận — thà hiện nghĩa gần đúng hơn là gọi API. */
+async function lemmaLookup(word){
+  const cands=lemmaCandidates(word);
+  if(!cands.length) return null;
+  let fallback=null;
+  for(const c of cands){
+    let rec=await idbGet(c.base);
+    if(rec && rec.alias) rec=await idbGet(rec.alias);
+    if(!rec || !rec.data) continue;
+    const poses=(rec.data.senses||[]).map(s=>String(s.pos||'').toLowerCase());
+    const isVerb=poses.some(p=>p.includes('verb'));
+    const isNoun=poses.some(p=>p.includes('noun'));
+    const isAdj =poses.some(p=>p.includes('adj'));
+    const wantVerb=['past','pastp','ing','s3'].includes(c.kind);
+    const wantNoun=c.kind==='plural';
+    const wantAdj =c.kind==='comparative'||c.kind==='superlative';
+    const good = (wantVerb&&isVerb) || (wantNoun&&isNoun) || (wantAdj&&isAdj) || !poses.length;
+    if(good) return {rec, base:c.base, kind:c.kind};
+    if(!fallback) fallback={rec, base:c.base, kind:c.kind};
+  }
+  return fallback;
+}
+
+/* Điểm vào duy nhất: luật xuôi trước (nhanh, có bảng bất quy tắc), hết
+   cửa thì quét ngược toàn thư viện. */
+async function lemmaResolve(word){
+  const fwd=await lemmaLookup(word);
+  if(fwd) return fwd;
+  const rev=await lemmaReverse(word);
+  if(!rev) return null;
+  let rec=await idbGet(rev.base);
+  if(rec && rec.alias) rec=await idbGet(rec.alias);
+  if(!rec || !rec.data) return null;
+  return {rec, base:rev.base, kind:rev.kind, viaReverse:true};
+}
+window.lemmaResolve=lemmaResolve;
+
+/* Chẩn đoán: gõ lemmaDebug('went') trong console Safari để xem vì sao
+   một dạng nào đó không tra được. */
+async function lemmaDebug(word){
+  const w=norm(word||'');
+  const cands=lemmaCandidates(w);
+  const rows=[];
+  for(const c of cands){
+    const rec=await idbGet(c.base);
+    rows.push({base:c.base, kind:c.kind, coTrongThuVien:!!(rec&&rec.data)});
+  }
+  const rev=await lemmaReverse(w);
+  const out={tu:w, ungVienXuoi:rows, quetNguoc:rev, ketQua:await lemmaResolve(w)};
+  console.log(out); return out;
+}
+window.lemmaDebug=lemmaDebug;
+
+/* ------------------------------------------------------------------
+   NGHĨA CỦA CHÍNH DẠNG BIẾN ĐỔI — dựng tại máy, không gọi AI.
+   Thư viện chỉ có nghĩa của từ gốc ("go" = đi). Nhưng người tra "went"
+   muốn thấy nghĩa của "went". Tiếng Việt đánh dấu thời bằng hư từ đứng
+   trước, nên phép biến đổi này thuần cơ học và đúng ngữ pháp: thêm "đã",
+   "đang", "hơn", "nhất"… vào nghĩa gốc. Không hề suy diễn nghĩa mới.
+   ------------------------------------------------------------------ */
+const VI_FORM_WRAP = {
+  past:       v => 'đã ' + v,
+  pastp:      v => 'đã ' + v,
+  ing:        v => 'đang ' + v,
+  s3:         v => v,
+  plural:     v => v + ' (số nhiều)',
+  comparative:v => v + ' hơn',
+  superlative:v => v + ' nhất'
+};
+const EN_FORM_NOTE = {
+  past:'past simple', pastp:'past participle', ing:'present participle / gerund',
+  s3:'third person singular', plural:'plural',
+  comparative:'comparative', superlative:'superlative'
+};
+
+function inflectedData(baseData, kind, form){
+  const wrap=VI_FORM_WRAP[kind]; if(!wrap) return baseData;
+  const d=Object.assign({}, baseData);
+  d.word=form;
+  d._inflectedFrom=baseData.word;
+  d._inflectKind=kind;
+  if(d.vi_equivalent) d.vi_equivalent=wrap(d.vi_equivalent);
+  if(Array.isArray(d.senses)){
+    d.senses=d.senses.map(s=>{
+      const c=Object.assign({}, s);
+      if(c.vi) c.vi=wrap(c.vi);
+      return c;
+    });
+  }
+  // Phiên âm của từ gốc không dùng được cho dạng biến đổi — bỏ hơn là sai.
+  if(kind!=='s3') delete d.phonetic;
+  return d;
+}
+
+/* Ghi alias để lần sau tra dạng này là ra ngay, không phải suy lại.
+   Bản ghi alias mang thêm formKind nên khung thông báo vẫn hiện đúng. */
+async function lemmaSaveAlias(form, rec, kind){
+  try{
+    const ex=await idbGet(form);
+    if(ex) return;
+    await idbPut({ word:form, alias:rec.word, formKind:kind,
+                   firstSeen:now(), saved:0, savedAt:0 });
+  }catch(e){}
+}
+window.lemmaLookup=lemmaLookup;
+window.lemmaCandidates=lemmaCandidates;
+window.FORM_LABEL=FORM_LABEL;
 
 /* ============================================================
    WORD FAMILY — computed locally from the offline library already
@@ -1159,7 +1553,7 @@ function maybeLoadYouglish(word){
   }
 }
 
-function renderEntry(rec, queriedAs){
+function renderEntry(rec, queriedAs, formNote){
   const d=rec.data||{}; const w=rec.word;
   const badge = rec.source==='ai' ? '<span class="badge ai">✦ AI · saved offline</span>' : '<span class="badge off">◆ offline</span>';
 
@@ -1172,12 +1566,29 @@ function renderEntry(rec, queriedAs){
   let h='<div class="entry">';
   h+='<img class="entry-corner" src="./mascot-'+corner+'.webp" alt=""/>';
   h+='';
-  if(queriedAs){
+  if(formNote){
+    // KHÔNG phải sửa lỗi chính tả — bạn tra đúng, đây chỉ là dạng biến đổi.
+    const baseW=formNote.base||rec.word;
+    h+='<div class="inflect">'
+      +'<b>'+esc(formNote.form)+'</b> · '+esc(EN_FORM_NOTE[formNote.kind]||'form')
+      +' of <b>'+esc(baseW)+'</b>'
+      +'<span>Nghĩa suy từ từ gốc trong máy — không gọi AI. '
+      +'Ví dụ và cụm từ bên dưới thuộc dạng gốc <b>'+esc(baseW)+'</b>.</span>'
+      +'<button class="inflect-go" onclick="jump(\''+esc(baseW).replace(/'/g,"\\'")+'\')">Xem từ gốc</button>'
+      +'</div>';
+  } else if(queriedAs){
     h+='<div class="corrected">Corrected from “'+esc(queriedAs)+'”'+(d.query_note?' · '+esc(d.query_note):'')+'</div>';
   }
   const safeW=esc(w).replace(/'/g,"\\'");
   h+='<div class="head"><div class="head-main">';
   h+='<div class="headword">'+esc(d.word||w)+'</div>';
+  // Nhãn trình độ đọc từ levels.txt (đã có sẵn levelTag()) — dạng biến đổi
+  // thì tra theo TỪ GỐC, vì levels.txt chỉ liệt kê từ gốc.
+  {
+    const lvWord = d._inflectedFrom || d.word || w;
+    const lv = (typeof levelTag==='function') ? levelTag(lvWord) : '';
+    if(lv) h+='<div class="head-lv">'+lv+'</div>';
+  }
   h+='<div class="head-meta">';
   if(d.phonetic) h+='<span class="phon">'+esc(d.phonetic)+'</span>';
   h+=(typeof levelTag==='function'?levelTag(d.word||w):'');
@@ -1438,8 +1849,9 @@ async function renderHistory(){
   let h='';
   for(const r of recs){ if(!r) continue; const d=r.data||{}; const w=esc(r.word);
     const safeW=w.replace(/'/g,"\\'");
-    h+='<div class="hist-item" onclick="jump(\''+safeW+'\')">'
-      +'<img class="hist-ico" src="./decor-magnifying-glass.webp" alt=""/>'
+    const isPhrase = d.phrase || /\s/.test(r.word);
+    h+='<div class="hist-item'+(isPhrase?' is-phrase':'')+'" onclick="jump(\''+safeW+'\')">'
+      +'<img class="hist-ico" src="./'+(isPhrase?'decor-note-and-pen':'decor-magnifying-glass')+'.webp" alt=""/>'
       +'<div class="hist-mid"><div class="hist-top"><span class="w">'+w+'</span>'
       +(d.phonetic?'<span class="phon">'+esc(d.phonetic)+'</span>':'')+'</div>'
       +(d.vi_equivalent?'<div class="e">'+esc(d.vi_equivalent)+'</div>':'')+'</div>'
