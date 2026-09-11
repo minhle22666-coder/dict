@@ -2210,12 +2210,14 @@
   .wf-acts button:active{transform:scale(.98);color:var(--primary)}
 
   /* ============================================================
-     FOCCI EXPLAINS — kết quả tra theo cú pháp "từ1, từ2".
-     Tóm tắt trước, rồi mỗi từ một khối; phần cần nhớ in đậm màu cam để
-     mắt bắt được ngay mà không phải đọc lại cả đoạn.
+     FOCCI EXPLAINS — ba loại thông tin, ba HÌNH DẠNG khác nhau.
+     Bản trước chỉ là chữ xếp dọc nên đọc ngộp: gốc chung, nghĩa và điểm
+     khác trông y như nhau. Ở đây gốc chung là một dải riêng chữ serif to;
+     cấu tạo là các chip ghép lại nhìn thấy được; điểm khác là dòng duy
+     nhất có vạch cam — mắt bắt được thứ tự quan trọng trước khi đọc.
      ============================================================ */
   .wh-card{padding:2px}
-  .wh-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:13px}
+  .wh-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
   .wh-title{flex:1;min-width:0;font-size:21px;font-weight:800;letter-spacing:-.025em;
     color:var(--text);line-height:1.2}
   .wh-kicker{display:block;font-size:10px;font-weight:800;letter-spacing:.1em;
@@ -2225,28 +2227,55 @@
   .wh-star.on{color:var(--amber);filter:drop-shadow(0 0 10px rgba(255,197,61,.55))}
   .wh-star:active{transform:scale(.9)}
 
-  .wh-sum{padding:14px 15px;border-radius:16px;font-size:13.5px;line-height:1.65;
-    color:var(--text);background:linear-gradient(155deg,var(--surface-2),var(--surface) 78%);
-    border:1px solid var(--line);margin-bottom:14px}
-  .wh-sum b{color:var(--primary);font-weight:800}
+  .wh-root{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:13px 15px;margin-bottom:14px;border-radius:16px;
+    background:linear-gradient(150deg,rgba(255,159,69,.14),var(--surface-2) 70%);
+    border:1px solid rgba(255,159,69,.26)}
+  .wh-root-lbl{flex:none;font-size:9.5px;font-weight:800;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--primary)}
+  .wh-root-f{font-family:ui-serif,Georgia,"Times New Roman",serif;
+    font-size:20px;font-style:italic;font-weight:600;color:var(--text)}
+  .wh-root-g{font-size:12.5px;color:var(--muted);line-height:1.4}
+  .wh-root-no{background:var(--surface-2);border-color:var(--line)}
+  .wh-root-no .wh-root-lbl{color:var(--muted-2)}
 
   .wh-items{display:flex;flex-direction:column;gap:10px}
-  .wh-item{position:relative;padding:14px 15px 13px;border-radius:16px;
+  .wh-item{padding:14px 15px 12px;border-radius:16px;
     background:var(--surface);border:1px solid var(--line)}
-  .wh-item::before{content:'';position:absolute;left:0;top:16px;bottom:16px;width:3px;
-    border-radius:0 3px 3px 0;background:var(--grad-hero)}
-  .wh-w{font-size:15.5px;font-weight:800;color:var(--text);margin-bottom:6px}
-  .wh-vi{font-size:12.5px;font-weight:600;color:var(--muted);margin-left:8px}
-  .wh-why{font-size:13px;line-height:1.62;color:var(--muted)}
-  .wh-why b{color:var(--primary);font-weight:800}
-  .wh-go{margin-top:10px;font-size:11.5px;font-weight:800;color:var(--primary);padding:0}
+  .wh-item-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .wh-n{flex:none;width:18px;height:18px;border-radius:50%;display:flex;
+    align-items:center;justify-content:center;font-size:10px;font-weight:800;
+    color:var(--muted-2);background:var(--surface-2);border:1px solid var(--line)}
+  .wh-w{font-size:16px;font-weight:800;letter-spacing:-.015em;color:var(--text)}
+  .wh-vi{font-size:12.5px;font-weight:600;color:var(--muted)}
 
-  .wh-hook{margin-top:14px;padding:13px 15px;border-radius:16px;font-size:13px;
-    line-height:1.55;color:var(--text);background:var(--primary-bg);
+  .wh-parts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .wh-chip{display:inline-flex;flex-direction:column;gap:1px;padding:5px 10px;
+    border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}
+  .wh-chip b{font-size:12.5px;font-weight:800;color:var(--text);
+    font-family:ui-serif,Georgia,serif;font-style:italic}
+  .wh-chip i{font-size:10px;font-style:normal;color:var(--muted-2)}
+  .wh-plus{font-size:11px;font-weight:800;color:var(--primary)}
+
+  .wh-diff{position:relative;margin-top:11px;padding:9px 0 9px 13px;
+    font-size:13.5px;line-height:1.55;color:var(--text);font-weight:600}
+  .wh-diff::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;
+    border-radius:99px;background:var(--grad-hero)}
+
+  .wh-go{margin-top:9px;font-size:11.5px;font-weight:800;color:var(--primary);padding:0}
+
+  .wh-hook{display:flex;flex-direction:column;gap:5px;margin-top:14px;
+    padding:13px 15px;border-radius:16px;font-size:13.5px;font-weight:600;
+    line-height:1.5;color:var(--text);background:var(--primary-bg);
     border:1px solid rgba(255,159,69,.28)}
-  .wh-hook span{display:block;font-size:9.5px;font-weight:800;letter-spacing:.09em;
-    text-transform:uppercase;color:var(--primary);margin-bottom:5px}
-  .wh-hook b{color:var(--primary);font-weight:800}
+  .wh-hook span{font-size:9.5px;font-weight:800;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--primary)}
+
+  .hist-item.is-why .hist-top .w{font-size:13.5px;font-weight:700}
+
+  /* Why Files: dùng lại đúng các lớp trên trong thẻ gập */
+  .wf-body .wh-root{margin-bottom:11px}
+  .wf-body .wh-item{background:var(--surface-2)}
 
 </style>
 </head>
@@ -2649,7 +2678,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v71 · Focci Explains, Saved theo lịch ôn, vuốt để back</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v72. 09.11.2026 - Focci&rsquo;s Learning App</b></p>
   </section>
 </main>
 
