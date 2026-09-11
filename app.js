@@ -78,7 +78,7 @@ function idbCount(){ return tx('readonly').then(s=>new Promise((res,rej)=>{const
 function idbPrefix(prefix){
   return tx('readonly').then(s=>new Promise((res,rej)=>{
     const range=IDBKeyRange.bound(prefix, prefix+'\uffff');
-    const r=s.getAll(range,8);
+    const r=s.getAll(range,40);
     r.onsuccess=()=>res((r.result||[]).filter(x=>!x.alias));
     r.onerror=()=>rej(r.error);
   }));
@@ -341,6 +341,7 @@ return `You are a bilingual English→Vietnamese lexicographer building a rich, 
       "gloss":"short English meaning", "rank":5,
       "example":"one natural English sentence", "example_vi":"bản dịch tiếng Việt tự nhiên" }
   ],
+  "cefr": "one of A1 A2 B1 B2 C1 C2 — the CEFR level at which a learner normally meets this word. Your best judgement; never empty.",
   "collocations": [
     { "text":"natural word-partnership using this word, e.g. 'make a decision', 'heavy rain', 'strongly agree'",
       "vi":"nghĩa cụm này", "rank":5, "example":"short natural sentence", "example_vi":"bản dịch" }
@@ -483,6 +484,238 @@ async function forceViTranslate(word){
     }catch(e){ logEvent('search', null); }
     addXP(1);
   }catch(err){ box.innerHTML=errorState(word,err.message||''); }
+}
+
+/* ============================================================
+   FOCCI EXPLAINS — "vì sao lại là từ đó".
+
+   Gõ nhiều từ cách nhau bằng dấu phẩy ("cease, decease") thì đây không
+   phải yêu cầu tra nghĩa mà là câu hỏi "hai từ này có liên quan gì
+   nhau?". Một từ đơn cũng dùng được qua nút trên trang từ ("eggplant"
+   → vì sao lại gọi là cây trứng).
+
+   Vì sao tính năng này giúp nhớ: ghi nhớ có neo nhân quả bền hơn ghi nhớ
+   thuần lặp lại. Biết "decease = de- (rời khỏi) + cedere (đi)" thì từ đó
+   không còn là chuỗi ký tự rời rạc nữa. Nên câu trả lời được ép về dạng
+   MỘT câu tóm tắt gốc chung, rồi mỗi từ một dòng — không phải một đoạn
+   văn dài, vì đoạn dài thì không ai đọc lại lần hai.
+   ============================================================ */
+const EXPLAIN_KEY_PREFIX='why:';
+
+function isExplainQuery(s){
+  return /,/.test(String(s||''));
+}
+function explainWordsOf(s){
+  return String(s||'').split(',').map(x=>norm(x)).filter(Boolean).slice(0,6);
+}
+
+async function askExplain(words){
+  const key=getKey(); if(!key) throw new Error('NO_KEY');
+  if(!navigator.onLine) throw new Error('OFFLINE');
+  const list=words.join(', ');
+  const many=words.length>1;
+  const prompt='Bạn là nhà từ nguyên học giải thích cho người Việt đang học tiếng Anh.\n'
+    +(many
+      ? 'Người học gõ vào '+words.length+' từ: '+list+'. Họ gõ chúng CÙNG NHAU vì thấy chúng trông giống nhau hoặc cảm giác liên quan. Hãy cho biết chúng có thật sự cùng gốc không, rồi phân biệt nghĩa.\n'
+      : 'Người học muốn hiểu VÌ SAO từ "'+list+'" lại có hình dạng và nghĩa như vậy.\n')
+    +'Trả về DUY NHẤT JSON này, không markdown fence, không lời dẫn:\n'
+    +'{'
+    +'"summary":"1–2 câu tiếng Việt nói gốc chung (hoặc nói rõ là KHÔNG cùng gốc nếu đúng vậy). Bọc **hai dấu sao** quanh từ gốc Latinh/Hy Lạp và các ý then chốt.",'
+    +'"items":[{"word":"từ","vi":"nghĩa ngắn bằng tiếng Việt","why":"vì sao từ này mang nghĩa đó — tách tiền tố/hậu tố/gốc ra và dịch từng phần. Bọc **hai dấu sao** quanh phần cần nhớ. Tối đa 2 câu."}],'
+    +'"hook":"một mẹo nhớ cực ngắn bằng tiếng Việt, dưới 15 từ, hoặc chuỗi rỗng nếu không có mẹo nào thật sự hay"'
+    +'}\n'
+    +'QUY TẮC: mỗi từ người học gõ phải có đúng một phần tử trong "items", giữ nguyên thứ tự họ gõ. '
+    +'Nếu các từ KHÔNG cùng gốc thì nói thẳng trong "summary" chứ đừng bịa ra liên hệ. '
+    +'Không dùng dấu sao ở chỗ nào khác ngoài phần cần in đậm.';
+
+  const url='https://generativelanguage.googleapis.com/v1beta/models/'+getModel()
+    +':generateContent?key='+encodeURIComponent(key);
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
+      generationConfig:{temperature:0.4,maxOutputTokens:1400}})});
+  if(!r.ok) throw new Error('HTTP_'+r.status);
+  const j=await r.json();
+  let txt=(j.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+  txt=txt.replace(/```json|```/g,'').trim();
+  const s=txt.indexOf('{'), e=txt.lastIndexOf('}');
+  if(s<0||e<0) throw new Error('BAD_JSON');
+  return JSON.parse(txt.slice(s,e+1));
+}
+
+/* **in đậm** → <b>. esc() chạy TRƯỚC nên không có đường tiêm HTML. */
+function mdBold(s){
+  return esc(String(s||'')).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+}
+
+function explainState(query, data, saved){
+  const items=Array.isArray(data.items)?data.items:[];
+  const safeQ=esc(query).replace(/'/g,"\\'");
+  let h='<div class="wh-card">';
+  h+='<div class="wh-top">';
+  h+='<div class="wh-title"><span class="wh-kicker">Focci explains</span>'+esc(query)+'</div>';
+  h+='<button class="wh-star'+(saved?' on':'')+'" onclick="toggleExplainSave(\''+safeQ+'\')"'
+    +' aria-label="Save explanation">'+(saved?'★':'☆')+'</button>';
+  h+='</div>';
+  if(data.summary) h+='<div class="wh-sum">'+mdBold(data.summary)+'</div>';
+  if(items.length){
+    h+='<div class="wh-items">';
+    for(const it of items){
+      h+='<div class="wh-item">';
+      h+='<div class="wh-w">'+esc(it.word||'')
+        +(it.vi?'<span class="wh-vi">'+esc(it.vi)+'</span>':'')+'</div>';
+      if(it.why) h+='<div class="wh-why">'+mdBold(it.why)+'</div>';
+      h+='<button class="wh-go" onclick="jump(\''+esc(it.word||'').replace(/'/g,"\\'")+'\')">'
+        +'Tra t\u1eeb n\u00e0y</button>';
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+  if(data.hook) h+='<div class="wh-hook"><span>M\u1eb9o nh\u1ee1</span>'+mdBold(data.hook)+'</div>';
+  h+='</div>';
+  return h;
+}
+
+async function runExplain(query){
+  const box=$('#result');
+  const words=explainWordsOf(query);
+  if(!words.length) return;
+  const key=EXPLAIN_KEY_PREFIX+words.join(', ');
+
+  const cached=await idbGet(key);
+  if(cached && cached.data && cached.data.explain){
+    currentWord=null;
+    box.innerHTML=explainState(words.join(', '), cached.data, !!cached.saved);
+    logEvent('search', key);
+    return;
+  }
+
+  if(!getKey()){ box.innerHTML=needKeyState(query); return; }
+  if(!navigator.onLine){ box.innerHTML=offlineState(query); return; }
+  box.innerHTML=questScene(words.join(', '));
+  try{
+    const data=await askExplain(words);
+    data.explain=true; data.query=words.join(', '); data.word=words.join(', ');
+    await idbPut({ word:key, data, source:'explain',
+                   firstSeen:now(), saved:0, savedAt:0 });
+    currentWord=null;
+    box.innerHTML=explainState(words.join(', '), data, false);
+    logEvent('search', key);
+    addXP(2);
+  }catch(err){
+    box.innerHTML=errorState(query, err.message||'');
+  }
+}
+window.runExplain=runExplain;
+
+async function toggleExplainSave(query){
+  const key=EXPLAIN_KEY_PREFIX+explainWordsOf(query).join(', ');
+  const rec=await idbGet(key); if(!rec) return;
+  rec.saved=rec.saved?0:1; rec.savedAt=rec.saved?now():0;
+  await idbPut(rec);
+  toast(rec.saved?'Saved to Why Files':'Removed');
+  const btn=document.querySelector('.wh-star');
+  if(btn){ btn.textContent=rec.saved?'★':'☆'; btn.classList.toggle('on',!!rec.saved); }
+  if(rec.saved) addXP(1);
+}
+window.toggleExplainSave=toggleExplainSave;
+
+/* ============================================================
+   KHỚP CỤM GẦN ĐÚNG.
+
+   Tra 'mileage out of' không ra gì vì thư viện lưu theo TỪ, còn cụm nằm
+   bên trong các mảng collocations / phrasal_verbs / idioms / prepositions
+   của từ gốc. Trước đây chỉ so khớp tuyệt đối nên app gọi AI cho một cụm
+   đã có sẵn trong máy.
+
+   Giờ khi một cụm không khớp tuyệt đối, quét các mảng đó bằng con trỏ
+   IndexedDB: chấm điểm theo cụm chứa nguyên văn (cao nhất), rồi tới số từ
+   khớp, rồi tới độ ngắn. Dừng sớm khi đã đủ kết quả tốt nên không phải
+   duyệt hết 16 nghìn bản ghi. Bấm vào kết quả là mở TỪ GỐC chứa cụm đó.
+   ============================================================ */
+const PHRASE_FIELDS=['collocations','phrasal_verbs','idioms','prepositions'];
+
+async function phraseLookup(query, maxOut){
+  const q=norm(query||'');
+  const qw=q.split(/\s+/).filter(w=>w.length>1);
+  if(qw.length<2) return [];
+  const want=maxOut||10;
+  const out=[];
+
+  await db().then(d=>new Promise((res)=>{
+    const st=d.transaction(STORE,'readonly').objectStore(STORE);
+    const req=st.openCursor();
+    let scanned=0;
+    req.onsuccess=(e)=>{
+      const c=e.target.result;
+      if(!c){ res(); return; }
+      const r=c.value;
+      if(r && r.data && !r.alias){
+        for(const f of PHRASE_FIELDS){
+          const arr=r.data[f];
+          if(!Array.isArray(arr)) continue;
+          for(const it of arr){
+            const txt=norm(it && it.text);
+            if(!txt || txt.length<3) continue;
+            let score=0;
+            if(txt===q) score=100;
+            else if(txt.includes(q)) score=80;
+            else if(q.includes(txt)) score=60;
+            else{
+              let hit=0;
+              for(const w of qw) if(txt.includes(w)) hit++;
+              if(hit<qw.length) continue;          // phải chứa ĐỦ các từ
+              score=30+hit;
+            }
+            score -= Math.min(10, Math.abs(txt.split(/\s+/).length-qw.length));
+            out.push({ owner:r.word, field:f, text:it.text, vi:it.vi||'',
+                       example:it.example||'', score });
+          }
+        }
+      }
+      scanned++;
+      // đủ nhiều kết quả tốt, hoặc đã quét quá nhiều → dừng
+      if(out.filter(x=>x.score>=60).length>=want || scanned>20000){ res(); return; }
+      c.continue();
+    };
+    req.onerror=()=>res();
+  })).catch(()=>{});
+
+  out.sort((x,y)=>y.score-x.score);
+  const seen=new Set(); const uniq=[];
+  for(const o of out){
+    const k=norm(o.text);
+    if(seen.has(k)) continue;
+    seen.add(k); uniq.push(o);
+    if(uniq.length>=want) break;
+  }
+  return uniq;
+}
+window.phraseLookup=phraseLookup;
+
+const PHRASE_FIELD_LABEL={collocations:'collocation', phrasal_verbs:'phrasal verb',
+  idioms:'idiom', prepositions:'preposition'};
+
+function phraseMatchState(query, hits){
+  let h='<div class="pm-card">';
+  h+='<div class="pm-h"><b>Kh\u00f4ng c\u00f3 m\u1ee5c ri\u00eang cho \u201c'+esc(query)+'\u201d</b>'
+    +'<span>Nh\u01b0ng c\u1ee5m n\u00e0y n\u1eb1m trong '+hits.length
+    +' m\u1ee5c \u0111\u00e3 c\u00f3 s\u1eb5n trong m\u00e1y</span></div>';
+  for(const o of hits){
+    const safe=esc(o.owner).replace(/'/g,"\\'");
+    h+='<div class="pm-row" onclick="jump(\''+safe+'\')">';
+    h+='<div class="pm-row-main"><div class="pm-txt">'+esc(o.text)+'</div>';
+    if(o.vi) h+='<div class="pm-vi">'+esc(o.vi)+'</div>';
+    h+='</div>';
+    h+='<div class="pm-meta"><span class="pm-kind">'
+      +esc(PHRASE_FIELD_LABEL[o.field]||o.field)+'</span>'
+      +'<span class="pm-owner">'+esc(o.owner)+'</span></div>';
+    h+='</div>';
+  }
+  const safeQ=esc(query).replace(/'/g,"\\'");
+  h+='<button class="pm-ai" onclick="forceTranslate(\''+safeQ+'\')">'
+    +'D\u1ecbch c\u1ee5m n\u00e0y b\u1eb1ng AI</button>';
+  h+='</div>';
+  return h;
 }
 
 /* ============================================================
@@ -803,6 +1036,21 @@ async function search(rawWord, forceAI){
   // Multiple English words with no local match — this reads as "translate
   // this for me", not "look this word up", so it gets its own AI call and
   // its own result view instead of forcing it through the dictionary prompt.
+  /* Dấu phẩy = "giải thích giúp tôi", không phải "tra nghĩa". */
+  if(isExplainQuery(word)){ await runExplain(word); return; }
+
+  /* Cụm nhiều từ: thử khớp gần đúng trong kho TRƯỚC khi tiêu token. Cụm
+     như 'mileage out of' nằm trong collocations của 'get', không có mục
+     riêng, nên so khớp tuyệt đối luôn miss và app gọi AI vô ích. */
+  if(hasSpace && !forceAI){
+    const pm=await phraseLookup(word, 10);
+    if(pm.length){
+      box.innerHTML=phraseMatchState(word, pm);
+      logEvent('search', norm(word));
+      return;
+    }
+  }
+
   if(hasSpace){
     box.innerHTML=questScene(word);
     const questStart=now();
@@ -849,6 +1097,9 @@ async function search(rawWord, forceAI){
   }
 }
 function forceAI(word){ search(word,true); }
+/* Người dùng xem gợi ý cụm rồi vẫn muốn bản dịch AI thì bấm nút này. */
+function forceTranslate(word){ search(word,true); }
+window.forceTranslate=forceTranslate;
 /* Set by story.js before it sends you from a passage to a full word page, so
    the back button returns you to the passage instead of dumping you on home. */
 window._returnTo = null;
@@ -1593,7 +1844,7 @@ function renderEntry(rec, queriedAs, formNote){
   if(d.phonetic) h+='<span class="phon">'+esc(d.phonetic)+'</span>';
   // Nhãn trình độ: với dạng biến đổi thì tra theo TỪ GỐC, vì levels.txt
   // chỉ liệt kê từ gốc — "walked" không có trong đó, "walk" thì có.
-  h+=(typeof levelTag==='function'?levelTag(d._inflectedFrom||d.word||w):'');
+  h+=(typeof levelTag==='function'?levelTag(d._inflectedFrom||d.word||w, d):'');
   h+='</div>';
   const posSet=[...new Set((d.senses||[]).map(s=>s.pos).filter(Boolean))];
   if(posSet.length){ h+='<div class="pos-row">'+posSet.map(posChip).join('')+'</div>'; }
@@ -1602,6 +1853,8 @@ function renderEntry(rec, queriedAs, formNote){
   // Icon-only actions, no boxes: save, and refresh the Vietnamese meaning.
   h+='<div class="head-acts">';
   h+='<button class="icon-act star '+(rec.saved?'on':'')+'" onclick="toggleSave(\''+safeW+'\')" aria-label="Save word">'+(rec.saved?'★':'☆')+'</button>';
+  h+='<button class="icon-act" onclick="runExplain(\''+safeW+'\')" aria-label="Why this word" title="Vì sao lại là từ này">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round"><path d="M9.2 9a2.9 2.9 0 1 1 4.3 2.5c-.9.5-1.5 1.2-1.5 2.2v.4"/><circle cx="12" cy="17.6" r="1"/><circle cx="12" cy="12" r="9"/></svg></button>';
   h+='<button class="icon-act" id="rewrite-btn" onclick="rewriteMeaning(\''+safeW+'\')" title="Refresh the Vietnamese meaning with AI" aria-label="Refresh meaning">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">'
     +'<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>';
@@ -1725,8 +1978,18 @@ function renderEntry(rec, queriedAs, formNote){
   return h;
 }
 function formCell(k,v){ return '<div class="form"><div class="k">'+k+'</div><div class="v">'+esc(v||'—')+'</div></div>'; }
+/* jump() gán q.value bằng code, mà gán bằng code thì KHÔNG bắn event
+   'input' — đó là lý do dấu ✕ không hiện sau khi bấm một gợi ý hay một
+   từ trong lịch sử. Phải tự đồng bộ. */
+function syncClearX(){
+  const q=$('#q'), x=$('#clearx');
+  if(q && x) x.style.display = q.value ? 'block' : 'none';
+}
+window.syncClearX=syncClearX;
+
 function jump(w){
   $('#q').value=w;
+  syncClearX();
   hideSuggest();
   const box=$('#result');
   if(box) box.classList.add('leaving');
@@ -1797,11 +2060,14 @@ function questScene(word){
 let suggestTimer=null;
 function hideSuggest(){ const el=$('#suggest'); el.classList.remove('show'); el.innerHTML=''; }
 async function showRecentSuggest(){
-  const logs=await logAll();
+  /* Đọc từ sổ lịch sử thay vì bảng log — sổ không bị logTrim cắt, nên
+     dropdown hiện được cả lịch sử cũ. Trần 8 cũ bỏ đi; hộp đã cuộn được. */
+  await histMigrateOnce();
+  const store=histLoad();
   const seen=new Set(); const recent=[];
-  for(let i=logs.length-1;i>=0 && recent.length<8;i--){
-    const l=logs[i]; if(l.type!=='search'||!l.word||seen.has(l.word)) continue;
-    seen.add(l.word); recent.push(l.word);
+  for(let i=store.length-1;i>=0 && recent.length<SUGGEST_MAX;i--){
+    const e=store[i]; if(!e||!e.w||seen.has(e.w)) continue;
+    seen.add(e.w); recent.push(e.w);
   }
   if(!recent.length){ hideSuggest(); return; }
   const recs=await Promise.all(recent.map(w=>idbGet(w)));
@@ -1813,10 +2079,12 @@ async function showTypedSuggest(q){
   if(!results.length){ hideSuggest(); return; }
   renderSuggestList('Suggestions', results, false);
 }
+const SUGGEST_MAX=60;    // dropdown cuộn được nên không cần bó ở 8
 function renderSuggestList(label, recs, deletable){
   const el=$('#suggest');
-  let h='<div class="suggest-lbl">'+label+'</div>';
-  for(const r of recs.slice(0,8)){
+  let h='<div class="suggest-lbl">'+label
+    +(recs.length>12?' <i>'+recs.length+'</i>':'')+'</div>';
+  for(const r of recs.slice(0,SUGGEST_MAX)){
     const d=r.data||{};
     const safeW=esc(r.word).replace(/'/g,"\\'");
     h+='<div class="suggest-item" onclick="jump(\''+safeW+'\')">'
@@ -2237,8 +2505,10 @@ async function shakeTree(){
   // every 2nd shake, a saved word falls out too — a free micro-review
   if(treeShakes%2===0){
     try{
-      const saved=(await idbAll()).filter(r=>r.saved);
-      const pool=saved.length?saved:(await idbAll());
+      const isWord=r=>r.data && !r.data.explain && !r.data.phrase && !r.alias;
+      const allRecs=(await idbAll()).filter(isWord);
+      const saved=allRecs.filter(r=>r.saved);
+      const pool=saved.length?saved:allRecs;
       if(pool.length){
         const r=pool[Math.floor(Math.random()*pool.length)];
         const eq=r.data?.vi_equivalent||'';
@@ -2278,25 +2548,173 @@ let savedSort='newest';
 const SORT_CYCLE=['newest','oldest','az','za'];
 const SORT_LABEL={newest:'Newest',oldest:'Oldest',az:'A–Z',za:'Z–A'};
 const BOOKMARK_COLORS=['yellow','orange','red','blue','green'];
+/* ============================================================
+   SAVED — hai tab, và sắp xếp theo LỊCH ÔN thay vì theo ngày lưu.
+
+   Vì sao bố cục này: hai thứ có bằng chứng vững nhất trong nghiên cứu
+   ghi nhớ là GIÃN CÁCH (ôn đúng lúc sắp quên) và TRUY XUẤT CHỦ ĐỘNG
+   (tự nhớ lại trước khi xem đáp án). Danh sách xếp theo ngày lưu không
+   phục vụ cả hai — nó chỉ là một cái kho.
+
+   Nên ở đây mỗi từ có một "hộp" 0–5 tính từ số lần trả lời đúng/sai đã
+   ghi sẵn trong bản ghi, và khoảng ôn giãn dần 1 → 3 → 7 → 16 → 35 ngày.
+   Từ tới hạn nổi lên đầu; phần còn lại xếp theo ngày tới hạn. Thanh 5 đốt
+   cạnh mỗi từ cho thấy độ vững — phản hồi thấy được là thứ khiến người ta
+   quay lại ôn.
+
+   GIỚI HẠN: đây là lịch giãn cách kiểu Leitner, KHÔNG phải SM-2 đầy đủ —
+   không có hệ số dễ/khó riêng cho từng từ. Đủ tốt cho một app cá nhân và
+   không cần thêm dữ liệu nào mới.
+   ============================================================ */
+const SRS_DAYS=[0,1,3,7,16,35];        // hộp 0..5 → số ngày tới lần ôn sau
+
+function srsBox(r){
+  const ok=r.reviewCorrect||0, bad=r.reviewWrong||0;
+  return Math.max(0, Math.min(5, ok-2*bad));
+}
+function srsDueAt(r){
+  if(!r.lastReviewedAt) return 0;                 // chưa ôn lần nào → tới hạn ngay
+  return r.lastReviewedAt + SRS_DAYS[srsBox(r)]*DAY;
+}
+function srsMeter(box){
+  let s='<span class="sv-meter" aria-label="Strength '+box+'/5">';
+  for(let i=1;i<=5;i++) s+='<i'+(i<=box?' class="on"':'')+'></i>';
+  return s+'</span>';
+}
+function srsWhen(due){
+  const d=due-now();
+  if(d<=0) return 'ôn ngay';
+  const days=Math.ceil(d/DAY);
+  return days<=1 ? 'mai' : 'sau '+days+' ngày';
+}
+
+let savedTab='vault';
+window.setSavedTab=function(t){
+  savedTab = t==='why' ? 'why' : 'vault';
+  document.querySelectorAll('.sv-tab').forEach(b=>
+    b.classList.toggle('on', b.dataset.tab===savedTab));
+  renderSaved();
+};
+
+function svRow(r, due, box){
+  const eq=(r.data&&r.data.vi_equivalent)||'';
+  const w=esc(r.word);
+  const safeW=w.replace(/'/g,"\\'");
+  return '<div class="sv-row" onclick="jump(\''+safeW+'\')">'
+    + '<div class="sv-mid"><span class="sv-w">'+w+'</span>'
+    + (eq?'<span class="sv-e">'+esc(eq)+'</span>':'')
+    + '<span class="sv-foot">'+srsMeter(box)+'<span class="sv-when">'+srsWhen(due)+'</span></span>'
+    + '</div>'
+    + '<button class="sv-star" onclick="event.stopPropagation();toggleSave(\''+safeW+'\')" aria-label="Unsave">★</button>'
+    + '</div>';
+}
+
 async function renderSaved(){
-  let all=(await idbAll()).filter(r=>r.saved);
   const box=$('#saved-list');
-  $('#saved-count').innerHTML='<img class="hdr-ico" src="./decor-earth.webp" alt=""/>'
-    +all.length+' word'+(all.length===1?'':'s')+' collected';
-  if(!all.length){ box.innerHTML='<div class="empty"><img class="ill" src="./mascot-explore.webp" alt=""/><h3>No saved words yet</h3><p>Tap the star ☆ on any word to save it here.</p></div>'; return; }
-  if(savedSort==='az') all.sort((a,b)=>a.word.localeCompare(b.word));
-  else if(savedSort==='za') all.sort((a,b)=>b.word.localeCompare(a.word));
-  else if(savedSort==='oldest') all.sort((a,b)=>a.savedAt-b.savedAt);
-  else all.sort((a,b)=>b.savedAt-a.savedAt);
+  const head=$('#saved-count');
+  const all=await idbAll();
+
+  if(savedTab==='why'){
+    const files=all.filter(r=>r.saved && r.data && r.data.explain)
+                   .sort((x,y)=>y.savedAt-x.savedAt);
+    if(head) head.innerHTML='<img class="hdr-ico" src="./decor-book.webp" alt=""/>'
+      +files.length+' explanation'+(files.length===1?'':'s');
+    if(!files.length){
+      box.innerHTML='<div class="empty"><img class="ill" src="./mascot-investigate.webp" alt=""/>'
+        +'<h3>Chưa có lời giải thích nào</h3>'
+        +'<p>Gõ hai từ cách nhau bằng dấu phẩy — ví dụ <b>cease, decease</b> — '
+        +'rồi lưu lại lời giải thích của Focci. Biết vì sao một từ mang nghĩa đó '
+        +'thì nhớ lâu hơn học vẹt nhiều.</p></div>';
+      return;
+    }
+    let h='';
+    for(const r of files){
+      const d=r.data||{};
+      const items=Array.isArray(d.items)?d.items:[];
+      const safeQ=esc(d.query||r.word).replace(/'/g,"\\'");
+      h+='<div class="wf-row">';
+      h+='<div class="wf-head" onclick="this.parentNode.classList.toggle(\'open\')">';
+      h+='<div class="wf-q">'+esc(d.query||r.word)+'</div>';
+      h+='<span class="wf-n">'+items.length+'</span>';
+      h+='<span class="wf-x">\u25be</span>';
+      h+='</div>';
+      h+='<div class="wf-body">';
+      if(d.summary) h+='<div class="wf-sum">'+mdBold(d.summary)+'</div>';
+      for(const it of items){
+        h+='<div class="wf-item"><b>'+esc(it.word||'')+'</b>'
+          +(it.vi?' — '+esc(it.vi):'')
+          +(it.why?'<span>'+mdBold(it.why)+'</span>':'')+'</div>';
+      }
+      if(d.hook) h+='<div class="wf-hook">'+mdBold(d.hook)+'</div>';
+      h+='<div class="wf-acts">'
+        +'<button onclick="runExplain(\''+safeQ+'\')">M\u1edf l\u1ea1i</button>'
+        +'<button onclick="toggleExplainSave(\''+safeQ+'\');renderSaved()">B\u1ecf l\u01b0u</button>'
+        +'</div>';
+      h+='</div></div>';
+    }
+    box.innerHTML=h;
+    return;
+  }
+
+  // ---------- tab Vault ----------
+  let words=all.filter(r=>r.saved && r.data && !r.data.explain && !r.alias);
+  if(head) head.innerHTML='<img class="hdr-ico" src="./decor-earth.webp" alt=""/>'
+    +words.length+' word'+(words.length===1?'':'s')+' collected';
+  if(!words.length){
+    box.innerHTML='<div class="empty"><img class="ill" src="./mascot-explore.webp" alt=""/>'
+      +'<h3>No saved words yet</h3><p>Tap the star \u2606 on any word to save it here.</p></div>';
+    return;
+  }
+
+  const rows=words.map(r=>({r, due:srsDueAt(r), box:srsBox(r)}));
+  const dueNow=rows.filter(x=>x.due<=now()).sort((x,y)=>x.box-y.box);
+  const soon  =rows.filter(x=>x.due>now()).sort((x,y)=>x.due-y.due);
+  const solid =soon.filter(x=>x.box>=4);
+  const upNext=soon.filter(x=>x.box<4);
+
+  // Sắp xếp tay vẫn dùng được, nhưng chỉ áp TRONG từng nhóm.
+  const applySort=(arr)=>{
+    if(savedSort==='az') arr.sort((x,y)=>x.r.word.localeCompare(y.r.word));
+    else if(savedSort==='za') arr.sort((x,y)=>y.r.word.localeCompare(x.r.word));
+    else if(savedSort==='oldest') arr.sort((x,y)=>x.r.savedAt-y.r.savedAt);
+    return arr;
+  };
+  if(savedSort!=='newest'){ applySort(dueNow); applySort(upNext); applySort(solid); }
+
   let h='';
-  all.forEach((r,i)=>{ const eq=r.data?.vi_equivalent||''; const w=esc(r.word); const bm=BOOKMARK_COLORS[i%BOOKMARK_COLORS.length];
-    h+='<div class="row" onclick="jump(\''+w+'\')"><img class="bookmark-tag" src="./decor-bookmark-'+bm+'.webp" alt=""/>'
-     +'<div class="mid"><span class="w">'+w+'</span>'
-     +(eq?'<div class="e">'+esc(eq)+'</div>':'')+'</div>'
-     +'<button class="rm" onclick="event.stopPropagation();toggleSave(\''+w+'\')">★</button></div>';
-  });
+  /* Dải nhắc ôn: chỉ một hành động, và nó là hành động đúng về mặt học tập
+     — truy xuất chủ động, không phải đọc lại danh sách. */
+  h+='<div class="sv-hero'+(dueNow.length?'':' calm')+'">';
+  h+='<div class="sv-hero-n">'+dueNow.length+'</div>';
+  h+='<div class="sv-hero-t"><b>'+(dueNow.length?'t\u1eeb c\u1ea7n \u00f4n h\u00f4m nay':'kh\u00f4ng c\u00f3 t\u1eeb n\u00e0o t\u1edbi h\u1ea1n')+'</b>'
+    +'<span>'+(dueNow.length
+        ? 'T\u1ef1 nh\u1ee9 l\u1ea1i tr\u01b0\u1edbc khi xem \u0111\u00e1p \u00e1n \u2014 \u0111\u00f3 m\u1edbi l\u00e0 l\u00fac ghi nh\u1edb h\u00ecnh th\u00e0nh.'
+        : 'Quay l\u1ea1i sau. \u00d4n s\u1edbm h\u01a1n l\u1ecbch th\u00ec h\u1ecdc \u0111\u01b0\u1ee3c \u00edt h\u01a1n.')+'</span></div>';
+  if(dueNow.length) h+='<button class="sv-hero-go" onclick="startSavedReview()">\u00d4n ngay</button>';
+  h+='</div>';
+
+  const sec=(title, note, arr)=>{
+    if(!arr.length) return '';
+    let s='<div class="sv-sec"><div class="sv-sec-h"><b>'+title+'</b>'
+      +'<span>'+arr.length+'</span>'
+      +(note?'<i>'+note+'</i>':'')+'</div>';
+    for(const x of arr) s+=svRow(x.r, x.due, x.box);
+    return s+'</div>';
+  };
+  h+=sec('\u00d4n ngay','y\u1ebfu nh\u1ea5t tr\u01b0\u1edbc',dueNow);
+  h+=sec('S\u1eafp t\u1edbi','\u0111\u1ec3 y\u00ean cho \u0111\u1ebfn ng\u00e0y',upNext);
+  h+=sec('\u0110\u00e3 v\u1eefng','\u00f4n r\u1ea5t th\u01b0a',solid);
   box.innerHTML=h;
 }
+
+/* Bắt đầu một vòng luyện chỉ với các từ tới hạn — nối vào phần Practice
+   đã có, không dựng một cơ chế chơi thứ hai. */
+function startSavedReview(){
+  try{ localStorage.setItem(POOL_LS,'saved'); }catch(e){}
+  showView('review');
+  if(typeof setPracticeMode==='function') setPracticeMode('type');
+}
+window.startSavedReview=startSavedReview;
 
 /* ============================================================
    PRACTICE — two games, one setup screen
@@ -2343,9 +2761,19 @@ function levelOf(word){
   if(!_levels) return 0;
   return _levels.get(String(word||'').toLowerCase())||0;
 }
-function levelTag(word){
+const CEFR_TO_LV={A1:1,A2:2,B1:3,B2:4,C1:5,C2:6};
+/* levels.txt chỉ phủ những từ có trong danh sách tần suất, nên từ mới do AI
+   sinh ra hầu như không bao giờ có nhãn. Giờ prompt trả về "cefr" và nhãn
+   rơi về đó — nhưng ghi rõ nguồn: danh sách tần suất là chấm theo dữ liệu,
+   còn cefr của AI là phán đoán, hai thứ không cùng độ tin cậy. */
+function levelTag(word, data){
   const lv=levelOf(word);
-  return lv?'<span class="lv-tag lv'+lv+'">'+LEVEL_NAMES[lv]+'</span>':'';
+  if(lv) return '<span class="lv-tag lv'+lv+'">'+LEVEL_NAMES[lv]+'</span>';
+  const c=data && data.cefr ? String(data.cefr).trim().toUpperCase() : '';
+  const guess=CEFR_TO_LV[c];
+  if(guess) return '<span class="lv-tag lv'+guess+' lv-guess" title="Do AI phán đoán">'
+    +LEVEL_NAMES[guess]+'</span>';
+  return '';
 }
 window.levelOf=levelOf; window.levelTag=levelTag;
 let _wordsAtLevelCache=null;
@@ -2467,7 +2895,10 @@ function setupEmptyHelp(){
 async function availableWords(){
   const lv=getLevel();
   const hasMeaning=(r)=>r.data && (r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi);
-  let list=(await idbAll()).filter(r=>!r.alias && hasMeaning(r));
+  /* Bản ghi Focci Explains cũng có data và cũng được lưu sao, nên phải
+     loại trừ tường minh — nếu không sẽ bị đem ra đố như một từ vựng. */
+  let list=(await idbAll()).filter(r=>!r.alias && hasMeaning(r)
+            && !(r.data && r.data.explain) && !(r.data && r.data.phrase));
   if(practiceMode==='type'){
     list=list.filter(r=>r.saved);
   } else {
@@ -3220,7 +3651,8 @@ window.chooseMascot=chooseMascot;
    SETTINGS actions
    ============================================================ */
 async function refreshStats(){
-  try{ const total=await idbCount(); const saved=(await idbAll()).filter(r=>r.saved).length;
+  try{ const total=await idbCount();
+    const saved=(await idbAll()).filter(r=>r.saved && !(r.data&&r.data.explain)).length;
     $('#st-total').textContent=total.toLocaleString(); $('#st-saved').textContent=saved; }catch(e){}
   const ai=$('#sx-ai');
   if(ai){
@@ -3828,7 +4260,35 @@ function showView(v){
   if(v==='settings'){ refreshStats(); if(typeof scanRefreshState==='function'){ scanRefreshState().catch(()=>{}); missRefreshState(); } if(typeof renderTargetLevelUI==='function') renderTargetLevelUI(); }
 }
 
+/* Vuốt phải để quay lại. Chỉ nhận khi đang có kết quả mở, vuốt rõ ràng
+   theo chiều ngang, không bắt đầu từ trong ô nhập hay vùng cuộn ngang
+   (dải chip, hộp gợi ý) để không tranh chấp với chúng. */
+function wireSwipeBack(){
+  const view=$('#v-home'); if(!view || view._swipeBack) return;
+  view._swipeBack=1;
+  let sx=0, sy=0, st=0, live=false;
+  view.addEventListener('touchstart',(e)=>{
+    live=false;
+    if(e.touches.length!==1) return;
+    if(!currentWord && !$('#result').innerHTML.trim()) return;   // không có gì để back
+    const t=e.touches[0];
+    if(t.target.closest && t.target.closest('input,textarea,.suggest-drop,.chips,.yg-wrap,[data-noswipe]')) return;
+    sx=t.clientX; sy=t.clientY; st=Date.now(); live=true;
+  },{passive:true});
+  view.addEventListener('touchend',(e)=>{
+    if(!live) return; live=false;
+    const t=e.changedTouches[0];
+    const dx=t.clientX-sx, dy=t.clientY-sy, dt=Date.now()-st;
+    if(dt>800) return;
+    if(dx<70 || Math.abs(dy)>Math.abs(dx)*0.6) return;           // phải là vuốt phải, rõ ràng
+    const box=$('#result');
+    if(box){ box.classList.add('leaving'); setTimeout(()=>box.classList.remove('leaving'),200); }
+    backToHome();
+  },{passive:true});
+}
+
 function wire(){
+  wireSwipeBack();
   const q=$('#q'), clearx=$('#clearx');
   q.addEventListener('input',()=>{
     clearx.style.display=q.value?'block':'none';
@@ -3839,7 +4299,13 @@ function wire(){
   q.addEventListener('focus',()=>{ if(!q.value.trim()) showRecentSuggest(); else showTypedSuggest(norm(q.value)); });
   q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); q.blur(); search(q.value); } });
   document.addEventListener('click',(e)=>{ if(!e.target.closest('.searchwrap')) hideSuggest(); });
-  clearx.addEventListener('click',()=>{ q.value=''; clearx.style.display='none'; hideSuggest(); backToHome(); });
+  /* Bấm ✕: xoá chữ và trả con trỏ lại ô nhập để gõ tiếp ngay, thay vì
+     đẩy người ta về trang chủ rồi phải bấm vào ô lần nữa. */
+  clearx.addEventListener('click',()=>{
+    q.value=''; clearx.style.display='none'; hideSuggest();
+    if(currentWord!=null || $('#result').innerHTML.trim()) backToHome();
+    q.focus(); showRecentSuggest();
+  });
 
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>showView(t.dataset.view)));
   $('#sort-cycle').addEventListener('click',()=>{

@@ -622,7 +622,7 @@ function condensedEntryHTML(rec, formNote){
   }
   h+='<div class="ws-head"><div class="ws-word">'+esc(d.word||w)+'</div>';
   // dạng biến đổi tra nhãn theo TỪ GỐC, giống trang từ đầy đủ
-  if(typeof levelTag==='function') h+=levelTag(d._inflectedFrom||d.word||w);
+  if(typeof levelTag==='function') h+=levelTag(d._inflectedFrom||d.word||w, d);
   h+='<button class="ws-star'+(rec.saved?' on':'')+'" onclick="wordPopupToggleSave(\''+safeW+'\')" aria-label="Save word">'+(rec.saved?'★':'☆')+'</button>';
   h+='</div>';
   if(d.phonetic) h+='<div class="ws-phon">'+esc(d.phonetic)+'</div>';
