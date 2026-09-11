@@ -514,25 +514,45 @@ async function askExplain(words){
   if(!navigator.onLine) throw new Error('OFFLINE');
   const list=words.join(', ');
   const many=words.length>1;
-  const prompt='Bạn là nhà từ nguyên học giải thích cho người Việt đang học tiếng Anh.\n'
+
+  /* Prompt cũ cho ra bài dài dòng: nó nhắc lại "com- + parare" ở CẢ HAI từ,
+     rồi kết luận "không cùng gốc" ngay sau khi đưa ra gốc giống nhau. Ba lỗi
+     thiết kế prompt:
+       · không có chỗ nào để nói gốc chung MỘT lần
+       · mỗi từ được tự do viết 2 câu nên nó lấp chỗ bằng cách lặp lại gốc
+       · không có ô nào buộc nó nêu ĐIỂM KHÁC
+     Bản này tách hẳn: "root" nói gốc chung một lần; mỗi từ chỉ được viết
+     phần KHÁC BIỆT trong 14 từ; và "contrast" buộc nó chốt cách phân biệt
+     trong một dòng. Giới hạn số từ là thứ duy nhất khiến mô hình chịu cắt. */
+  const prompt='Bạn là nhà từ nguyên học, viết cho người Việt học tiếng Anh. Viết NGẮN. Người đọc cần nhớ được, không cần đọc bài luận.\n'
     +(many
-      ? 'Người học gõ vào '+words.length+' từ: '+list+'. Họ gõ chúng CÙNG NHAU vì thấy chúng trông giống nhau hoặc cảm giác liên quan. Hãy cho biết chúng có thật sự cùng gốc không, rồi phân biệt nghĩa.\n'
-      : 'Người học muốn hiểu VÌ SAO từ "'+list+'" lại có hình dạng và nghĩa như vậy.\n')
-    +'Trả về DUY NHẤT JSON này, không markdown fence, không lời dẫn:\n'
+      ? 'Người học gõ '+words.length+' mục cùng lúc: '+list+'. Họ gõ cùng nhau vì thấy giống nhau và muốn biết KHÁC NHAU ở đâu.\n'
+      : 'Người học muốn biết vì sao "'+list+'" lại mang nghĩa như vậy.\n')
+    +'Trả về DUY NHẤT JSON, không markdown fence, không lời dẫn:\n'
     +'{'
-    +'"summary":"1–2 câu tiếng Việt nói gốc chung (hoặc nói rõ là KHÔNG cùng gốc nếu đúng vậy). Bọc **hai dấu sao** quanh từ gốc Latinh/Hy Lạp và các ý then chốt.",'
-    +'"items":[{"word":"từ","vi":"nghĩa ngắn bằng tiếng Việt","why":"vì sao từ này mang nghĩa đó — tách tiền tố/hậu tố/gốc ra và dịch từng phần. Bọc **hai dấu sao** quanh phần cần nhớ. Tối đa 2 câu."}],'
-    +'"hook":"một mẹo nhớ cực ngắn bằng tiếng Việt, dưới 15 từ, hoặc chuỗi rỗng nếu không có mẹo nào thật sự hay"'
+    +'"same_root": true hoặc false,'
+    +'"root":{"form":"gốc Latinh/Hy Lạp dùng chung, ví dụ cedere. Chuỗi rỗng nếu không có gốc chung.","gloss":"nghĩa gốc đó, 2-5 từ tiếng Việt"},'
+    +'"items":[{'
+      +'"word":"mục đúng như người học gõ",'
+      +'"parts":[{"p":"com-","g":"cùng nhau"}],'
+      +'"vi":"nghĩa, tối đa 8 từ tiếng Việt",'
+      +'"diff":"ĐIỂM KHÁC so với các mục kia, tối đa 14 từ. Đây là phần quan trọng nhất."'
+    +'}],'
+    +'"contrast":"một dòng chốt cách phân biệt, tối đa 16 từ. Chuỗi rỗng nếu chỉ có một mục."'
     +'}\n'
-    +'QUY TẮC: mỗi từ người học gõ phải có đúng một phần tử trong "items", giữ nguyên thứ tự họ gõ. '
-    +'Nếu các từ KHÔNG cùng gốc thì nói thẳng trong "summary" chứ đừng bịa ra liên hệ. '
-    +'Không dùng dấu sao ở chỗ nào khác ngoài phần cần in đậm.';
+    +'QUY TẮC BẮT BUỘC:\n'
+    +'1. Gốc chung chỉ được nói MỘT lần, trong "root". TUYỆT ĐỐI không nhắc lại gốc chung trong "diff" của từng mục.\n'
+    +'2. "parts" chỉ liệt kê phần cấu tạo RIÊNG của mục đó (tiền tố, hậu tố, giới từ đi kèm). Tối đa 3 phần. Không lặp lại gốc chung ở đây nếu mọi mục đều có nó.\n'
+    +'3. "diff" phải nói điều mà các mục KHÁC không có. Nếu hai mục cùng gốc và chỉ khác cách dùng, thì "diff" nói cách dùng, đừng nói từ nguyên.\n'
+    +'4. same_root=false thì "root.form" để rỗng và "diff" giải thích gốc riêng của từng mục.\n'
+    +'5. Không dùng dấu sao, không markdown, không câu mở đầu kiểu "Hai từ này...".\n'
+    +'6. Mỗi mục người học gõ có đúng một phần tử trong "items", giữ nguyên thứ tự.';
 
   const url='https://generativelanguage.googleapis.com/v1beta/models/'+getModel()
     +':generateContent?key='+encodeURIComponent(key);
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.4,maxOutputTokens:1400}})});
+      generationConfig:{temperature:0.3,maxOutputTokens:1100}})});
   if(!r.ok) throw new Error('HTTP_'+r.status);
   const j=await r.json();
   let txt=(j.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
@@ -547,30 +567,66 @@ function mdBold(s){
   return esc(String(s||'')).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
 }
 
+/* Giao diện cũ chỉ là chữ xếp dọc nên đọc ngộp. Bản này chia thành ba lớp
+   thông tin khác nhau về hình dạng, để mắt phân biệt được mà không phải đọc:
+     · gốc chung  → một khối riêng, chữ gốc to, dùng font chữ khác
+     · cấu tạo    → các chip nhỏ (com-) (parare), nhìn là thấy từ ghép lại
+     · điểm khác  → dòng nổi bật nhất trong mỗi thẻ, có vạch cam bên trái
+   Và một dải chốt ở cuối. Ba hình dạng khác nhau cho ba loại thông tin. */
 function explainState(query, data, saved){
   const items=Array.isArray(data.items)?data.items:[];
   const safeQ=esc(query).replace(/'/g,"\\'");
+  const root=data.root||{};
   let h='<div class="wh-card">';
+
   h+='<div class="wh-top">';
   h+='<div class="wh-title"><span class="wh-kicker">Focci explains</span>'+esc(query)+'</div>';
   h+='<button class="wh-star'+(saved?' on':'')+'" onclick="toggleExplainSave(\''+safeQ+'\')"'
     +' aria-label="Save explanation">'+(saved?'★':'☆')+'</button>';
   h+='</div>';
-  if(data.summary) h+='<div class="wh-sum">'+mdBold(data.summary)+'</div>';
+
+  // ---- lớp 1: gốc chung, nói MỘT lần ----
+  if(data.same_root && root.form){
+    h+='<div class="wh-root">'
+      +'<span class="wh-root-lbl">c\u00f9ng g\u1ed1c</span>'
+      +'<span class="wh-root-f">'+esc(root.form)+'</span>'
+      +(root.gloss?'<span class="wh-root-g">'+esc(root.gloss)+'</span>':'')
+      +'</div>';
+  }else if(data.same_root===false){
+    h+='<div class="wh-root wh-root-no">'
+      +'<span class="wh-root-lbl">kh\u00f4ng c\u00f9ng g\u1ed1c</span>'
+      +'<span class="wh-root-g">m\u1ed7i m\u1ee5c c\u00f3 \u0111\u01b0\u1eddng ri\u00eang</span></div>';
+  }
+
+  // ---- lớp 2+3: mỗi mục một thẻ ----
   if(items.length){
     h+='<div class="wh-items">';
-    for(const it of items){
+    items.forEach((it,i)=>{
+      const parts=Array.isArray(it.parts)?it.parts.slice(0,3):[];
       h+='<div class="wh-item">';
-      h+='<div class="wh-w">'+esc(it.word||'')
+      h+='<div class="wh-item-h"><span class="wh-n">'+(i+1)+'</span>'
+        +'<span class="wh-w">'+esc(it.word||'')+'</span>'
         +(it.vi?'<span class="wh-vi">'+esc(it.vi)+'</span>':'')+'</div>';
-      if(it.why) h+='<div class="wh-why">'+mdBold(it.why)+'</div>';
+      if(parts.length){
+        h+='<div class="wh-parts">';
+        parts.forEach((pt,k)=>{
+          if(k) h+='<span class="wh-plus">+</span>';
+          h+='<span class="wh-chip"><b>'+esc(pt.p||'')+'</b>'
+            +(pt.g?'<i>'+esc(pt.g)+'</i>':'')+'</span>';
+        });
+        h+='</div>';
+      }
+      if(it.diff) h+='<div class="wh-diff">'+esc(it.diff)+'</div>';
       h+='<button class="wh-go" onclick="jump(\''+esc(it.word||'').replace(/'/g,"\\'")+'\')">'
         +'Tra t\u1eeb n\u00e0y</button>';
       h+='</div>';
-    }
+    });
     h+='</div>';
   }
-  if(data.hook) h+='<div class="wh-hook"><span>M\u1eb9o nh\u1ee1</span>'+mdBold(data.hook)+'</div>';
+
+  if(data.contrast){
+    h+='<div class="wh-hook"><span>ph\u00e2n bi\u1ec7t nhanh</span>'+esc(data.contrast)+'</div>';
+  }
   h+='</div>';
   return h;
 }
@@ -581,6 +637,8 @@ async function runExplain(query){
   if(!words.length) return;
   const key=EXPLAIN_KEY_PREFIX+words.join(', ');
 
+  /* Đọc lại bản đã lưu trước khi nghĩ tới việc gọi AI — mở lại một lời
+     giải thích cũ không được tốn thêm token nào. */
   const cached=await idbGet(key);
   if(cached && cached.data && cached.data.explain){
     currentWord=null;
@@ -595,6 +653,12 @@ async function runExplain(query){
   try{
     const data=await askExplain(words);
     data.explain=true; data.query=words.join(', '); data.word=words.join(', ');
+    /* Các danh sách sẵn có (lịch sử, gợi ý) đều đọc vi_equivalent để hiện
+       dòng phụ. Đặt nó bằng dòng chốt phân biệt thì mọi chỗ đó tự có nội
+       dung, không phải sửa từng renderer. */
+    data.vi_equivalent = data.contrast
+      || (data.root && data.root.form ? 'gốc '+data.root.form
+            +(data.root.gloss?' — '+data.root.gloss:'') : 'lời giải thích của Focci');
     await idbPut({ word:key, data, source:'explain',
                    firstSeen:now(), saved:0, savedAt:0 });
     currentWord=null;
@@ -1119,7 +1183,19 @@ function backToHome(){
   }
   return _backToHomePlain();
 }
-function _backToHomePlain(){ currentWord=null; $('#result').innerHTML=''; $('#dashboard').style.display='block'; $('#topbar-back').style.display='none'; $('#q').value=''; $('#clearx').style.display='none'; renderDashboard(); window.scrollTo(0,0); }
+function _backToHomePlain(){
+  /* Dọn và hiện dashboard NGAY, rồi mới vẽ lại nội dung ở khung sau. Gọi
+     renderDashboard() đồng bộ trước khi trả điều khiển làm cú vuốt bị đứng
+     lại một nhịp — đó là phần trễ còn lại sau khi đã bắn sớm ở touchmove. */
+  currentWord=null;
+  $('#result').innerHTML='';
+  $('#dashboard').style.display='block';
+  $('#topbar-back').style.display='none';
+  $('#q').value='';
+  $('#clearx').style.display='none';
+  window.scrollTo(0,0);
+  requestAnimationFrame(()=>renderDashboard());
+}
 
 /* ---------- toggle save ---------- */
 async function toggleSave(word){
@@ -1988,6 +2064,16 @@ function syncClearX(){
 window.syncClearX=syncClearX;
 
 function jump(w){
+  /* Mục lịch sử của Focci Explains có khoá dạng "why:cease, decease". Nếu
+     cứ đưa nguyên chuỗi đó vào search() thì explainWordsOf() sẽ tách ra
+     "why:cease" — sai hẳn. Bắt tiền tố ở đây và mở lại bản đã lưu. */
+  if(typeof w==='string' && w.startsWith(EXPLAIN_KEY_PREFIX)){
+    const q=w.slice(EXPLAIN_KEY_PREFIX.length);
+    $('#q').value=q; syncClearX(); hideSuggest();
+    window.scrollTo({top:0,behavior:'smooth'});
+    runExplain(q);
+    return;
+  }
   $('#q').value=w;
   syncClearX();
   hideSuggest();
@@ -2180,9 +2266,11 @@ async function renderHistory(){
   let h='';
   for(const r of recs){ if(!r) continue; const d=r.data||{}; const w=esc(r.word);
     const safeW=w.replace(/'/g,"\\'");
-    const isPhrase = d.phrase || /\s/.test(r.word);
-    h+='<div class="hist-item'+(isPhrase?' is-phrase':'')+'" onclick="jump(\''+safeW+'\')">'
-      +'<img class="hist-ico" src="./'+(isPhrase?'decor-note-and-pen':'decor-magnifying-glass')+'.webp" alt=""/>'
+    const isWhy = !!(d && d.explain);
+    const isPhrase = !isWhy && (d.phrase || /\s/.test(r.word));
+    h+='<div class="hist-item'+(isPhrase?' is-phrase':'')+(isWhy?' is-why':'')+'" onclick="jump(\''+safeW+'\')">'
+      +'<img class="hist-ico" src="./'
+      +(isWhy?'decor-book':(isPhrase?'decor-note-and-pen':'decor-magnifying-glass'))+'.webp" alt=""/>'
       +'<div class="hist-mid"><div class="hist-top"><span class="w">'+w+'</span>'
       +(d.phonetic?'<span class="phon">'+esc(d.phonetic)+'</span>':'')+'</div>'
       +(d.vi_equivalent?'<div class="e">'+esc(d.vi_equivalent)+'</div>':'')+'</div>'
@@ -2639,13 +2727,37 @@ async function renderSaved(){
       h+='<span class="wf-x">\u25be</span>';
       h+='</div>';
       h+='<div class="wf-body">';
-      if(d.summary) h+='<div class="wf-sum">'+mdBold(d.summary)+'</div>';
-      for(const it of items){
-        h+='<div class="wf-item"><b>'+esc(it.word||'')+'</b>'
-          +(it.vi?' — '+esc(it.vi):'')
-          +(it.why?'<span>'+mdBold(it.why)+'</span>':'')+'</div>';
+      /* Dùng lại y nguyên các khối của trang Explains, nên mở thẻ ra là
+         thấy đúng thứ đã thấy lúc tra — không phải một bản rút gọn khác.
+         Bản ghi CŨ (trước v72) có summary/why thay vì root/diff, nên đọc
+         cả hai dạng để lời giải thích đã lưu không bị trắng. */
+      if(d.same_root && d.root && d.root.form){
+        h+='<div class="wh-root"><span class="wh-root-lbl">c\u00f9ng g\u1ed1c</span>'
+          +'<span class="wh-root-f">'+esc(d.root.form)+'</span>'
+          +(d.root.gloss?'<span class="wh-root-g">'+esc(d.root.gloss)+'</span>':'')+'</div>';
+      }else if(d.summary){
+        h+='<div class="wh-root wh-root-no"><span class="wh-root-g">'+mdBold(d.summary)+'</span></div>';
       }
-      if(d.hook) h+='<div class="wf-hook">'+mdBold(d.hook)+'</div>';
+      for(const it of items){
+        const parts=Array.isArray(it.parts)?it.parts.slice(0,3):[];
+        h+='<div class="wh-item">';
+        h+='<div class="wh-item-h"><span class="wh-w">'+esc(it.word||'')+'</span>'
+          +(it.vi?'<span class="wh-vi">'+esc(it.vi)+'</span>':'')+'</div>';
+        if(parts.length){
+          h+='<div class="wh-parts">';
+          parts.forEach((pt,k)=>{
+            if(k) h+='<span class="wh-plus">+</span>';
+            h+='<span class="wh-chip"><b>'+esc(pt.p||'')+'</b>'
+              +(pt.g?'<i>'+esc(pt.g)+'</i>':'')+'</span>';
+          });
+          h+='</div>';
+        }
+        const diff=it.diff||it.why||'';
+        if(diff) h+='<div class="wh-diff">'+mdBold(diff)+'</div>';
+        h+='</div>';
+      }
+      const tail=d.contrast||d.hook||'';
+      if(tail) h+='<div class="wh-hook"><span>ph\u00e2n bi\u1ec7t nhanh</span>'+mdBold(tail)+'</div>';
       h+='<div class="wf-acts">'
         +'<button onclick="runExplain(\''+safeQ+'\')">M\u1edf l\u1ea1i</button>'
         +'<button onclick="toggleExplainSave(\''+safeQ+'\');renderSaved()">B\u1ecf l\u01b0u</button>'
@@ -2963,6 +3075,18 @@ function practiceAdvance(dir){
   },170);
 }
 window.practiceAdvance=practiceAdvance;
+/* Lùi một bậc trong tab Game. Thứ tự bậc: cảnh truyện → hub → trang chủ. */
+function gameSwipeBack(){
+  const area=$('#review-area');
+  const inStory = !!(area && area.querySelector('.story-view'));
+  const inSetup = !!(area && area.querySelector('.game-tab'));
+  if(inStory || inSetup){
+    if(typeof renderGameHub==='function'){ renderGameHub(); window.scrollTo(0,0); return; }
+  }
+  showView('home');
+}
+window.gameSwipeBack=gameSwipeBack;
+
 function wirePracticeSwipe(){
   const el=$('#review-area');
   if(!el || el._swipeWired) return;
@@ -2980,6 +3104,14 @@ function wirePracticeSwipe(){
     if(Math.abs(dx)<55 || Math.abs(dy)>Math.abs(dx)*0.8) return;    // must be clearly horizontal
     const ae=document.activeElement;
     if(ae && (ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) ae.blur();
+
+    /* Ngoài lúc đang chơi một vòng, vuốt phải trong tab Game là LÙI một
+       bậc chứ không phải chuyển câu: đang đọc cảnh → về màn hub; đang ở
+       hub → về trang chủ. Trước đây cử chỉ này không làm gì cả ở hub. */
+    if(practiceStage!=='playing'){
+      if(dx>0) gameSwipeBack();
+      return;
+    }
     practiceAdvance(dx<0?'left':'right');
   },{passive:true});
   document.addEventListener('keydown',(e)=>{
@@ -4266,25 +4398,33 @@ function showView(v){
 function wireSwipeBack(){
   const view=$('#v-home'); if(!view || view._swipeBack) return;
   view._swipeBack=1;
-  let sx=0, sy=0, st=0, live=false;
+  let sx=0, sy=0, st=0, live=false, fired=false;
+
+  const canBack=()=> !!(currentWord || $('#result').innerHTML.trim());
+
   view.addEventListener('touchstart',(e)=>{
-    live=false;
-    if(e.touches.length!==1) return;
-    if(!currentWord && !$('#result').innerHTML.trim()) return;   // không có gì để back
+    live=false; fired=false;
+    if(e.touches.length!==1 || !canBack()) return;
     const t=e.touches[0];
     if(t.target.closest && t.target.closest('input,textarea,.suggest-drop,.chips,.yg-wrap,[data-noswipe]')) return;
     sx=t.clientX; sy=t.clientY; st=Date.now(); live=true;
   },{passive:true});
-  view.addEventListener('touchend',(e)=>{
-    if(!live) return; live=false;
-    const t=e.changedTouches[0];
-    const dx=t.clientX-sx, dy=t.clientY-sy, dt=Date.now()-st;
-    if(dt>800) return;
-    if(dx<70 || Math.abs(dy)>Math.abs(dx)*0.6) return;           // phải là vuốt phải, rõ ràng
-    const box=$('#result');
-    if(box){ box.classList.add('leaving'); setTimeout(()=>box.classList.remove('leaving'),200); }
-    backToHome();
+
+  /* Bản trước chỉ xử lý ở touchend — nghĩa là phải NHẤC NGÓN xong mới thấy
+     phản hồi, cảm giác đúng như trễ. Giờ bắn ngay khi vượt ngưỡng trong lúc
+     ngón còn trên màn hình, giống cử chỉ back của hệ điều hành. */
+  view.addEventListener('touchmove',(e)=>{
+    if(!live || fired) return;
+    const t=e.touches[0];
+    const dx=t.clientX-sx, dy=t.clientY-sy;
+    if(Math.abs(dy)>Math.abs(dx)*0.6){ live=false; return; }   // đang cuộn dọc
+    if(dx>62){
+      fired=true; live=false;
+      if(Date.now()-st<900) backToHome();
+    }
   },{passive:true});
+
+  view.addEventListener('touchend',()=>{ live=false; },{passive:true});
 }
 
 function wire(){
