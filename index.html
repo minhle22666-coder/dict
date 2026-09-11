@@ -2256,13 +2256,33 @@
     font-family:ui-serif,Georgia,serif;font-style:italic}
   .wh-chip i{font-size:10px;font-style:normal;color:var(--muted-2)}
   .wh-plus{font-size:11px;font-weight:800;color:var(--primary)}
+  /* Phần dùng chung hiện lại mờ trong mỗi mục để thấy công thức ghép,
+     nhưng nhạt hơn thân từ riêng — thứ cần chú ý là phần RIÊNG. */
+  .wh-chip-mute{opacity:.55}
+  .wh-chip-mute b{font-weight:600}
+
+  /* Cụm hay đi kèm — cách phân biệt đáng tin nhất khi viết thật */
+  .wh-typ{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+  .wh-typ span{font-size:11px;font-weight:600;color:var(--muted);
+    padding:4px 9px;border-radius:99px;background:var(--surface-2);
+    border:1px solid var(--line)}
 
   .wh-diff{position:relative;margin-top:11px;padding:9px 0 9px 13px;
     font-size:13.5px;line-height:1.55;color:var(--text);font-weight:600}
   .wh-diff::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;
     border-radius:99px;background:var(--grad-hero)}
 
-  .wh-go{margin-top:9px;font-size:11.5px;font-weight:800;color:var(--primary);padding:0}
+  /* Ví dụ: câu tiếng Anh trước, bản dịch thụt vào và nhạt hơn — mắt đọc
+     câu gốc trước, dịch chỉ để đối chiếu khi cần. Vạch dọc mảnh gom hai
+     ví dụ thành một khối, không lẫn vào dòng "điểm khác" phía trên. */
+  .wh-ex{margin-top:11px;padding-left:11px;border-left:1px solid var(--line);
+    display:flex;flex-direction:column;gap:9px}
+  .wh-ex-row{display:flex;flex-direction:column;gap:2px}
+  .wh-ex-en{font-size:13px;line-height:1.45;color:var(--text)}
+  .wh-ex-vi{font-size:11.5px;line-height:1.45;color:var(--muted-2);padding-left:9px;
+    border-left:2px solid var(--line)}
+
+  .wh-go{margin-top:11px;font-size:11.5px;font-weight:800;color:var(--primary);padding:0}
 
   .wh-hook{display:flex;flex-direction:column;gap:5px;margin-top:14px;
     padding:13px 15px;border-radius:16px;font-size:13.5px;font-weight:600;
@@ -2678,7 +2698,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v72. 09.11.2026 - Focci&rsquo;s Learning App</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v74. 09.11.2026 - Focci&rsquo;s Learning App</b></p>
   </section>
 </main>
 
