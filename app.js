@@ -524,35 +524,69 @@ async function askExplain(words){
      Bản này tách hẳn: "root" nói gốc chung một lần; mỗi từ chỉ được viết
      phần KHÁC BIỆT trong 14 từ; và "contrast" buộc nó chốt cách phân biệt
      trong một dòng. Giới hạn số từ là thứ duy nhất khiến mô hình chịu cắt. */
-  const prompt='Bạn là nhà từ nguyên học, viết cho người Việt học tiếng Anh. Viết NGẮN. Người đọc cần nhớ được, không cần đọc bài luận.\n'
+  /* Hai lỗi của bản trước, sửa ở tầng SCHEMA chứ không phải bằng cách dặn
+     thêm — dặn thêm thì mô hình vẫn lấp chỗ theo hình dạng ô có sẵn:
+
+     1. SAI SỰ THẬT. Bản trước chỉ có MỘT ô "root" dùng chung + một cờ nhị
+        phân same_root. Gặp ca "chung tiền tố, khác thân từ" (conference từ
+        con-+ferre, convention từ con-+venire) thì không có ô nào diễn đạt
+        được, nên nó bịa ra một gốc chung. Giờ "shared" có thêm "kind" để
+        nói rõ chung ở mức nào, và MỖI mục có "stem" riêng của nó.
+
+     2. VÔ DỤNG. "diff" bị lấp bằng từ nguyên diễn giải lại ("tập trung vào
+        trao đổi ý tưởng") — nghe hợp lý mà không giúp chọn từ. Giờ "diff"
+        bị cấm nhắc từ nguyên và phải nêu thứ kiểm chứng được: ai tổ chức,
+        quy mô, mức trang trọng. Thêm "typical" cho các cụm hay đi kèm, vì
+        collocation là cách phân biệt đáng tin nhất trong thực tế.
+
+     Và một ví dụ mẫu đặt ngay trong prompt: một ví dụ cho thấy mức cụ thể
+     mong đợi có tác dụng hơn năm dòng quy tắc. */
+  const prompt='Bạn là nhà từ điển học viết cho người Việt học tiếng Anh. Mục tiêu: giúp người đọc CHỌN ĐÚNG TỪ khi viết, không phải đọc một bài về từ nguyên.\n'
     +(many
-      ? 'Người học gõ '+words.length+' mục cùng lúc: '+list+'. Họ gõ cùng nhau vì thấy giống nhau và muốn biết KHÁC NHAU ở đâu.\n'
-      : 'Người học muốn biết vì sao "'+list+'" lại mang nghĩa như vậy.\n')
+      ? 'Người học gõ '+words.length+' mục cùng lúc: '+list+'. Họ muốn biết khi nào dùng cái nào.\n'
+      : 'Người học muốn biết vì sao "'+list+'" mang nghĩa như vậy và khi nào dùng nó.\n')
     +'Trả về DUY NHẤT JSON, không markdown fence, không lời dẫn:\n'
     +'{'
-    +'"same_root": true hoặc false,'
-    +'"root":{"form":"gốc Latinh/Hy Lạp dùng chung, ví dụ cedere. Chuỗi rỗng nếu không có gốc chung.","gloss":"nghĩa gốc đó, 2-5 từ tiếng Việt"},'
+    +'"shared":{"kind":"root | prefix | none","form":"phần thật sự dùng chung, ví dụ con-","gloss":"nghĩa phần đó, 2-5 từ tiếng Việt"},'
     +'"items":[{'
       +'"word":"mục đúng như người học gõ",'
-      +'"parts":[{"p":"com-","g":"cùng nhau"}],'
-      +'"vi":"nghĩa, tối đa 8 từ tiếng Việt",'
-      +'"diff":"ĐIỂM KHÁC so với các mục kia, tối đa 14 từ. Đây là phần quan trọng nhất."'
+      +'"stem":{"form":"thân từ RIÊNG của mục này, ví dụ ferre","gloss":"nghĩa thân từ đó"},'
+      +'"vi":"nghĩa tiếng Việt, tối đa 8 từ",'
+      +'"diff":"ĐIỂM KHÁC THỰC TẾ, tối đa 20 từ: ai tổ chức/ai dùng, quy mô, mức trang trọng, hoặc lĩnh vực. TUYỆT ĐỐI không nhắc từ nguyên ở đây.",'
+      +'"typical":"2-3 cụm hay đi kèm nhất, cách nhau bằng dấu phẩy",'
+      +'"ex":[{"en":"câu tiếng Anh tự nhiên, tối đa 12 từ","vi":"bản dịch tiếng Việt"}]'
     +'}],'
-    +'"contrast":"một dòng chốt cách phân biệt, tối đa 16 từ. Chuỗi rỗng nếu chỉ có một mục."'
+    +'"contrast":"một dòng chốt cách chọn, tối đa 16 từ. Rỗng nếu chỉ có một mục."'
     +'}\n'
     +'QUY TẮC BẮT BUỘC:\n'
-    +'1. Gốc chung chỉ được nói MỘT lần, trong "root". TUYỆT ĐỐI không nhắc lại gốc chung trong "diff" của từng mục.\n'
-    +'2. "parts" chỉ liệt kê phần cấu tạo RIÊNG của mục đó (tiền tố, hậu tố, giới từ đi kèm). Tối đa 3 phần. Không lặp lại gốc chung ở đây nếu mọi mục đều có nó.\n'
-    +'3. "diff" phải nói điều mà các mục KHÁC không có. Nếu hai mục cùng gốc và chỉ khác cách dùng, thì "diff" nói cách dùng, đừng nói từ nguyên.\n'
-    +'4. same_root=false thì "root.form" để rỗng và "diff" giải thích gốc riêng của từng mục.\n'
-    +'5. Không dùng dấu sao, không markdown, không câu mở đầu kiểu "Hai từ này...".\n'
-    +'6. Mỗi mục người học gõ có đúng một phần tử trong "items", giữ nguyên thứ tự.';
+    +'1. TIỀN TỐ GIỐNG NHAU KHÔNG PHẢI CÙNG GỐC. Nếu các mục chỉ chung tiền tố (con-, de-, re-...) mà khác thân từ thì shared.kind="prefix". Chỉ dùng "root" khi thân từ thật sự cùng một gốc. Không có gì chung thì "none" và shared.form rỗng.\n'
+    +'2. Nếu bạn KHÔNG CHẮC về từ nguyên của một mục, để stem.form rỗng. Để rỗng thì tốt hơn là đoán sai.\n'
+    +'3. "diff" phải là thông tin có thể kiểm chứng ngoài đời. Cấm các câu kiểu "tập trung vào việc trao đổi ý tưởng" — nghe hợp lý mà không giúp chọn từ. Hãy nói AI tổ chức, QUY MÔ bao nhiêu người, TRANG TRỌNG tới đâu, hoặc dùng trong NGÀNH nào.\n'
+    +'4. Phần dùng chung chỉ nói MỘT lần trong "shared". Không nhắc lại trong "diff" hay "stem".\n'
+    +'5. "ex" đúng 2 ví dụ mỗi mục, kèm bản dịch. Chọn câu mà nếu thay bằng mục kia thì nghe sai hoặc đổi nghĩa.\n'
+    +'6. Mỗi mục người học gõ có đúng một phần tử trong "items", giữ nguyên thứ tự. Không dùng dấu sao, không markdown.\n'
+    +'\nVÍ DỤ MẪU cho đầu vào "conference, convention" — hãy đạt mức cụ thể NÀY:\n'
+    +'{"shared":{"kind":"prefix","form":"con-","gloss":"cùng nhau"},'
+    +'"items":[' 
+    +'{"word":"conference","stem":{"form":"ferre","gloss":"mang, đem tới"},'
+    +'"vi":"hội nghị, hội thảo chuyên môn",'
+    +'"diff":"Giới học thuật và doanh nghiệp tổ chức, vài trăm người, có diễn giả và báo cáo",'
+    +'"typical":"academic conference, press conference, conference call",'
+    +'"ex":[{"en":"She presented her paper at a medical conference.","vi":"Cô trình bày báo cáo tại một hội nghị y khoa."},'
+    +'{"en":"The CEO held a press conference this morning.","vi":"Giám đốc tổ chức họp báo sáng nay."}]},'
+    +'{"word":"convention","stem":{"form":"venire","gloss":"đến, tới"},'
+    +'"vi":"đại hội, kỳ họp lớn",'
+    +'"diff":"Đảng phái hoặc cả một ngành tổ chức, hàng nghìn người, thường để bầu chọn hoặc thống nhất",'
+    +'"typical":"national convention, party convention, comic convention",'
+    +'"ex":[{"en":"He was nominated at the party convention.","vi":"Ông được đề cử tại đại hội đảng."},'
+    +'{"en":"Thousands attended the annual comic convention.","vi":"Hàng nghìn người dự đại hội truyện tranh thường niên."}]}],'
+    +'"contrast":"Conference để báo cáo chuyên môn, convention để cả giới tụ họp và quyết định."}';
 
   const url='https://generativelanguage.googleapis.com/v1beta/models/'+getModel()
     +':generateContent?key='+encodeURIComponent(key);
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.3,maxOutputTokens:1100}})});
+      generationConfig:{temperature:0.3,maxOutputTokens:1600}})});
   if(!r.ok) throw new Error('HTTP_'+r.status);
   const j=await r.json();
   let txt=(j.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
@@ -576,47 +610,86 @@ function mdBold(s){
 function explainState(query, data, saved){
   const items=Array.isArray(data.items)?data.items:[];
   const safeQ=esc(query).replace(/'/g,"\\'");
-  const root=data.root||{};
-  let h='<div class="wh-card">';
+  const sh=data.shared||{};
+  // bản ghi cũ (trước v74) dùng data.root + data.same_root
+  const legacyRoot=data.root||{};
+  const kind = sh.kind || (data.same_root===true?'root':(data.same_root===false?'none':''));
+  const shForm = sh.form || (data.same_root?legacyRoot.form:'') || '';
+  const shGloss = sh.gloss || legacyRoot.gloss || '';
 
+  let h='<div class="wh-card">';
   h+='<div class="wh-top">';
   h+='<div class="wh-title"><span class="wh-kicker">Focci explains</span>'+esc(query)+'</div>';
   h+='<button class="wh-star'+(saved?' on':'')+'" onclick="toggleExplainSave(\''+safeQ+'\')"'
     +' aria-label="Save explanation">'+(saved?'★':'☆')+'</button>';
   h+='</div>';
 
-  // ---- lớp 1: gốc chung, nói MỘT lần ----
-  if(data.same_root && root.form){
+  /* Nhãn phải nói ĐÚNG mức chung. Gộp "chung tiền tố" thành "cùng gốc" là
+     chỗ bản trước nói sai sự thật về conference/convention. */
+  const KIND_LBL={root:'c\u00f9ng g\u1ed1c', prefix:'c\u00f9ng ti\u1ec1n t\u1ed1', none:'kh\u00f4ng chung g\u1ed1c'};
+  if(shForm && kind!=='none'){
     h+='<div class="wh-root">'
-      +'<span class="wh-root-lbl">c\u00f9ng g\u1ed1c</span>'
-      +'<span class="wh-root-f">'+esc(root.form)+'</span>'
-      +(root.gloss?'<span class="wh-root-g">'+esc(root.gloss)+'</span>':'')
+      +'<span class="wh-root-lbl">'+esc(KIND_LBL[kind]||'chung')+'</span>'
+      +'<span class="wh-root-f">'+esc(shForm)+'</span>'
+      +(shGloss?'<span class="wh-root-g">'+esc(shGloss)+'</span>':'')
       +'</div>';
-  }else if(data.same_root===false){
+  }else if(kind==='none'){
     h+='<div class="wh-root wh-root-no">'
-      +'<span class="wh-root-lbl">kh\u00f4ng c\u00f9ng g\u1ed1c</span>'
+      +'<span class="wh-root-lbl">'+esc(KIND_LBL.none)+'</span>'
       +'<span class="wh-root-g">m\u1ed7i m\u1ee5c c\u00f3 \u0111\u01b0\u1eddng ri\u00eang</span></div>';
   }
 
-  // ---- lớp 2+3: mỗi mục một thẻ ----
   if(items.length){
     h+='<div class="wh-items">';
     items.forEach((it,i)=>{
-      const parts=Array.isArray(it.parts)?it.parts.slice(0,3):[];
       h+='<div class="wh-item">';
       h+='<div class="wh-item-h"><span class="wh-n">'+(i+1)+'</span>'
         +'<span class="wh-w">'+esc(it.word||'')+'</span>'
         +(it.vi?'<span class="wh-vi">'+esc(it.vi)+'</span>':'')+'</div>';
-      if(parts.length){
+
+      // thân từ RIÊNG của mục này — cộng với phần chung ở dải trên
+      const st=it.stem||{};
+      const parts=Array.isArray(it.parts)?it.parts.slice(0,3):[];
+      if(st.form || parts.length){
         h+='<div class="wh-parts">';
-        parts.forEach((pt,k)=>{
-          if(k) h+='<span class="wh-plus">+</span>';
-          h+='<span class="wh-chip"><b>'+esc(pt.p||'')+'</b>'
-            +(pt.g?'<i>'+esc(pt.g)+'</i>':'')+'</span>';
-        });
+        if(shForm && kind!=='none' && st.form){
+          h+='<span class="wh-chip wh-chip-mute"><b>'+esc(shForm)+'</b>'
+            +(shGloss?'<i>'+esc(shGloss)+'</i>':'')+'</span><span class="wh-plus">+</span>';
+        }
+        if(st.form){
+          h+='<span class="wh-chip"><b>'+esc(st.form)+'</b>'
+            +(st.gloss?'<i>'+esc(st.gloss)+'</i>':'')+'</span>';
+        }else{
+          parts.forEach((pt,k)=>{
+            if(k) h+='<span class="wh-plus">+</span>';
+            h+='<span class="wh-chip"><b>'+esc(pt.p||'')+'</b>'
+              +(pt.g?'<i>'+esc(pt.g)+'</i>':'')+'</span>';
+          });
+        }
         h+='</div>';
       }
+
       if(it.diff) h+='<div class="wh-diff">'+esc(it.diff)+'</div>';
+
+      /* Collocation là cách phân biệt đáng tin nhất khi viết thật — thấy
+         "press conference" là biết ngay cụm nào đi với từ nào. */
+      if(it.typical){
+        h+='<div class="wh-typ">';
+        String(it.typical).split(',').map(x=>x.trim()).filter(Boolean).slice(0,3)
+          .forEach(c=>{ h+='<span>'+esc(c)+'</span>'; });
+        h+='</div>';
+      }
+
+      const exs=Array.isArray(it.ex)?it.ex.slice(0,2):[];
+      if(exs.length){
+        h+='<div class="wh-ex">';
+        for(const e of exs){
+          if(!e || !e.en) continue;
+          h+='<div class="wh-ex-row"><span class="wh-ex-en">'+esc(e.en)+'</span>'
+            +(e.vi?'<span class="wh-ex-vi">'+esc(e.vi)+'</span>':'')+'</div>';
+        }
+        h+='</div>';
+      }
       h+='<button class="wh-go" onclick="jump(\''+esc(it.word||'').replace(/'/g,"\\'")+'\')">'
         +'Tra t\u1eeb n\u00e0y</button>';
       h+='</div>';
@@ -625,7 +698,7 @@ function explainState(query, data, saved){
   }
 
   if(data.contrast){
-    h+='<div class="wh-hook"><span>ph\u00e2n bi\u1ec7t nhanh</span>'+esc(data.contrast)+'</div>';
+    h+='<div class="wh-hook"><span>ch\u1ecdn c\u00e1i n\u00e0o</span>'+esc(data.contrast)+'</div>';
   }
   h+='</div>';
   return h;
@@ -656,9 +729,10 @@ async function runExplain(query){
     /* Các danh sách sẵn có (lịch sử, gợi ý) đều đọc vi_equivalent để hiện
        dòng phụ. Đặt nó bằng dòng chốt phân biệt thì mọi chỗ đó tự có nội
        dung, không phải sửa từng renderer. */
+    const sh0=data.shared||{};
     data.vi_equivalent = data.contrast
-      || (data.root && data.root.form ? 'gốc '+data.root.form
-            +(data.root.gloss?' — '+data.root.gloss:'') : 'lời giải thích của Focci');
+      || (sh0.form ? (sh0.kind==='prefix'?'tiền tố ':'gốc ')+sh0.form
+            +(sh0.gloss?' — '+sh0.gloss:'') : 'lời giải thích của Focci');
     await idbPut({ word:key, data, source:'explain',
                    firstSeen:now(), saved:0, savedAt:0 });
     currentWord=null;
@@ -2731,19 +2805,31 @@ async function renderSaved(){
          thấy đúng thứ đã thấy lúc tra — không phải một bản rút gọn khác.
          Bản ghi CŨ (trước v72) có summary/why thay vì root/diff, nên đọc
          cả hai dạng để lời giải thích đã lưu không bị trắng. */
-      if(d.same_root && d.root && d.root.form){
-        h+='<div class="wh-root"><span class="wh-root-lbl">c\u00f9ng g\u1ed1c</span>'
-          +'<span class="wh-root-f">'+esc(d.root.form)+'</span>'
-          +(d.root.gloss?'<span class="wh-root-g">'+esc(d.root.gloss)+'</span>':'')+'</div>';
+      const sh=d.shared||{}, lr=d.root||{};
+      const kind=sh.kind||(d.same_root===true?'root':(d.same_root===false?'none':''));
+      const shForm=sh.form||(d.same_root?lr.form:'')||'';
+      const shGloss=sh.gloss||lr.gloss||'';
+      const KL={root:'c\u00f9ng g\u1ed1c',prefix:'c\u00f9ng ti\u1ec1n t\u1ed1',none:'kh\u00f4ng chung g\u1ed1c'};
+      if(shForm && kind!=='none'){
+        h+='<div class="wh-root"><span class="wh-root-lbl">'+esc(KL[kind]||'chung')+'</span>'
+          +'<span class="wh-root-f">'+esc(shForm)+'</span>'
+          +(shGloss?'<span class="wh-root-g">'+esc(shGloss)+'</span>':'')+'</div>';
       }else if(d.summary){
         h+='<div class="wh-root wh-root-no"><span class="wh-root-g">'+mdBold(d.summary)+'</span></div>';
       }
       for(const it of items){
+        const st=it.stem||{};
         const parts=Array.isArray(it.parts)?it.parts.slice(0,3):[];
         h+='<div class="wh-item">';
         h+='<div class="wh-item-h"><span class="wh-w">'+esc(it.word||'')+'</span>'
           +(it.vi?'<span class="wh-vi">'+esc(it.vi)+'</span>':'')+'</div>';
-        if(parts.length){
+        if(st.form){
+          h+='<div class="wh-parts">';
+          if(shForm && kind!=='none')
+            h+='<span class="wh-chip wh-chip-mute"><b>'+esc(shForm)+'</b></span><span class="wh-plus">+</span>';
+          h+='<span class="wh-chip"><b>'+esc(st.form)+'</b>'
+            +(st.gloss?'<i>'+esc(st.gloss)+'</i>':'')+'</span></div>';
+        }else if(parts.length){
           h+='<div class="wh-parts">';
           parts.forEach((pt,k)=>{
             if(k) h+='<span class="wh-plus">+</span>';
@@ -2754,6 +2840,22 @@ async function renderSaved(){
         }
         const diff=it.diff||it.why||'';
         if(diff) h+='<div class="wh-diff">'+mdBold(diff)+'</div>';
+        if(it.typical){
+          h+='<div class="wh-typ">';
+          String(it.typical).split(',').map(x=>x.trim()).filter(Boolean).slice(0,3)
+            .forEach(c=>{ h+='<span>'+esc(c)+'</span>'; });
+          h+='</div>';
+        }
+        const exs=Array.isArray(it.ex)?it.ex.slice(0,2):[];
+        if(exs.length){
+          h+='<div class="wh-ex">';
+          for(const e of exs){
+            if(!e || !e.en) continue;
+            h+='<div class="wh-ex-row"><span class="wh-ex-en">'+esc(e.en)+'</span>'
+              +(e.vi?'<span class="wh-ex-vi">'+esc(e.vi)+'</span>':'')+'</div>';
+          }
+          h+='</div>';
+        }
         h+='</div>';
       }
       const tail=d.contrast||d.hook||'';
