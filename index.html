@@ -401,14 +401,6 @@
 
   .empty{text-align:center;color:var(--muted);padding:34px 20px}
 
-  /* ---- Vietnamese → English reverse lookup ---- */
-  .vi-results{padding:6px 2px}
-  .vi-results-h{font-size:18px;font-weight:800;letter-spacing:-.01em;margin-bottom:14px}
-  .vi-results-list{display:flex;flex-wrap:wrap;gap:9px}
-  .vi-result-chip{background:var(--surface);border:1.5px solid var(--line);border-radius:99px;
-    padding:10px 16px;font-size:14px;font-weight:700;color:var(--text);box-shadow:var(--shadow)}
-  .vi-result-chip:active{transform:scale(.95);background:var(--primary-bg);border-color:var(--primary)}
-
   /* ---- phrase / sentence translation ---- */
   /* --- translation result: ONE unified block, closest option just highlighted
      (tinted background + checkmark), not boxed off as its own separate card --- */
@@ -2351,25 +2343,13 @@
      chấm theo danh sách tần suất, hai nguồn không cùng độ tin cậy. */
   .lv-tag.lv-guess{border-bottom:1px dashed currentColor;opacity:.85}
 
-  /* Khớp cụm gần đúng: cụm nằm trong collocations/idioms của một từ khác */
-  .pm-card{padding:2px}
-  .pm-h{margin-bottom:12px}
-  .pm-h b{display:block;font-size:15px;font-weight:800;letter-spacing:-.01em;color:var(--text)}
-  .pm-h span{display:block;margin-top:3px;font-size:11.5px;color:var(--muted-2);line-height:1.45}
-  .pm-row{display:flex;align-items:center;gap:11px;padding:12px 13px;margin-bottom:8px;
-    border-radius:14px;background:var(--surface);border:1px solid var(--line)}
-  .pm-row:active{transform:scale(.99);background:var(--surface-2)}
-  .pm-row-main{flex:1;min-width:0}
-  .pm-txt{font-size:14.5px;font-weight:700;color:var(--text);line-height:1.35}
-  .pm-vi{margin-top:3px;font-size:12px;color:var(--muted);line-height:1.4}
-  .pm-meta{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-  .pm-kind{font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
-    color:var(--muted-2);background:var(--surface-2);padding:3px 7px;border-radius:99px}
-  .pm-owner{font-size:11.5px;font-weight:800;color:var(--primary)}
-  .pm-ai{width:100%;margin-top:6px;padding:13px;border-radius:14px;
+  /* Nút "Dịch đầy đủ bằng AI" dùng chung cho mọi khung tr-card — offline
+     match (viResultsState/phraseMatchState) hay AI dịch thẳng đều thấy
+     cùng một nút ở cùng một chỗ, không phải học lại giao diện mỗi lần. */
+  .tr-ai-btn{width:100%;margin-top:6px;padding:13px;border-radius:14px;
     background:var(--surface-2);border:1px solid var(--line);
     color:var(--muted);font-size:12.5px;font-weight:700}
-  .pm-ai:active{transform:scale(.985);color:var(--primary)}
+  .tr-ai-btn:active{transform:scale(.985);color:var(--primary)}
 
 
   /* ============================================================

@@ -462,12 +462,26 @@ async function viReverseLookup(term){
   return out;
 }
 function viResultsState(query, words){
-  let h='';
-  h+='<div class="vi-results"><div class="vi-results-h">“'+esc(query)+'” in English</div><div class="vi-results-list">';
-  for(const w of words){
-    h+='<button class="vi-result-chip" onclick="jump(\''+esc(w).replace(/'/g,"\\'")+'\')">'+esc(w)+'</button>';
-  }
-  h+='</div></div>';
+  if(!words.length) return viNotFoundState(query);
+  const safeQ=esc(query).replace(/'/g,"\\'");
+  let h='<div class="tr-card">';
+  h+='<div class="tr-dir">Ti\u1ebfng Vi\u1ec7t → English</div>';
+  h+='<div class="tr-src">'+esc(query)+'</div>';
+  h+='<div class="tr-opts">';
+  words.forEach((w,i)=>{
+    const safe=esc(w).replace(/'/g,"\\'");
+    h+='<div class="tr-row'+(i===0?' tr-row-best':'')+'">';
+    h+='<div class="tr-row-top">';
+    if(i===0) h+='<span class="tr-check">\u2713 S\u00e1t nh\u1ea5t</span>';
+    h+='<button class="tr-copy" onclick="trCopy(this,\''+safe+'\')" aria-label="Copy">⧉</button>';
+    h+='</div>';
+    h+='<div class="tr-row-text">'+esc(w)+'</div>';
+    h+='<button class="tr-lookup" onclick="jump(\''+safe+'\')">Tra t\u1eeb n\u00e0y \u2192</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  h+='<button class="tr-ai-btn" onclick="forceViTranslate(\''+safeQ+'\')">D\u1ecbch \u0111\u1ea7y \u0111\u1ee7 b\u1eb1ng AI</button>';
+  h+='</div>';
   return h;
 }
 function viNotFoundState(query){
@@ -489,11 +503,13 @@ async function forceViTranslate(word){
     currentWord=null;
     box.innerHTML=phraseResultState(word, result);
     /* Lưu bản dịch (saved:0) rồi log CHÍNH cụm từ đó, nên nó hiện trong
-       Recent searches và bấm lại là ra ngay — không gọi AI lần hai. */
+       Recent searches và bấm lại là ra ngay — không gọi AI lần hai.
+       Log theo rec.word (key THẬT SỰ đã lưu — luôn là tiếng Anh, xem
+       phraseHistoryRecord), không phải theo "word" người dùng gõ, vì
+       hai cái giờ có thể khác nhau khi hướng dịch là Việt→Anh. */
     try{
-      const prim=(result&&result.primary&&result.primary.text)||result.translation||'';
-      if(prim) await phraseHistoryRecord(word, prim, result);
-      logEvent('search', norm(word));
+      const savedRec=await phraseHistoryRecord(word, result);
+      logEvent('search', savedRec?savedRec.word:norm(word));
     }catch(e){ logEvent('search', null); }
     addXP(1);
   }catch(err){ box.innerHTML=errorState(word,err.message||''); }
@@ -966,25 +982,33 @@ window.phraseSuggest=phraseSuggest;
 const PHRASE_FIELD_LABEL={collocations:'collocation', phrasal_verbs:'phrasal verb',
   idioms:'idiom', prepositions:'preposition'};
 
+/* Trước đây mỗi đường dịch VI↔EN có một khung riêng: viResultsState là
+   một cụm chip rời không phân biệt cái nào sát nhất, phraseMatchState là
+   thẻ "pm-" kiểu khác hẳn, phraseResultState mới có khung "tr-" đầy đủ
+   với dấu ✓ Sát nhất. Cùng một việc "dịch một cụm" mà ba hình dạng khác
+   nhau — rất khó nhớ. Giờ CẢ BA dùng chung khung tr-card/tr-dir/tr-src/
+   tr-opts/tr-row, luôn có đúng MỘT kết quả gắn dấu ✓ Sát nhất đứng đầu. */
 function phraseMatchState(query, hits){
-  let h='<div class="pm-card">';
-  h+='<div class="pm-h"><b>No separate entry for \u201c'+esc(query)+'\u201d</b>'
-    +'<span>But this phrase shows up in '+hits.length
-    +' entr'+(hits.length===1?'y':'ies')+' already in your library</span></div>';
-  for(const o of hits){
-    const safe=esc(o.owner).replace(/'/g,"\\'");
-    h+='<div class="pm-row" onclick="jump(\''+safe+'\')">';
-    h+='<div class="pm-row-main"><div class="pm-txt">'+esc(o.text)+'</div>';
-    if(o.vi) h+='<div class="pm-vi">'+esc(o.vi)+'</div>';
-    h+='</div>';
-    h+='<div class="pm-meta"><span class="pm-kind">'
-      +esc(PHRASE_FIELD_LABEL[o.field]||o.field)+'</span>'
-      +'<span class="pm-owner">'+esc(o.owner)+'</span></div>';
-    h+='</div>';
-  }
   const safeQ=esc(query).replace(/'/g,"\\'");
-  h+='<button class="pm-ai" onclick="forceTranslate(\''+safeQ+'\')">'
-    +'Translate this phrase with AI</button>';
+  let h='<div class="tr-card">';
+  h+='<div class="tr-dir">English → Ti\u1ebfng Vi\u1ec7t</div>';
+  h+='<div class="tr-src">'+esc(query)+'</div>';
+  h+='<div class="tr-opts">';
+  hits.forEach((o,i)=>{
+    const safeOwner=esc(o.owner).replace(/'/g,"\\'");
+    h+='<div class="tr-row'+(i===0?' tr-row-best':'')+'">';
+    h+='<div class="tr-row-top">';
+    if(i===0) h+='<span class="tr-check">\u2713 S\u00e1t nh\u1ea5t</span>';
+    h+='<span class="tr-reg">'+esc(PHRASE_FIELD_LABEL[o.field]||o.field)+'</span>';
+    h+='<button class="tr-copy" onclick="trCopy(this,\''+esc(o.vi).replace(/'/g,"\\'")+'\')" aria-label="Copy">⧉</button>';
+    h+='</div>';
+    h+='<div class="tr-row-text">'+esc(o.vi)+'</div>';
+    h+='<div class="tr-row-why">'+esc(o.text)+'</div>';
+    h+='<button class="tr-lookup" onclick="jump(\''+safeOwner+'\')">Xem trong \u201c'+esc(o.owner)+'\u201d \u2192</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  h+='<button class="tr-ai-btn" onclick="forceTranslate(\''+safeQ+'\')">D\u1ecbch \u0111\u1ea7y \u0111\u1ee7 b\u1eb1ng AI</button>';
   h+='</div>';
   return h;
 }
@@ -1122,14 +1146,35 @@ function trCopy(btn, text){
    Saved alongside single words, with the translation as its meaning. */
 /* Bản ghi cụm từ cho lịch sử: saved:0 nên không nằm trong Saved, nhưng
    vẫn tra được offline và hiện ở Recent. Không ghi đè nếu đã lưu sao. */
-async function phraseHistoryRecord(text, translation, result){
-  const w=norm(text||''); if(!w) return null;
+/* Lưu một bản dịch cụm vào thư viện — LUÔN lưu theo khuôn "word tiếng
+   Anh + vi_equivalent tiếng Việt" giống mọi bản ghi từ điển khác, BẤT KỂ
+   người dùng gõ tiếng Anh hay tiếng Việt vào ô tìm kiếm.
+
+   Trước đây hàm này lưu "y nguyên những gì người dùng gõ" làm word — nên
+   khi gõ tiếng Việt (ví dụ "tôi cho là vậy"), CHÍNH câu tiếng Việt đó trở
+   thành headword, còn field vi_equivalent (đáng lẽ là nghĩa tiếng Việt)
+   lại chứa bản dịch TIẾNG ANH — ngược hoàn toàn. Hậu quả: trang Saved
+   (chỉ nên toàn tiếng Anh, vì đó là "từ đang học") hiện lẫn nguyên câu
+   tiếng Việt vào — nhìn khó chịu và sai bản chất dữ liệu.
+
+   Giờ tự xác định chiều dịch qua result.source_lang rồi gán đúng field,
+   nên headword luôn là tiếng Anh dù người dùng gõ chiều nào. */
+async function phraseHistoryRecord(typedText, result){
+  const isViSource = result && result.source_lang==='vi';
+  const primText=(result&&result.primary&&result.primary.text)||'';
+  const enText = isViSource ? primText : typedText;
+  const viText = isViSource ? typedText : primText;
+  const w=norm(enText||''); if(!w) return null;
   const ex=await idbGet(w);
   if(ex && ex.saved) return ex;
-  const alts=((result&&result.alternatives)||[]).filter(x=>x&&x.text).slice(0,3);
+  /* "senses" vốn là khuôn MỘT từ tiếng Anh → NHIỀU cách nói tiếng Việt,
+     nên chỉ nạp alternatives vào đây khi đúng chiều đó (gõ tiếng Anh).
+     Chiều ngược lại (gõ tiếng Việt) chỉ có một nghĩa tiếng Việt duy nhất
+     — chính là câu người dùng gõ — nên không có gì để nạp thêm. */
+  const alts=isViSource ? [] : ((result&&result.alternatives)||[]).filter(x=>x&&x.text).slice(0,3);
   const data={
-    word:text, phrase:true, vi_equivalent:translation,
-    senses:[{pos:'phrase', vi:translation,
+    word:enText, phrase:true, vi_equivalent:viText,
+    senses:[{pos:'phrase', vi:viText,
              en:(result&&result.primary&&result.primary.why)||''}]
       .concat(alts.map(x=>({pos:x.register||'alt', vi:x.text, en:x.why||''})))
   };
@@ -1210,12 +1255,19 @@ async function fuzzyLocalSearch(query){
   const all=await idbAll();
   // Pass 1: exact phrase — collocations/idioms/phrasal verbs are real,
   // known phrases already in the library; no guessing needed for these.
+  // NHƯNG chỉ short-circuit khi mục đó THẬT SỰ có nghĩa tiếng Việt (e.vi).
+  // Trước đây bỏ qua điều kiện này: "I suppose so" khớp tuyệt đối một
+  // collocation cũ đã lưu cho "suppose" nhưng collocation đó chưa có vi
+  // (lỗ hổng chất lượng dữ liệu cũ), nên app nhảy thẳng vào trang từ
+  // "suppose" và dừng lại ở một dòng trống — không hề gọi AI dịch — trông
+  // y như "gõ vào không dịch ra gì cả". Cùng lỗi này đã được vá ở
+  // phraseLookup() (lọc theo o.vi) nhưng bỏ sót chỗ này.
   for(const r of all){
     if(r.alias) continue;
     const buckets=[r.data&&r.data.expressions, r.data&&r.data.collocations, r.data&&r.data.phrasal_verbs, r.data&&r.data.idioms];
     for(const arr of buckets){
       if(!Array.isArray(arr)) continue;
-      for(const e of arr){ if(e.text && norm(e.text)===q) return {type:'expr', target:r.word, label:e.text, exact:true}; }
+      for(const e of arr){ if(e.text && e.vi && norm(e.text)===q) return {type:'expr', target:r.word, label:e.text, exact:true}; }
     }
   }
   // Pass 2: fuzzy fallback, as before
@@ -1278,9 +1330,8 @@ async function search(rawWord, forceAI){
       try{
         const result=await translatePhrase(word);
         box.innerHTML=phraseResultState(word, result);
-        const prim=(result&&result.primary&&result.primary.text)||result.translation||'';
-        if(prim) await phraseHistoryRecord(word, prim, result);
-        logEvent('search', norm(word));
+        const savedRec=await phraseHistoryRecord(word, result);
+        logEvent('search', savedRec?savedRec.word:norm(word));
         addXP(1);
       }catch(err){ box.innerHTML=errorState(word, err.message||''); }
       return;
@@ -1354,8 +1405,16 @@ async function search(rawWord, forceAI){
      người chưa nhập key bị chặn khỏi chính dữ liệu của mình. */
   if(hasSpace && !forceAI && !isExplainQuery(word)){
     const pm=await phraseLookup(word, 10);
-    if(pm.length){
-      box.innerHTML=phraseMatchState(word, pm);
+    /* Chỉ DỪNG LẠI ở đây nếu ít nhất một kết quả đã có sẵn nghĩa tiếng
+       Việt (o.vi) — trước đây chỉ cần khớp đúng CHUỖI là dừng, bất kể có
+       nghĩa hay không, nên một câu như "I suppose so" (nếu tình cờ khớp
+       một cụm đã lưu nhưng cụm đó chưa có trường vi) sẽ dừng ở đây và
+       hiện một thẻ trống trơn — trông như "gõ vào không dịch ra gì cả".
+       Giờ nếu không có nghĩa nào sẵn, rơi xuống nhánh dịch bằng AI bên
+       dưới để luôn có một bản dịch thật, thay vì một ngõ cụt. */
+    const pmWithVi=pm.filter(o=>o.vi);
+    if(pmWithVi.length){
+      box.innerHTML=phraseMatchState(word, pmWithVi);
       logEvent('search', norm(word));
       return;
     }
@@ -1379,12 +1438,12 @@ async function search(rawWord, forceAI){
       if(elapsed<1800) await new Promise(r=>setTimeout(r,1800-elapsed));
       currentWord=null;
       box.innerHTML=phraseResultState(word, result);
-      /* Lưu bản dịch (saved:0) rồi log CHÍNH cụm đó → hiện ở Recent, và
-         bấm lại là ra ngay vì idbGet tìm thấy, không gọi AI lần hai. */
+      /* Lưu bản dịch (saved:0) rồi log CHÍNH key đã lưu (luôn là tiếng
+         Anh) → hiện ở Recent, và bấm lại là ra ngay vì idbGet tìm thấy,
+         không gọi AI lần hai. */
       try{
-        const prim=(result&&result.primary&&result.primary.text)||result.translation||'';
-        if(prim) await phraseHistoryRecord(word, prim, result);
-        logEvent('search', norm(word));
+        const savedRec=await phraseHistoryRecord(word, result);
+        logEvent('search', savedRec?savedRec.word:norm(word));
       }catch(e){ logEvent('search', null); }
       addXP(1);
     }catch(err){ box.innerHTML=errorState(word,err.message||''); }
@@ -1904,20 +1963,161 @@ const _DERIV_SUFFIXES=new Set([
 function isDerivational(root, form){
   return _DERIV_SUFFIXES.has(form.slice(root.length));
 }
+/* Rụng "e" câm trước hậu tố bắt đầu bằng nguyên âm — ĐÂY LÀ QUY TẮC CHÍNH
+   TẢ ĐỀU, không phải biệt lệ, nên suy luận được thay vì phải liệt kê tay
+   từng từ: create+ion→creation, desire+able→desirable, admire+ation→
+   admiration, examine+ation→examination… "th"/"ty" tuy bắt đầu bằng phụ
+   âm vẫn kéo theo rụng e (true→truth, safe→safety) nên xếp riêng. */
+const _E_DROP_CONSONANT_SUF=new Set(['th','ty','ties']);
+function isVowelChar(ch){ return ch==='a'||ch==='e'||ch==='i'||ch==='o'||ch==='u'; }
+function derivEDrop(root, form){
+  if(!root.endsWith('e') || root.length<4) return false;
+  const stem=root.slice(0,-1);
+  if(!form.startsWith(stem)) return false;
+  const suf=form.slice(stem.length);
+  if(!suf || !_DERIV_SUFFIXES.has(suf)) return false;
+  return isVowelChar(suf[0]) || _E_DROP_CONSONANT_SUF.has(suf);
+}
+/* "y" cuối sau PHỤ ÂM đổi thành "i" trước hậu tố — cũng là quy tắc chính
+   tả đều (không phải biệt lệ): happy→happiness, easy→easily, busy→
+   business, rely→reliance. "y" sau NGUYÊN ÂM thì giữ nguyên (play, day…
+   không thuộc quy tắc này — hiếm khi cần phái sinh thêm nên bỏ qua). */
+function derivYtoI(root, form){
+  if(root.length<4 || !root.endsWith('y')) return false;
+  if(isVowelChar(root[root.length-2])) return false;
+  const stem=root.slice(0,-1)+'i';
+  if(!form.startsWith(stem)) return false;
+  const suf=form.slice(stem.length);
+  return !!suf && _DERIV_SUFFIXES.has(suf);
+}
+
+/* ============================================================
+   GIA ĐÌNH TỪ BẤT QUY TẮC — enter→entrance, decide→decision…
+
+   Bộ quét ở trên (tiền tố chung + hậu tố hợp lệ) chỉ bắt được nhóm biến
+   đổi ĐỀU: gốc giữ nguyên nguyên vẹn, chỉ nối thêm hậu tố phía sau
+   (act→active, teach→teacher, happy→happiness). Nhưng một phần lớn từ
+   vựng tiếng Anh thông dụng rơi vào nhóm KHÔNG ĐỀU — chính gốc bị biến
+   dạng khi thêm hậu tố, nên xét thuần theo CHUỖI KÝ TỰ thì "entrance"
+   không hề bắt đầu bằng "enter" nữa (dù vẫn cùng gốc theo NGÔN NGỮ HỌC).
+   Ba kiểu hay gặp nhất:
+     · rụng nguyên âm yếu (syncope):  enter+ance → entr+ance → entrance
+     · biến âm nguyên âm gốc (ablaut): deep→depth, heal→health
+     · biến phụ âm đuôi:               decide→decision, permit→permission
+   Không có công thức chuỗi ký tự chung nào suy ra được các ca này — mỗi
+   ca là một biệt lệ riêng của lịch sử ngôn ngữ, nên phải liệt kê tay.
+   Danh sách dưới đây là các cụm ĐÃ XÁC MINH (không phải suy đoán), nên
+   được ưu tiên hiện ra TRƯỚC cả kết quả từ bộ quét hậu tố phía trên —
+   và được hiện dù từ đó CHƯA có trong thư viện offline (bấm vào vẫn tra
+   được bình thường, y như tra một từ mới bất kỳ). */
+const IRREGULAR_FAMILIES=[
+  ['enter','entrance','entry'],
+  ['decide','decision','decisive'],
+  ['permit','permission','permissive'],
+  ['intend','intention','intentional'],
+  ['confide','confidence','confident'],
+  ['please','pleasure','pleasant'],
+  ['deep','depth'],
+  ['wide','width'],
+  ['heal','health','healthy'],
+  ['wise','wisdom'],
+  ['long','length'],
+  ['strong','strength','strengthen'],
+  ['broad','breadth'],
+  ['high','height'],
+  ['grow','growth'],
+  ['know','knowledge','knowledgeable'],
+  ['believe','belief','believable'],
+  ['live','life','lively'],
+  ['die','death','dead'],
+  ['choose','choice'],
+  ['lose','loss','lost'],
+  ['prove','proof','provable'],
+  ['describe','description','descriptive'],
+  ['receive','reception','receptive'],
+  ['conceive','conception','concept','conceptual'],
+  ['perceive','perception','perceptive'],
+  ['explain','explanation','explanatory'],
+  ['maintain','maintenance'],
+  ['retain','retention'],
+  ['apply','application','applicant','appliance'],
+  ['imply','implication'],
+  ['destroy','destruction','destructive'],
+  ['admit','admission','admissible'],
+  ['omit','omission'],
+  ['submit','submission'],
+  ['transmit','transmission'],
+  ['commit','commission','committee'],
+  ['emit','emission'],
+  ['convert','conversion'],
+  ['revert','reversion'],
+  ['divert','diversion'],
+  ['revise','revision'],
+  ['divide','division','divisive'],
+  ['provide','provision'],
+  ['collide','collision'],
+  ['explode','explosion','explosive'],
+  ['conclude','conclusion','conclusive'],
+  ['exclude','exclusion','exclusive'],
+  ['include','inclusion','inclusive'],
+  ['persuade','persuasion','persuasive'],
+  ['confuse','confusion'],
+  ['succeed','success','successful'],
+  ['proceed','procession','procedure'],
+  ['speak','speech'],
+  ['fly','flight'],
+  ['weigh','weight'],
+  ['sell','sale'],
+  ['grieve','grief'],
+  ['relieve','relief']
+];
+let _irregIndex=null;                         // 'word' → mảng các từ liên quan (không gồm chính nó)
+function buildIrregIndex(){
+  if(_irregIndex) return _irregIndex;
+  const idx={};
+  for(const cluster of IRREGULAR_FAMILIES){
+    for(const w of cluster) idx[w]=cluster.filter(x=>x!==w);
+  }
+  _irregIndex=idx;
+  return idx;
+}
 async function familyOf(word, maxN){
-  const idx = await buildWordIndex();
   const w=(word||'').trim().toLowerCase();
   if(w.length<4) return [];
-  const out=[];
-  for(const e of idx){
-    if(e.w===w) continue;
-    const shorter = e.w.length<w.length ? e.w : w;
-    const longer  = e.w.length<w.length ? w : e.w;
-    if(shorter.length<4 || !longer.startsWith(shorter)) continue;
-    if(isJustInflection(shorter, longer)) continue;
-    if(!isDerivational(shorter, longer)) continue;
-    out.push(e);
-    if(out.length>=maxN) break;
+  const out=[]; const seen=new Set();
+  const push=(entry)=>{ if(seen.has(entry.w)) return; seen.add(entry.w); out.push(entry); };
+
+  const idx = await buildWordIndex();
+  const byWord={}; for(const e of idx) byWord[e.w]=e;
+
+  // Ưu tiên cụm bất quy tắc đã xác minh tay — kể cả khi từ liên quan
+  // chưa có trong thư viện offline (bấm vào vẫn tra bình thường).
+  const irreg=buildIrregIndex()[w];
+  if(irreg){
+    for(const rel of irreg){
+      if(out.length>=maxN) break;
+      push(byWord[rel] || {word:rel, w:rel, pos:''});
+    }
+  }
+
+  // Rồi bổ sung bằng bộ quét tiền tố + hậu tố đều trên thư viện offline —
+  // kèm nhánh "rụng e câm" cho các cặp như create/creation mà chuỗi ký tự
+  // không còn là tiền tố của nhau nữa sau khi thêm hậu tố. Luôn thử CẢ HAI
+  // nhánh độc lập (không phải "hết cái này mới tới cái kia") — vì có ca
+  // tiền tố VẪN khớp nhưng phần dư không phải hậu tố hợp lệ (examine vs
+  // examiner: dư mỗi chữ "r"), mà nhánh rụng-e lại khớp đúng (examin+er).
+  if(out.length<maxN){
+    for(const e of idx){
+      if(out.length>=maxN) break;
+      if(e.w===w || seen.has(e.w)) continue;
+      const shorter = e.w.length<w.length ? e.w : w;
+      const longer  = e.w.length<w.length ? w : e.w;
+      if(shorter.length<4) continue;
+      if(isJustInflection(shorter, longer)) continue;
+      const plainOk = longer.startsWith(shorter) && isDerivational(shorter, longer);
+      if(!plainOk && !derivEDrop(shorter, longer) && !derivYtoI(shorter, longer)) continue;
+      push(e);
+    }
   }
   return out;
 }
@@ -3048,9 +3248,9 @@ function srsMeter(box){
 }
 function srsWhen(due){
   const d=due-now();
-  if(d<=0) return 'ôn ngay';
+  if(d<=0) return 'due now';
   const days=Math.ceil(d/DAY);
-  return days<=1 ? 'mai' : 'sau '+days+' ngày';
+  return days<=1 ? 'tomorrow' : 'in '+days+' days';
 }
 
 let savedTab='vault';
@@ -3193,11 +3393,11 @@ async function renderSaved(){
      — truy xuất chủ động, không phải đọc lại danh sách. */
   h+='<div class="sv-hero'+(dueNow.length?'':' calm')+'">';
   h+='<div class="sv-hero-n">'+dueNow.length+'</div>';
-  h+='<div class="sv-hero-t"><b>'+(dueNow.length?'t\u1eeb c\u1ea7n \u00f4n h\u00f4m nay':'kh\u00f4ng c\u00f3 t\u1eeb n\u00e0o t\u1edbi h\u1ea1n')+'</b>'
+  h+='<div class="sv-hero-t"><b>'+(dueNow.length?'words due today':'nothing due right now')+'</b>'
     +'<span>'+(dueNow.length
-        ? 'T\u1ef1 nh\u1ee9 l\u1ea1i tr\u01b0\u1edbc khi xem \u0111\u00e1p \u00e1n \u2014 \u0111\u00f3 m\u1edbi l\u00e0 l\u00fac ghi nh\u1edb h\u00ecnh th\u00e0nh.'
-        : 'Quay l\u1ea1i sau. \u00d4n s\u1edbm h\u01a1n l\u1ecbch th\u00ec h\u1ecdc \u0111\u01b0\u1ee3c \u00edt h\u01a1n.')+'</span></div>';
-  if(dueNow.length) h+='<button class="sv-hero-go" onclick="startSavedReview()">\u00d4n ngay</button>';
+        ? 'Recall it yourself before checking the answer \u2014 that\u2019s when memory actually forms.'
+        : 'You\u2019re all caught up. Come back when a word is due \u2014 reviewing it before then won\u2019t help it stick.')+'</span></div>';
+  if(dueNow.length) h+='<button class="sv-hero-go" onclick="startSavedReview()">Review now</button>';
   h+='</div>';
 
   const sec=(title, note, arr)=>{
@@ -3208,9 +3408,9 @@ async function renderSaved(){
     for(const x of arr) s+=svRow(x.r, x.due, x.box);
     return s+'</div>';
   };
-  h+=sec('\u00d4n ngay','y\u1ebfu nh\u1ea5t tr\u01b0\u1edbc',dueNow);
-  h+=sec('S\u1eafp t\u1edbi','\u0111\u1ec3 y\u00ean cho \u0111\u1ebfn ng\u00e0y',upNext);
-  h+=sec('\u0110\u00e3 v\u1eefng','\u00f4n r\u1ea5t th\u01b0a',solid);
+  h+=sec('Review now','weakest first',dueNow);
+  h+=sec('Coming up','left until due',upNext);
+  h+=sec('Mastered','reviewed rarely now',solid);
   box.innerHTML=h;
 }
 
