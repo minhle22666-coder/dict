@@ -448,8 +448,13 @@ async function viReverseLookup(term){
   if(exact && exact.length) return rank(exact).slice(0,14);
   // no exact entry — a loose "contains" pass catches close-enough phrasing
   const out=[]; const seen=new Set();
+  /* Nhánh q.includes(t) là nguồn rác: với câu "tôi cho là vậy", mọi nghĩa
+     ngắn nằm lọt trong câu đều khớp — "cho" kéo theo deem/accuses, "vậy"
+     kéo theo ah/er/well. Giờ chiều đó chỉ được nhận khi t đủ dài so với
+     câu hỏi, tức nó thật sự là phần lớn ý nghĩa chứ không phải một mẩu. */
+  const minSub=Math.max(4, Math.floor(q.length*0.6));
   for(const [t,entries] of idx){
-    if(t.includes(q) || q.includes(t)){
+    if(t.includes(q) || (q.includes(t) && t.length>=minSub)){
       for(const w of rank(entries)) if(!seen.has(w)){ seen.add(w); out.push(w); }
       if(out.length>=14) break;
     }
@@ -1218,6 +1223,24 @@ async function search(rawWord, forceAI){
   // syllables ("tranh luận"), so space-count can't be used to route this.
   if(!forceAI && isVN){
     currentWord=null;
+    /* Ba âm tiết trở lên gần như luôn là một CÂU, và người ta muốn bản
+       dịch chứ không phải một rổ chip từ đơn. Tra ngược chỉ hợp với từ
+       hoặc cụm ngắn. */
+    const viWords=word.trim().split(/\s+/).filter(Boolean).length;
+    if(viWords>=3){
+      if(!getKey()){ box.innerHTML=needKeyState(word); return; }
+      if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
+      box.innerHTML=questScene(word);
+      try{
+        const result=await translatePhrase(word);
+        box.innerHTML=phraseResultState(word, result);
+        const prim=(result&&result.primary&&result.primary.text)||result.translation||'';
+        if(prim) await phraseHistoryRecord(word, prim, result);
+        logEvent('search', norm(word));
+        addXP(1);
+      }catch(err){ box.innerHTML=errorState(word, err.message||''); }
+      return;
+    }
     const hits=await viReverseLookup(word);
     if(hits.length){ box.innerHTML=viResultsState(word, hits); logEvent('search', null); addXP(1); return; }
     box.innerHTML=viNotFoundState(word);   // opt-in "Translate with AI" button lives in here — never automatic
@@ -2118,7 +2141,14 @@ function renderEntry(rec, queriedAs, formNote){
   h+='<div class="head-acts">';
   h+='<button class="icon-act star '+(rec.saved?'on':'')+'" onclick="toggleSave(\''+safeW+'\')" aria-label="Save word">'+(rec.saved?'★':'☆')+'</button>';
   h+='<button class="icon-act" onclick="runExplain(\''+safeW+'\')" aria-label="Why this word" title="Vì sao lại là từ này">'
-    +'<svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round"><path d="M9.2 9a2.9 2.9 0 1 1 4.3 2.5c-.9.5-1.5 1.2-1.5 2.2v.4"/><circle cx="12" cy="17.6" r="1"/><circle cx="12" cy="12" r="9"/></svg></button>';
+    /* Thiếu stroke="currentColor" nên nét không được vẽ — trông như ảnh
+       hỏng. Các icon khác có rule CSS đặt stroke, icon này thì không. */
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+    +'stroke-linecap="round" stroke-linejoin="round">'
+    +'<circle cx="12" cy="12" r="9"/>'
+    +'<path d="M9.3 9.2a2.8 2.8 0 1 1 3.6 2.7c-.7.3-1.1.9-1.1 1.7v.3"/>'
+    +'<circle cx="11.8" cy="17.4" r=".9" fill="currentColor" stroke="none"/>'
+    +'</svg></button>';
   h+='<button class="icon-act" id="rewrite-btn" onclick="rewriteMeaning(\''+safeW+'\')" title="Refresh the Vietnamese meaning with AI" aria-label="Refresh meaning">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">'
     +'<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>';
@@ -2370,6 +2400,22 @@ async function showTypedSuggest(q){
 }
 
 /* gõ phraseDebug('mileage out') trong console để xem chỉ mục có gì */
+/* gõ searchDebug('con') trong console Safari để biết vì sao gợi ý trống */
+async function searchDebug(q){
+  q=norm(q||'con');
+  const out={};
+  try{ out.tongSoTuTrongMay=await idbCount(); }catch(e){ out.tongSoTuTrongMay='LỖI '+e; }
+  try{ out.khopTienTo=(await idbPrefix(q)).map(r=>r.word).slice(0,10); }catch(e){ out.khopTienTo='LỖI '+e; }
+  try{ out.soMucLichSu=histLoad().length; }catch(e){ out.soMucLichSu='LỖI '+e; }
+  out.chiMucCumSanSang=phraseIndexReady();
+  try{ out.soCumTrongChiMuc=(await buildPhraseIndex()).length; }catch(e){ out.soCumTrongChiMuc='LỖI '+e; }
+  const el=document.querySelector('#suggest');
+  out.hopGoiY = el ? {coTrongDOM:true, dangHien:el.classList.contains('show'),
+                      soConTrongHop:el.children.length} : 'không thấy #suggest';
+  console.log(out); return out;
+}
+window.searchDebug=searchDebug;
+
 async function phraseDebug(q){
   const idx=await buildPhraseIndex();
   const out={ soMucTrongChiMuc: idx.length,
