@@ -149,12 +149,12 @@
     display:flex;align-items:center;justify-content:center}
   .topbar-back:active{transform:scale(.9);background:var(--primary-bg)}
   .searchbox{display:flex;align-items:center;gap:10px;
-    background:linear-gradient(135deg,var(--surface-2),var(--surface));
-    border:1.5px solid var(--line);border-radius:99px;padding:0 16px;
-    box-shadow:0 4px 14px rgba(0,0,0,.12),0 0 0 1px var(--primary-bg);
-    transition:border-color .2s,box-shadow .2s,transform .12s}
-  .searchbox:active{transform:scale(.99)}
-  .searchbox:focus-within{border-color:var(--primary);box-shadow:var(--glow),0 6px 18px rgba(0,0,0,.16)}
+    background:var(--surface);
+    border:1px solid var(--line);border-radius:18px;padding:0 15px;
+    box-shadow:none;
+    transition:border-color .2s,box-shadow .2s}
+  .searchbox:focus-within{border-color:var(--primary);
+    box-shadow:0 0 0 3px var(--primary-bg)}
   .searchbox svg{flex:none;width:19px;height:19px;stroke:var(--primary);
     filter:drop-shadow(0 0 5px var(--primary-bg));animation:search-pulse 3.5s ease-in-out infinite}
   @keyframes search-pulse{0%,100%{opacity:.85;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
@@ -396,13 +396,14 @@
   .bar-col.today .bar-lbl{color:var(--primary)}
 
   .sec{margin-top:24px}
-  .sec-h{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:800;letter-spacing:-.01em;
-    text-transform:none;color:var(--text);margin-bottom:12px}
-  .sec-h .more{margin-left:auto;font-size:11px;color:var(--cyan);text-transform:none;letter-spacing:0;font-weight:700}
-
-  /* ---- rows ---- */
-  .row{position:relative;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);
-    border-radius:var(--r-sm);padding:13px 14px 13px 24px;margin-bottom:9px;box-shadow:var(--shadow);transition:transform .1s,border-color .2s}
+  .sec-h{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:800;
+    letter-spacing:-.005em;color:var(--muted);margin:0 2px 10px}
+  .sec-h .tile{display:none}
+  /* .row bị cắt mất dòng khai báo đầu khi mình thay .sec-h — dựng lại */
+  .row{position:relative;display:flex;align-items:center;gap:12px;
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:13px 14px 13px 24px;margin-bottom:9px;
+    transition:transform .1s,border-color .2s}
   .row:active{background:var(--surface-2);transform:scale(.98);border-color:var(--primary)}
   .row .bookmark-tag{position:absolute;left:8px;top:-4px;width:17px;height:24px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))}
   .row .row-ico{width:22px;height:22px;object-fit:contain;flex:none;opacity:.9}
@@ -1752,11 +1753,13 @@
      vật chính: lời chào lớn, Focci tràn ra mép phải, các chỉ số
      hôm nay thành một dải đồng hồ đo chung một khối.
      ============================================================ */
-  .jhead{position:relative;margin-bottom:16px;padding:15px 16px 14px;
-    border-radius:22px 22px 20px 20px;background:
-      radial-gradient(120% 90% at 88% 0%, rgba(255,159,69,.13), transparent 62%),
-      linear-gradient(168deg,var(--surface-2),var(--surface) 72%);
-    border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+  /* Trang Home nhẹ đi: bỏ nền gradient hai lớp + shadow đậm của thẻ chào,
+     thay bằng nền phẳng và một viền mảnh. Cả trang trước đây là một chuỗi
+     khối đặc có bóng, nhìn nặng; giờ chỉ NÚT TRUYỆN có bóng, còn lại phẳng
+     — mắt biết ngay đâu là thứ bấm được. */
+  .jhead{position:relative;margin-bottom:16px;padding:16px 16px 14px;
+    border-radius:20px;background:var(--surface);
+    border:1px solid var(--line);overflow:hidden}
 
   .jhead-row{display:flex;align-items:center;gap:10px;margin-bottom:11px}
   .jhead-date{flex:1;min-width:0;font-size:11.5px;font-weight:600;color:var(--muted-2)}
@@ -1796,24 +1799,28 @@
   .jgauge-txt b{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis}
   .jgauge-txt i{font-size:10.5px;font-style:normal;color:var(--muted-2);font-weight:600}
-  .jgauge-track{height:4px;margin:8px 16px 0;background:var(--surface-2);
+  .jgauge-track{height:3px;margin:10px 16px 0;background:var(--surface-2);
     border-radius:99px;overflow:hidden}
 
   /* hành động chính — chỗ duy nhất được phép ồn */
+  /* Nút truyện: nền cũ là gradient TỐI viết cứng (#20364E → #16283C) trong
+     khi chữ dùng var(--text). Sang light theme thì --text thành xanh đậm,
+     nằm trên nền tối → chữ chìm hẳn, không đọc được. Giờ nền dùng biến
+     theo theme và chữ cũng vậy, nên hai bên luôn tương phản. */
   .jstory{position:relative;display:flex;align-items:center;gap:13px;width:100%;
-    text-align:left;padding:17px 17px 17px 15px;margin-bottom:18px;
-    border-radius:26px 26px 26px 8px;overflow:hidden;
-    background:linear-gradient(112deg,#20364E,#16283C 58%);
-    border:1px solid rgba(255,159,69,.34);box-shadow:0 12px 26px rgba(0,0,0,.34),var(--glow)}
+    text-align:left;padding:16px 16px 16px 14px;margin-bottom:20px;
+    border-radius:24px 24px 24px 8px;overflow:hidden;
+    background:linear-gradient(112deg,var(--surface-2),var(--surface) 62%);
+    border:1px solid rgba(255,159,69,.28);box-shadow:0 6px 18px rgba(0,0,0,.14)}
   .jstory:active{transform:scale(.985)}
-  .jstory::before{content:'';position:absolute;right:-40px;top:-52px;width:158px;height:158px;
-    border-radius:50%;background:radial-gradient(circle,rgba(255,159,69,.2),transparent 68%);
+  .jstory::before{content:'';position:absolute;right:-40px;top:-52px;width:150px;height:150px;
+    border-radius:50%;background:radial-gradient(circle,var(--primary-bg),transparent 70%);
     pointer-events:none}
-  .jstory-char{position:relative;z-index:1;flex:none;width:62px;height:62px;object-fit:contain;
-    filter:drop-shadow(0 6px 12px rgba(0,0,0,.42))}
-  .jstory-text{position:relative;z-index:1;display:flex;flex-direction:column;gap:4px;min-width:0}
-  .jstory-title{font-size:17px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
-  .jstory-sub{font-size:12.5px;color:var(--muted);line-height:1.4}
+  .jstory-char{position:relative;z-index:1;flex:none;width:58px;height:58px;object-fit:contain;
+    filter:drop-shadow(0 5px 10px rgba(0,0,0,.28))}
+  .jstory-text{position:relative;z-index:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .jstory-title{font-size:16.5px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+  .jstory-sub{font-size:12px;color:var(--muted);line-height:1.4}
 
   /* ba con số: hàng ngang, vạch mảnh, nhãn viết thường */
   .jfigs{display:flex;align-items:stretch;margin-bottom:18px}
@@ -2702,7 +2709,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v76. 09.11.2026 - Focci&rsquo;s Learning App</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v77. 09.11.2026 - Focci&rsquo;s Learning App</b></p>
   </section>
 </main>
 

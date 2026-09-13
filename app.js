@@ -66,7 +66,14 @@ function db(){
 }
 function tx(mode){ return db().then(d=>d.transaction(STORE,mode).objectStore(STORE)); }
 function idbGet(word){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.get(word);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})); }
-function idbPut(obj){ if(typeof phraseIndexReset==='function') phraseIndexReset();
+function idbPut(obj){
+  /* Trước đây MỌI lần ghi đều xoá chỉ mục, kể cả ghi alias hay cập nhật
+     lastReviewedAt — nên chỉ mục bị dựng lại liên tục và gần như không
+     bao giờ sẵn sàng lúc người ta gõ. Chỉ xoá khi bản ghi thật sự có cụm. */
+  if(typeof phraseIndexReset==='function' && obj && obj.data){
+    const d=obj.data;
+    if(d.collocations||d.phrasal_verbs||d.idioms||d.prepositions) phraseIndexReset();
+  }
   return tx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.put(obj);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})); }
 function idbAll(){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})); }
 let _allRecordsCache=null;
@@ -736,7 +743,21 @@ function explainState(query, data, saved){
   return h;
 }
 
+/* Chuyển sang "chế độ kết quả": giấu dashboard, hiện nút back, cuộn lên
+   đầu. search() vẫn làm việc này, nhưng runExplain() còn được gọi THẲNG
+   từ nút ? trên trang từ và từ jump() với khoá "why:" — hai đường đó không
+   đi qua search(), nên dashboard không bị giấu và trang chủ nằm ngay dưới
+   kết quả: kéo xuống hết là thấy lại lời chào "Good morning". */
+function enterResultMode(){
+  if(!$('#v-home').classList.contains('active')) showView('home');
+  $('#dashboard').style.display='none';
+  $('#topbar-back').style.display='flex';
+}
+window.enterResultMode=enterResultMode;
+
 async function runExplain(query){
+  enterResultMode();
+  window.scrollTo(0,0);
   const box=$('#result');
   const words=explainWordsOf(query);
   if(!words.length) return;
@@ -1189,8 +1210,7 @@ async function search(rawWord, forceAI){
   hideSuggest();
   // A search always takes you to the word page, no matter which tab you were on.
   if(!$('#v-home').classList.contains('active')) showView('home');
-  $('#dashboard').style.display='none';
-  $('#topbar-back').style.display='flex';
+  enterResultMode();
   const box=$('#result');
 
   // Vietnamese → offline reverse lookup, ALWAYS tried first, regardless of
@@ -2328,28 +2348,36 @@ async function showRecentSuggest(){
   renderSuggestList('Recent Searches', recs.filter(Boolean), true);
 }
 async function showTypedSuggest(q){
-  const results=await idbPrefix(q);
-  /* Lỗi v75: hàm này await phraseSuggest(), mà lần gọi đầu phải DỰNG chỉ
-     mục cụm bằng cursor qua 16.000 bản ghi. Mỗi ký tự gõ vào là một lần
-     chờ vài giây, nên danh sách gợi ý coi như biến mất.
+  /* Gợi ý từ đơn là tính năng chính và phải CHẠY ĐƯỢC dù mọi thứ khác hỏng.
+     Trước đây một lỗi trong nhánh cụm là cả dropdown im lặng biến mất. Giờ
+     mỗi nhánh có try/catch riêng và nhánh cụm chỉ được BỔ SUNG vào. */
+  let results=[];
+  try{ results=await idbPrefix(q); }catch(e){ results=[]; }
 
-     Giờ vẽ từ đơn NGAY, không chờ gì cả. Cụm chỉ được thêm vào khi chỉ
-     mục đã sẵn trong bộ nhớ; chưa sẵn thì âm thầm dựng ở nền cho lần gõ
-     sau. Gợi ý từ đơn không bao giờ bị một tính năng phụ làm chậm. */
-  if(!results.length && !phraseIndexReady()){ hideSuggest(); return; }
-  renderSuggestList('In your library', results, false, null);
+  if(results.length) renderSuggestList('In your library', results, false, null);
 
-  if(phraseIndexReady()){
-    try{
-      const phrases=await phraseSuggest(q, 6);
-      if(phrases.length && $('#q').value.trim().toLowerCase()===q)
-        renderSuggestList('In your library', results, false, phrases);
-      else if(!results.length && !phrases.length) hideSuggest();
-    }catch(e){}
-  }else{
-    buildPhraseIndex();            // dựng ngầm, không chặn lần gõ này
-  }
+  let phrases=[];
+  try{
+    if(phraseIndexReady()) phrases=await phraseSuggest(q, 6);
+    else buildPhraseIndex();          // dựng ngầm cho lần gõ sau
+  }catch(e){ phrases=[]; }
+
+  // người dùng gõ tiếp trong lúc chờ thì bỏ kết quả cũ đi
+  if(norm($('#q').value)!==q) return;
+
+  if(!results.length && !phrases.length){ hideSuggest(); return; }
+  renderSuggestList('In your library', results, false, phrases);
 }
+
+/* gõ phraseDebug('mileage out') trong console để xem chỉ mục có gì */
+async function phraseDebug(q){
+  const idx=await buildPhraseIndex();
+  const out={ soMucTrongChiMuc: idx.length,
+              vaiMucDau: idx.slice(0,5).map(e=>e.d+'  ← '+e.o),
+              ketQua: await phraseSuggest(q||'', 10) };
+  console.log(out); return out;
+}
+window.phraseDebug=phraseDebug;
 
 function renderSuggestList(label, recs, deletable, phrases){
   const el=$('#suggest');
