@@ -370,6 +370,13 @@
     const f = document.querySelector('#ds-import-file');
     if(f) f.addEventListener('change', e => { if(e.target.files[0]) dsImport(e.target.files[0]); e.target.value = ''; });
     dsState();
+
+    /* Tự động chạy dsSync() mỗi lần mở app, không cần vào Settings bấm tay.
+       dsSync() đã có sẵn cơ chế bỏ qua shard nào đã áp dụng rồi (lưu trong
+       fc_dict_applied), nên sau lần đầu thành công, các lần sau chỉ là một
+       lượt fetch manifest rồi không làm gì thêm — rất nhẹ. Đây là phần còn
+       thiếu khiến người dùng phải tự tay Sync ở lần mở đầu tiên. */
+    dsSync(false).catch(() => {});
   }
 
   window.dsSync   = dsSync;

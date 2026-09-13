@@ -681,15 +681,15 @@ function explainState(query, data, saved){
     +' aria-label="Save explanation">'+(saved?'★':'☆')+'</button>';
   h+='</div>';
 
-  const KIND_LBL={root:'c\u00f9ng g\u1ed1c', prefix:'c\u00f9ng ti\u1ec1n t\u1ed1'};
+  const KIND_LBL={root:'same root', prefix:'same prefix'};
   if(shForm && kind && kind!=='none'){
-    h+='<div class="wh-root"><span class="wh-root-lbl">'+esc(KIND_LBL[kind]||'chung')+'</span>'
+    h+='<div class="wh-root"><span class="wh-root-lbl">'+esc(KIND_LBL[kind]||'shared')+'</span>'
       +'<span class="wh-root-f">'+esc(shForm)+'</span>'
       +(shGloss?'<span class="wh-root-g">'+esc(shGloss)+'</span>':'')+'</div>';
   }
   if(data._sharedRejected){
-    h+='<div class="wh-warn">Focci \u0111\u00e3 khai chung \u201c'+esc(data._sharedRejected)
-      +'\u201d nh\u01b0ng ph\u1ea7n \u0111\u00f3 kh\u00f4ng c\u00f3 trong m\u1ecdi m\u1ee5c \u2014 app \u0111\u00e3 b\u1ecf.</div>';
+    h+='<div class="wh-warn">Focci flagged \u201c'+esc(data._sharedRejected)
+      +'\u201d as shared, but it\u2019s not actually in every item \u2014 so it was dropped.</div>';
   }
 
   if(items.length){
@@ -733,7 +733,7 @@ function explainState(query, data, saved){
       const etForm = (et.helps && et.form) ? et.form : (et.helps===undefined ? legacyStem.form : '');
       const etGloss = etForm ? (et.gloss||legacyStem.gloss||'') : '';
       if(etForm){
-        h+='<div class="wh-etym"><span>g\u1ed1c</span><b>'+esc(etForm)+'</b>'
+        h+='<div class="wh-etym"><span>root</span><b>'+esc(etForm)+'</b>'
           +(etGloss?'<i>'+esc(etGloss)+'</i>':'')+'</div>';
       }
       h+='</div>';
@@ -742,7 +742,7 @@ function explainState(query, data, saved){
   }
 
   if(data.contrast){
-    h+='<div class="wh-hook"><span>ch\u1ecdn c\u00e1i n\u00e0o</span>'+esc(data.contrast)+'</div>';
+    h+='<div class="wh-hook"><span>which to pick</span>'+esc(data.contrast)+'</div>';
   }
   h+='</div>';
   return h;
@@ -924,7 +924,7 @@ window.phraseLookup=phraseLookup;
    dài) vì lúc gõ người ta chưa gõ xong. */
 async function phraseSuggest(query, maxOut){
   const q=norm(query||'');
-  if(q.length<4) return [];
+  if(q.length<2) return [];
   const qw=q.split(/\s+/).filter(w=>w.length>1);
   if(!qw.length) return [];
   const idx=await buildPhraseIndex();
@@ -955,9 +955,9 @@ const PHRASE_FIELD_LABEL={collocations:'collocation', phrasal_verbs:'phrasal ver
 
 function phraseMatchState(query, hits){
   let h='<div class="pm-card">';
-  h+='<div class="pm-h"><b>Kh\u00f4ng c\u00f3 m\u1ee5c ri\u00eang cho \u201c'+esc(query)+'\u201d</b>'
-    +'<span>Nh\u01b0ng c\u1ee5m n\u00e0y n\u1eb1m trong '+hits.length
-    +' m\u1ee5c \u0111\u00e3 c\u00f3 s\u1eb5n trong m\u00e1y</span></div>';
+  h+='<div class="pm-h"><b>No separate entry for \u201c'+esc(query)+'\u201d</b>'
+    +'<span>But this phrase shows up in '+hits.length
+    +' entr'+(hits.length===1?'y':'ies')+' already in your library</span></div>';
   for(const o of hits){
     const safe=esc(o.owner).replace(/'/g,"\\'");
     h+='<div class="pm-row" onclick="jump(\''+safe+'\')">';
@@ -971,7 +971,7 @@ function phraseMatchState(query, hits){
   }
   const safeQ=esc(query).replace(/'/g,"\\'");
   h+='<button class="pm-ai" onclick="forceTranslate(\''+safeQ+'\')">'
-    +'D\u1ecbch c\u1ee5m n\u00e0y b\u1eb1ng AI</button>';
+    +'Translate this phrase with AI</button>';
   h+='</div>';
   return h;
 }
@@ -2425,6 +2425,16 @@ async function phraseDebug(q){
 }
 window.phraseDebug=phraseDebug;
 
+/* All the distinct parts of speech a word has (noun AND adjective, etc.),
+   as small colored tags — reused in the suggestion dropdown so you can see
+   a word's full grammatical range before you even open it. */
+function suggestPosTags(r){
+  const senses=(r.data&&r.data.senses)||[];
+  const keys=[...new Set(senses.map(s=>posKey(s.pos)).filter(k=>k&&k!=='other'))];
+  if(!keys.length) return '';
+  return '<span class="suggest-pos">'+keys.map(k=>
+    '<span class="sg-pos-tag pos-'+POS_COLOR[k]+'">'+esc(POS_SHORT[k]||'')+'</span>').join('')+'</span>';
+}
 function renderSuggestList(label, recs, deletable, phrases){
   const el=$('#suggest');
   let h='<div class="suggest-lbl">'+label
@@ -2434,14 +2444,14 @@ function renderSuggestList(label, recs, deletable, phrases){
     const safeW=esc(r.word).replace(/'/g,"\\'");
     h+='<div class="suggest-item" onclick="jump(\''+safeW+'\')">'
       +'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>'
-      +'<span class="suggest-mid"><span class="w">'+esc(r.word)+'</span>'
+      +'<span class="suggest-mid"><span class="w">'+esc(r.word)+suggestPosTags(r)+'</span>'
       +(d.vi_equivalent?'<span class="e">'+esc(d.vi_equivalent)+'</span>':'')+'</span>'
       +(deletable?'<button class="suggest-del" onclick="event.stopPropagation();removeFromSuggest(\''+safeW+'\',this)" aria-label="Remove">✕</button>':'')
       +'</div>';
   }
   /* Cụm xếp sau từ đơn: gõ để tìm từ là chính, cụm là phần thêm. */
   if(phrases && phrases.length){
-    h+='<div class="suggest-lbl">C\u1ee5m c\u00f3 s\u1eb5n <i>'+phrases.length+'</i></div>';
+    h+='<div class="suggest-lbl">Phrases in your library <i>'+phrases.length+'</i></div>';
     for(const p of phrases){
       const safeO=esc(p.o).replace(/'/g,"\\'");
       h+='<div class="suggest-item sg-phrase" onclick="jump(\''+safeO+'\')">'
@@ -2980,10 +2990,10 @@ async function renderSaved(){
       +files.length+' explanation'+(files.length===1?'':'s');
     if(!files.length){
       box.innerHTML='<div class="empty"><img class="ill" src="./mascot-investigate.webp" alt=""/>'
-        +'<h3>Chưa có lời giải thích nào</h3>'
-        +'<p>Gõ hai từ cách nhau bằng dấu phẩy — ví dụ <b>cease, decease</b> — '
-        +'rồi lưu lại lời giải thích của Focci. Biết vì sao một từ mang nghĩa đó '
-        +'thì nhớ lâu hơn học vẹt nhiều.</p></div>';
+        +'<h3>No comparisons saved yet</h3>'
+        +'<p>Type two or more words separated by a comma — e.g. <b>cease, decease</b> — '
+        +'then save Focci\u2019s explanation. Knowing WHY a word means what it means '
+        +'sticks a lot better than plain memorization.</p></div>';
       return;
     }
     let h='';
@@ -3006,9 +3016,9 @@ async function renderSaved(){
       const kind=sh.kind||(d.same_root===true?'root':(d.same_root===false?'none':''));
       const shForm=sh.form||(d.same_root?lr.form:'')||'';
       const shGloss=sh.gloss||lr.gloss||'';
-      const KL={root:'c\u00f9ng g\u1ed1c',prefix:'c\u00f9ng ti\u1ec1n t\u1ed1',none:'kh\u00f4ng chung g\u1ed1c'};
+      const KL={root:'same root',prefix:'same prefix',none:'no shared root'};
       if(shForm && kind!=='none'){
-        h+='<div class="wh-root"><span class="wh-root-lbl">'+esc(KL[kind]||'chung')+'</span>'
+        h+='<div class="wh-root"><span class="wh-root-lbl">'+esc(KL[kind]||'shared')+'</span>'
           +'<span class="wh-root-f">'+esc(shForm)+'</span>'
           +(shGloss?'<span class="wh-root-g">'+esc(shGloss)+'</span>':'')+'</div>';
       }else if(d.summary){
@@ -3041,15 +3051,15 @@ async function renderSaved(){
         }
         const et=it.etym||{}, ls=it.stem||{};
         const ef=(et.helps&&et.form)?et.form:(et.helps===undefined?ls.form:'');
-        if(ef) h+='<div class="wh-etym"><span>g\u1ed1c</span><b>'+esc(ef)+'</b>'
+        if(ef) h+='<div class="wh-etym"><span>root</span><b>'+esc(ef)+'</b>'
           +((et.gloss||ls.gloss)?'<i>'+esc(et.gloss||ls.gloss)+'</i>':'')+'</div>';
         h+='</div>';
       }
       const tail=d.contrast||d.hook||'';
-      if(tail) h+='<div class="wh-hook"><span>ph\u00e2n bi\u1ec7t nhanh</span>'+mdBold(tail)+'</div>';
+      if(tail) h+='<div class="wh-hook"><span>quick take</span>'+mdBold(tail)+'</div>';
       h+='<div class="wf-acts">'
-        +'<button onclick="runExplain(\''+safeQ+'\')">M\u1edf l\u1ea1i</button>'
-        +'<button onclick="toggleExplainSave(\''+safeQ+'\');renderSaved()">B\u1ecf l\u01b0u</button>'
+        +'<button onclick="runExplain(\''+safeQ+'\')">Reopen</button>'
+        +'<button onclick="toggleExplainSave(\''+safeQ+'\');renderSaved()">Unsave</button>'
         +'</div>';
       h+='</div></div>';
     }
@@ -4677,7 +4687,7 @@ function showView(v){
   if(v==='home'){
     renderHero();
     // keep an open word visible; only rebuild the dashboard when none is open
-    if(currentWord && $('#result').innerHTML.trim()){ $('#dashboard').style.display='none'; $('#topbar-back').style.display='flex'; }
+    if(currentWord || $('#result').innerHTML.trim()){ $('#dashboard').style.display='none'; $('#topbar-back').style.display='flex'; }
     else { $('#dashboard').style.display='block'; $('#topbar-back').style.display='none'; renderDashboard(); }
   }
   if(v==='saved') renderSaved();
