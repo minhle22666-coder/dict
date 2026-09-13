@@ -66,7 +66,8 @@ function db(){
 }
 function tx(mode){ return db().then(d=>d.transaction(STORE,mode).objectStore(STORE)); }
 function idbGet(word){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.get(word);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})); }
-function idbPut(obj){ return tx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.put(obj);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})); }
+function idbPut(obj){ if(typeof phraseIndexReset==='function') phraseIndexReset();
+  return tx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.put(obj);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})); }
 function idbAll(){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})); }
 let _allRecordsCache=null;
 async function idbAllCached(){
@@ -559,6 +560,7 @@ async function askExplain(words){
     +'"contrast":"một dòng chốt cách chọn, tối đa 16 từ. Rỗng nếu chỉ có một mục."'
     +'}\n'
     +'QUY TẮC BẮT BUỘC:\n'
+    +'0. PHẦN DÙNG CHUNG PHẢI CÓ THẬT TRONG CHÍNH TẢ CỦA MỌI MỤC. Ví dụ SAI cần tránh: với "contaminate, pollute" mà khai shared con- là sai, vì "pollute" không bắt đầu bằng con-. Trường hợp đó phải để kind="none". Kiểm lại từng chữ cái trước khi khai.\n'
     +'1. TIỀN TỐ GIỐNG NHAU KHÔNG PHẢI CÙNG GỐC. Nếu các mục chỉ chung tiền tố (con-, de-, re-...) mà khác thân từ thì shared.kind="prefix". Chỉ dùng "root" khi thân từ thật sự cùng một gốc. Không có gì chung thì "none" và shared.form rỗng.\n'
     +'2. Nếu bạn KHÔNG CHẮC về từ nguyên của một mục, để stem.form rỗng. Để rỗng thì tốt hơn là đoán sai.\n'
     +'3. "diff" phải là thông tin có thể kiểm chứng ngoài đời. Cấm các câu kiểu "tập trung vào việc trao đổi ý tưởng" — nghe hợp lý mà không giúp chọn từ. Hãy nói AI tổ chức, QUY MÔ bao nhiêu người, TRANG TRỌNG tới đâu, hoặc dùng trong NGÀNH nào.\n'
@@ -593,8 +595,34 @@ async function askExplain(words){
   txt=txt.replace(/```json|```/g,'').trim();
   const s=txt.indexOf('{'), e=txt.lastIndexOf('}');
   if(s<0||e<0) throw new Error('BAD_JSON');
-  return JSON.parse(txt.slice(s,e+1));
+  const data=JSON.parse(txt.slice(s,e+1));
+  return verifyShared(data, words);
 }
+
+/* Dặn mô hình "đừng bịa" không đủ — nó vừa khai "cùng tiền tố con-" cho
+   contaminate/pollute, mà pollute không hề có con-. Đây là thứ KIỂM TRA
+   ĐƯỢC bằng code: một tiền tố dùng chung thì phải xuất hiện thật trong
+   chính tả của MỌI mục. Không thoả thì hạ xuống "không chung gốc" và bỏ
+   luôn chip phần chung, thay vì tin lời mô hình.
+
+   Không kiểm được "cùng gốc" theo cách này (gốc Latinh không lộ ra trong
+   chính tả), nên với kind="root" ta chỉ kiểm tối thiểu và chấp nhận rủi
+   ro — nhưng ca hay sai nhất là tiền tố, và ca đó giờ chặn được. */
+function verifyShared(data, words){
+  const sh=data && data.shared;
+  if(!sh || !sh.form || sh.kind==='none') return data;
+  const form=String(sh.form).replace(/-/g,'').toLowerCase();
+  if(!form) return data;
+  if(sh.kind==='prefix'){
+    const all=(words||[]).every(w=>String(w).toLowerCase().replace(/^[^a-z]+/,'').startsWith(form));
+    if(!all){
+      data.shared={kind:'none', form:'', gloss:''};
+      data._sharedRejected=sh.form;     // để hiện lời nhắc trung thực
+    }
+  }
+  return data;
+}
+window.verifyShared=verifyShared;
 
 /* **in đậm** → <b>. esc() chạy TRƯỚC nên không có đường tiêm HTML. */
 function mdBold(s){
@@ -637,6 +665,10 @@ function explainState(query, data, saved){
     h+='<div class="wh-root wh-root-no">'
       +'<span class="wh-root-lbl">'+esc(KIND_LBL.none)+'</span>'
       +'<span class="wh-root-g">m\u1ed7i m\u1ee5c c\u00f3 \u0111\u01b0\u1eddng ri\u00eang</span></div>';
+  }
+  if(data._sharedRejected){
+    h+='<div class="wh-warn">Focci \u0111\u00e3 khai chung \u201c'+esc(data._sharedRejected)
+      +'\u201d nh\u01b0ng ph\u1ea7n \u0111\u00f3 kh\u00f4ng c\u00f3 trong m\u1ecdi m\u1ee5c \u2014 app \u0111\u00e3 b\u1ecf.</div>';
   }
 
   if(items.length){
@@ -772,52 +804,80 @@ window.toggleExplainSave=toggleExplainSave;
    ============================================================ */
 const PHRASE_FIELDS=['collocations','phrasal_verbs','idioms','prepositions'];
 
-async function phraseLookup(query, maxOut){
-  const q=norm(query||'');
-  const qw=q.split(/\s+/).filter(w=>w.length>1);
-  if(qw.length<2) return [];
-  const want=maxOut||10;
-  const out=[];
+/* ------------------------------------------------------------------
+   CHỈ MỤC CỤM TỪ — dựng MỘT lần, giữ trong bộ nhớ phiên.
 
-  await db().then(d=>new Promise((res)=>{
-    const st=d.transaction(STORE,'readonly').objectStore(STORE);
-    const req=st.openCursor();
-    let scanned=0;
+   Bản trước quét cursor qua toàn bộ 16.000 bản ghi cho MỖI lần tra nhiều
+   từ. Mỗi bản ghi phải giải tuần tự cả khối JSON nghĩa, nên trên điện
+   thoại mất vài giây — và vì nó chạy trước mọi nhánh khác, người dùng
+   thấy như tra nhiều từ không ra gì cả.
+
+   Giờ quét một lần rồi giữ lại một mảng gọn: chỉ chuỗi cụm đã chuẩn hoá,
+   chuỗi hiển thị, từ gốc và loại. Tra sau đó là duyệt mảng trong RAM,
+   vài mili giây. Có trần 40.000 mục để không phình bộ nhớ.
+   ------------------------------------------------------------------ */
+let _phraseIndex=null, _phraseIndexBuilding=null;
+const PHRASE_INDEX_CAP=40000;
+
+function buildPhraseIndex(){
+  if(_phraseIndex) return Promise.resolve(_phraseIndex);
+  if(_phraseIndexBuilding) return _phraseIndexBuilding;
+  _phraseIndexBuilding = db().then(d=>new Promise((res)=>{
+    const idx=[];
+    const req=d.transaction(STORE,'readonly').objectStore(STORE).openCursor();
     req.onsuccess=(e)=>{
       const c=e.target.result;
-      if(!c){ res(); return; }
+      if(!c || idx.length>=PHRASE_INDEX_CAP){ res(idx); return; }
       const r=c.value;
-      if(r && r.data && !r.alias){
+      if(r && r.data && !r.alias && !r.data.explain){
         for(const f of PHRASE_FIELDS){
           const arr=r.data[f];
           if(!Array.isArray(arr)) continue;
           for(const it of arr){
-            const txt=norm(it && it.text);
-            if(!txt || txt.length<3) continue;
-            let score=0;
-            if(txt===q) score=100;
-            else if(txt.includes(q)) score=80;
-            else if(q.includes(txt)) score=60;
-            else{
-              let hit=0;
-              for(const w of qw) if(txt.includes(w)) hit++;
-              if(hit<qw.length) continue;          // phải chứa ĐỦ các từ
-              score=30+hit;
-            }
-            score -= Math.min(10, Math.abs(txt.split(/\s+/).length-qw.length));
-            out.push({ owner:r.word, field:f, text:it.text, vi:it.vi||'',
-                       example:it.example||'', score });
+            const t=norm(it && it.text);
+            if(t.length<3) continue;
+            idx.push({t, d:it.text, o:r.word, f, vi:it.vi||''});
+            if(idx.length>=PHRASE_INDEX_CAP) break;
           }
         }
       }
-      scanned++;
-      // đủ nhiều kết quả tốt, hoặc đã quét quá nhiều → dừng
-      if(out.filter(x=>x.score>=60).length>=want || scanned>20000){ res(); return; }
       c.continue();
     };
-    req.onerror=()=>res();
-  })).catch(()=>{});
+    req.onerror=()=>res(idx);
+  })).then(idx=>{ _phraseIndex=idx; _phraseIndexBuilding=null; return idx; })
+     .catch(()=>{ _phraseIndex=[]; _phraseIndexBuilding=null; return []; });
+  return _phraseIndexBuilding;
+}
+/* Thư viện đổi thì chỉ mục cũ không còn đúng. */
+function phraseIndexReset(){ _phraseIndex=null; }
+window.phraseIndexReset=phraseIndexReset;
+window.buildPhraseIndex=buildPhraseIndex;
 
+function phraseScore(q, qw, t){
+  let score=0;
+  if(t===q) score=100;
+  else if(t.includes(q)) score=80;
+  else if(q.includes(t)) score=60;
+  else{
+    let hit=0;
+    for(const w of qw) if(t.includes(w)) hit++;
+    if(hit<qw.length) return 0;
+    score=30+hit;
+  }
+  return score - Math.min(10, Math.abs(t.split(' ').length-qw.length));
+}
+
+async function phraseLookup(query, maxOut){
+  const q=norm(query||'');
+  const qw=q.split(/\s+/).filter(w=>w.length>1);
+  if(qw.length<2) return [];
+  const idx=await buildPhraseIndex();
+  const want=maxOut||10;
+  const out=[];
+  for(const e of idx){
+    const s=phraseScore(q, qw, e.t);
+    if(s>0) out.push({owner:e.o, field:e.f, text:e.d, vi:e.vi, score:s});
+  }
   out.sort((x,y)=>y.score-x.score);
   const seen=new Set(); const uniq=[];
   for(const o of out){
@@ -829,6 +889,37 @@ async function phraseLookup(query, maxOut){
   return uniq;
 }
 window.phraseLookup=phraseLookup;
+
+/* Gợi ý cụm NGAY TRONG LÚC GÕ: gõ "mileage out" là thấy "get mileage out
+   of" trước cả khi bấm enter. Ngưỡng thấp hơn lúc tra (chỉ cần 1 từ đủ
+   dài) vì lúc gõ người ta chưa gõ xong. */
+async function phraseSuggest(query, maxOut){
+  const q=norm(query||'');
+  if(q.length<4) return [];
+  const qw=q.split(/\s+/).filter(w=>w.length>1);
+  if(!qw.length) return [];
+  const idx=await buildPhraseIndex();
+  const out=[];
+  for(const e of idx){
+    if(!e.t.includes(q)){
+      if(qw.length<2) continue;
+      let hit=0; for(const w of qw) if(e.t.includes(w)) hit++;
+      if(hit<qw.length) continue;
+      out.push({e, s:30+hit});
+      continue;
+    }
+    out.push({e, s: e.t.startsWith(q)?90:70});
+  }
+  out.sort((x,y)=> y.s-x.s || x.e.t.length-y.e.t.length);
+  const seen=new Set(); const uniq=[];
+  for(const o of out){
+    if(seen.has(o.e.t)) continue;
+    seen.add(o.e.t); uniq.push(o.e);
+    if(uniq.length>=(maxOut||6)) break;
+  }
+  return uniq;
+}
+window.phraseSuggest=phraseSuggest;
 
 const PHRASE_FIELD_LABEL={collocations:'collocation', phrasal_verbs:'phrasal verb',
   idioms:'idiom', prepositions:'preposition'};
@@ -1168,6 +1259,18 @@ async function search(rawWord, forceAI){
     if(guess && !hasSpace){ box.innerHTML=suggestState(word, guess); return; }
   }
 
+  /* Khớp cụm trong kho phải đứng TRƯỚC hai cửa này: 'mileage out of' có
+     sẵn trong máy, không cần API key và cũng chẳng cần mạng. Đặt sau thì
+     người chưa nhập key bị chặn khỏi chính dữ liệu của mình. */
+  if(hasSpace && !forceAI && !isExplainQuery(word)){
+    const pm=await phraseLookup(word, 10);
+    if(pm.length){
+      box.innerHTML=phraseMatchState(word, pm);
+      logEvent('search', norm(word));
+      return;
+    }
+  }
+
   if(!getKey()){ box.innerHTML=needKeyState(word); return; }
   if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
 
@@ -1176,18 +1279,6 @@ async function search(rawWord, forceAI){
   // its own result view instead of forcing it through the dictionary prompt.
   /* Dấu phẩy = "giải thích giúp tôi", không phải "tra nghĩa". */
   if(isExplainQuery(word)){ await runExplain(word); return; }
-
-  /* Cụm nhiều từ: thử khớp gần đúng trong kho TRƯỚC khi tiêu token. Cụm
-     như 'mileage out of' nằm trong collocations của 'get', không có mục
-     riêng, nên so khớp tuyệt đối luôn miss và app gọi AI vô ích. */
-  if(hasSpace && !forceAI){
-    const pm=await phraseLookup(word, 10);
-    if(pm.length){
-      box.innerHTML=phraseMatchState(word, pm);
-      logEvent('search', norm(word));
-      return;
-    }
-  }
 
   if(hasSpace){
     box.innerHTML=questScene(word);
@@ -2234,13 +2325,17 @@ async function showRecentSuggest(){
   renderSuggestList('Recent Searches', recs.filter(Boolean), true);
 }
 async function showTypedSuggest(q){
-  if(q.length<2){ hideSuggest(); return; }
   const results=await idbPrefix(q);
-  if(!results.length){ hideSuggest(); return; }
-  renderSuggestList('Suggestions', results, false);
+  /* Ngoài từ bắt đầu bằng chuỗi đang gõ, còn gợi ý CỤM chứa chuỗi đó — gõ
+     "mileage out" là thấy "get mileage out of" ngay, không phải bấm enter
+     rồi mới biết trong máy có sẵn. */
+  let phrases=[];
+  try{ phrases=await phraseSuggest(q, 6); }catch(e){}
+  if(!results.length && !phrases.length){ hideSuggest(); return; }
+  renderSuggestList('In your library', results, false, phrases);
 }
-const SUGGEST_MAX=60;    // dropdown cuộn được nên không cần bó ở 8
-function renderSuggestList(label, recs, deletable){
+
+function renderSuggestList(label, recs, deletable, phrases){
   const el=$('#suggest');
   let h='<div class="suggest-lbl">'+label
     +(recs.length>12?' <i>'+recs.length+'</i>':'')+'</div>';
@@ -2253,6 +2348,18 @@ function renderSuggestList(label, recs, deletable){
       +(d.vi_equivalent?'<span class="e">'+esc(d.vi_equivalent)+'</span>':'')+'</span>'
       +(deletable?'<button class="suggest-del" onclick="event.stopPropagation();removeFromSuggest(\''+safeW+'\',this)" aria-label="Remove">✕</button>':'')
       +'</div>';
+  }
+  /* Cụm xếp sau từ đơn: gõ để tìm từ là chính, cụm là phần thêm. */
+  if(phrases && phrases.length){
+    h+='<div class="suggest-lbl">C\u1ee5m c\u00f3 s\u1eb5n <i>'+phrases.length+'</i></div>';
+    for(const p of phrases){
+      const safeO=esc(p.o).replace(/'/g,"\\'");
+      h+='<div class="suggest-item sg-phrase" onclick="jump(\''+safeO+'\')">'
+        +'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h13"/></svg>'
+        +'<span class="suggest-mid"><span class="w">'+esc(p.d)+'</span>'
+        +(p.vi?'<span class="e">'+esc(p.vi)+'</span>':'')+'</span>'
+        +'<span class="sg-owner">'+esc(p.o)+'</span></div>';
+    }
   }
   el.innerHTML=h; el.classList.add('show');
 }
@@ -3545,11 +3652,16 @@ function insightRow(figure, title, body){
    được khoảng nghỉ thay vì mất hút. */
 function progressChart(s){
   const max=Math.max(1, s.peakDay ? s.peakDay.n : 1);
-  const today=dayStart(now());
   let bars='';
+  /* Ba sắc cam theo GIÁ TRỊ, không phải theo ngày nào là hôm nay. Tô riêng
+     hôm nay và ngày đỉnh chỉ đánh dấu hai cột lẻ, còn 26 cột kia xám xịt
+     nên nhìn không ra hình dáng nỗ lực. Giờ mọi cột đều cam, đậm nhạt kể
+     luôn câu chuyện: đậm = ngày làm nhiều. */
   for(const d of s.days28){
-    const pct = d.n ? Math.max(7, Math.round(d.n/max*100)) : 0;
-    const cls = d.ts===today ? ' is-today' : (d.n===max && d.n>0 ? ' is-peak' : '');
+    const ratio = d.n/max;
+    const pct = d.n ? Math.max(7, Math.round(ratio*100)) : 0;
+    let cls=' lv0';
+    if(d.n){ cls = ratio>=0.66 ? ' lv3' : (ratio>=0.33 ? ' lv2' : ' lv1'); }
     const label = new Date(d.ts).toLocaleDateString(undefined,{day:'numeric',month:'short'});
     bars += '<i class="pg-bar'+cls+'" style="height:'+pct+'%" title="'+esc(label)+': '+d.n+'"></i>';
   }
@@ -4500,33 +4612,48 @@ function showView(v){
 function wireSwipeBack(){
   const view=$('#v-home'); if(!view || view._swipeBack) return;
   view._swipeBack=1;
-  let sx=0, sy=0, st=0, live=false, fired=false;
+  let sx=0, sy=0, st=0, live=false, fired=false, locked=false;
 
   const canBack=()=> !!(currentWord || $('#result').innerHTML.trim());
+  const unlock=()=>{ if(locked){ document.body.style.overflow=''; locked=false; } };
 
   view.addEventListener('touchstart',(e)=>{
-    live=false; fired=false;
+    live=false; fired=false; unlock();
     if(e.touches.length!==1 || !canBack()) return;
     const t=e.touches[0];
     if(t.target.closest && t.target.closest('input,textarea,.suggest-drop,.chips,.yg-wrap,[data-noswipe]')) return;
     sx=t.clientX; sy=t.clientY; st=Date.now(); live=true;
   },{passive:true});
 
-  /* Bản trước chỉ xử lý ở touchend — nghĩa là phải NHẤC NGÓN xong mới thấy
-     phản hồi, cảm giác đúng như trễ. Giờ bắn ngay khi vượt ngưỡng trong lúc
-     ngón còn trên màn hình, giống cử chỉ back của hệ điều hành. */
+  /* Tay người luôn run, nên không thể đòi vuốt thẳng tuyệt đối. Cách làm
+     giờ theo hai giai đoạn:
+       · 14px đầu tiên chỉ dùng để ĐOÁN Ý ĐỊNH. Ngang trội hơn dọc thì
+         chốt là vuốt ngang và KHOÁ CUỘN TRANG lại, nên phần run về sau
+         không còn làm trang trượt dọc nữa.
+       · Đã khoá rồi thì chỉ còn nhìn dx, kệ dy — vì trang đã đứng yên.
+     Bản trước kiểm tỉ lệ dx/dy ở MỌI khung hình, nên một cú run giữa
+     chừng là huỷ cả cử chỉ; và nó cũng không khoá trang nên vuốt chéo
+     vừa cuộn vừa back. */
   view.addEventListener('touchmove',(e)=>{
     if(!live || fired) return;
     const t=e.touches[0];
     const dx=t.clientX-sx, dy=t.clientY-sy;
-    if(Math.abs(dy)>Math.abs(dx)*0.6){ live=false; return; }   // đang cuộn dọc
-    if(dx>62){
-      fired=true; live=false;
-      if(Date.now()-st<900) backToHome();
+    if(!locked){
+      if(Math.abs(dx)<14 && Math.abs(dy)<14) return;      // chưa đủ để đoán
+      if(Math.abs(dy)>Math.abs(dx)){ live=false; return; } // rõ ràng là cuộn dọc
+      document.body.style.overflow='hidden';               // khoá trang
+      locked=true;
+    }
+    if(dx>48 && Date.now()-st<1200){                       // ngưỡng thấp hơn, bắt nhanh hơn
+      fired=true; live=false; unlock();
+      backToHome();
+    }else if(dx<-30){                                      // đổi ý, kéo ngược lại
+      live=false; unlock();
     }
   },{passive:true});
 
-  view.addEventListener('touchend',()=>{ live=false; },{passive:true});
+  view.addEventListener('touchend',()=>{ live=false; unlock(); },{passive:true});
+  view.addEventListener('touchcancel',()=>{ live=false; unlock(); },{passive:true});
 }
 
 function wire(){

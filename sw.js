@@ -5,7 +5,7 @@
    every image is cached automatically the first time it's fetched
    successfully, which happens naturally the first time you open the
    app online. */
-const CACHE = 'focci-v74';
+const CACHE = 'focci-v75';
 const SHELL = [
   './',
   './index.html',
