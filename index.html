@@ -60,6 +60,157 @@
     --shadow:0 12px 30px rgba(30,60,90,.10);
     --glow:0 0 24px rgba(232,128,42,.18);
   }
+  /* ---- 10 extra palettes, alongside Auto/Light/Dark ---- */
+  :root[data-theme="midnight-indigo"]{
+    --bg:#12102A; --bg-2:#0D0B22;
+    --surface:#1C1940; --surface-2:#262159; --surface-3:#332C74;
+    --text:#EDE9FE; --muted:#A79CD8; --muted-2:#6C619E; --line:#332C74;
+    --primary:#8B5CF6; --primary-2:#C4B5FD; --primary-bg:rgba(139,92,246,.18);
+    --cyan:#22D3EE; --cyan-bg:rgba(34,211,238,.16);
+    --mint:#34D399; --mint-bg:rgba(52,211,153,.16);
+    --amber:#FBBF24; --amber-bg:rgba(251,191,36,.16);
+    --coral:#FB7185; --coral-bg:rgba(251,113,133,.16);
+    --blue:#60A5FA; --blue-bg:rgba(96,165,250,.16);
+    --pink:#F472B6; --pink-bg:rgba(244,114,182,.16);
+    --violet:#A78BFA; --violet-bg:rgba(167,139,250,.16);
+    --grad-hero:linear-gradient(135deg,#8B5CF6,#C4B5FD); --grad-cool:linear-gradient(135deg,#22D3EE,#60A5FA);
+    --shadow:0 12px 32px rgba(0,0,0,.5); --glow:0 0 26px rgba(139,92,246,.3);
+  }
+  :root[data-theme="forest-dusk"]{
+    --bg:#0E1A14; --bg-2:#0A130F;
+    --surface:#16281F; --surface-2:#1E3A2C; --surface-3:#2A4F3B;
+    --text:#E8F5EC; --muted:#8FB8A0; --muted-2:#5C8068; --line:#25422F;
+    --primary:#4ADE80; --primary-2:#86EFAC; --primary-bg:rgba(74,222,128,.16);
+    --cyan:#2DD4BF; --cyan-bg:rgba(45,212,191,.16);
+    --mint:#4ADE80; --mint-bg:rgba(74,222,128,.16);
+    --amber:#FACC15; --amber-bg:rgba(250,204,21,.16);
+    --coral:#FB923C; --coral-bg:rgba(251,146,60,.16);
+    --blue:#38BDF8; --blue-bg:rgba(56,189,248,.16);
+    --pink:#F472B6; --pink-bg:rgba(244,114,182,.16);
+    --violet:#A78BFA; --violet-bg:rgba(167,139,250,.16);
+    --grad-hero:linear-gradient(135deg,#4ADE80,#2DD4BF); --grad-cool:linear-gradient(135deg,#2DD4BF,#38BDF8);
+    --shadow:0 12px 32px rgba(0,0,0,.45); --glow:0 0 26px rgba(74,222,128,.28);
+  }
+  :root[data-theme="espresso-mocha"]{
+    --bg:#1D1410; --bg-2:#160F0C;
+    --surface:#2A1D16; --surface-2:#3A2A1F; --surface-3:#4D3A2A;
+    --text:#F5E9DD; --muted:#C2A28A; --muted-2:#8A6F5A; --line:#3F2E22;
+    --primary:#E08A3C; --primary-2:#F0B26A; --primary-bg:rgba(224,138,60,.18);
+    --cyan:#4FB8AE; --cyan-bg:rgba(79,184,174,.16);
+    --mint:#8FBC6E; --mint-bg:rgba(143,188,110,.16);
+    --amber:#E5B84B; --amber-bg:rgba(229,184,75,.16);
+    --coral:#D9705A; --coral-bg:rgba(217,112,90,.16);
+    --blue:#5C9BC7; --blue-bg:rgba(92,155,199,.16);
+    --pink:#D98BA3; --pink-bg:rgba(217,139,163,.16);
+    --violet:#A78BC0; --violet-bg:rgba(167,139,192,.16);
+    --grad-hero:linear-gradient(135deg,#E08A3C,#F0B26A); --grad-cool:linear-gradient(135deg,#4FB8AE,#5C9BC7);
+    --shadow:0 12px 32px rgba(0,0,0,.5); --glow:0 0 26px rgba(224,138,60,.3);
+  }
+  :root[data-theme="neon-cyberpunk"]{
+    --bg:#0A0A12; --bg-2:#06060D;
+    --surface:#131320; --surface-2:#1B1B30; --surface-3:#252542;
+    --text:#EAEAFB; --muted:#9C9CC9; --muted-2:#605F8C; --line:#252542;
+    --primary:#FF2ED1; --primary-2:#FF7AE8; --primary-bg:rgba(255,46,209,.18);
+    --cyan:#00F5FF; --cyan-bg:rgba(0,245,255,.16);
+    --mint:#39FF9E; --mint-bg:rgba(57,255,158,.16);
+    --amber:#FFE156; --amber-bg:rgba(255,225,86,.16);
+    --coral:#FF4D6D; --coral-bg:rgba(255,77,109,.16);
+    --blue:#4DA8FF; --blue-bg:rgba(77,168,255,.16);
+    --pink:#FF6AD5; --pink-bg:rgba(255,106,213,.16);
+    --violet:#B967FF; --violet-bg:rgba(185,103,255,.16);
+    --grad-hero:linear-gradient(135deg,#FF2ED1,#00F5FF); --grad-cool:linear-gradient(135deg,#00F5FF,#B967FF);
+    --shadow:0 12px 32px rgba(0,0,0,.55); --glow:0 0 30px rgba(255,46,209,.35);
+  }
+  :root[data-theme="slate-mono"]{
+    --bg:#15181D; --bg-2:#0F1114;
+    --surface:#1D2127; --surface-2:#262B33; --surface-3:#333A44;
+    --text:#E7EBF0; --muted:#8D97A3; --muted-2:#5C6570; --line:#2B313A;
+    --primary:#6C8CFF; --primary-2:#9FB4FF; --primary-bg:rgba(108,140,255,.16);
+    --cyan:#4DC3C7; --cyan-bg:rgba(77,195,199,.16);
+    --mint:#5FC98D; --mint-bg:rgba(95,201,141,.16);
+    --amber:#D7B85C; --amber-bg:rgba(215,184,92,.16);
+    --coral:#D9707A; --coral-bg:rgba(217,112,122,.16);
+    --blue:#6C8CFF; --blue-bg:rgba(108,140,255,.16);
+    --pink:#C983B0; --pink-bg:rgba(201,131,176,.16);
+    --violet:#9C8FD9; --violet-bg:rgba(156,143,217,.16);
+    --grad-hero:linear-gradient(135deg,#6C8CFF,#9FB4FF); --grad-cool:linear-gradient(135deg,#4DC3C7,#6C8CFF);
+    --shadow:0 12px 30px rgba(0,0,0,.45); --glow:0 0 24px rgba(108,140,255,.25);
+  }
+  :root[data-theme="sakura-light"]{
+    --bg:#FDF3F6; --bg-2:#FBE7EE;
+    --surface:#FFFFFF; --surface-2:#FDEEF3; --surface-3:#F9DCE6;
+    --text:#3B1F2B; --muted:#8C6577; --muted-2:#BB94A5; --line:#F5D9E3;
+    --primary:#E8598A; --primary-2:#F189AC; --primary-bg:rgba(232,89,138,.12);
+    --cyan:#3AA6A0; --cyan-bg:rgba(58,166,160,.12);
+    --mint:#4CAE71; --mint-bg:rgba(76,174,113,.12);
+    --amber:#D9A441; --amber-bg:rgba(217,164,65,.12);
+    --coral:#E2685A; --coral-bg:rgba(226,104,90,.12);
+    --blue:#4A87C9; --blue-bg:rgba(74,135,201,.12);
+    --pink:#D6559A; --pink-bg:rgba(214,85,154,.12);
+    --violet:#9B6FD1; --violet-bg:rgba(155,111,209,.12);
+    --grad-hero:linear-gradient(135deg,#E8598A,#F189AC); --grad-cool:linear-gradient(135deg,#3AA6A0,#4A87C9);
+    --shadow:0 12px 28px rgba(190,90,130,.14); --glow:0 0 22px rgba(232,89,138,.18);
+  }
+  :root[data-theme="ocean-breeze"]{
+    --bg:#F1F8FB; --bg-2:#E2F0F6;
+    --surface:#FFFFFF; --surface-2:#EAF4F8; --surface-3:#D7EAF2;
+    --text:#0E2A38; --muted:#4F7A8C; --muted-2:#8FB2C0; --line:#D7EAF2;
+    --primary:#0EA5C4; --primary-2:#4FC7DE; --primary-bg:rgba(14,165,196,.12);
+    --cyan:#0EA5C4; --cyan-bg:rgba(14,165,196,.12);
+    --mint:#1DAE8E; --mint-bg:rgba(29,174,142,.12);
+    --amber:#D6A32C; --amber-bg:rgba(214,163,44,.12);
+    --coral:#E2695E; --coral-bg:rgba(226,105,94,.12);
+    --blue:#2E7FD9; --blue-bg:rgba(46,127,217,.12);
+    --pink:#D25FA0; --pink-bg:rgba(210,95,160,.12);
+    --violet:#7B6FD1; --violet-bg:rgba(123,111,209,.12);
+    --grad-hero:linear-gradient(135deg,#0EA5C4,#4FC7DE); --grad-cool:linear-gradient(135deg,#1DAE8E,#2E7FD9);
+    --shadow:0 12px 28px rgba(20,90,120,.12); --glow:0 0 22px rgba(14,165,196,.18);
+  }
+  :root[data-theme="sunset-terracotta"]{
+    --bg:#FBF3EA; --bg-2:#F5E5D3;
+    --surface:#FFFFFF; --surface-2:#F8ECDF; --surface-3:#F0DCC7;
+    --text:#3A2417; --muted:#8A6A4F; --muted-2:#BB9A7C; --line:#EFDCC5;
+    --primary:#D9622B; --primary-2:#EA8A4E; --primary-bg:rgba(217,98,43,.12);
+    --cyan:#3E9C93; --cyan-bg:rgba(62,156,147,.12);
+    --mint:#6FA85A; --mint-bg:rgba(111,168,90,.12);
+    --amber:#D6A230; --amber-bg:rgba(214,162,48,.12);
+    --coral:#D9503F; --coral-bg:rgba(217,80,63,.12);
+    --blue:#3E7FA6; --blue-bg:rgba(62,127,166,.12);
+    --pink:#C9668A; --pink-bg:rgba(201,102,138,.12);
+    --violet:#8A6FB0; --violet-bg:rgba(138,111,176,.12);
+    --grad-hero:linear-gradient(135deg,#D9622B,#EA8A4E); --grad-cool:linear-gradient(135deg,#3E9C93,#3E7FA6);
+    --shadow:0 12px 28px rgba(140,80,40,.14); --glow:0 0 22px rgba(217,98,43,.2);
+  }
+  :root[data-theme="lavender-fields"]{
+    --bg:#F5F2FC; --bg-2:#EBE5F9;
+    --surface:#FFFFFF; --surface-2:#F1ECFB; --surface-3:#E3D9F5;
+    --text:#2C2440; --muted:#71638F; --muted-2:#A79AC4; --line:#E3D9F5;
+    --primary:#7C5CD9; --primary-2:#A688E8; --primary-bg:rgba(124,92,217,.12);
+    --cyan:#3FA6AE; --cyan-bg:rgba(63,166,174,.12);
+    --mint:#4FAE81; --mint-bg:rgba(79,174,129,.12);
+    --amber:#D2A23A; --amber-bg:rgba(210,162,58,.12);
+    --coral:#D96A79; --coral-bg:rgba(217,106,121,.12);
+    --blue:#5B7FD9; --blue-bg:rgba(91,127,217,.12);
+    --pink:#C767A8; --pink-bg:rgba(199,103,168,.12);
+    --violet:#7C5CD9; --violet-bg:rgba(124,92,217,.12);
+    --grad-hero:linear-gradient(135deg,#7C5CD9,#A688E8); --grad-cool:linear-gradient(135deg,#3FA6AE,#5B7FD9);
+    --shadow:0 12px 28px rgba(90,70,150,.12); --glow:0 0 22px rgba(124,92,217,.18);
+  }
+  :root[data-theme="coral-reef"]{
+    --bg:#F0FAF8; --bg-2:#DFF3EE;
+    --surface:#FFFFFF; --surface-2:#E8F6F2; --surface-3:#D3EEE6;
+    --text:#0F332C; --muted:#4F8A7C; --muted-2:#8FBBAF; --line:#D3EEE6;
+    --primary:#F0704F; --primary-2:#F79A78; --primary-bg:rgba(240,112,79,.12);
+    --cyan:#1FA398; --cyan-bg:rgba(31,163,152,.12);
+    --mint:#2FB380; --mint-bg:rgba(47,179,128,.12);
+    --amber:#D9A83B; --amber-bg:rgba(217,168,59,.12);
+    --coral:#F0704F; --coral-bg:rgba(240,112,79,.12);
+    --blue:#2E8FBF; --blue-bg:rgba(46,143,191,.12);
+    --pink:#D9668F; --pink-bg:rgba(217,102,143,.12);
+    --violet:#8570C7; --violet-bg:rgba(133,112,199,.12);
+    --grad-hero:linear-gradient(135deg,#F0704F,#F79A78); --grad-cool:linear-gradient(135deg,#1FA398,#2E8FBF);
+    --shadow:0 12px 28px rgba(20,110,90,.12); --glow:0 0 22px rgba(240,112,79,.2);
+  }
   /* Bản tự host — chỉ có tác dụng nếu ./fonts/*.woff2 tồn tại trong repo.
      Thiếu file thì @font-face này im lặng thất bại và stack rơi xuống
      "Raleway" của Google Fonts, nên để sẵn đây không gây lỗi gì. */
@@ -203,22 +354,23 @@
   .vi-result-chip:active{transform:scale(.95);background:var(--primary-bg);border-color:var(--primary)}
 
   /* ---- phrase / sentence translation ---- */
-  /* --- translation result: several labelled options, closest one flagged --- */
-  .tr-opts{display:flex;flex-direction:column;gap:9px;margin-top:12px}
-  .tr-opt{padding:13px 14px;border-radius:14px;background:var(--surface);
-    border:1px solid var(--line)}
-  .tr-opt-best{border-color:var(--primary);background:var(--primary-bg);
-    box-shadow:0 0 0 1px var(--primary) inset}
-  .tr-opt-top{display:flex;align-items:center;gap:7px;margin-bottom:7px}
-  .tr-badge{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
-    color:#3A1E00;background:var(--grad-hero);padding:3px 8px;border-radius:20px}
+  /* --- translation result: ONE unified block, closest option just highlighted
+     (tinted background + checkmark), not boxed off as its own separate card --- */
+  .tr-opts{display:flex;flex-direction:column;margin-top:12px;border-radius:14px;
+    border:1px solid var(--line);overflow:hidden;background:var(--surface)}
+  .tr-row{padding:13px 14px;border-bottom:1px solid var(--line)}
+  .tr-row:last-child{border-bottom:none}
+  .tr-row-best{background:var(--primary-bg)}
+  .tr-row-top{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .tr-check{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--primary)}
   .tr-reg{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
     color:var(--muted-2);background:var(--surface-2);padding:3px 8px;border-radius:20px}
   .tr-copy{margin-left:auto;background:none;border:none;color:var(--muted-2);font-size:14px;
     padding:2px 4px}
-  .tr-opt-text{font-size:16.5px;font-weight:700;line-height:1.5;color:var(--text)}
-  .tr-opt-best .tr-opt-text{font-size:17.5px}
-  .tr-opt-why{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.45}
+  .tr-row-text{font-size:15.5px;font-weight:600;line-height:1.5;color:var(--text)}
+  .tr-row-best .tr-row-text{font-size:16.5px;font-weight:800;color:var(--primary)}
+  .tr-row-why{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.45}
   .tr-lookup{margin-top:9px;font-size:11.5px;font-weight:700;color:var(--primary);
     background:none;border:none;padding:0}
   .tr-lit{margin-top:11px;padding:11px 13px;border-radius:12px;background:var(--surface-2);
@@ -448,6 +600,7 @@
   .icon-act{width:40px;height:40px;border-radius:14px;display:flex;align-items:center;justify-content:center;
     color:var(--muted-2);transition:transform .12s,color .2s,background .2s}
   .icon-act svg{width:19px;height:19px;stroke:currentColor;fill:none}
+  .icon-act.sparkle svg{fill:currentColor;stroke:none}
   .icon-act:active{transform:scale(.9)}
   /* :hover trên iOS DÍNH LẠI sau khi chạm, cho tới lúc chạm chỗ khác — đó
      là cái khung 40×40 hiện ra quanh ngôi sao rồi mới mất. Chỉ áp cho thiết
@@ -804,6 +957,14 @@
   .seg{display:flex;background:var(--surface-2);border-radius:99px;padding:5px;gap:5px}
   .seg button{flex:1;padding:10px;border-radius:99px;font-size:13px;font-weight:700;color:var(--muted)}
   .seg button.active{background:var(--surface);color:var(--primary);box-shadow:var(--shadow)}
+  .palette-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:8px}
+  .palette-sw{display:flex;flex-direction:column;align-items:center;gap:6px;padding:9px 4px;
+    border-radius:16px;border:1.5px solid transparent;background:none}
+  .palette-sw .pv{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line);box-shadow:var(--shadow);flex:none}
+  .palette-sw i{font-style:normal;font-size:9.5px;font-weight:700;color:var(--muted);text-align:center;line-height:1.25}
+  .palette-sw.active{border-color:var(--primary);background:var(--primary-bg)}
+  .palette-sw.active i{color:var(--primary)}
+  .palette-sw:active{transform:scale(.94)}
   .gen-progress{font-size:13px;color:var(--muted);margin-top:10px;text-align:center}
   .mnt-state{font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:14px;padding:11px 13px;margin-bottom:12px;line-height:1.6}
   .mnt-bar{height:9px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-top:12px}
@@ -2539,10 +2700,21 @@
       <div class="sx-sep"></div>
       <div class="sx-field">
         <label>Theme</label>
-        <div class="seg" id="theme-seg">
-          <button data-theme="auto" class="active">Auto</button>
-          <button data-theme="light">Light</button>
-          <button data-theme="dark">Dark</button>
+        <p class="sx-hint" style="margin-bottom:10px">Pick a look — applies across the whole app.</p>
+        <div class="palette-grid" id="theme-seg">
+          <button data-theme="auto" class="palette-sw active"><span class="pv" style="background:linear-gradient(135deg,#0E1B2A 50%,#F3F7FB 50%)"></span><i>Auto</i></button>
+          <button data-theme="light" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F3F7FB 55%,#E8802A 55%)"></span><i>Light</i></button>
+          <button data-theme="dark" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#0E1B2A 55%,#FF9F45 55%)"></span><i>Dark</i></button>
+          <button data-theme="midnight-indigo" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#12102A 55%,#8B5CF6 55%)"></span><i>Midnight Indigo</i></button>
+          <button data-theme="forest-dusk" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#0E1A14 55%,#4ADE80 55%)"></span><i>Forest Dusk</i></button>
+          <button data-theme="espresso-mocha" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#1D1410 55%,#E08A3C 55%)"></span><i>Espresso Mocha</i></button>
+          <button data-theme="neon-cyberpunk" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#0A0A12 55%,#FF2ED1 55%)"></span><i>Neon Cyberpunk</i></button>
+          <button data-theme="slate-mono" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#15181D 55%,#6C8CFF 55%)"></span><i>Slate Mono</i></button>
+          <button data-theme="sakura-light" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#FDF3F6 55%,#E8598A 55%)"></span><i>Sakura Light</i></button>
+          <button data-theme="ocean-breeze" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F1F8FB 55%,#0EA5C4 55%)"></span><i>Ocean Breeze</i></button>
+          <button data-theme="sunset-terracotta" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#FBF3EA 55%,#D9622B 55%)"></span><i>Sunset Terracotta</i></button>
+          <button data-theme="lavender-fields" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F5F2FC 55%,#7C5CD9 55%)"></span><i>Lavender Fields</i></button>
+          <button data-theme="coral-reef" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F0FAF8 55%,#F0704F 55%)"></span><i>Coral Reef</i></button>
         </div>
       </div>
       <div class="sx-sep"></div>

@@ -516,7 +516,16 @@ async function forceViTranslate(word){
 const EXPLAIN_KEY_PREFIX='why:';
 
 function isExplainQuery(s){
-  return /,/.test(String(s||''));
+  const str=String(s||'');
+  if(!str.includes(',')) return false;
+  const parts=str.split(',').map(x=>x.trim()).filter(Boolean);
+  if(parts.length<2) return false;
+  /* "cease, decease" là 2 mục ngắn cần SO SÁNH. "Well, I don't think so"
+     cũng có dấu phẩy nhưng vẫn là MỘT câu cần DỊCH — trước đây bất kỳ dấu
+     phẩy nào cũng bị hiểu nhầm thành yêu cầu so sánh từ, nên câu có dấu
+     phẩy bị đẩy nhầm sang Compare Words và không dịch được. Giờ chỉ coi
+     là so sánh từ khi MỌI phần đều ngắn (≤4 từ) và không có dấu kết câu. */
+  return parts.every(p=>p.split(/\s+/).filter(Boolean).length<=4 && !/[.?!]/.test(p));
 }
 function explainWordsOf(s){
   return String(s||'').split(',').map(x=>norm(x)).filter(Boolean).slice(0,6);
@@ -1000,7 +1009,8 @@ async function translatePhrase(text){
     +'1. 2 to 3 items in "alternatives" (never 0 unless the text is a fixed proper noun).\n'
     +'2. "gloss" up to 6 pairs, covering the words a learner would want to isolate; empty array for very short input.\n'
     +'3. Every "why"/"issue"/"note" must be in Vietnamese and under 12 words.\n'
-    +'4. "input_check" ONLY evaluates the ENGLISH side. If source_lang is "en", judge whether the ORIGINAL text itself reads as something a native speaker would actually say — set natural=false only for genuine non-native tells (word-for-word translation from Vietnamese, wrong preposition/collocation, unnatural word order), not for text that is merely short, casual or simple. If source_lang is "vi", always set natural=true with issue="" and better=[] (nothing to flag — the English side here is the translation Focci produced, not the user\u2019s own phrasing).\n\n'
+    +'4. "input_check" ONLY evaluates the ENGLISH side. If source_lang is "en", judge whether the ORIGINAL text itself reads as something a native speaker would actually say — set natural=false only for genuine non-native tells (word-for-word translation from Vietnamese, wrong preposition/collocation, unnatural word order), not for text that is merely short, casual or simple. If source_lang is "vi", always set natural=true with issue="" and better=[] (nothing to flag — the English side here is the translation Focci produced, not the user\u2019s own phrasing).\n'
+    +'5. MATCH THE EXACT SHADE OF CERTAINTY/TONE, NOT JUST THE GENERAL MEANING. Vietnamese has several distinct levels for "I think" that a lazy translation flattens into one: "tôi nghĩ" (plain opinion), "tôi tin" (confident, closer to "I believe"), "tôi cho là"/"tôi đoán là" (tentative/guessing — closer to "I suppose so"/"I guess so"/"I\u2019d assume so"), "có lẽ" (probably/maybe). "primary" must be the option that matches the SPECIFIC shade of the source, not the most generic/common phrase for that general category — e.g. "tôi cho là vậy" should surface "I suppose so" or "I guess so" as primary or a close alternative, not default to the more assertive "I think so"/"I believe so" every time. The same care applies going VI\u2192EN as well as EN\u2192VI: preserve hedging, confidence, and formality, don\u2019t just preserve the topic.\n\n'
     +'TEXT:\n'+text;
   const body={ contents:[{parts:[{text:prompt}]}],
     generationConfig:{ temperature:0.2, maxOutputTokens:1600, responseMimeType:"application/json" } };
@@ -1034,14 +1044,14 @@ function phraseResultState(original, result){
 
   const optRow = (o, isPrimary)=>{
     const safe = (o.text||'').replace(/'/g,"\\'");
-    let r='<div class="tr-opt'+(isPrimary?' tr-opt-best':'')+'">';
-    r+='<div class="tr-opt-top">';
-    if(isPrimary) r+='<span class="tr-badge">Sát nhất</span>';
+    let r='<div class="tr-row'+(isPrimary?' tr-row-best':'')+'">';
+    r+='<div class="tr-row-top">';
+    if(isPrimary) r+='<span class="tr-check">\u2713 S\u00e1t nh\u1ea5t</span>';
     if(o.register) r+='<span class="tr-reg">'+esc(regLbl(o.register))+'</span>';
     r+='<button class="tr-copy" onclick="trCopy(this,\''+safe+'\')" aria-label="Copy">⧉</button>';
     r+='</div>';
-    r+='<div class="tr-opt-text">'+esc(o.text||'')+'</div>';
-    if(o.why) r+='<div class="tr-opt-why">'+esc(o.why)+'</div>';
+    r+='<div class="tr-row-text">'+esc(o.text||'')+'</div>';
+    if(o.why) r+='<div class="tr-row-why">'+esc(o.why)+'</div>';
     // Translating INTO English → every option is a lookup target.
     if(toEN && o.text && o.text.split(/\s+/).length<=4)
       r+='<button class="tr-lookup" onclick="jump(\''+safe+'\')">Tra từ này →</button>';
@@ -2170,14 +2180,9 @@ function renderEntry(rec, queriedAs, formNote){
   // Icon-only actions, no boxes: save, and refresh the Vietnamese meaning.
   h+='<div class="head-acts">';
   h+='<button class="icon-act star '+(rec.saved?'on':'')+'" onclick="toggleSave(\''+safeW+'\')" aria-label="Save word">'+(rec.saved?'★':'☆')+'</button>';
-  h+='<button class="icon-act" onclick="runExplain(\''+safeW+'\')" aria-label="Why this word" title="Vì sao lại là từ này">'
-    /* Thiếu stroke="currentColor" nên nét không được vẽ — trông như ảnh
-       hỏng. Các icon khác có rule CSS đặt stroke, icon này thì không. */
-    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
-    +'stroke-linecap="round" stroke-linejoin="round">'
-    +'<circle cx="12" cy="12" r="9"/>'
-    +'<path d="M9.3 9.2a2.8 2.8 0 1 1 3.6 2.7c-.7.3-1.1.9-1.1 1.7v.3"/>'
-    +'<circle cx="11.8" cy="17.4" r=".9" fill="currentColor" stroke="none"/>'
+  h+='<button class="icon-act sparkle" onclick="runExplain(\''+safeW+'\')" aria-label="Why this word" title="Vì sao lại là từ này">'
+    +'<svg viewBox="0 0 24 24" fill="currentColor">'
+    +'<path d="M12 2c.45 3.68 1.05 6.28 2.34 7.66C15.72 11 18.32 11.55 22 12c-3.68.45-6.28 1.05-7.66 2.34C13 15.72 12.45 18.32 12 22c-.45-3.68-1.05-6.28-2.34-7.66C8.28 13 5.68 12.45 2 12c3.68-.45 6.28-1.05 7.66-2.34C11 5.68 11.55 3.05 12 2Z"/>'
     +'</svg></button>';
   h+='<button class="icon-act" id="rewrite-btn" onclick="rewriteMeaning(\''+safeW+'\')" title="Refresh the Vietnamese meaning with AI" aria-label="Refresh meaning">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">'
@@ -2392,6 +2397,7 @@ function questScene(word){
    AUTOSUGGEST
    ============================================================ */
 let suggestTimer=null;
+const SUGGEST_MAX=20;   // dropdown cuộn được nên trần này chỉ để khỏi vô hạn, không phải giới hạn UX cứng
 function hideSuggest(){ const el=$('#suggest'); el.classList.remove('show'); el.innerHTML=''; }
 async function showRecentSuggest(){
   /* Đọc từ sổ lịch sử thay vì bảng log — sổ không bị logTrim cắt, nên
