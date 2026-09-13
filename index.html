@@ -2243,59 +2243,50 @@
   .wh-root-no .wh-root-lbl{color:var(--muted-2)}
 
   .wh-items{display:flex;flex-direction:column;gap:10px}
-  .wh-item{padding:14px 15px 12px;border-radius:16px;
+  .wh-item{padding:15px 15px 13px;border-radius:16px;
     background:var(--surface);border:1px solid var(--line)}
-  .wh-item-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-  .wh-n{flex:none;width:18px;height:18px;border-radius:50%;display:flex;
-    align-items:center;justify-content:center;font-size:10px;font-weight:800;
-    color:var(--muted-2);background:var(--surface-2);border:1px solid var(--line)}
-  .wh-w{font-size:16px;font-weight:800;letter-spacing:-.015em;color:var(--text)}
-  .wh-vi{font-size:12.5px;font-weight:600;color:var(--muted)}
 
-  .wh-parts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px}
-  .wh-chip{display:inline-flex;flex-direction:column;gap:1px;padding:5px 10px;
-    border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}
-  .wh-chip b{font-size:12.5px;font-weight:800;color:var(--text);
-    font-family:ui-serif,Georgia,serif;font-style:italic}
-  .wh-chip i{font-size:10px;font-style:normal;color:var(--muted-2)}
-  .wh-plus{font-size:11px;font-weight:800;color:var(--primary)}
-  /* Phần dùng chung hiện lại mờ trong mỗi mục để thấy công thức ghép,
-     nhưng nhạt hơn thân từ riêng — thứ cần chú ý là phần RIÊNG. */
-  .wh-chip-mute{opacity:.55}
-  .wh-chip-mute b{font-weight:600}
+  /* TÊN TỪ là nút bấm sang trang từ — bỏ hẳn dòng "Tra từ này" ở cuối,
+     vì tên từ vốn là chỗ người ta định bấm vào đầu tiên. */
+  .wh-w{display:inline-flex;align-items:center;gap:5px;padding:0;
+    font-size:17px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+  .wh-w:active{transform:scale(.97);color:var(--primary)}
+  .wh-w-arrow{font-size:11px;color:var(--primary);opacity:.75}
+  .wh-vi{display:block;margin-top:3px;font-size:12.5px;color:var(--muted)}
 
-  /* Cụm hay đi kèm — cách phân biệt đáng tin nhất khi viết thật */
+  /* KEY — thứ duy nhất cần nhớ, nên là chữ to nhất trong thẻ */
+  .wh-key{margin-top:11px;padding:11px 13px;border-radius:13px;
+    font-size:15.5px;font-weight:800;line-height:1.4;letter-spacing:-.015em;
+    color:var(--text);background:var(--primary-bg);
+    border-left:3px solid var(--primary)}
+
+  .wh-diff{margin-top:9px;padding:0;font-size:12.5px;line-height:1.55;
+    color:var(--muted);font-weight:400}
+  .wh-diff::before{display:none}
+
   .wh-typ{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
   .wh-typ span{font-size:11px;font-weight:600;color:var(--muted);
     padding:4px 9px;border-radius:99px;background:var(--surface-2);
     border:1px solid var(--line)}
 
-  .wh-diff{position:relative;margin-top:11px;padding:9px 0 9px 13px;
-    font-size:13.5px;line-height:1.55;color:var(--text);font-weight:600}
-  .wh-diff::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;
-    border-radius:99px;background:var(--grad-hero)}
-
-  /* Ví dụ: câu tiếng Anh trước, bản dịch thụt vào và nhạt hơn — mắt đọc
-     câu gốc trước, dịch chỉ để đối chiếu khi cần. Vạch dọc mảnh gom hai
-     ví dụ thành một khối, không lẫn vào dòng "điểm khác" phía trên. */
   .wh-ex{margin-top:11px;padding-left:11px;border-left:1px solid var(--line);
     display:flex;flex-direction:column;gap:9px}
   .wh-ex-row{display:flex;flex-direction:column;gap:2px}
   .wh-ex-en{font-size:13px;line-height:1.45;color:var(--text)}
-  .wh-ex-vi{font-size:11.5px;line-height:1.45;color:var(--muted-2);padding-left:9px;
-    border-left:2px solid var(--line)}
+  .wh-ex-vi{font-size:11.5px;line-height:1.45;color:var(--muted-2)}
 
-  /* Lời nhắc khi app bác bỏ phần chung mà AI khai sai */
-  .wh-warn{margin:-6px 0 13px;padding:9px 12px;border-radius:12px;font-size:11.5px;
+  /* Từ nguyên: xuống cuối, chữ nhỏ, chỉ hiện khi thật sự giúp phân biệt */
+  .wh-etym{display:flex;align-items:baseline;gap:7px;margin-top:12px;
+    padding-top:10px;border-top:1px dashed var(--line);font-size:11.5px}
+  .wh-etym span{font-size:9px;font-weight:800;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--muted-2)}
+  .wh-etym b{font-family:ui-serif,Georgia,serif;font-style:italic;
+    font-weight:600;color:var(--muted);font-size:13px}
+  .wh-etym i{font-style:normal;color:var(--muted-2)}
+
+  .wh-warn{margin:-4px 0 13px;padding:9px 12px;border-radius:12px;font-size:11.5px;
     line-height:1.45;color:var(--coral);background:rgba(255,107,122,.1);
     border:1px solid rgba(255,107,122,.26)}
-
-  /* Cụm trong dropdown gợi ý: có tên từ gốc ở mép phải */
-  .sg-phrase .sg-owner{flex:none;font-size:11px;font-weight:800;color:var(--primary);
-    margin-left:8px}
-  .sg-phrase .w{font-size:13.5px}
-
-  .wh-go{margin-top:11px;font-size:11.5px;font-weight:800;color:var(--primary);padding:0}
 
   .wh-hook{display:flex;flex-direction:column;gap:5px;margin-top:14px;
     padding:13px 15px;border-radius:16px;font-size:13.5px;font-weight:600;
@@ -2711,7 +2702,7 @@
       <div class="saved-flash" id="restart-story-flash"></div>
     </div>
 
-    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v75. 09.11.2026 - Focci&rsquo;s Learning App</b></p>
+    <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v76. 09.11.2026 - Focci&rsquo;s Learning App</b></p>
   </section>
 </main>
 

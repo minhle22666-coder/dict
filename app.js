@@ -542,47 +542,57 @@ async function askExplain(words){
 
      Và một ví dụ mẫu đặt ngay trong prompt: một ví dụ cho thấy mức cụ thể
      mong đợi có tác dụng hơn năm dòng quy tắc. */
-  const prompt='Bạn là nhà từ điển học viết cho người Việt học tiếng Anh. Mục tiêu: giúp người đọc CHỌN ĐÚNG TỪ khi viết, không phải đọc một bài về từ nguyên.\n'
+  /* Lỗi còn lại của bản trước: LUÔN bắt khai từ nguyên. Có ô thì mô hình
+     phải lấp, nên contaminate/pollute bị gán taminare/polluere — đúng về
+     từ nguyên nhưng KHÔNG giúp chọn từ, mà lại chiếm chỗ đẹp nhất trên
+     màn hình. Giờ từ nguyên chỉ xuất hiện khi nó thật sự giải thích được
+     điểm khác; mặc định là không.
+
+     Thay vào đó ô quan trọng nhất là "key": một cụm 3-7 từ chốt bản chất,
+     đủ ngắn để in to và nhớ được. Đó mới là thứ đáng chiếm chỗ đẹp. */
+  const prompt='Bạn là nhà từ điển học viết cho người Việt học tiếng Anh. Mục tiêu duy nhất: giúp người đọc CHỌN ĐÚNG TỪ khi viết.\n'
     +(many
       ? 'Người học gõ '+words.length+' mục cùng lúc: '+list+'. Họ muốn biết khi nào dùng cái nào.\n'
-      : 'Người học muốn biết vì sao "'+list+'" mang nghĩa như vậy và khi nào dùng nó.\n')
+      : 'Người học muốn hiểu rõ khi nào dùng "'+list+'".\n')
     +'Trả về DUY NHẤT JSON, không markdown fence, không lời dẫn:\n'
     +'{'
-    +'"shared":{"kind":"root | prefix | none","form":"phần thật sự dùng chung, ví dụ con-","gloss":"nghĩa phần đó, 2-5 từ tiếng Việt"},'
+    +'"shared":{"kind":"root | prefix | none","form":"phần dùng chung nếu CÓ THẬT trong chính tả mọi mục","gloss":"nghĩa phần đó"},'
     +'"items":[{'
       +'"word":"mục đúng như người học gõ",'
-      +'"stem":{"form":"thân từ RIÊNG của mục này, ví dụ ferre","gloss":"nghĩa thân từ đó"},'
       +'"vi":"nghĩa tiếng Việt, tối đa 8 từ",'
-      +'"diff":"ĐIỂM KHÁC THỰC TẾ, tối đa 20 từ: ai tổ chức/ai dùng, quy mô, mức trang trọng, hoặc lĩnh vực. TUYỆT ĐỐI không nhắc từ nguyên ở đây.",'
+      +'"key":"BẢN CHẤT gói trong 3-7 từ tiếng Việt. Đây là thứ người đọc sẽ nhớ. Phải đối lập rõ với key của mục kia.",'
+      +'"diff":"một câu cụ thể, tối đa 18 từ: ai dùng, trong ngữ cảnh nào, quy mô ra sao.",'
       +'"typical":"2-3 cụm hay đi kèm nhất, cách nhau bằng dấu phẩy",'
-      +'"ex":[{"en":"câu tiếng Anh tự nhiên, tối đa 12 từ","vi":"bản dịch tiếng Việt"}]'
+      +'"etym":{"form":"","gloss":"","helps":false},'
+      +'"ex":[{"en":"câu tiếng Anh tối đa 12 từ","vi":"bản dịch"}]'
     +'}],'
-    +'"contrast":"một dòng chốt cách chọn, tối đa 16 từ. Rỗng nếu chỉ có một mục."'
+    +'"contrast":"một dòng chốt cách chọn, tối đa 16 từ."'
     +'}\n'
     +'QUY TẮC BẮT BUỘC:\n'
-    +'0. PHẦN DÙNG CHUNG PHẢI CÓ THẬT TRONG CHÍNH TẢ CỦA MỌI MỤC. Ví dụ SAI cần tránh: với "contaminate, pollute" mà khai shared con- là sai, vì "pollute" không bắt đầu bằng con-. Trường hợp đó phải để kind="none". Kiểm lại từng chữ cái trước khi khai.\n'
-    +'1. TIỀN TỐ GIỐNG NHAU KHÔNG PHẢI CÙNG GỐC. Nếu các mục chỉ chung tiền tố (con-, de-, re-...) mà khác thân từ thì shared.kind="prefix". Chỉ dùng "root" khi thân từ thật sự cùng một gốc. Không có gì chung thì "none" và shared.form rỗng.\n'
-    +'2. Nếu bạn KHÔNG CHẮC về từ nguyên của một mục, để stem.form rỗng. Để rỗng thì tốt hơn là đoán sai.\n'
-    +'3. "diff" phải là thông tin có thể kiểm chứng ngoài đời. Cấm các câu kiểu "tập trung vào việc trao đổi ý tưởng" — nghe hợp lý mà không giúp chọn từ. Hãy nói AI tổ chức, QUY MÔ bao nhiêu người, TRANG TRỌNG tới đâu, hoặc dùng trong NGÀNH nào.\n'
-    +'4. Phần dùng chung chỉ nói MỘT lần trong "shared". Không nhắc lại trong "diff" hay "stem".\n'
-    +'5. "ex" đúng 2 ví dụ mỗi mục, kèm bản dịch. Chọn câu mà nếu thay bằng mục kia thì nghe sai hoặc đổi nghĩa.\n'
-    +'6. Mỗi mục người học gõ có đúng một phần tử trong "items", giữ nguyên thứ tự. Không dùng dấu sao, không markdown.\n'
-    +'\nVÍ DỤ MẪU cho đầu vào "conference, convention" — hãy đạt mức cụ thể NÀY:\n'
-    +'{"shared":{"kind":"prefix","form":"con-","gloss":"cùng nhau"},'
+    +'0. PHẦN DÙNG CHUNG PHẢI CÓ THẬT TRONG CHÍNH TẢ CỦA MỌI MỤC. Ví dụ SAI: với "contaminate, pollute" mà khai shared con- là sai vì "pollute" không bắt đầu bằng con-. Ca đó phải để kind="none".\n'
+    +'1. TỪ NGUYÊN LÀ TUỲ CHỌN, MẶC ĐỊNH BỎ QUA. Chỉ điền "etym" và đặt helps=true khi gốc Latinh/Hy Lạp THẬT SỰ giải thích được điểm khác giữa các mục. Nếu hai mục cùng nghĩa gần nhau mà gốc chẳng nói lên khác biệt nào (ví dụ contaminate với pollute), để helps=false và bỏ trống form. Người học cần biết dùng từ nào, không cần một bài từ nguyên.\n'
+    +'2. "key" là ô quan trọng nhất. Hai key phải ĐỐI LẬP nhau rõ ràng, đọc cạnh nhau là thấy khác ngay. Ví dụ tốt cho contaminate/pollute: "chất độc lẫn vào, mất an toàn" đối với "thải bẩn ra môi trường". Cấm key chung chung kiểu "làm ô nhiễm" cho cả hai.\n'
+    +'3. "diff" nói thứ kiểm chứng được ngoài đời. Cấm câu kiểu "tập trung vào việc làm bẩn" — nghe hợp lý mà không giúp chọn từ.\n'
+    +'4. "ex" đúng 2 ví dụ mỗi mục kèm bản dịch. Chọn câu mà thay bằng mục kia thì nghe sai hoặc đổi nghĩa.\n'
+    +'5. Mỗi mục người học gõ có đúng một phần tử trong "items", giữ nguyên thứ tự. Không dùng dấu sao, không markdown.\n'
+    +'\nVÍ DỤ MẪU cho "contaminate, pollute" — chú ý etym bị bỏ vì không giúp phân biệt:\n'
+    +'{"shared":{"kind":"none","form":"","gloss":""},'
     +'"items":[' 
-    +'{"word":"conference","stem":{"form":"ferre","gloss":"mang, đem tới"},'
-    +'"vi":"hội nghị, hội thảo chuyên môn",'
-    +'"diff":"Giới học thuật và doanh nghiệp tổ chức, vài trăm người, có diễn giả và báo cáo",'
-    +'"typical":"academic conference, press conference, conference call",'
-    +'"ex":[{"en":"She presented her paper at a medical conference.","vi":"Cô trình bày báo cáo tại một hội nghị y khoa."},'
-    +'{"en":"The CEO held a press conference this morning.","vi":"Giám đốc tổ chức họp báo sáng nay."}]},'
-    +'{"word":"convention","stem":{"form":"venire","gloss":"đến, tới"},'
-    +'"vi":"đại hội, kỳ họp lớn",'
-    +'"diff":"Đảng phái hoặc cả một ngành tổ chức, hàng nghìn người, thường để bầu chọn hoặc thống nhất",'
-    +'"typical":"national convention, party convention, comic convention",'
-    +'"ex":[{"en":"He was nominated at the party convention.","vi":"Ông được đề cử tại đại hội đảng."},'
-    +'{"en":"Thousands attended the annual comic convention.","vi":"Hàng nghìn người dự đại hội truyện tranh thường niên."}]}],'
-    +'"contrast":"Conference để báo cáo chuyên môn, convention để cả giới tụ họp và quyết định."}';
+    +'{"word":"contaminate","vi":"làm nhiễm bẩn, nhiễm độc",'
+    +'"key":"chất lạ lẫn vào, mất an toàn",'
+    +'"diff":"Dùng cho thứ con người tiếp xúc trực tiếp: thức ăn, nước uống, vết thương, mẫu xét nghiệm",'
+    +'"typical":"contaminated food, contaminated water, cross-contamination",'
+    +'"etym":{"form":"","gloss":"","helps":false},'
+    +'"ex":[{"en":"Do not let raw meat contaminate the salad.","vi":"Đừng để thịt sống làm nhiễm bẩn đĩa salad."},'
+    +'{"en":"The blood sample was contaminated.","vi":"Mẫu máu đã bị nhiễm bẩn."}]},'
+    +'{"word":"pollute","vi":"gây ô nhiễm môi trường",'
+    +'"key":"thải bẩn ra môi trường chung",'
+    +'"diff":"Dùng cho không khí, sông biển, đất đai ở quy mô cộng đồng",'
+    +'"typical":"air pollution, polluted river, polluting industries",'
+    +'"etym":{"form":"","gloss":"","helps":false},'
+    +'"ex":[{"en":"Factories pollute the river every day.","vi":"Các nhà máy gây ô nhiễm dòng sông mỗi ngày."},'
+    +'{"en":"Plastic waste pollutes the ocean.","vi":"Rác nhựa gây ô nhiễm đại dương."}]}],'
+    +'"contrast":"Contaminate là thứ ta chạm vào, pollute là môi trường quanh ta."}';
 
   const url='https://generativelanguage.googleapis.com/v1beta/models/'+getModel()
     +':generateContent?key='+encodeURIComponent(key);
@@ -635,15 +645,22 @@ function mdBold(s){
      · cấu tạo    → các chip nhỏ (com-) (parare), nhìn là thấy từ ghép lại
      · điểm khác  → dòng nổi bật nhất trong mỗi thẻ, có vạch cam bên trái
    Và một dải chốt ở cuối. Ba hình dạng khác nhau cho ba loại thông tin. */
+/* Giao diện cũ dàn trải: tên từ, nghĩa, gốc Latinh, điểm khác, collocation,
+   hai ví dụ — tất cả cùng cỡ chữ, cùng sức nặng, cộng thêm một dòng "Tra từ
+   này" thừa ở cuối. Người đọc không biết nhìn vào đâu.
+
+   Bản này có thứ bậc rõ: TÊN TỪ chính là link (bấm vào là sang trang từ,
+   không cần dòng riêng); ngay dưới là "key" in to — bản chất gói trong vài
+   chữ, thứ duy nhất cần nhớ; rồi mới tới chi tiết nhỏ dần. Từ nguyên chỉ
+   hiện khi nó thật sự giúp phân biệt. */
 function explainState(query, data, saved){
   const items=Array.isArray(data.items)?data.items:[];
   const safeQ=esc(query).replace(/'/g,"\\'");
   const sh=data.shared||{};
-  // bản ghi cũ (trước v74) dùng data.root + data.same_root
-  const legacyRoot=data.root||{};
+  const legacy=data.root||{};
   const kind = sh.kind || (data.same_root===true?'root':(data.same_root===false?'none':''));
-  const shForm = sh.form || (data.same_root?legacyRoot.form:'') || '';
-  const shGloss = sh.gloss || legacyRoot.gloss || '';
+  const shForm = sh.form || (data.same_root?legacy.form:'') || '';
+  const shGloss = sh.gloss || legacy.gloss || '';
 
   let h='<div class="wh-card">';
   h+='<div class="wh-top">';
@@ -652,19 +669,11 @@ function explainState(query, data, saved){
     +' aria-label="Save explanation">'+(saved?'★':'☆')+'</button>';
   h+='</div>';
 
-  /* Nhãn phải nói ĐÚNG mức chung. Gộp "chung tiền tố" thành "cùng gốc" là
-     chỗ bản trước nói sai sự thật về conference/convention. */
-  const KIND_LBL={root:'c\u00f9ng g\u1ed1c', prefix:'c\u00f9ng ti\u1ec1n t\u1ed1', none:'kh\u00f4ng chung g\u1ed1c'};
-  if(shForm && kind!=='none'){
-    h+='<div class="wh-root">'
-      +'<span class="wh-root-lbl">'+esc(KIND_LBL[kind]||'chung')+'</span>'
+  const KIND_LBL={root:'c\u00f9ng g\u1ed1c', prefix:'c\u00f9ng ti\u1ec1n t\u1ed1'};
+  if(shForm && kind && kind!=='none'){
+    h+='<div class="wh-root"><span class="wh-root-lbl">'+esc(KIND_LBL[kind]||'chung')+'</span>'
       +'<span class="wh-root-f">'+esc(shForm)+'</span>'
-      +(shGloss?'<span class="wh-root-g">'+esc(shGloss)+'</span>':'')
-      +'</div>';
-  }else if(kind==='none'){
-    h+='<div class="wh-root wh-root-no">'
-      +'<span class="wh-root-lbl">'+esc(KIND_LBL.none)+'</span>'
-      +'<span class="wh-root-g">m\u1ed7i m\u1ee5c c\u00f3 \u0111\u01b0\u1eddng ri\u00eang</span></div>';
+      +(shGloss?'<span class="wh-root-g">'+esc(shGloss)+'</span>':'')+'</div>';
   }
   if(data._sharedRejected){
     h+='<div class="wh-warn">Focci \u0111\u00e3 khai chung \u201c'+esc(data._sharedRejected)
@@ -672,39 +681,21 @@ function explainState(query, data, saved){
   }
 
   if(items.length){
-    h+='<div class="wh-items">';
-    items.forEach((it,i)=>{
+    h+='<div class="wh-items'+(items.length===2?' wh-pair':'')+'">';
+    items.forEach((it)=>{
+      const safeW=esc(it.word||'').replace(/'/g,"\\'");
       h+='<div class="wh-item">';
-      h+='<div class="wh-item-h"><span class="wh-n">'+(i+1)+'</span>'
-        +'<span class="wh-w">'+esc(it.word||'')+'</span>'
-        +(it.vi?'<span class="wh-vi">'+esc(it.vi)+'</span>':'')+'</div>';
 
-      // thân từ RIÊNG của mục này — cộng với phần chung ở dải trên
-      const st=it.stem||{};
-      const parts=Array.isArray(it.parts)?it.parts.slice(0,3):[];
-      if(st.form || parts.length){
-        h+='<div class="wh-parts">';
-        if(shForm && kind!=='none' && st.form){
-          h+='<span class="wh-chip wh-chip-mute"><b>'+esc(shForm)+'</b>'
-            +(shGloss?'<i>'+esc(shGloss)+'</i>':'')+'</span><span class="wh-plus">+</span>';
-        }
-        if(st.form){
-          h+='<span class="wh-chip"><b>'+esc(st.form)+'</b>'
-            +(st.gloss?'<i>'+esc(st.gloss)+'</i>':'')+'</span>';
-        }else{
-          parts.forEach((pt,k)=>{
-            if(k) h+='<span class="wh-plus">+</span>';
-            h+='<span class="wh-chip"><b>'+esc(pt.p||'')+'</b>'
-              +(pt.g?'<i>'+esc(pt.g)+'</i>':'')+'</span>';
-          });
-        }
-        h+='</div>';
-      }
+      /* Tên từ LÀ link. Dòng "Tra từ này" ở cuối bị bỏ hẳn. */
+      h+='<button class="wh-w" onclick="jump(\''+safeW+'\')">'+esc(it.word||'')
+        +'<span class="wh-w-arrow">\u2197</span></button>';
+      if(it.vi) h+='<div class="wh-vi">'+esc(it.vi)+'</div>';
 
-      if(it.diff) h+='<div class="wh-diff">'+esc(it.diff)+'</div>';
+      // thứ duy nhất cần nhớ — cỡ chữ lớn nhất trong thẻ
+      const key=it.key||it.diff||'';
+      if(key) h+='<div class="wh-key">'+esc(key)+'</div>';
+      if(it.key && it.diff) h+='<div class="wh-diff">'+esc(it.diff)+'</div>';
 
-      /* Collocation là cách phân biệt đáng tin nhất khi viết thật — thấy
-         "press conference" là biết ngay cụm nào đi với từ nào. */
       if(it.typical){
         h+='<div class="wh-typ">';
         String(it.typical).split(',').map(x=>x.trim()).filter(Boolean).slice(0,3)
@@ -715,15 +706,24 @@ function explainState(query, data, saved){
       const exs=Array.isArray(it.ex)?it.ex.slice(0,2):[];
       if(exs.length){
         h+='<div class="wh-ex">';
-        for(const e of exs){
-          if(!e || !e.en) continue;
-          h+='<div class="wh-ex-row"><span class="wh-ex-en">'+esc(e.en)+'</span>'
-            +(e.vi?'<span class="wh-ex-vi">'+esc(e.vi)+'</span>':'')+'</div>';
+        for(const ex of exs){
+          if(!ex || !ex.en) continue;
+          h+='<div class="wh-ex-row"><span class="wh-ex-en">'+esc(ex.en)+'</span>'
+            +(ex.vi?'<span class="wh-ex-vi">'+esc(ex.vi)+'</span>':'')+'</div>';
         }
         h+='</div>';
       }
-      h+='<button class="wh-go" onclick="jump(\''+esc(it.word||'').replace(/'/g,"\\'")+'\')">'
-        +'Tra t\u1eeb n\u00e0y</button>';
+
+      /* Từ nguyên xuống cuối và chỉ hiện khi có ích — trước đây nó chiếm
+         chỗ ngay dưới tên từ dù chẳng giúp phân biệt gì. */
+      const et=it.etym||{};
+      const legacyStem=it.stem||{};
+      const etForm = (et.helps && et.form) ? et.form : (et.helps===undefined ? legacyStem.form : '');
+      const etGloss = etForm ? (et.gloss||legacyStem.gloss||'') : '';
+      if(etForm){
+        h+='<div class="wh-etym"><span>g\u1ed1c</span><b>'+esc(etForm)+'</b>'
+          +(etGloss?'<i>'+esc(etGloss)+'</i>':'')+'</div>';
+      }
       h+='</div>';
     });
     h+='</div>';
@@ -850,6 +850,9 @@ function buildPhraseIndex(){
 }
 /* Thư viện đổi thì chỉ mục cũ không còn đúng. */
 function phraseIndexReset(){ _phraseIndex=null; }
+/* Có sẵn trong RAM chưa? Dùng để quyết định KHÔNG chờ khi đang gõ. */
+function phraseIndexReady(){ return Array.isArray(_phraseIndex); }
+window.phraseIndexReady=phraseIndexReady;
 window.phraseIndexReset=phraseIndexReset;
 window.buildPhraseIndex=buildPhraseIndex;
 
@@ -2326,13 +2329,26 @@ async function showRecentSuggest(){
 }
 async function showTypedSuggest(q){
   const results=await idbPrefix(q);
-  /* Ngoài từ bắt đầu bằng chuỗi đang gõ, còn gợi ý CỤM chứa chuỗi đó — gõ
-     "mileage out" là thấy "get mileage out of" ngay, không phải bấm enter
-     rồi mới biết trong máy có sẵn. */
-  let phrases=[];
-  try{ phrases=await phraseSuggest(q, 6); }catch(e){}
-  if(!results.length && !phrases.length){ hideSuggest(); return; }
-  renderSuggestList('In your library', results, false, phrases);
+  /* Lỗi v75: hàm này await phraseSuggest(), mà lần gọi đầu phải DỰNG chỉ
+     mục cụm bằng cursor qua 16.000 bản ghi. Mỗi ký tự gõ vào là một lần
+     chờ vài giây, nên danh sách gợi ý coi như biến mất.
+
+     Giờ vẽ từ đơn NGAY, không chờ gì cả. Cụm chỉ được thêm vào khi chỉ
+     mục đã sẵn trong bộ nhớ; chưa sẵn thì âm thầm dựng ở nền cho lần gõ
+     sau. Gợi ý từ đơn không bao giờ bị một tính năng phụ làm chậm. */
+  if(!results.length && !phraseIndexReady()){ hideSuggest(); return; }
+  renderSuggestList('In your library', results, false, null);
+
+  if(phraseIndexReady()){
+    try{
+      const phrases=await phraseSuggest(q, 6);
+      if(phrases.length && $('#q').value.trim().toLowerCase()===q)
+        renderSuggestList('In your library', results, false, phrases);
+      else if(!results.length && !phrases.length) hideSuggest();
+    }catch(e){}
+  }else{
+    buildPhraseIndex();            // dựng ngầm, không chặn lần gõ này
+  }
 }
 
 function renderSuggestList(label, recs, deletable, phrases){
@@ -2925,28 +2941,14 @@ async function renderSaved(){
         h+='<div class="wh-root wh-root-no"><span class="wh-root-g">'+mdBold(d.summary)+'</span></div>';
       }
       for(const it of items){
-        const st=it.stem||{};
-        const parts=Array.isArray(it.parts)?it.parts.slice(0,3):[];
+        const safeW=esc(it.word||'').replace(/'/g,"\\'");
         h+='<div class="wh-item">';
-        h+='<div class="wh-item-h"><span class="wh-w">'+esc(it.word||'')+'</span>'
-          +(it.vi?'<span class="wh-vi">'+esc(it.vi)+'</span>':'')+'</div>';
-        if(st.form){
-          h+='<div class="wh-parts">';
-          if(shForm && kind!=='none')
-            h+='<span class="wh-chip wh-chip-mute"><b>'+esc(shForm)+'</b></span><span class="wh-plus">+</span>';
-          h+='<span class="wh-chip"><b>'+esc(st.form)+'</b>'
-            +(st.gloss?'<i>'+esc(st.gloss)+'</i>':'')+'</span></div>';
-        }else if(parts.length){
-          h+='<div class="wh-parts">';
-          parts.forEach((pt,k)=>{
-            if(k) h+='<span class="wh-plus">+</span>';
-            h+='<span class="wh-chip"><b>'+esc(pt.p||'')+'</b>'
-              +(pt.g?'<i>'+esc(pt.g)+'</i>':'')+'</span>';
-          });
-          h+='</div>';
-        }
-        const diff=it.diff||it.why||'';
-        if(diff) h+='<div class="wh-diff">'+mdBold(diff)+'</div>';
+        h+='<button class="wh-w" onclick="event.stopPropagation();jump(\''+safeW+'\')">'
+          +esc(it.word||'')+'<span class="wh-w-arrow">\u2197</span></button>';
+        if(it.vi) h+='<div class="wh-vi">'+esc(it.vi)+'</div>';
+        const key=it.key||it.diff||it.why||'';
+        if(key) h+='<div class="wh-key">'+mdBold(key)+'</div>';
+        if(it.key && it.diff) h+='<div class="wh-diff">'+mdBold(it.diff)+'</div>';
         if(it.typical){
           h+='<div class="wh-typ">';
           String(it.typical).split(',').map(x=>x.trim()).filter(Boolean).slice(0,3)
@@ -2963,6 +2965,10 @@ async function renderSaved(){
           }
           h+='</div>';
         }
+        const et=it.etym||{}, ls=it.stem||{};
+        const ef=(et.helps&&et.form)?et.form:(et.helps===undefined?ls.form:'');
+        if(ef) h+='<div class="wh-etym"><span>g\u1ed1c</span><b>'+esc(ef)+'</b>'
+          +((et.gloss||ls.gloss)?'<i>'+esc(et.gloss||ls.gloss)+'</i>':'')+'</div>';
         h+='</div>';
       }
       const tail=d.contrast||d.hook||'';
@@ -4612,52 +4618,61 @@ function showView(v){
 function wireSwipeBack(){
   const view=$('#v-home'); if(!view || view._swipeBack) return;
   view._swipeBack=1;
-  let sx=0, sy=0, st=0, live=false, fired=false, locked=false;
+  let sx=0, sy=0, st=0, live=false, fired=false, locked=false, moves=0, lastT=0, lastX=0;
 
   const canBack=()=> !!(currentWord || $('#result').innerHTML.trim());
   const unlock=()=>{ if(locked){ document.body.style.overflow=''; locked=false; } };
+  const reset=()=>{ live=false; moves=0; unlock(); };
 
   view.addEventListener('touchstart',(e)=>{
-    live=false; fired=false; unlock();
+    fired=false; reset();
     if(e.touches.length!==1 || !canBack()) return;
     const t=e.touches[0];
     if(t.target.closest && t.target.closest('input,textarea,.suggest-drop,.chips,.yg-wrap,[data-noswipe]')) return;
-    sx=t.clientX; sy=t.clientY; st=Date.now(); live=true;
+    sx=lastX=t.clientX; sy=t.clientY; st=lastT=Date.now(); live=true; moves=0;
   },{passive:true});
 
-  /* Tay người luôn run, nên không thể đòi vuốt thẳng tuyệt đối. Cách làm
-     giờ theo hai giai đoạn:
-       · 14px đầu tiên chỉ dùng để ĐOÁN Ý ĐỊNH. Ngang trội hơn dọc thì
-         chốt là vuốt ngang và KHOÁ CUỘN TRANG lại, nên phần run về sau
-         không còn làm trang trượt dọc nữa.
-       · Đã khoá rồi thì chỉ còn nhìn dx, kệ dy — vì trang đã đứng yên.
-     Bản trước kiểm tỉ lệ dx/dy ở MỌI khung hình, nên một cú run giữa
-     chừng là huỷ cả cử chỉ; và nó cũng không khoá trang nên vuốt chéo
-     vừa cuộn vừa back. */
+  /* v75 bắn ở 48px — khoảng 5mm, tức chỉ cần tì ngón hơi trượt là quay về.
+     Giờ đòi BA điều kiện cùng lúc, vì một mình quãng đường không phân biệt
+     được "vuốt" với "tì tay":
+       · ít nhất 3 lần touchmove — chạm rồi giữ thì gần như không có
+       · quãng đường ngang ≥ 90px, HOẶC ≥ 64px nhưng phải đủ nhanh
+       · tốc độ tức thời > 0.25 px/ms ở đoạn cuối
+     Ngưỡng khoá trang cũng nâng 14 → 20px cho đỡ bắt nhầm. */
   view.addEventListener('touchmove',(e)=>{
     if(!live || fired) return;
     const t=e.touches[0];
+    const nowT=Date.now();
     const dx=t.clientX-sx, dy=t.clientY-sy;
+    const vx=(t.clientX-lastX)/Math.max(1, nowT-lastT);   // px/ms đoạn cuối
+    lastX=t.clientX; lastT=nowT; moves++;
+
     if(!locked){
-      if(Math.abs(dx)<14 && Math.abs(dy)<14) return;      // chưa đủ để đoán
-      if(Math.abs(dy)>Math.abs(dx)){ live=false; return; } // rõ ràng là cuộn dọc
-      document.body.style.overflow='hidden';               // khoá trang
+      if(Math.abs(dx)<20 && Math.abs(dy)<20) return;
+      if(Math.abs(dy)>Math.abs(dx)){ reset(); return; }
+      document.body.style.overflow='hidden';
       locked=true;
     }
-    if(dx>48 && Date.now()-st<1200){                       // ngưỡng thấp hơn, bắt nhanh hơn
-      fired=true; live=false; unlock();
+    if(dx<-30){ reset(); return; }                        // đổi ý, kéo ngược
+
+    const farEnough = dx>=90 || (dx>=64 && vx>0.25);
+    if(moves>=3 && farEnough && nowT-st<1200){
+      fired=true; reset();
       backToHome();
-    }else if(dx<-30){                                      // đổi ý, kéo ngược lại
-      live=false; unlock();
     }
   },{passive:true});
 
-  view.addEventListener('touchend',()=>{ live=false; unlock(); },{passive:true});
-  view.addEventListener('touchcancel',()=>{ live=false; unlock(); },{passive:true});
+  view.addEventListener('touchend',reset,{passive:true});
+  view.addEventListener('touchcancel',reset,{passive:true});
 }
 
 function wire(){
   wireSwipeBack();
+  /* Dựng chỉ mục cụm lúc máy rảnh, để lần gõ đầu tiên đã có sẵn thay vì
+     phải chờ. Nếu trình duyệt không có requestIdleCallback thì hoãn 4s. */
+  const warm=()=>{ try{ buildPhraseIndex(); }catch(e){} };
+  if(window.requestIdleCallback) requestIdleCallback(warm,{timeout:6000});
+  else setTimeout(warm,4000);
   const q=$('#q'), clearx=$('#clearx');
   q.addEventListener('input',()=>{
     clearx.style.display=q.value?'block':'none';
