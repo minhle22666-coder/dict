@@ -182,6 +182,11 @@
             + '. Thư viện hiện có ' + n.toLocaleString() + ' từ.', 'ok');
       if(typeof refreshStats === 'function') refreshStats();
       dsState();
+      // Xác nhận NGAY trên màn hình, không cần mở Settings ra mới biết —
+      // chỉ hiện khi thực sự có từ mới, để không làm phiền ở những lần mở
+      // app sau (lúc đó mọi shard đã áp dụng, totalAdded luôn là 0).
+      if(totalAdded > 0 && typeof toast === 'function')
+        toast('Focci loaded ' + totalAdded.toLocaleString() + ' words offline ✓');
     }finally{
       dsBusy = false;
       if(btn) btn.textContent = 'Đồng bộ từ repo';

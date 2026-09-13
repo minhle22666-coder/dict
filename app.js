@@ -992,13 +992,18 @@ async function translatePhrase(text){
     +'"alternatives":[{"text":"a real alternative a native speaker might use instead","register":"formal | casual | literal | idiomatic | regional","why":"one short Vietnamese clause on when to use this one instead"}],'
     +'"literal":"word-for-word rendering, ONLY when it differs usefully from primary; else empty string",'
     +'"gloss":[{"src":"a key word/chunk from the source","dst":"what it maps to in the translation"}],'
-    +'"note":"one short Vietnamese sentence on tone, formality or a grammar trap — empty string if nothing useful"'
+    +'"note":"one short Vietnamese sentence on tone, formality or a grammar trap — empty string if nothing useful",'
+    +'"input_check":{"natural":true or false,"issue":"one short Vietnamese clause on what reads as non-native — empty string if natural or if source_lang is vi","better":["2-3 phrasings a native English speaker would actually use for the SAME idea — empty array if natural or if source_lang is vi"]}'
     +'}\n\n'
-    +'RULES: 2 to 3 items in "alternatives" (never 0 unless the text is a fixed proper noun). '
-    +'"gloss" up to 6 pairs, covering the words a learner would want to isolate; empty array for very short input. '
-    +'Every "why" must be in Vietnamese and under 12 words.\n\n'
+    +'RULES:\n'
+    +'0. LANGUAGE OF EACH FIELD IS FIXED BY source_lang, NOT OPTIONAL. If source_lang is "vi", then primary.text and every alternatives[].text MUST be written in ENGLISH — never leave them in Vietnamese. If source_lang is "en", primary.text and every alternatives[].text MUST be written in VIETNAMESE. Getting this backwards makes the whole answer useless — check it before answering.\n'
+    +'1. 2 to 3 items in "alternatives" (never 0 unless the text is a fixed proper noun).\n'
+    +'2. "gloss" up to 6 pairs, covering the words a learner would want to isolate; empty array for very short input.\n'
+    +'3. Every "why"/"issue"/"note" must be in Vietnamese and under 12 words.\n'
+    +'4. "input_check" ONLY evaluates the ENGLISH side. If source_lang is "en", judge whether the ORIGINAL text itself reads as something a native speaker would actually say — set natural=false only for genuine non-native tells (word-for-word translation from Vietnamese, wrong preposition/collocation, unnatural word order), not for text that is merely short, casual or simple. If source_lang is "vi", always set natural=true with issue="" and better=[] (nothing to flag — the English side here is the translation Focci produced, not the user\u2019s own phrasing).\n\n'
     +'TEXT:\n'+text;
-  const body={ contents:[{parts:[{text:prompt}]}], generationConfig:{ temperature:0.2, responseMimeType:"application/json" } };
+  const body={ contents:[{parts:[{text:prompt}]}],
+    generationConfig:{ temperature:0.2, maxOutputTokens:1600, responseMimeType:"application/json" } };
   const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!res.ok){
     let m=res.status; try{const e=await res.json(); m=(e.error&&e.error.message)||m;}catch(_){}
@@ -1008,7 +1013,12 @@ async function translatePhrase(text){
   const data=await res.json();
   let raw=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
   raw=raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-  let obj; try{ obj=JSON.parse(raw); }catch(e){ throw new Error('PARSE'); }
+  // Bắt theo dấu ngoặc {…} đầu/cuối thay vì JSON.parse thẳng chuỗi đã strip —
+  // model đôi khi vẫn kèm vài chữ dẫn trước dấu { dù đã dặn "no commentary",
+  // strip fence không dọn được phần đó nên JSON.parse thẳng hay ăn PARSE oan.
+  const s=raw.indexOf('{'), e=raw.lastIndexOf('}');
+  if(s<0||e<0) throw new Error('PARSE');
+  let obj; try{ obj=JSON.parse(raw.slice(s,e+1)); }catch(err){ throw new Error('PARSE'); }
   return obj;
 }
 /* One boxed translation reads like a guess. Several labelled options, with the
@@ -1042,6 +1052,26 @@ function phraseResultState(original, result){
   let h='<div class="tr-card">';
   h+='<div class="tr-dir">'+esc(dirLbl)+'</div>';
   h+='<div class="tr-src">'+esc(original)+'</div>';
+
+  // Chỉ áp dụng khi INPUT là tiếng Anh của người dùng (không phải bản dịch
+  // Focci vừa tạo ra) — nên chỉ hiện khi source_lang === 'en'.
+  const ic=result.input_check;
+  if(result.source_lang==='en' && ic && ic.natural===false){
+    const better=(ic.better||[]).filter(Boolean).slice(0,3);
+    h+='<div class="tr-unnat">';
+    h+='<div class="tr-unnat-h">\u26a0 C\u00e1ch n\u00f3i n\u00e0y nghe kh\u00f4ng t\u1ef1 nhi\u00ean v\u1edbi ng\u01b0\u1eddi b\u1ea3n ng\u1eef</div>';
+    if(ic.issue) h+='<div class="tr-unnat-why">'+esc(ic.issue)+'</div>';
+    if(better.length){
+      h+='<div class="tr-unnat-list">';
+      for(const b of better){
+        const safeB=esc(b).replace(/'/g,"\\'");
+        h+='<button class="tr-unnat-opt" onclick="jump(\''+safeB+'\')">'+esc(b)+'</button>';
+      }
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+
   h+='<div class="tr-opts">'+optRow(primary,true)+alts.map(a=>optRow(a,false)).join('')+'</div>';
 
   if(result.literal && result.literal!==primary.text)
