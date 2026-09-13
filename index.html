@@ -211,6 +211,25 @@
     --grad-hero:linear-gradient(135deg,#F0704F,#F79A78); --grad-cool:linear-gradient(135deg,#1FA398,#2E8FBF);
     --shadow:0 12px 28px rgba(20,110,90,.12); --glow:0 0 22px rgba(240,112,79,.2);
   }
+  /* "Obsidian Ember" — gần đen tuyền pha xanh biển thẫm, đốm lửa cam bão
+     hoà cao làm điểm nhấn, xanh điện làm đối trọng mát. Đậm và tương phản
+     hơn hẳn theme mặc định (theme mặc định là cam nhạt kiểu "hoàng hôn",
+     bản này là than đen + lửa cháy — chọn có chủ đích, không phải random). */
+  :root[data-theme="obsidian-ember"]{
+    --bg:#05090F; --bg-2:#02050A;
+    --surface:#0D1720; --surface-2:#13212E; --surface-3:#1C3040;
+    --text:#F3F7FB; --muted:#7C93AD; --muted-2:#4A5C70; --line:#182634;
+    --primary:#FF5A1F; --primary-2:#FFA640; --primary-bg:rgba(255,90,31,.20);
+    --cyan:#00C2FF; --cyan-bg:rgba(0,194,255,.18);
+    --mint:#22E0A0; --mint-bg:rgba(34,224,160,.16);
+    --amber:#FFB020; --amber-bg:rgba(255,176,32,.18);
+    --coral:#FF4757; --coral-bg:rgba(255,71,87,.16);
+    --blue:#2F8FFF; --blue-bg:rgba(47,143,255,.16);
+    --pink:#FF4FA3; --pink-bg:rgba(255,79,163,.16);
+    --violet:#8B5FFF; --violet-bg:rgba(139,95,255,.16);
+    --grad-hero:linear-gradient(135deg,#FF5A1F,#FFA640); --grad-cool:linear-gradient(135deg,#00C2FF,#2F8FFF);
+    --shadow:0 14px 36px rgba(0,0,0,.62); --glow:0 0 30px rgba(255,90,31,.4);
+  }
   /* Bản tự host — chỉ có tác dụng nếu ./fonts/*.woff2 tồn tại trong repo.
      Thiếu file thì @font-face này im lặng thất bại và stack rơi xuống
      "Raleway" của Google Fonts, nên để sẵn đây không gây lỗi gì. */
@@ -238,13 +257,22 @@
       radial-gradient(1px 1px at 86% 58%, rgba(255,255,255,.26), transparent),
       radial-gradient(1px 1px at 22% 66%, rgba(255,255,255,.2), transparent),
       radial-gradient(1.4px 1.4px at 49% 80%, rgba(255,255,255,.24), transparent),
-      radial-gradient(900px 520px at 84% -10%, rgba(255,159,69,.16), transparent 70%),
-      radial-gradient(720px 440px at -12% 34%, rgba(61,217,214,.12), transparent 70%);
+      radial-gradient(900px 520px at 84% -10%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 70%),
+      radial-gradient(720px 440px at -12% 34%, color-mix(in srgb, var(--cyan) 12%, transparent), transparent 70%);
     background-attachment:fixed;
   }
-  :root[data-theme="light"] body{background-image:
-    radial-gradient(820px 470px at 84% -12%, rgba(232,128,42,.12), transparent 70%),
-    radial-gradient(660px 410px at -10% 30%, rgba(15,168,165,.09), transparent 70%);}
+  /* Nền sáng cần glow nhạt hơn hẳn để không bết màu trên nền trắng — nên
+     giữ riêng cặp opacity thấp này, nhưng vẫn bám var(--primary)/var(--cyan)
+     của CHÍNH theme sáng đang chọn (light hay bất kỳ theme nền sáng nào
+     khác — sakura, ocean, sunset, lavender, coral) thay vì khoá cứng cam. */
+  :root[data-theme="light"] body,
+  :root[data-theme="sakura-light"] body,
+  :root[data-theme="ocean-breeze"] body,
+  :root[data-theme="sunset-terracotta"] body,
+  :root[data-theme="lavender-fields"] body,
+  :root[data-theme="coral-reef"] body{background-image:
+    radial-gradient(820px 470px at 84% -12%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 70%),
+    radial-gradient(660px 410px at -10% 30%, color-mix(in srgb, var(--cyan) 9%, transparent), transparent 70%);}
   /* scrolling stays fully functional everywhere — this only hides the visible scrollbar track/thumb */
   *{scrollbar-width:none;-ms-overflow-style:none}
   *::-webkit-scrollbar{display:none;width:0;height:0}
@@ -285,14 +313,42 @@
   .tile.pink{background:var(--pink-bg);color:var(--pink)}
 
   /* ---- top bar ---- */
-  .topbar{position:sticky;top:0;z-index:40;background:rgba(14,27,42,.88);
+  .topbar{position:sticky;top:0;z-index:40;background:color-mix(in srgb, var(--bg) 88%, transparent);
     backdrop-filter:saturate(1.6) blur(18px);-webkit-backdrop-filter:saturate(1.6) blur(18px);
     padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 12px}
-  :root[data-theme="light"] .topbar{background:rgba(243,247,251,.9)}
   .brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   .brand img{width:32px;height:32px;border-radius:10px;box-shadow:var(--glow)}
   .brand h1{font-size:15.5px;line-height:1.15;font-weight:800;margin:0;letter-spacing:-.02em;
     background:var(--grad-hero);-webkit-background-clip:text;background-clip:text;color:transparent}
+  /* Icon đổi theme ngay trên header — trước đây chôn trong tận Settings
+     nên khó thấy. Luôn ánh màu --primary hiện tại (không cần JS đổi màu
+     icon, CSS var tự cập nhật khi data-theme đổi) để liếc là biết ngay
+     theme nào đang bật. */
+  .topbar-theme-btn{flex:none;width:32px;height:32px;border-radius:50%;margin-left:auto;
+    display:flex;align-items:center;justify-content:center;background:var(--primary-bg);
+    color:var(--primary);border:1px solid var(--primary);transition:transform .12s}
+  .topbar-theme-btn svg{width:16px;height:16px}
+  .topbar-theme-btn:active{transform:scale(.88)}
+  .theme-pop-backdrop{position:fixed;inset:0;z-index:44;background:rgba(0,0,0,.32);
+    opacity:0;pointer-events:none;transition:opacity .18s}
+  .theme-pop-backdrop.show{opacity:1;pointer-events:auto}
+  .theme-pop{position:fixed;z-index:45;top:calc(env(safe-area-inset-top,0px) + 54px);right:14px;left:14px;
+    max-width:400px;margin:0 auto;max-height:min(76vh,560px);overflow-y:auto;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--shadow);padding:16px;
+    opacity:0;transform:translateY(-10px) scale(.97);pointer-events:none;
+    transition:opacity .18s,transform .18s}
+  .theme-pop.show{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+  .theme-pop-hd{display:flex;align-items:center;justify-content:space-between;
+    font-size:14px;font-weight:800;margin-bottom:12px;color:var(--text)}
+  .theme-pop-x{flex:none;width:28px;height:28px;border-radius:50%;background:var(--surface-2);
+    color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px}
+  .theme-pop-x:active{transform:scale(.9)}
+  .theme-pop-open-btn{display:inline-flex;align-items:center;gap:9px;padding:9px 15px 9px 9px;
+    border-radius:99px;background:var(--surface-2);border:1px solid var(--line);
+    color:var(--text);font-size:13px;font-weight:700}
+  .theme-pop-open-btn:active{transform:scale(.97)}
+  .theme-pop-open-btn .pv{width:22px;height:22px;border-radius:50%;flex:none}
   .searchwrap{position:relative;display:flex;align-items:center;gap:8px}
   .searchbox{flex:1;min-width:0}
   .topbar-back{flex:none;width:38px;height:38px;border-radius:50%;background:var(--surface-2);
@@ -552,8 +608,8 @@
   .bar-n{font-size:10.5px;font-weight:800;color:var(--muted-2)}
   .bar-col.today .bar-n{color:var(--primary)}
   .bar-track{width:100%;flex:1;display:flex;align-items:flex-end}
-  .bar-fill{width:100%;background:var(--grad-hero);border-radius:7px 7px 4px 4px;min-height:5px;box-shadow:0 0 12px rgba(255,159,69,.35)}
-  .bar-col.today .bar-fill{box-shadow:0 0 16px rgba(255,159,69,.6)}
+  .bar-fill{width:100%;background:var(--grad-hero);border-radius:7px 7px 4px 4px;min-height:5px;box-shadow:0 0 12px color-mix(in srgb, var(--primary) 35%, transparent)}
+  .bar-col.today .bar-fill{box-shadow:0 0 16px color-mix(in srgb, var(--primary) 60%, transparent)}
   .bar-lbl{font-size:10px;color:var(--muted-2);font-weight:700}
   .bar-col.today .bar-lbl{color:var(--primary)}
 
@@ -858,7 +914,7 @@
 
   /* ---- buttons ---- */
   .btn{display:block;width:100%;background:var(--grad-hero);color:#3A1E00;font-weight:800;font-size:16px;
-    padding:16px;border-radius:99px;text-align:center;margin-top:12px;transition:transform .12s;box-shadow:0 6px 18px rgba(255,159,69,.25)}
+    padding:16px;border-radius:99px;text-align:center;margin-top:12px;transition:transform .12s;box-shadow:0 6px 18px color-mix(in srgb, var(--primary) 25%, transparent)}
   .btn:active{opacity:.92;transform:scale(.97)}
   .btn.ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--line);box-shadow:none}
   .btn.sm{padding:12px;font-size:14px}
@@ -870,7 +926,7 @@
     padding:20px 18px;margin-bottom:12px;background:linear-gradient(150deg,#2A4767,#16283C);
     border:1px solid var(--line);box-shadow:var(--shadow)}
   .prog-rays{position:absolute;top:50%;left:50%;width:640px;height:640px;margin:-320px 0 0 -320px;
-    background:repeating-conic-gradient(rgba(255,159,69,.10) 0deg 15deg, transparent 15deg 30deg);animation:rays-spin 20s linear infinite}
+    background:repeating-conic-gradient(color-mix(in srgb, var(--primary) 10%, transparent) 0deg 15deg, transparent 15deg 30deg);animation:rays-spin 20s linear infinite}
   @keyframes rays-spin{to{transform:rotate(360deg)}}
   .prog-char{position:relative;z-index:1;width:68px;flex:none;filter:drop-shadow(0 10px 14px rgba(0,0,0,.4));animation:strut 3s ease-in-out infinite}
   .prog-info{position:relative;z-index:1;flex:1;min-width:0}
@@ -1061,7 +1117,7 @@
 
   /* ---- the orchard: tap the tree, fruit falls ---- */
   .tree-widget{position:relative;height:262px;
-    background:radial-gradient(ellipse 260px 160px at 50% 100%, rgba(255,159,69,.14), transparent 70%),
+    background:radial-gradient(ellipse 260px 160px at 50% 100%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 70%),
       linear-gradient(180deg,var(--surface-2),var(--surface));
     border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer}
   .tree-hint{position:absolute;top:13px;left:13px;font-size:12.5px;font-weight:600;color:var(--text);
@@ -1174,7 +1230,7 @@
   .lesson-scroll{position:relative;max-width:380px;width:100%;max-height:82vh;
     overflow-y:auto;-webkit-overflow-scrolling:touch;padding:26px 20px 22px;
     border-radius:24px;
-    background:linear-gradient(158deg,rgba(255,255,255,.13),rgba(255,255,255,.045) 52%,rgba(255,159,69,.07));
+    background:linear-gradient(158deg,rgba(255,255,255,.13),rgba(255,255,255,.045) 52%,color-mix(in srgb, var(--primary) 7%, transparent));
     backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);
     border:1px solid rgba(255,255,255,.2);border-top-color:rgba(255,255,255,.38);
     box-shadow:0 26px 64px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.14);
@@ -1250,7 +1306,7 @@
   /* Kính mờ thay vì khối đặc: nền phía sau vẫn thấy lờ mờ nên thẻ trông
      nổi trên bản đồ chứ không phải một cục tối dán lên. */
   .info-card{position:relative;overflow:hidden;
-    background:linear-gradient(150deg,rgba(255,255,255,.13),rgba(255,255,255,.05) 46%,rgba(255,159,69,.07));
+    background:linear-gradient(150deg,rgba(255,255,255,.13),rgba(255,255,255,.05) 46%,color-mix(in srgb, var(--primary) 7%, transparent));
     backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);
     border:1px solid rgba(255,255,255,.22);border-top-color:rgba(255,255,255,.4);
     border-radius:26px;padding:26px 24px 20px;
@@ -1316,7 +1372,7 @@
     background:linear-gradient(150deg,var(--primary-bg),var(--surface) 65%)}
   .game-tab.on .gt-name{color:var(--primary)}
   .game-tab.on::after{content:'';position:absolute;right:-14px;top:-14px;width:52px;height:52px;
-    border-radius:50%;background:radial-gradient(circle,rgba(255,159,69,.35),transparent 70%)}
+    border-radius:50%;background:radial-gradient(circle,color-mix(in srgb, var(--primary) 35%, transparent),transparent 70%)}
 
   /* setup card — every choice visible and labelled, then one Start button */
   .setup-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
@@ -1374,7 +1430,7 @@
   .mask-hint{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin-top:18px}
   .mh-ch{font-size:21px;font-weight:800;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     line-height:1;color:var(--muted-2)}
-  .mh-ch.first{color:var(--primary);text-shadow:0 0 14px rgba(255,159,69,.5)}
+  .mh-ch.first{color:var(--primary);text-shadow:0 0 14px color-mix(in srgb, var(--primary) 50%, transparent)}
   .mh-ch.punct{color:var(--muted)}
   .mh-gap{width:14px}
   .mh-count{width:100%;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.07em;
@@ -1422,6 +1478,7 @@
   .hist-item:last-child{border-bottom:none}
   .hist-item:active{opacity:.6}
   .hist-ico{width:20px;height:20px;object-fit:contain;flex:none;opacity:.75}
+  .hist-ico-svg{opacity:1;color:var(--primary)}
   .hist-mid{flex:1;min-width:0;text-align:left}
   .hist-top{display:flex;align-items:baseline;gap:8px;text-align:left}
   .hist-top .w{font-weight:700;font-size:15px}
@@ -1629,13 +1686,13 @@
   .wtap{padding:3px 0;margin:-3px 0}
 
   /* vùng đang chọn: một dải liền mạch, bo hai đầu mút */
-  .wtap.wsel{background:rgba(255,159,69,.28);box-shadow:0 0 0 2px rgba(255,159,69,.28);
+  .wtap.wsel{background:color-mix(in srgb, var(--primary) 28%, transparent);box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
     color:var(--text)}
-  .wtap.wsel-a{border-radius:5px 0 0 5px;box-shadow:-3px 0 0 3px rgba(255,159,69,.28),
-    0 0 0 2px rgba(255,159,69,.28)}
-  .wtap.wsel-z{border-radius:0 5px 5px 0;box-shadow:3px 0 0 3px rgba(255,159,69,.28),
-    0 0 0 2px rgba(255,159,69,.28)}
-  .wtap.wsel-a.wsel-z{border-radius:5px;box-shadow:0 0 0 3px rgba(255,159,69,.28)}
+  .wtap.wsel-a{border-radius:5px 0 0 5px;box-shadow:-3px 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent)}
+  .wtap.wsel-z{border-radius:0 5px 5px 0;box-shadow:3px 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent)}
+  .wtap.wsel-a.wsel-z{border-radius:5px;box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent)}
   .story-page.paper-bg .wtap.wsel{background:rgba(200,120,20,.3);
     box-shadow:0 0 0 2px rgba(200,120,20,.3);color:#2a1d0c}
   .wtap:active{background:var(--primary-bg)}
@@ -1982,7 +2039,7 @@
     text-align:left;padding:16px 16px 16px 14px;margin-bottom:20px;
     border-radius:24px 24px 24px 8px;overflow:hidden;
     background:linear-gradient(112deg,var(--surface-2),var(--surface) 62%);
-    border:1px solid rgba(255,159,69,.28);box-shadow:0 6px 18px rgba(0,0,0,.14)}
+    border:1px solid color-mix(in srgb, var(--primary) 28%, transparent);box-shadow:0 6px 18px rgba(0,0,0,.14)}
   .jstory:active{transform:scale(.985)}
   .jstory::before{content:'';position:absolute;right:-40px;top:-52px;width:150px;height:150px;
     border-radius:50%;background:radial-gradient(circle,var(--primary-bg),transparent 70%);
@@ -2112,9 +2169,9 @@
      hoạt động vẫn là cam, chỉ nhạt và thấp — nhìn một lượt là ra hình dáng
      nỗ lực, thay vì hai cột nổi bật giữa một dải xám. */
   .pg-bar{flex:1;min-width:0;min-height:3px;border-radius:3px 3px 1px 1px}
-  .pg-bar.lv0{background:rgba(255,159,69,.2)}
-  .pg-bar.lv1{background:rgba(255,159,69,.42)}
-  .pg-bar.lv2{background:rgba(255,159,69,.68)}
+  .pg-bar.lv0{background:color-mix(in srgb, var(--primary) 20%, transparent)}
+  .pg-bar.lv1{background:color-mix(in srgb, var(--primary) 42%, transparent)}
+  .pg-bar.lv2{background:color-mix(in srgb, var(--primary) 68%, transparent)}
   .pg-bar.lv3{background:linear-gradient(180deg,#FFCB6B,var(--primary))}
   .pg-axis{display:flex;justify-content:space-between;margin-top:7px}
   .pg-axis span{font-size:10px;color:var(--muted-2);font-weight:600}
@@ -2190,7 +2247,7 @@
   .gm-zone-chip{flex:none;font-size:10.5px;font-weight:700;color:var(--muted-2);
     padding:3px 9px;border-radius:99px;background:var(--surface-2);border:1px solid var(--line);
     transition:color .2s,border-color .2s,background .2s}
-  .gm-zone-chip.on{color:var(--primary);border-color:rgba(255,159,69,.34);
+  .gm-zone-chip.on{color:var(--primary);border-color:color-mix(in srgb, var(--primary) 34%, transparent);
     background:var(--primary-bg)}
 
   /* Panel lõm — ĐÂY là thứ tách vùng, không phải chữ. */
@@ -2220,7 +2277,7 @@
   .mp-ov.show{opacity:1;pointer-events:auto}
   .mp-card{position:relative;overflow:hidden;width:100%;max-width:340px;max-height:74vh;
     display:flex;flex-direction:column;border-radius:24px;padding:17px 15px 13px;
-    background:linear-gradient(152deg,rgba(255,255,255,.14),rgba(255,255,255,.05) 48%,rgba(255,159,69,.08));
+    background:linear-gradient(152deg,rgba(255,255,255,.14),rgba(255,255,255,.05) 48%,color-mix(in srgb, var(--primary) 8%, transparent));
     backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);
     border:1px solid rgba(255,255,255,.22);border-top-color:rgba(255,255,255,.4);
     box-shadow:0 22px 54px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.14);
@@ -2329,7 +2386,7 @@
 
   .sv-hero{display:flex;align-items:center;gap:13px;padding:14px 15px;margin-bottom:18px;
     border-radius:18px;background:linear-gradient(150deg,var(--primary-bg),var(--surface) 72%);
-    border:1px solid rgba(255,159,69,.3)}
+    border:1px solid color-mix(in srgb, var(--primary) 30%, transparent)}
   .sv-hero.calm{background:var(--surface);border-color:var(--line)}
   .sv-hero-n{flex:none;min-width:46px;height:46px;border-radius:14px;display:flex;
     align-items:center;justify-content:center;font-size:20px;font-weight:800;
@@ -2384,7 +2441,7 @@
   .wf-item span{display:block;margin-top:4px;font-size:12px;color:var(--muted-2);line-height:1.55}
   .wf-hook{margin-top:11px;padding:10px 12px;border-radius:11px;font-size:12px;
     line-height:1.5;color:var(--text);background:var(--primary-bg);
-    border:1px solid rgba(255,159,69,.24)}
+    border:1px solid color-mix(in srgb, var(--primary) 24%, transparent)}
   .wf-acts{display:flex;gap:8px;margin-top:12px}
   .wf-acts button{flex:1;padding:10px;border-radius:11px;font-size:11.5px;font-weight:800;
     color:var(--muted);background:var(--surface-2);border:1px solid var(--line)}
@@ -2410,8 +2467,8 @@
 
   .wh-root{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
     padding:13px 15px;margin-bottom:14px;border-radius:16px;
-    background:linear-gradient(150deg,rgba(255,159,69,.14),var(--surface-2) 70%);
-    border:1px solid rgba(255,159,69,.26)}
+    background:linear-gradient(150deg,color-mix(in srgb, var(--primary) 14%, transparent),var(--surface-2) 70%);
+    border:1px solid color-mix(in srgb, var(--primary) 26%, transparent)}
   .wh-root-lbl{flex:none;font-size:9.5px;font-weight:800;letter-spacing:.09em;
     text-transform:uppercase;color:var(--primary)}
   .wh-root-f{font-family:ui-serif,Georgia,"Times New Roman",serif;
@@ -2469,7 +2526,7 @@
   .wh-hook{display:flex;flex-direction:column;gap:5px;margin-top:14px;
     padding:13px 15px;border-radius:16px;font-size:13.5px;font-weight:600;
     line-height:1.5;color:var(--text);background:var(--primary-bg);
-    border:1px solid rgba(255,159,69,.28)}
+    border:1px solid color-mix(in srgb, var(--primary) 28%, transparent)}
   .wh-hook span{font-size:9.5px;font-weight:800;letter-spacing:.09em;
     text-transform:uppercase;color:var(--primary)}
 
@@ -2497,6 +2554,13 @@
   <div class="brand" onclick="backToHome()" title="Back to home">
     <img src="./icon-192.png" alt="" />
     <h1>Focci&rsquo;s Little Tales</h1>
+    <button class="topbar-theme-btn" id="theme-btn" aria-label="Change theme" title="Đổi giao diện / theme" onclick="event.stopPropagation();toggleThemePop()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="13.5" cy="6.5" r=".6" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r=".6" fill="currentColor" stroke="none"/>
+        <circle cx="8.5" cy="7.5" r=".6" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12.5" r=".6" fill="currentColor" stroke="none"/>
+        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+      </svg>
+    </button>
   </div>
   <div class="searchwrap">
     <button class="topbar-back" id="topbar-back" onclick="backToHome()" style="display:none" aria-label="Back">‹</button>
@@ -2507,6 +2571,31 @@
       <button class="clearx" id="clearx" aria-label="Clear">✕</button>
     </div>
     <div class="suggest-drop" id="suggest"></div>
+  </div>
+</div>
+
+<!-- Bảng chọn theme dời từ Settings ra đây — bấm icon cọ màu trên header
+     là thấy ngay, không phải chui vào Settings mới tìm ra. Giữ nguyên id
+     "theme-seg" nên toàn bộ JS wiring cũ (applyTheme, click listener) không
+     phải đổi gì. -->
+<div class="theme-pop-backdrop" id="theme-pop-backdrop" onclick="closeThemePop()"></div>
+<div class="theme-pop" id="theme-pop">
+  <div class="theme-pop-hd">Theme<button class="theme-pop-x" onclick="closeThemePop()" aria-label="Close">✕</button></div>
+  <div class="palette-grid" id="theme-seg">
+    <button data-theme="auto" class="palette-sw active"><span class="pv" style="background:linear-gradient(135deg,#0E1B2A 50%,#F3F7FB 50%)"></span><i>Auto</i></button>
+    <button data-theme="light" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F3F7FB 55%,#E8802A 55%)"></span><i>Light</i></button>
+    <button data-theme="dark" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#0E1B2A 55%,#FF9F45 55%)"></span><i>Dark</i></button>
+    <button data-theme="obsidian-ember" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#05090F 55%,#FF5A1F 55%)"></span><i>Obsidian Ember</i></button>
+    <button data-theme="midnight-indigo" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#12102A 55%,#8B5CF6 55%)"></span><i>Midnight Indigo</i></button>
+    <button data-theme="forest-dusk" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#0E1A14 55%,#4ADE80 55%)"></span><i>Forest Dusk</i></button>
+    <button data-theme="espresso-mocha" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#1D1410 55%,#E08A3C 55%)"></span><i>Espresso Mocha</i></button>
+    <button data-theme="neon-cyberpunk" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#0A0A12 55%,#FF2ED1 55%)"></span><i>Neon Cyberpunk</i></button>
+    <button data-theme="slate-mono" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#15181D 55%,#6C8CFF 55%)"></span><i>Slate Mono</i></button>
+    <button data-theme="sakura-light" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#FDF3F6 55%,#E8598A 55%)"></span><i>Sakura Light</i></button>
+    <button data-theme="ocean-breeze" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F1F8FB 55%,#0EA5C4 55%)"></span><i>Ocean Breeze</i></button>
+    <button data-theme="sunset-terracotta" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#FBF3EA 55%,#D9622B 55%)"></span><i>Sunset Terracotta</i></button>
+    <button data-theme="lavender-fields" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F5F2FC 55%,#7C5CD9 55%)"></span><i>Lavender Fields</i></button>
+    <button data-theme="coral-reef" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F0FAF8 55%,#F0704F 55%)"></span><i>Coral Reef</i></button>
   </div>
 </div>
 
@@ -2701,21 +2790,10 @@
       <div class="sx-field">
         <label>Theme</label>
         <p class="sx-hint" style="margin-bottom:10px">Pick a look — applies across the whole app.</p>
-        <div class="palette-grid" id="theme-seg">
-          <button data-theme="auto" class="palette-sw active"><span class="pv" style="background:linear-gradient(135deg,#0E1B2A 50%,#F3F7FB 50%)"></span><i>Auto</i></button>
-          <button data-theme="light" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F3F7FB 55%,#E8802A 55%)"></span><i>Light</i></button>
-          <button data-theme="dark" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#0E1B2A 55%,#FF9F45 55%)"></span><i>Dark</i></button>
-          <button data-theme="midnight-indigo" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#12102A 55%,#8B5CF6 55%)"></span><i>Midnight Indigo</i></button>
-          <button data-theme="forest-dusk" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#0E1A14 55%,#4ADE80 55%)"></span><i>Forest Dusk</i></button>
-          <button data-theme="espresso-mocha" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#1D1410 55%,#E08A3C 55%)"></span><i>Espresso Mocha</i></button>
-          <button data-theme="neon-cyberpunk" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#0A0A12 55%,#FF2ED1 55%)"></span><i>Neon Cyberpunk</i></button>
-          <button data-theme="slate-mono" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#15181D 55%,#6C8CFF 55%)"></span><i>Slate Mono</i></button>
-          <button data-theme="sakura-light" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#FDF3F6 55%,#E8598A 55%)"></span><i>Sakura Light</i></button>
-          <button data-theme="ocean-breeze" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F1F8FB 55%,#0EA5C4 55%)"></span><i>Ocean Breeze</i></button>
-          <button data-theme="sunset-terracotta" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#FBF3EA 55%,#D9622B 55%)"></span><i>Sunset Terracotta</i></button>
-          <button data-theme="lavender-fields" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F5F2FC 55%,#7C5CD9 55%)"></span><i>Lavender Fields</i></button>
-          <button data-theme="coral-reef" class="palette-sw"><span class="pv" style="background:linear-gradient(135deg,#F0FAF8 55%,#F0704F 55%)"></span><i>Coral Reef</i></button>
-        </div>
+        <button class="theme-pop-open-btn" onclick="openThemePop()">
+          <span class="pv" id="theme-open-sw" style="background:var(--grad-hero)"></span>
+          Open theme picker
+        </button>
       </div>
       <div class="sx-sep"></div>
       <div class="sx-field">

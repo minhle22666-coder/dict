@@ -674,8 +674,9 @@ function mdBold(s){
    không cần dòng riêng); ngay dưới là "key" in to — bản chất gói trong vài
    chữ, thứ duy nhất cần nhớ; rồi mới tới chi tiết nhỏ dần. Từ nguyên chỉ
    hiện khi nó thật sự giúp phân biệt. */
-function explainState(query, data, saved){
+function explainState(query, data, saved, posMap){
   const items=Array.isArray(data.items)?data.items:[];
+  posMap=posMap||{};
   const safeQ=esc(query).replace(/'/g,"\\'");
   const sh=data.shared||{};
   const legacy=data.root||{};
@@ -709,7 +710,8 @@ function explainState(query, data, saved){
 
       /* Tên từ LÀ link. Dòng "Tra từ này" ở cuối bị bỏ hẳn. */
       h+='<button class="wh-w" onclick="jump(\''+safeW+'\')">'+esc(it.word||'')
-        +'<span class="wh-w-arrow">\u2197</span></button>';
+        +'<span class="wh-w-arrow">\u2197</span></button>'
+        +(posMap[it.word]||'');
       if(it.vi) h+='<div class="wh-vi">'+esc(it.vi)+'</div>';
 
       // thứ duy nhất cần nhớ — cỡ chữ lớn nhất trong thẻ
@@ -782,7 +784,8 @@ async function runExplain(query){
   const cached=await idbGet(key);
   if(cached && cached.data && cached.data.explain){
     currentWord=null;
-    box.innerHTML=explainState(words.join(', '), cached.data, !!cached.saved);
+    const posMap0=await posTagMapFor((cached.data.items||[]).map(it=>it.word));
+    box.innerHTML=explainState(words.join(', '), cached.data, !!cached.saved, posMap0);
     logEvent('search', key);
     return;
   }
@@ -803,7 +806,8 @@ async function runExplain(query){
     await idbPut({ word:key, data, source:'explain',
                    firstSeen:now(), saved:0, savedAt:0 });
     currentWord=null;
-    box.innerHTML=explainState(words.join(', '), data, false);
+    const posMap=await posTagMapFor((data.items||[]).map(it=>it.word));
+    box.innerHTML=explainState(words.join(', '), data, false, posMap);
     logEvent('search', key);
     addXP(2);
   }catch(err){
@@ -1871,6 +1875,35 @@ function isJustInflection(root,form){
   if(form.endsWith('ied') && root===form.slice(0,-3)+'y') return true;                                // tried -> try
   return false;
 }
+/* Chỉ khớp tiền tố (longer.startsWith(shorter)) là chưa đủ — "enter" và
+   "entertain"/"enterprise" cũng khớp tiền tố dù trong tiếng Anh hiện đại
+   chúng KHÔNG cùng gốc gì cả. Một từ cùng "gia đình" thật sự phải là gốc
+   + một HẬU TỐ CẤU TỪ có thật (govern+ment, act+ive, help+ful…), nên phần
+   dư sau tiền tố chung phải khớp với danh sách hậu tố dưới đây, chứ không
+   phải bất kỳ phần dư nào cũng được chấp nhận như trước. */
+const _DERIV_SUFFIXES=new Set([
+  'ion','ions','tion','tions','ation','ations','ition','itions','ution','utions',
+  'sion','sions','ssion','ssions','ization','izations','isation','isations',
+  'ment','ments','ness','nesses',
+  'ity','ities','ty','ties','ability','abilities','ibility','ibilities',
+  'ivity','ivities','ality','alities','icity',
+  'ism','isms','ist','ists',
+  'ive','ives','ative','atives','itive','itives','utive','utives',
+  'able','ables','ible','ibles',
+  'al','als','ial','ials','ical','icals','ically','ic','ics',
+  'ous','ious','eous','uous',
+  'ful','fully','less','lessly',
+  'ize','izes','izing','ized','ise','ises','ising','ised',
+  'ify','ifies','ifying','ified',
+  'ly',
+  'er','ers','or','ors','ant','ants','ent','ents','ance','ances','ence','ences',
+  'age','ages','hood','hoods','ship','ships','dom','doms',
+  'cy','cies','ery','eries','ry','ries',
+  'ward','wards','like','proof','worthy'
+]);
+function isDerivational(root, form){
+  return _DERIV_SUFFIXES.has(form.slice(root.length));
+}
 async function familyOf(word, maxN){
   const idx = await buildWordIndex();
   const w=(word||'').trim().toLowerCase();
@@ -1882,6 +1915,7 @@ async function familyOf(word, maxN){
     const longer  = e.w.length<w.length ? w : e.w;
     if(shorter.length<4 || !longer.startsWith(shorter)) continue;
     if(isJustInflection(shorter, longer)) continue;
+    if(!isDerivational(shorter, longer)) continue;
     out.push(e);
     if(out.length>=maxN) break;
   }
@@ -2471,6 +2505,22 @@ function suggestPosTags(r){
   return '<span class="suggest-pos">'+keys.map(k=>
     '<span class="sg-pos-tag pos-'+POS_COLOR[k]+'">'+esc(POS_SHORT[k]||'')+'</span>').join('')+'</span>';
 }
+/* Cùng bộ chip POS như trên (noun/verb/…), nhưng tra thẳng từ THƯ VIỆN
+   OFFLINE đã có trên máy — không hỏi AI — dùng cho Focci Explains (kể cả
+   khi gõ 1 từ qua dấu phẩy), vì hiện tại thẻ "why" không hiện luôn từ đó
+   là danh từ hay động từ hay cả hai. */
+async function posTagsFor(word){
+  try{
+    const rec=await idbGet(norm(word));
+    if(!rec) return '';
+    return suggestPosTags(rec);
+  }catch(e){ return ''; }
+}
+async function posTagMapFor(words){
+  const map={};
+  await Promise.all((words||[]).map(async w=>{ map[w]=await posTagsFor(w); }));
+  return map;
+}
 function renderSuggestList(label, recs, deletable, phrases){
   const el=$('#suggest');
   let h='<div class="suggest-lbl">'+label
@@ -2585,9 +2635,19 @@ async function renderHistory(){
     const safeW=w.replace(/'/g,"\\'");
     const isWhy = !!(d && d.explain);
     const isPhrase = !isWhy && (d.phrase || /\s/.test(r.word));
+    /* "why" (Focci Explains) từng dùng decor-book.webp — không tồn tại
+       trong repo nên vỡ ảnh. Đổi sang chính icon sparkle vẽ bằng SVG mà
+       nút "Why this word" trên trang từ đang dùng: không bao giờ vỡ ảnh
+       (không phụ thuộc file ngoài), và người dùng đã quen mặt icon này
+       gắn với tính năng "vì sao" nên phân biệt được ngay với từ/cụm thường. */
+    const icoHtml = isWhy
+      ? '<svg class="hist-ico hist-ico-svg" viewBox="0 0 24 24" fill="currentColor">'
+        +'<path d="M12 2c.45 3.68 1.05 6.28 2.34 7.66C15.72 11 18.32 11.55 22 12c-3.68.45-6.28 1.05-7.66 2.34'
+        +'C13 15.72 12.45 18.32 12 22c-.45-3.68-1.05-6.28-2.34-7.66C8.28 13 5.68 12.45 2 12c3.68-.45 6.28-1.05 7.66-2.34'
+        +'C11 5.68 11.55 3.05 12 2Z"/></svg>'
+      : '<img class="hist-ico" src="./'+(isPhrase?'decor-note-and-pen':'decor-magnifying-glass')+'.webp" alt=""/>';
     h+='<div class="hist-item'+(isPhrase?' is-phrase':'')+(isWhy?' is-why':'')+'" onclick="jump(\''+safeW+'\')">'
-      +'<img class="hist-ico" src="./'
-      +(isWhy?'decor-book':(isPhrase?'decor-note-and-pen':'decor-magnifying-glass'))+'.webp" alt=""/>'
+      +icoHtml
       +'<div class="hist-mid"><div class="hist-top"><span class="w">'+w+'</span>'
       +(d.phonetic?'<span class="phon">'+esc(d.phonetic)+'</span>':'')+'</div>'
       +(d.vi_equivalent?'<div class="e">'+esc(d.vi_equivalent)+'</div>':'')+'</div>'
@@ -4182,7 +4242,28 @@ function applyTheme(theme){
   if(theme==='auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', theme);
   document.querySelectorAll('#theme-seg button').forEach(b=>b.classList.toggle('active', b.dataset.theme===theme));
+  /* Thanh trạng thái iOS (ngoài app, trên cùng màn hình) cũng nên đổi
+     theo theme luôn, chứ không chỉ riêng header trong app — đọc lại
+     --bg vừa áp dụng rồi ghi vào <meta name="theme-color">. */
+  try{
+    const bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    if(bg){ const m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', bg); }
+  }catch(e){}
 }
+function openThemePop(){
+  $('#theme-pop').classList.add('show');
+  $('#theme-pop-backdrop').classList.add('show');
+}
+function closeThemePop(){
+  $('#theme-pop').classList.remove('show');
+  $('#theme-pop-backdrop').classList.remove('show');
+}
+function toggleThemePop(){
+  $('#theme-pop').classList.contains('show') ? closeThemePop() : openThemePop();
+}
+window.openThemePop=openThemePop;
+window.closeThemePop=closeThemePop;
+window.toggleThemePop=toggleThemePop;
 
 
 /* ============================================================
@@ -4820,6 +4901,7 @@ function wire(){
   });
   document.querySelectorAll('#theme-seg button').forEach(b=>b.addEventListener('click',()=>{
     localStorage.setItem(THEME_LS, b.dataset.theme); applyTheme(b.dataset.theme);
+    closeThemePop();
   }));
   wireJar();
 
