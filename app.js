@@ -373,7 +373,7 @@ return `You are a bilingual English→Vietnamese lexicographer building a rich, 
 }
 
 ${exact ? `THE INPUT IS EXACT. The user tapped or typed "${word}" deliberately and it is spelled the way they want it. Analyse THAT word or phrase and nothing else. NEVER substitute a similar-looking word ("shone" is NOT "phone", "flour" is NOT "floor"). Echo the input into "word". If — and only if — it is genuinely not a real English word, expression or name, set "not_found": true and put your best guess of the intended word in "suggestion"; the app will offer it as a suggestion the user can decline. Leave "query_note" empty.`
-: `INPUT MAY BE MESSY: a typo, a partial/incomplete idiom (e.g. "rain dogs" → "it's raining cats and dogs"), or casual slang spelling. Silently resolve it to the real, common English word/idiom/slang term and put THAT corrected form in "word". Fill "query_note" only when you actually corrected something.`}
+: `INPUT MAY BE MESSY: a typo, a partial/incomplete idiom (e.g. "rain dogs" → "it's raining cats and dogs"), casual slang spelling, or two real words mashed together with NO SPACE because the user typed too fast (e.g. "malegaze" → "male gaze", "confirmationbias" → "confirmation bias"). For this last case specifically: if the input as one solid word is not itself a real word, but splitting it into two or more real English words produces a real, common term, ALWAYS prefer that split — put the correctly-spaced form in "word". Silently resolve any of these and put THAT corrected form in "word". Fill "query_note" only when you actually corrected something.`}
 
 GOAL: extract AS MUCH genuinely common, real-world usage as you know for this word — a learner should almost never need to look elsewhere. Prioritize BREADTH across every category below over padding just one of them:
 - senses: up to 8. For an idiom/slang entry, pos can be "idiom" or "slang". Four HARD rules:
@@ -382,6 +382,7 @@ GOAL: extract AS MUCH genuinely common, real-world usage as you know for this wo
   (3) Include informal, figurative and slang senses a learner actually meets online, even if a formal dictionary ranks them low.
   (4) SẮC THÁI của từng "vi" quan trọng hơn độ ngắn gọn. Trước khi chốt mỗi "vi", tự hỏi: từ tiếng Việt này khen hay chê? Từ tiếng Anh gốc khen hay chê? Lệch nhau là SAI, phải đổi. Thà viết "vui tươi, giàu tưởng tượng theo kiểu ngộ nghĩnh" (dài mà đúng) còn hơn "kỳ quặc" (ngắn mà sai sắc thái).
   (5) rank = how often you meet this sense in real life (5 = very common … 1 = rare), exactly as before. Order the array by rank, highest first, so the everyday meaning stays at the top and a rare-but-real meaning like "fly = the zip on trousers" simply sits at the bottom of the list. Rule (2) is about the sense EXISTING at all — it never promotes a rare sense above a common one.
+  (6) EVERY sense must be a grammatical use of THIS EXACT WORDFORM — "${word}", spelled exactly like that, not a different inflected/derived word that merely shares the root. This is the single most common mistake to avoid: a verb like "promise" tempts you into adding an "adjective" sense that is actually describing "promising" ("a promising start"); "excite"/"interest" tempt you into an adjective sense that is actually "exciting"/"excited" or "interesting"/"interested". Before you add ANY sense, check that "${word}" itself — unchanged — can grammatically fill that role in a sentence. If a part of speech only becomes valid after adding "-ing", "-ed", "-s" or any other suffix, that sense belongs to THAT other word, not this one — leave it out entirely, even if it means this word ends up with only one or two senses. Every "example" you write must contain the exact string "${word}", never a conjugated/inflected form of it.
 - collocations: the natural word-partnerships a native speaker reaches for — verb+noun, adjective+noun, adverb+adjective, noun+noun, fixed comparisons, whatever fits this word's part of speech. This is usually the BIGGEST category — up to 10, ranked. Dig for real ones, don't stop at 1–2.
 - phrasal_verbs: ONLY if this word is a verb that genuinely forms phrasal verbs. Up to 6, ranked. Leave the array empty if none exist — never invent one.
 - idioms: genuine fixed idioms/proverbs containing this word. Up to 6, ranked. Leave empty if none exist.
@@ -530,6 +531,35 @@ async function forceViTranslate(word){
    văn dài, vì đoạn dài thì không ai đọc lại lần hai.
    ============================================================ */
 const EXPLAIN_KEY_PREFIX='why:';
+
+/* Nhiều từ có dấu cách KHÔNG có nghĩa nó là một CÂU cần dịch — "male gaze",
+   "confirmation bias", "growth mindset" là THUẬT NGỮ/cụm danh từ, cần một
+   trang từ điển đầy đủ (có Youglish, có POS, có ví dụ) y như một từ đơn,
+   chứ không phải nhét vào khung dịch cụm (vốn dành cho câu/phát ngôn kiểu
+   "I suppose so"). Trước đây MỌI input có khoảng trắng đều bị coi là "câu
+   cần dịch" nên tra "male gaze" không ra được trang từ điển của nó.
+   Heuristic: có đại từ nhân xưng/trợ động từ/phủ định hoặc dài từ 5 từ trở
+   lên → gần như chắc chắn là một câu, cần dịch. Ngắn hơn, không có mấy dấu
+   hiệu đó → coi là thuật ngữ/cụm, tra như một headword. */
+const _SENTENCE_SIGNAL_WORDS=new Set([
+  'i',"i'm","im","i'll","ill","i've","ive","i'd","id",
+  'you',"you're","youre","you'll","youll","you've","youve","you'd","youd",
+  'he',"he's",'she',"she's",'we',"we're","were","we'll","well","we've","weve",
+  'they',"they're","theyre","they'll","theyll","they've","theyve",
+  'my','your','his','our','their','me','him','them','us','it',"it's",'its','her',
+  'am','is','are','was','was','do','does','did',
+  "don't",'dont',"doesn't",'doesnt',"didn't",'didnt',
+  'can',"can't",'cant','could',"couldn't",'couldnt',
+  'will',"won't",'wont','would',"wouldn't",'wouldnt',
+  'should',"shouldn't",'shouldnt','must',"mustn't",'mustnt',
+  "let's",'lets','please','yes','no','not','so','if','when','because',
+  'what',"what's",'whats','why','how','who','thanks','thank'
+]);
+function looksLikeSentence(text){
+  const words=String(text||'').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if(words.length>=5) return true;
+  return words.some(w=>_SENTENCE_SIGNAL_WORDS.has(w.replace(/[^a-z']/g,'')));
+}
 
 function isExplainQuery(s){
   const str=String(s||'');
@@ -837,7 +867,7 @@ async function toggleExplainSave(query){
   const rec=await idbGet(key); if(!rec) return;
   rec.saved=rec.saved?0:1; rec.savedAt=rec.saved?now():0;
   await idbPut(rec);
-  toast(rec.saved?'Saved to Why Files':'Removed');
+  toast(rec.saved?'Starred in The Casebook':'Unstarred');
   const btn=document.querySelector('.wh-star');
   if(btn){ btn.textContent=rec.saved?'★':'☆'; btn.classList.toggle('on',!!rec.saved); }
   if(rec.saved) addXP(1);
@@ -1429,7 +1459,7 @@ async function search(rawWord, forceAI){
   /* Dấu phẩy = "giải thích giúp tôi", không phải "tra nghĩa". */
   if(isExplainQuery(word)){ await runExplain(word); return; }
 
-  if(hasSpace){
+  if(hasSpace && looksLikeSentence(word)){
     box.innerHTML=questScene(word);
     const questStart=now();
     try{
@@ -1450,6 +1480,10 @@ async function search(rawWord, forceAI){
     return;
   }
 
+  /* Còn lại — một từ đơn, HOẶC một cụm/thuật ngữ không giống câu (male
+     gaze, confirmation bias…) — đều tra như một headword thật sự.
+     buildPrompt() vốn đã viết cho "word OR phrase" nên không cần đường
+     riêng; nhờ vậy cụm kiểu này cũng có Youglish, POS, ví dụ như từ đơn. */
   box.innerHTML=questScene(word);
   const questStart=now();
   try{
@@ -1523,6 +1557,50 @@ async function toggleSave(word){
   if(rec.saved) addXP(1);
   refreshStats();
 }
+
+/* Lưu RIÊNG một collocation/phrasal verb/idiom (vd "kick in") độc lập với
+   từ gốc chứa nó (vd "kick") — trước đây trang chỉ có MỘT ngôi sao cho cả
+   entry, nên gõ "kick in" rồi bấm Saved chỉ lưu được "kick". Cụm này
+   thường đã có sẵn "text"/"vi" ngay trong dữ liệu của từ gốc, nên lưu
+   thẳng — không cần gọi AI lại. */
+let _savedPhraseKeys=null;
+async function buildSavedPhraseKeys(){
+  if(_savedPhraseKeys) return _savedPhraseKeys;
+  const all=await idbAllCached();
+  _savedPhraseKeys=new Set(all.filter(r=>r.saved && r.data && r.data.phrase).map(r=>r.word));
+  return _savedPhraseKeys;
+}
+function isPhraseSavedSync(text){
+  return !!(_savedPhraseKeys && _savedPhraseKeys.has(norm(text||'')));
+}
+async function togglePhraseSave(text, vi, example, exampleVi, btn){
+  const key=norm(text||''); if(!key) return;
+  let rec=await idbGet(key);
+  const wasSaved=!!(rec && rec.saved);
+  if(wasSaved){
+    rec.saved=0; rec.savedAt=0;
+    await idbPut(rec);
+    if(_savedPhraseKeys) _savedPhraseKeys.delete(key);
+    toast('Removed from The Cache');
+    logEvent('unsave', key);
+  }else{
+    if(!rec){
+      rec={ word:key, data:{ word:text, phrase:true, vi_equivalent:vi||'',
+             senses:[{pos:'phrase', vi:vi||'', example:example||'', example_vi:exampleVi||''}] },
+            source:'phrase', firstSeen:now(), saved:0, savedAt:0 };
+    }
+    rec.saved=1; rec.savedAt=now();
+    await idbPut(rec);
+    if(!_savedPhraseKeys) await buildSavedPhraseKeys();
+    _savedPhraseKeys.add(key);
+    toast('Saved to The Cache \u2b50');
+    logEvent('save', key);
+    addXP(1);
+  }
+  if(btn){ btn.textContent=rec.saved?'\u2605':'\u2606'; btn.classList.toggle('on', !!rec.saved); }
+  refreshStats();
+}
+window.togglePhraseSave=togglePhraseSave;
 
 /* ============================================================
    RENDER — word detail
@@ -2485,11 +2563,23 @@ function renderEntry(rec, queriedAs, formNote){
     h+='</div>';
   }
 
+/* Ngôi sao lưu riêng cho MỘT collocation/phrasal verb/idiom — độc lập với
+   ngôi sao lưu cả entry. text/vi nhét thẳng vào onclick nên escape y hệt
+   kiểu jump() vẫn dùng: esc() rồi thoát dấu nháy đơn riêng. */
+function exprStarBtn(text, vi, example, exampleVi){
+  const safeT=esc(text||'').replace(/'/g,"\\'");
+  const safeV=esc(vi||'').replace(/'/g,"\\'");
+  const safeEx=esc(example||'').replace(/'/g,"\\'");
+  const safeExVi=esc(exampleVi||'').replace(/'/g,"\\'");
+  const on=isPhraseSavedSync(text);
+  return '<button class="expr-star'+(on?' on':'')+'" onclick="event.stopPropagation();togglePhraseSave(\''+safeT+'\',\''+safeV+'\',\''+safeEx+'\',\''+safeExVi+'\',this)" aria-label="Save this phrase">'+(on?'\u2605':'\u2606')+'</button>';
+}
+
   if(Array.isArray(d.expressions)&&d.expressions.length){
     const es=[...d.expressions].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm blue">🔗</span>Common Usage</div>';
     for(const e of es){ h+='<div class="expr" data-ph="'+esc(norm(e.text||''))+'"><span class="rank">'+rankStar(e.rank)+'</span><span class="t">'+esc(e.text)+'</span>';
-      if(e.vi) h+='<span class="ev">'+esc(e.vi)+'</span>'; h+='</div>'; }
+      if(e.vi) h+='<span class="ev">'+esc(e.vi)+'</span>'; h+=exprStarBtn(e.text,e.vi,e.example,e.example_vi)+'</div>'; }
     h+='</div>';
   }
 
@@ -2497,7 +2587,7 @@ function renderEntry(rec, queriedAs, formNote){
     const cs=[...d.collocations].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-note-and-pen.webp" alt=""/>Collocations</div>';
     for(const c of cs){ h+='<div class="expr" data-ph="'+esc(norm(c.text||''))+'"><span class="rank">'+rankStar(c.rank)+'</span><span class="t">'+esc(c.text)+'</span>';
-      if(c.vi) h+='<span class="ev">'+esc(c.vi)+'</span>'; h+='</div>'; }
+      if(c.vi) h+='<span class="ev">'+esc(c.vi)+'</span>'; h+=exprStarBtn(c.text,c.vi,c.example,c.example_vi)+'</div>'; }
     h+='</div>';
   }
 
@@ -2505,7 +2595,7 @@ function renderEntry(rec, queriedAs, formNote){
     const ps=[...d.phrasal_verbs].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm mint">🧩</span>Phrasal Verbs</div>';
     for(const p of ps){ h+='<div class="expr" data-ph="'+esc(norm(p.text||''))+'"><span class="rank">'+rankStar(p.rank)+'</span><span class="t">'+esc(p.text)+'</span>';
-      if(p.vi) h+='<span class="ev">'+esc(p.vi)+'</span>'; h+='</div>'; }
+      if(p.vi) h+='<span class="ev">'+esc(p.vi)+'</span>'; h+=exprStarBtn(p.text,p.vi,p.example,p.example_vi)+'</div>'; }
     h+='</div>';
   }
 
@@ -2513,7 +2603,7 @@ function renderEntry(rec, queriedAs, formNote){
     const is_=[...d.idioms].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-magnifying-glass.webp" alt=""/>Idioms</div>';
     for(const it of is_){ h+='<div class="expr" data-ph="'+esc(norm(it.text||''))+'"><span class="rank">'+rankStar(it.rank)+'</span><span class="t">'+esc(it.text)+'</span>';
-      if(it.vi) h+='<span class="ev">'+esc(it.vi)+'</span>'; h+='</div>'; }
+      if(it.vi) h+='<span class="ev">'+esc(it.vi)+'</span>'; h+=exprStarBtn(it.text,it.vi,it.example,it.example_vi)+'</div>'; }
     h+='</div>';
   }
 
@@ -3280,15 +3370,26 @@ async function renderSaved(){
   const all=await idbAll();
 
   if(savedTab==='why'){
-    const files=all.filter(r=>r.saved && r.data && r.data.explain)
-                   .sort((x,y)=>y.savedAt-x.savedAt);
-    if(head) head.innerHTML='<img class="hdr-ico" src="./decor-book.webp" alt=""/>'
+    /* Trước đây chỉ những mục đã BẤM SAO mới hiện ở đây — nên phần lớn
+       lịch sử "vì sao" biến mất nếu quên bấm. Giờ MỌI lần tra đều tự nằm
+       lại ở đây (như Recent Search), ngôi sao chỉ còn tác dụng ghim lên
+       đầu chứ không còn là điều kiện để hiện. */
+    const files=all.filter(r=>r.data && r.data.explain)
+                   .sort((x,y)=>(y.saved-x.saved) ||
+                     ((y.saved?y.savedAt:y.firstSeen)-(x.saved?x.savedAt:x.firstSeen)));
+    /* decor-book.webp không tồn tại trong repo — vỡ ảnh y hệt lỗi đã sửa
+       ở Recent Search. Đổi sang cùng icon sparkle SVG cho nhất quán với
+       toàn bộ phần "why" trong app (không bao giờ vỡ vì là vector inline). */
+    if(head) head.innerHTML='<svg class="hdr-ico hdr-ico-svg" viewBox="0 0 24 24" fill="currentColor">'
+      +'<path d="M12 2c.45 3.68 1.05 6.28 2.34 7.66C15.72 11 18.32 11.55 22 12c-3.68.45-6.28 1.05-7.66 2.34'
+      +'C13 15.72 12.45 18.32 12 22c-.45-3.68-1.05-6.28-2.34-7.66C8.28 13 5.68 12.45 2 12c3.68-.45 6.28-1.05 7.66-2.34'
+      +'C11 5.68 11.55 3.05 12 2Z"/></svg>'
       +files.length+' explanation'+(files.length===1?'':'s');
     if(!files.length){
       box.innerHTML='<div class="empty"><img class="ill" src="./mascot-investigate.webp" alt=""/>'
-        +'<h3>No comparisons saved yet</h3>'
+        +'<h3>No comparisons yet</h3>'
         +'<p>Type two or more words separated by a comma — e.g. <b>cease, decease</b> — '
-        +'then save Focci\u2019s explanation. Knowing WHY a word means what it means '
+        +'and Focci\u2019s explanation lands here automatically. Knowing WHY a word means what it means '
         +'sticks a lot better than plain memorization.</p></div>';
       return;
     }
@@ -3355,7 +3456,8 @@ async function renderSaved(){
       if(tail) h+='<div class="wh-hook"><span>quick take</span>'+mdBold(tail)+'</div>';
       h+='<div class="wf-acts">'
         +'<button onclick="runExplain(\''+safeQ+'\')">Reopen</button>'
-        +'<button onclick="toggleExplainSave(\''+safeQ+'\');renderSaved()">Unsave</button>'
+        +'<button class="'+(r.saved?'wf-star on':'wf-star')+'" onclick="event.stopPropagation();toggleExplainSave(\''+safeQ+'\');renderSaved()">'
+        +(r.saved?'\u2605 Starred':'\u2606 Star')+'</button>'
         +'</div>';
       h+='</div></div>';
     }
@@ -3416,10 +3518,25 @@ async function renderSaved(){
 
 /* Bắt đầu một vòng luyện chỉ với các từ tới hạn — nối vào phần Practice
    đã có, không dựng một cơ chế chơi thứ hai. */
-function startSavedReview(){
+async function startSavedReview(){
+  // Đúng bộ lọc "tới hạn" mà trang Saved đang hiển thị, để số từ ở đây
+  // khớp CHÍNH XÁC với con số bạn vừa thấy — không phải một pool chung
+  // chung "toàn bộ từ đã lưu" như trước (đó là lý do trước đây bấm vào
+  // số từ tới hạn nhưng bài luyện lại ra từ khác).
+  const words=(await idbAll()).filter(r=>r.saved && r.data && !r.data.explain && !r.alias && !r.data.phrase);
+  const due=words.filter(r=>srsDueAt(r)<=now());
+  if(!due.length) return;   // phòng hờ — nút này vốn chỉ hiện khi có từ tới hạn
+  dueReviewMode=true;
   try{ localStorage.setItem(POOL_LS,'saved'); }catch(e){}
   showView('review');
-  if(typeof setPracticeMode==='function') setPracticeMode('type');
+  await loadLevels();
+  practiceMode='type';
+  wirePracticeSwipe();
+  practiceStage='playing';
+  revQueue=due.sort(()=>Math.random()-0.5);
+  revIdx=0; revState=null;
+  revResults=new Array(revQueue.length).fill(null); revCorrectCount=0; revSessionAwarded=false;
+  renderReview();
 }
 window.startSavedReview=startSavedReview;
 
@@ -3504,13 +3621,19 @@ function getQCount(){ const n=+localStorage.getItem(QCOUNT_LS); return QCOUNTS.i
 function setQCount(n){ localStorage.setItem(QCOUNT_LS,String(n)); renderPracticeSetup(); }
 const POOLS=[['all','Whole library'],['searched','Words I searched'],['saved','My saved words']];
 function getPool(){ const p=localStorage.getItem(POOL_LS); return POOLS.some(x=>x[0]===p)?p:'all'; }
-function setPool(p){ localStorage.setItem(POOL_LS,p); renderPracticeSetup(); }
+function setPool(p){ dueReviewMode=false; localStorage.setItem(POOL_LS,p); renderPracticeSetup(); }
 function getLevel(){ const l=localStorage.getItem(LEVEL_LS); return (l&&LEVEL_NAMES[+l])?+l:0; }   // 0 = every level
 function setLevel(l){ localStorage.setItem(LEVEL_LS,String(l)); renderPracticeSetup(); }
 window.setQCount=setQCount; window.setPool=setPool; window.setLevel=setLevel;
 
 let practiceMode='type';     // 'type' | 'match'
 let practiceStage='setup';   // 'setup' | 'playing'
+/* true CHỈ khi vào phiên ôn qua nút "Review now" trên Saved (số từ tới
+   hạn hôm nay). Ép đúng bộ từ ĐÓ (không phải theo pool/qcount thường), và
+   tự thêm lại từ vừa trả lời sai vào cuối hàng đợi tới khi qua được một
+   lượt sạch — coi như "đủ nhớ" mới thôi. Vào Type it/Match it theo cách
+   thường (tab bar, đổi pool tay…) thì cờ này luôn tắt, hành vi y như cũ. */
+let dueReviewMode=false;
 function setPracticeMode(m){ practiceMode=m; practiceStage='setup'; renderPracticeSetup(); }
 window.setPracticeMode=setPracticeMode;
 
@@ -3606,7 +3729,11 @@ async function availableWords(){
      loại trừ tường minh — nếu không sẽ bị đem ra đố như một từ vựng. */
   let list=(await idbAll()).filter(r=>!r.alias && hasMeaning(r)
             && !(r.data && r.data.explain) && !(r.data && r.data.phrase));
-  if(practiceMode==='type'){
+  if(dueReviewMode){
+    // Ép đúng bộ từ TỚI HẠN hôm nay — bỏ qua hẳn pool/practiceMode, vì đây
+    // là phiên ôn theo lịch, không phải luyện tự do.
+    list=list.filter(r=>r.saved && srsDueAt(r)<=now());
+  } else if(practiceMode==='type'){
     list=list.filter(r=>r.saved);
   } else {
     const pool=getPool();
@@ -3617,7 +3744,7 @@ async function availableWords(){
       list=list.filter(r=>seen.has(r.word));
     }
   }
-  if(lv) list=list.filter(r=>levelOf(r.word)===lv);
+  if(lv && !dueReviewMode) list=list.filter(r=>levelOf(r.word)===lv);
   return list;
 }
 
@@ -3627,17 +3754,21 @@ async function startPractice(){
   wirePracticeSwipe();
   practiceStage='playing';
   if(practiceMode==='match') return startMatch(avail);
-  revQueue=avail.sort(()=>Math.random()-0.5).slice(0,getQCount());
+  // Ôn tới hạn: hết đúng bộ từ đó, không cắt theo số câu đã chọn — mục
+  // tiêu là ôn hết những gì tới hạn, không phải một vòng ngắn tuỳ chọn.
+  revQueue=dueReviewMode ? avail.sort(()=>Math.random()-0.5)
+                         : avail.sort(()=>Math.random()-0.5).slice(0,getQCount());
   revIdx=0; revState=null;
   revResults=new Array(revQueue.length).fill(null); revCorrectCount=0; revSessionAwarded=false;
   renderReview();
 }
 window.startPractice=startPractice;
 
-/* Entry point used by the tab bar and by "play again". */
+/* Entry point used by the tab bar (fallback when there's no game hub). */
 async function startReview(){
   await loadLevels();
   if(practiceStage==='playing' && (revQueue.length||matchRounds.length)) return; // don't wipe a live round
+  dueReviewMode=false;   // vào tab Practice theo cách thường — không phải từ Saved
   return renderPracticeSetup();
 }
 
@@ -3760,33 +3891,52 @@ function roundDone(score,total,againFn){
    MATCH IT — six candidate words, one Vietnamese meaning
    ============================================================ */
 let matchRounds=[], matchIdx=0, matchHits=0, matchPicked=null, matchAwarded=false;
-async function startMatch(preAvail){
-  wirePracticeSwipe();
-  const area=$('#review-area');
-  const answers=preAvail||await availableWords();
-  // Decoys always come from the whole library, so a small pool still gets
-  // six believable options.
-  const all=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi));
-  if(!answers.length || all.length<6){ return renderPracticeSetup(); }
-  practiceStage='playing';
-  const meaningOf=(r)=>r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi || '';
-  matchRounds=[]; matchIdx=0; matchHits=0; matchPicked=null; matchAwarded=false;
-  const total=Math.min(getQCount(), answers.length);
-  const deck=answers.slice().sort(()=>Math.random()-0.5).slice(0,total);
-  for(const answer of deck){
+let _matchDecoyPool=null;   // toàn bộ từ có nghĩa — mồi nhử, dựng lại round khi cần thêm (ôn tới hạn)
+function meaningOf(r){ return r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi || ''; }
+function buildMatchRounds(answers, all){
+  const rounds=[];
+  for(const answer of answers){
     const opts=[answer];
     let g2=0;
     while(opts.length<6 && g2++<200){
       const c=all[Math.floor(Math.random()*all.length)];
       if(c.word!==answer.word && !opts.some(o=>o.word===c.word)) opts.push(c);
     }
-    matchRounds.push({answer, meaning:meaningOf(answer), opts:opts.sort(()=>Math.random()-0.5)});
+    rounds.push({answer, meaning:meaningOf(answer), opts:opts.sort(()=>Math.random()-0.5)});
   }
+  return rounds;
+}
+async function startMatch(preAvail){
+  wirePracticeSwipe();
+  const answers=preAvail||await availableWords();
+  // Decoys always come from the whole library, so a small pool still gets
+  // six believable options.
+  const all=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi));
+  if(!answers.length || all.length<6){ return renderPracticeSetup(); }
+  practiceStage='playing';
+  _matchDecoyPool=all;
+  matchIdx=0; matchHits=0; matchPicked=null; matchAwarded=false;
+  // Ôn tới hạn: hết đúng bộ từ tới hạn, không cắt theo số câu đã chọn.
+  const total=dueReviewMode ? answers.length : Math.min(getQCount(), answers.length);
+  const deck=answers.slice().sort(()=>Math.random()-0.5).slice(0,total);
+  matchRounds=buildMatchRounds(deck, all);
   renderMatch();
 }
 function renderMatch(){
   const area=$('#review-area');
   if(matchIdx>=matchRounds.length){
+    if(dueReviewMode){
+      // Từ nào trong lượt vừa xong bị chọn sai thì dựng lại round cho nó
+      // và nối tiếp thay vì kết thúc — lặp tới khi một lượt sạch hoàn toàn.
+      const misses=matchRounds.filter(x=>x._ok===false).map(x=>x.answer);
+      if(misses.length){
+        const extra=buildMatchRounds(misses.sort(()=>Math.random()-0.5), _matchDecoyPool||[]);
+        matchRounds=matchRounds.concat(extra);
+        renderMatch();
+        return;
+      }
+      dueReviewMode=false;   // qua một lượt sạch — không còn từ nào sai nữa
+    }
     if(!matchAwarded && matchRounds.length){
       matchAwarded=true; addXP(8);
       if(matchHits===matchRounds.length) localStorage.setItem(PERFECT_LS,'1');
@@ -3877,6 +4027,23 @@ function maskHint(word){
 function renderReview(){
   const area=$('#review-area');
   if(revIdx>=revQueue.length){
+    if(dueReviewMode){
+      // Từ nào ở LẦN GẦN NHẤT xuất hiện mà bị trả lời sai thì thêm lại vào
+      // cuối hàng đợi — cứ lặp tới khi có một lượt sạch (không còn từ nào
+      // sai) mới coi là "đủ nhớ" và dừng.
+      const lastStatus=new Map();
+      for(let i=0;i<revQueue.length;i++) lastStatus.set(revQueue[i].word, {r:revQueue[i], status:revResults[i]});
+      const misses=[...lastStatus.values()].filter(x=>x.status==='wrong').map(x=>x.r);
+      if(misses.length){
+        const from=revQueue.length;
+        revQueue=revQueue.concat(misses.sort(()=>Math.random()-0.5));
+        revResults=revResults.concat(new Array(misses.length).fill(null));
+        revIdx=from;
+        renderReview();
+        return;
+      }
+      dueReviewMode=false;   // qua một lượt sạch — không còn từ nào sai nữa
+    }
     if(!revSessionAwarded && revQueue.length){
       revSessionAwarded=true; addXP(10);
       if(revCorrectCount===revQueue.length) localStorage.setItem(PERFECT_LS,'1');
@@ -4530,13 +4697,15 @@ async function scanRefreshState(){
 
 function scanPrompt(lines){
   return `You are an expert English–Vietnamese lexicographer reviewing entries in a Vietnamese learner's dictionary.
-Each line is: ENGLISH WORD | main Vietnamese meaning | sub-meanings.
+Each line is: ENGLISH WORD | main Vietnamese meaning | sub-meanings, each shown as [pos] vietnamese (ex: "example sentence").
 
-Flag ONLY entries whose Vietnamese is genuinely poor, for one of these reasons:
-- wrong connotation (e.g. "whimsical" rendered as "kỳ quặc" — wrong, because "kỳ quặc" is derogatory while "whimsical" is a compliment)
-- literal word-by-word translation a Vietnamese reader cannot picture
-- a common meaning of the word is missing entirely
-- so vague it does not distinguish the word from its near-synonyms
+Flag an entry for EITHER of these reasons:
+1. Vietnamese quality:
+   - wrong connotation (e.g. "whimsical" rendered as "kỳ quặc" — wrong, because "kỳ quặc" is derogatory while "whimsical" is a compliment)
+   - literal word-by-word translation a Vietnamese reader cannot picture
+   - a common meaning of the word is missing entirely
+   - so vague it does not distinguish the word from its near-synonyms
+2. Wrong word borrowed: a sense's [pos] is not actually a grammatical use of the EXACT English word on that line — its own "ex:" example does not contain that exact word, only a different inflected/derived form of it (e.g. an "[adjective]" sense on "promise" whose example actually says "promising"; an "[adjective]" sense on "excite" whose example says "exciting" or "excited"). This is a structural bug, not a translation issue — flag it even if the Vietnamese text itself reads fine.
 
 If an entry is fine, SAY NOTHING about it. Be strict: most entries are fine.
 Return JSON only:
@@ -4548,7 +4717,12 @@ ${lines.join('\n')}`;
 
 function scanLine(rec){
   const d=rec.data||{};
-  const subs=(d.senses||[]).map(s=>String(s.vi||'').trim()).filter(Boolean).slice(0,6).join('; ');
+  const subs=(d.senses||[]).map(s=>{
+    const vi=String(s.vi||'').trim(); if(!vi) return '';
+    const pos=s.pos?'['+s.pos+'] ':'';
+    const ex=s.example?' (ex: "'+String(s.example).slice(0,80)+'")':'';
+    return pos+vi+ex;
+  }).filter(Boolean).slice(0,6).join('; ');
   return rec.word+' | '+(d.vi_equivalent||'∅')+' | '+(subs||'∅');
 }
 
@@ -4683,13 +4857,17 @@ async function clearQueue(){
    Writes straight back into the library — no download needed.
    ============================================================ */
 function refreshPrompt(word,d){
-  const cur=(d.senses||[]).map((s,i)=>(i+1)+'. ['+(s.pos||'?')+'] '+(s.vi||'∅')+' — '+(s.gloss||'')).join('\n');
+  const cur=(d.senses||[]).map((s,i)=>(i+1)+'. ['+(s.pos||'?')+'] '+(s.vi||'∅')+' — '+(s.gloss||'')
+    +(s.example?' | vd: "'+s.example+'"':'')).join('\n');
   return `You are an expert English–Vietnamese lexicographer. Rewrite ONLY the Vietnamese side of this dictionary entry for "${word}".
 
-Its current Vietnamese is weak. Existing senses (keep the same senses and the same order, just fix the Vietnamese):
+Its current Vietnamese is weak. Existing senses (fix the Vietnamese; keep order and count THE SAME unless RULE 0 below forces a removal):
 ${cur||'(none — supply the senses yourself, most common first)'}
 
-RULES:
+RULE 0 — STRUCTURAL CHECK, do this FIRST, before touching any Vietnamese:
+Every sense's part-of-speech must be a grammatical use of THIS EXACT WORDFORM — "${word}", spelled exactly like that, not a different inflected/derived word that merely shares the root (e.g. an "adjective" sense on the verb "promise" that is really describing "promising"; an "adjective" sense on "excite"/"interest" that is really "exciting"/"interesting" or "excited"/"interested"). Check this against the "vd:" example shown for each sense above — if that example does NOT contain the exact string "${word}", that sense does not belong here. DELETE any sense that fails this check instead of keeping it (it is fine for the result to have fewer senses than the input). For every sense you keep, write a fresh "example" that does contain "${word}" exactly.
+
+OTHER RULES:
 - Connotation matters more than brevity. Before finalising each Vietnamese meaning, ask: is the English word praising or criticising? Is the Vietnamese word praising or criticising? If they differ, it is WRONG — pick a longer phrasing that carries the right feeling instead. "vui tươi, giàu tưởng tượng theo kiểu ngộ nghĩnh" (long but right) beats "kỳ quặc" (short but wrong).
 - If NO Vietnamese word truly matches, leave "vi_equivalent" as "" and carry the meaning in "vi_feel". A confident but wrong equivalent is the worst possible answer.
 - rank = how often this sense appears in real life (5 very common … 1 rare). Keep the common meaning on top; a rare-but-real sense simply sits at the bottom.
@@ -4702,7 +4880,7 @@ Return ONLY this JSON:
   "vi_feel": "1–2 câu tiếng Việt tả HÌNH ẢNH / TÌNH HUỐNG dùng từ này, không phải định nghĩa từ điển",
   "vi_not": "một từ tiếng Việt hay bị lẫn + lý do ngắn. PHẢI khác nghĩa với mọi 'vi' trong senses ở trên. Rỗng nếu không có từ nào thật sự hay bị lẫn.",
   "register": "trang trọng|trung tính|thân mật|lóng · khen|trung tính|chê",
-  "senses": [ { "pos":"...", "vi":"nghĩa tiếng Việt đúng sắc thái", "vi_hint":"1 câu tả cảm giác nếu 'vi' chưa đủ, ngược lại rỗng", "gloss":"short English meaning", "rank":5, "example":"natural English sentence", "example_vi":"bản dịch tự nhiên" } ]
+  "senses": [ { "pos":"...", "vi":"nghĩa tiếng Việt đúng sắc thái", "vi_hint":"1 câu tả cảm giác nếu 'vi' chưa đủ, ngược lại rỗng", "gloss":"short English meaning", "rank":5, "example":"natural English sentence containing the exact wordform \"${word}\"", "example_vi":"bản dịch tự nhiên" } ]
 }`;
 }
 
@@ -5241,6 +5419,7 @@ function wireOnboarding(){
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
   buildWordIndex().catch(()=>{});
   buildViIndex().catch(()=>{});
+  buildSavedPhraseKeys().catch(()=>{});
   syncSeedFiles().catch(()=>{});        // fire-and-forget — re-renders itself if it actually merged anything new
 })();
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;
