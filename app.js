@@ -141,6 +141,7 @@ async function logEvent(type, word){
     await logAdd({ts:now(), type, word:word||null});
     const c=await logCount(); if(c>3000) logTrim();
     renderHero();
+    if(document.querySelector('#q-list')) renderQuests();
     // Every search — whether typed in the search bar or tapped inside a
     // story passage — lands here, so this is the one place the word-bank's
     // "new word" detector needs to watch.
@@ -175,6 +176,7 @@ function addXP(n){
   if(!n) return;
   const before=getXP(), after=before+n;
   localStorage.setItem(XP_LS, String(after));
+  if(n>0) xpPop(n);
   const lvlBefore=levelFromXP(before), lvlAfter=levelFromXP(after);
   const dailyBefore=getDailyXP(), dailyAfter=dailyBefore+n; setDailyXP(dailyAfter);
   const goal=getDailyGoal();
@@ -3248,8 +3250,13 @@ function renderWeekBars(offset){
     const cnt=_weekLogsCache.filter(l=>dayStart(l.ts)===dd && l.type==='search').length; week.push({dd,count:cnt}); }
   const maxWeek=Math.max(1,...week.map(w=>w.count));
   let h='';
-  week.forEach(w=>{ const pct=Math.round(w.count/maxWeek*100); const wd=WD[new Date(w.dd).getDay()]; const isToday=(w.dd===today);
-    h+='<div class="bar-col'+(isToday?' today':'')+'"><div class="bar-n">'+w.count+'</div><div class="bar-track"><div class="bar-fill" style="height:'+Math.max(4,pct)+'%"></div></div><div class="bar-lbl">'+wd+'</div></div>'; });
+  week.forEach(w=>{
+    const wd=WD[new Date(w.dd).getDay()], isToday=(w.dd===today);
+    h+='<div class="wk-tile'+(w.count>0?' on':'')+(isToday?' today':'')+'">'
+      +'<span class="wk-d">'+wd+'</span>'
+      +'<span class="wk-dot">'+(w.count>0?CHECK_SVG:'')+'</span>'
+      +'<b class="wk-n">'+w.count+'</b></div>';
+  });
   const bars=$('#week-bars'); if(bars) bars.innerHTML=h;
 
   const lbl=$('#week-range-label');
@@ -3294,8 +3301,8 @@ async function renderDashboardStats(){
   const mins=Math.round(ms/60000);
   _statCache={learned,avg,mins,activeDays,todayNew,bestDay,library:entries.length};
 
-  $('#d-total').textContent=learned.toLocaleString();
-  $('#d-avg').textContent=avg;
+  countUp($('#d-total'), learned, 900);
+  countUp($('#d-avg'), avg, 700);
   $('#d-time').textContent = mins<60 ? mins+'m' : Math.floor(mins/60)+'h '+(mins%60)+'m';
 
   // the chart can page back through every logged day on this device (the
@@ -3356,9 +3363,115 @@ function showInfoCard(img,title,body,actionLabel,actionOnclick){
 }
 window.statInsight=statInsight;
 
+/* ============================================================
+   GAME-FEEL — phản hồi khi được điểm + nhiệm vụ ngày
+   ============================================================ */
+/* "+N XP" nảy lên giữa màn hình. Chỉ giữ MỘT cái tại một thời điểm để nhiều
+   lần cộng liên tiếp không chồng lên nhau. */
+function xpPop(n){
+  try{
+    document.querySelectorAll('.xp-pop').forEach(e=>e.remove());
+    const d=document.createElement('div'); d.className='xp-pop'; d.textContent='\u26A1 +'+n+' XP';
+    document.body.appendChild(d); setTimeout(()=>d.remove(),1300);
+  }catch(e){}
+}
+/* Số chạy từ giá trị cũ tới giá trị mới (tôn trọng "giảm chuyển động"). */
+function countUp(el, to, ms){
+  if(!el) return;
+  const from=parseInt(String(el.textContent||'0').replace(/[^0-9]/g,''),10)||0;
+  const still=window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(still || from===to){ el.textContent=to.toLocaleString(); return; }
+  const t0=performance.now(), dur=ms||800;
+  const step=(t)=>{
+    const k=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-k,3);
+    el.textContent=Math.round(from+(to-from)*e).toLocaleString();
+    if(k<1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+/* Nhiệm vụ ngày: tiến trình lấy từ dữ liệu THẬT — số lượt tra và lưu trong log
+   hôm nay, cộng số vòng game đã xong (đếm bằng questBump). Nhận thưởng XP một
+   lần mỗi nhiệm vụ mỗi ngày; sang ngày mới tự đặt lại. */
+const QUEST_LS='fc_quests';
+const QUESTS=[
+  {id:'search', t:'Look up 5 words',        target:5, xp:10,
+   ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>'},
+  {id:'save',   t:'Save a word', target:1, xp:10,
+   ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m12 3.5 2.5 5.3 5.8.7-4.3 4 1.1 5.7L12 16.3 6.9 19.2 8 13.5l-4.3-4 5.8-.7L12 3.5Z"/></svg>'},
+  {id:'game',   t:'Play a mini-game', target:1, xp:15,
+   ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="11" rx="5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r=".9" fill="currentColor"/><circle cx="17.5" cy="13.5" r=".9" fill="currentColor"/></svg>'}
+];
+const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+function questState(){
+  try{ const v=JSON.parse(localStorage.getItem(QUEST_LS)||'null');
+       if(v && v.date===todayStr() && Array.isArray(v.claimed)) return v; }catch(e){}
+  return {date:todayStr(), games:0, claimed:[]};
+}
+function questSave(v){ try{ localStorage.setItem(QUEST_LS, JSON.stringify(v)); }catch(e){} }
+window.questBump=function(kind){
+  if(kind!=='game') return;
+  const st=questState(); st.games=(st.games||0)+1; questSave(st);
+  if($('#q-list')) renderQuests();
+};
+async function questProgress(){
+  let logs=[]; try{ logs=await logAll(); }catch(e){}
+  const d0=dayStart(now());
+  const today=logs.filter(l=>l.ts>=d0);
+  return { search: today.filter(l=>l.type==='search').length,
+           save:   today.filter(l=>l.type==='save').length,
+           game:   questState().games||0 };
+}
+async function renderQuests(){
+  const box=$('#q-list'); if(!box) return;
+  const prog=await questProgress(), st=questState();
+  let done=0, h='';
+  for(const q of QUESTS){
+    const cur=Math.min(q.target, prog[q.id]||0);
+    const claimed=st.claimed.includes(q.id);
+    const ready=!claimed && cur>=q.target;
+    if(claimed) done++;
+    h+='<div class="q-row'+(ready?' ready':'')+(claimed?' done':'')+'" data-q="'+q.id+'">'
+      +'<span class="q-ico">'+q.ico+'</span>'
+      +'<div class="q-mid"><div class="q-t">'+q.t+'</div>'
+      +'<div class="q-bar"><i style="width:'+Math.round(cur/q.target*100)+'%"></i></div>'
+      +'<div class="q-n">'+cur+' / '+q.target+'</div></div>'
+      +(claimed ? '<span class="q-done">'+CHECK_SVG+'</span>'
+        : ready ? '<button class="q-claim" onclick="claimQuest(\''+q.id+'\')">Claim +'+q.xp+'</button>'
+        : '<span class="q-rw">+'+q.xp+' XP</span>')
+      +'</div>';
+  }
+  box.innerHTML=h;
+  const c=$('#q-count'); if(c) c.textContent=done+'/'+QUESTS.length;
+}
+window.claimQuest=async function(id){
+  const q=QUESTS.find(x=>x.id===id); if(!q) return;
+  const prog=await questProgress(), st=questState();
+  if(st.claimed.includes(id) || (prog[id]||0)<q.target) return;
+  st.claimed.push(id); questSave(st);
+  const row=document.querySelector('.q-row[data-q="'+id+'"]');
+  if(row && typeof confettiBurst==='function') confettiBurst(row, 22);
+  addXP(q.xp);
+  renderQuests();
+};
+
+/* Banner truyện ở Home: nền = phong cảnh của vùng đang chơi, kèm tiến độ. */
+function renderStoryBanner(){
+  const b=$('#jstory'); if(!b) return;
+  let info={arcId:1,name:'The Nameless Field',pct:0,started:false};
+  try{ if(typeof window.storyHomeInfo==='function') info=Object.assign(info, window.storyHomeInfo()); }catch(e){}
+  const art=$('#jstory-art');
+  if(art) art.style.backgroundImage="url('./bg-arc"+info.arcId+".webp'),linear-gradient(135deg,#3b4a6b,#1d2a44)";
+  const land=$('#jstory-land'); if(land) land.textContent=info.name;
+  const ttl=$('#jstory-title'); if(ttl) ttl.textContent=info.started?'Continue the story':'Begin the story';
+  const fill=$('#jstory-fill'); if(fill) fill.style.width=Math.max(6,Math.min(100,info.pct||0))+'%';
+}
+
 async function renderDashboard(){
   renderJar();
   renderGoalCard();
+  renderStoryBanner();
+  renderQuests();
   renderDashboardStats();
   renderHistory();
 }
@@ -4185,7 +4298,7 @@ function renderMatch(){
       dueReviewMode=false;   // qua một lượt sạch — không còn từ nào sai nữa
     }
     if(!matchAwarded && matchRounds.length){
-      matchAwarded=true; addXP(8);
+      matchAwarded=true; addXP(8); questBump('game');
       if(matchHits===matchRounds.length) localStorage.setItem(PERFECT_LS,'1');
       checkAchievements();
     }
@@ -4401,30 +4514,51 @@ function startWrite(){
 }
 window.startWrite=startWrite;
 
+const SAY_DAILY_GOAL=5;
+function sayToday(){ const d0=dayStart(now()); return sayLoad().filter(a=>a.ts>=d0).length; }
+/* Đếm từ trực tiếp + chỉ bật nút Check khi đã gõ gì đó (nút xám → sáng lên là một
+   tín hiệu nhỏ "sẵn sàng"). */
+function syInput(el){
+  const v=(el.value||'').trim(), words=v?v.split(/\s+/).length:0;
+  const c=$('#sy-count'); if(c) c.textContent=words+(words===1?' word':' words');
+  const b=$('#write-check');
+  if(b){
+    const ok=v.length>=2, was=!b.disabled;
+    b.disabled=!ok;
+    if(ok && !was){ b.classList.remove('ready'); void b.offsetWidth; b.classList.add('ready'); }
+  }
+}
+window.syInput=syInput;
+
 function renderWrite(){
   const area=$('#review-area'); if(!area) return;
   if(!writeCur){ startWrite(); return; }
   if(!writeScene) writeScene=newWriteScene();
   const topic=WRITE_TOPICS[writeCur.topic]||{label:'Practice',icon:'\u2728',color:'blue'};
+  const done=sayToday();
+  const dots=Array.from({length:SAY_DAILY_GOAL},(_,i)=>'<i class="'+(i<done?'on':'')+'"></i>').join('');
   let h=gameSwitch();
-  h+='<div class="write-card sy-card">';
-  /* Cảnh: nền ngẫu nhiên + Focci đứng cạnh bong bóng nói chứa tình huống. */
-  h+='<div class="sy-scene" style="'+sceneBgStyle(writeScene.bg)+'">'
-    +'<span class="sy-scrim"></span>'
-    +'<div class="sy-topic"><span>'+topic.icon+'</span>'+esc(topic.label)+'</div>'
-    +'<div class="sy-stage">'
-    +'<div class="sy-bubble">'+esc(writeCur.context)+'</div>'
-    +'<img class="sy-focci'+(writeResult?' hop':'')+'" src="./'+writeScene.pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
-    +'</div></div>';
+  h+='<div class="sy-page">';
+  h+='<div class="sy-daily"><span>Sentences today<b>'+Math.min(done,SAY_DAILY_GOAL)+'/'+SAY_DAILY_GOAL+'</b></span>'
+    +'<span class="sy-dots">'+dots+'</span></div>';
+  /* Cảnh: nền ngẫu nhiên, chip chủ đề + chip thưởng, Focci đứng cạnh bong bóng tình huống. */
+  h+='<div class="sy-scene" style="'+sceneBgStyle(writeScene.bg)+'"><span class="sy-scrim"></span>'
+    +'<div class="sy-top"><div class="sy-topic"><span>'+topic.icon+'</span>'+esc(topic.label)+'</div>'
+    +'<span class="sy-reward'+(writeResult?' got':'')+'">'+(writeResult?'\u2713 ':'\u26A1 ')+'+2 XP</span></div>'
+    +'<div class="sy-stage"><div class="sy-bubble">'+esc(writeCur.context)+'</div>'
+    +'<img class="sy-focci'+(writeResult?' hop':'')+'" src="./'+writeScene.pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/></div></div>';
+  /* Thẻ nhiệm vụ: câu tiếng Việt nổi đè lên mép cảnh. */
+  h+='<div class="sy-mission sy-m-'+topic.color+(writeResult?' compact':'')+'">'+esc(writeCur.vi)+'</div>';
   h+='<div class="sy-body">';
-  h+='<div class="write-vi write-vi-'+topic.color+'"><span class="write-vi-mark">\u201C</span>'+esc(writeCur.vi)+'</div>';
   if(!writeResult){
-    h+='<textarea id="write-input" class="write-input" rows="3" placeholder="Type it in English…" autocapitalize="sentences" autocorrect="off" spellcheck="false"></textarea>';
-    h+='<button class="btn" id="write-check" onclick="submitWrite()">Check it \u2192</button>';
+    h+='<div class="sy-input"><textarea id="write-input" class="write-input" rows="3" placeholder="Type it in English…" '
+      +'autocapitalize="sentences" autocorrect="off" spellcheck="false" oninput="syInput(this)"></textarea>'
+      +'<span class="sy-count" id="sy-count">0 words</span></div>';
+    h+='<button class="btn" id="write-check" disabled onclick="submitWrite()">Check it</button>';
   }else{
     h+='<div class="sy-you"><span>You wrote</span><p>'+esc(writeAnswer)+'</p></div>';
     h+=writeResultHtml(writeResult);
-    h+='<button class="btn" onclick="startWrite()">Next sentence \u2192</button>';
+    h+='<button class="btn" onclick="startWrite()">Next sentence</button>';
     h+='<button class="sy-saved-link" onclick="openSaySaved()">Saved under <b>Say it</b> in Saved \u2197</button>';
   }
   h+='</div></div>';
@@ -4434,9 +4568,14 @@ function renderWrite(){
     if(inp){ inp.focus(); inp.addEventListener('keydown',e=>{
       if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); submitWrite(); }
     }); }
-  }else if(writeResult.verdict==='good'){
-    const card=area.querySelector('.write-card');
-    if(card) confettiBurst(card);
+  }else{
+    if(writeResult.verdict==='good'){
+      const card=area.querySelector('.sy-mission');
+      if(card) confettiBurst(card, 28);
+    }
+    /* Kết quả nằm dưới thẻ đề bài — tự cuộn tới nhận xét để thấy ngay, khỏi phải tìm. */
+    const fb=area.querySelector('.write-fb');
+    if(fb) setTimeout(()=>{ try{ fb.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} }, 120);
   }
 }
 window.renderWrite=renderWrite;
@@ -4599,6 +4738,7 @@ async function submitWrite(){
     if(writeScene) writeScene.pose=pickScenePose(vk, writeScene.pose);   // Focci phản ứng theo kết quả
     writeMarkSeen(writeCur.id);
     saveWriteAttempt(writeCur, answer, result);
+    questBump('game');
     addXP(2);
     refreshStats();
   }catch(err){
@@ -4657,7 +4797,7 @@ function renderReview(){
       dueReviewMode=false;   // qua một lượt sạch — không còn từ nào sai nữa
     }
     if(!revSessionAwarded && revQueue.length){
-      revSessionAwarded=true; addXP(10);
+      revSessionAwarded=true; addXP(10); questBump('game');
       if(revCorrectCount===revQueue.length) localStorage.setItem(PERFECT_LS,'1');
       checkAchievements();
     }
@@ -4991,13 +5131,20 @@ async function renderHero(){
     const daySet=new Set(logs.map(l=>dayStart(l.ts)));
     ({streak, hasToday}=computeStreak(daySet));
   }catch(e){}
-  if(streak>0){
-    streakEl.style.display='inline-flex';
-    streakEl.innerHTML='🔥 '+streak+' day'+(streak===1?'':'s');
-  } else streakEl.style.display='none';
+  /* HUD luôn hiện chuỗi ngày (kể cả 0 — "Start a streak" là một lời mời), và
+     nếu hôm nay chưa làm gì thì ngọn lửa nhấp nháy: chuỗi đang có nguy cơ đứt. */
+  streakEl.style.display='inline-flex';
+  streakEl.classList.toggle('is-zero', streak===0);
+  streakEl.classList.toggle('at-risk', streak>0 && !hasToday);
+  streakEl.innerHTML = streak>0
+    ? '<span class="hud-fl">🔥</span><b>'+streak+'</b> day'+(streak===1?'':'s')
+    : '<span class="hud-fl">🔥</span>Start a streak';
   subEl.textContent=heroLine(t, streak, hasToday, getDailyXP(), getDailyGoal());
   const lvl=levelFromXP(getXP());
-  if(levelEl) levelEl.innerHTML='⚡ Level '+lvl;
+  if(levelEl) levelEl.innerHTML='<span class="hud-fl">⚡</span>Level <b>'+lvl+'</b>';
+  const xpIn=getXP()%100;
+  const lf=$('#lvl-fill'); if(lf) lf.style.width=Math.max(4,xpIn)+'%';
+  const lt=$('#lvl-txt'); if(lt) lt.textContent=xpIn+'/100';
   try{ mascotSync(streak); }catch(e){}
 }
 

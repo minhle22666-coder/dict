@@ -1876,6 +1876,20 @@ window.showStoryIntro = function(){
     ov.classList.remove('show'); setTimeout(()=>ov.remove(),260);
   });
 };
+/* Thông tin cho banner truyện ở trang Home (app.js đọc qua window.storyHomeInfo):
+   vùng đang chơi, tên vùng và % tiến độ trong vùng đó. */
+window.storyHomeInfo = function(){
+  const cur = currentEntry();
+  const id = cur ? cur.arc.id : 1;
+  const meta = ARC_LANDS.find(a=>a.id===id) || ARC_LANDS[0];
+  let pct = 0;
+  if(cur){
+    const scenes = FLAT.filter(x=>x.arc.id===id);
+    const i = scenes.findIndex(x=>x.scene.id===cur.scene.id);
+    pct = scenes.length ? Math.round(((i+1)/scenes.length)*100) : 0;
+  }
+  return { arcId:id, name:meta.name, pct, started:isStoryStarted() };
+};
 function openStory(){ _pageDir=0; resetPending(); renderStory(); }
 window.openStory = openStory;
 
