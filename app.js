@@ -3398,11 +3398,11 @@ function countUp(el, to, ms){
    lần mỗi nhiệm vụ mỗi ngày; sang ngày mới tự đặt lại. */
 const QUEST_LS='fc_quests';
 const QUESTS=[
-  {id:'search', hue:'cyan', t:'Look up 5 words',        target:5, xp:10,
+  {id:'search', hue:'1', t:'Look up 5 words',        target:5, xp:10,
    ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>'},
-  {id:'save',   hue:'pink', t:'Save a word', target:1, xp:10,
+  {id:'save',   hue:'2', t:'Save a word', target:1, xp:10,
    ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m12 3.5 2.5 5.3 5.8.7-4.3 4 1.1 5.7L12 16.3 6.9 19.2 8 13.5l-4.3-4 5.8-.7L12 3.5Z"/></svg>'},
-  {id:'game',   hue:'mint', t:'Play a game', target:1, xp:15,
+  {id:'game',   hue:'3', t:'Play a game', target:1, xp:15,
    ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="11" rx="5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r=".9" fill="currentColor"/><circle cx="17.5" cy="13.5" r=".9" fill="currentColor"/></svg>'}
 ];
 const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
@@ -3626,11 +3626,16 @@ function svRow(r, due, box){
     + '</div>';
 }
 
+/* Mỗi lần vẽ lấy một số thứ tự. Đọc IndexedDB là bất đồng bộ (lâu hơn với thư viện lớn) nên
+   nếu bạn đã bấm sang tab khác, lượt vẽ CŨ phải tự bỏ — nếu không nó xong sau và vẽ đè lên tab mới. */
+let _savedSeq=0;
 async function renderSaved(){
+  const seq=++_savedSeq;
   const box=$('#saved-list');
   const head=$('#saved-count');
-  if(savedTab==='say'){ await renderSaySaved(box, head); return; }
+  if(savedTab==='say'){ await renderSaySaved(box, head, ()=>seq!==_savedSeq); return; }
   const all=await idbAll();
+  if(seq!==_savedSeq) return;
 
   if(savedTab==='why'){
     /* Trước đây chỉ những mục đã BẤM SAO mới hiện ở đây — nên phần lớn
@@ -3796,8 +3801,9 @@ function sayWhen(ts){
   if(days<7) return days+' days ago';
   return new Date(ts).toLocaleDateString(undefined,{day:'numeric',month:'short'});
 }
-async function renderSaySaved(box, head){
+async function renderSaySaved(box, head, stale){
   await sayMigrateOnce();
+  if(stale && stale()) return;
   const list=sayLoad();
   if(head) head.innerHTML='<svg class="hdr-ico hdr-ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
     +'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.2 3.6a.6.6 0 0 1-1-.46V15h-.3A2.5 2.5 0 0 1 4 12.5v-7Z"/></svg>'
@@ -5368,24 +5374,90 @@ function parseWordList(text){
 }
 
 /* ---------- theme ---------- */
-/* Các theme nền SÁNG — dùng để gắn data-scheme="light" lên <html>, để mọi
-   khối "kính mờ" (glassmorphism) vốn chỉ thiết kế cho nền tối (info-card,
-   Daily challenge, onboarding…) có MỘT chỗ duy nhất để tự đổi màu kính +
-   chữ theo, thay vì phải liệt kê lại cả 6 theme sáng ở từng nơi. */
-const LIGHT_THEMES=new Set(['light','sakura-light','ocean-breeze','sunset-terracotta','lavender-fields','coral-reef']);
-function applyTheme(theme){
-  if(theme==='auto') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.setAttribute('data-theme', theme);
-  document.documentElement.dataset.scheme = LIGHT_THEMES.has(theme) ? 'light' : 'dark';
-  document.querySelectorAll('#theme-seg button').forEach(b=>b.classList.toggle('active', b.dataset.theme===theme));
-  /* Thanh trạng thái iOS (ngoài app, trên cùng màn hình) cũng nên đổi
-     theo theme luôn, chứ không chỉ riêng header trong app — đọc lại
-     --bg vừa áp dụng rồi ghi vào <meta name="theme-color">. */
+/* ------------------------------------------------------------------
+   THEME = hai trục độc lập:
+     mode    : 'auto' | 'light' | 'dark'   (auto theo hệ thống thật sự)
+     palette : một trong PALETTES          (đổi MỌI màu gradient của app)
+   Lưu ở localStorage: sd_theme (mode) + sd_palette. Tên theme cũ
+   ("lavender-fields"…) được đổi sang cặp mới đúng một lần.
+   <html> nhận data-theme (light|dark ĐÃ RESOLVE), data-palette, data-scheme.
+   ------------------------------------------------------------------ */
+const PALETTE_LS='sd_palette';
+const PALETTES=[
+  {id:'grape', name:'Grape Soda', tag:'Fizzy and bold'},
+  {id:'bubblegum', name:'Bubblegum', tag:'Sweet and playful'},
+  {id:'ocean', name:'Deep Ocean', tag:'Cool and focused'},
+  {id:'mint', name:'Mint Fizz', tag:'Fresh and calm'},
+  {id:'sunset', name:'Sunset Pop', tag:'Warm and loud'},
+  {id:'berry', name:'Berry Blast', tag:'Juicy and rich'},
+  {id:'neon', name:'Neon Nights', tag:'Electric'},
+  {id:'forest', name:'Forest Sprite', tag:'Earthy and lively'},
+  {id:'cocoa', name:'Cocoa Caramel', tag:'Cozy and warm'},
+  {id:'slate', name:'Slate Calm', tag:'Quiet and steady'}
+];
+const LEGACY_THEMES={
+  'light':['light','sunset'],'dark':['dark','sunset'],'obsidian-ember':['dark','sunset'],
+  'midnight-indigo':['dark','grape'],'forest-dusk':['dark','forest'],'espresso-mocha':['dark','cocoa'],
+  'neon-cyberpunk':['dark','neon'],'slate-mono':['dark','slate'],'sakura-light':['light','bubblegum'],
+  'ocean-breeze':['light','ocean'],'sunset-terracotta':['light','sunset'],'lavender-fields':['light','grape'],
+  'coral-reef':['light','bubblegum']
+};
+const MODE_ICONS={
+  auto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17" /><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>',
+  light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>',
+  dark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg>'
+};
+const MODE_LABEL={auto:'Auto',light:'Light',dark:'Dark'};
+function getThemePrefs(){
+  let mode=localStorage.getItem(THEME_LS)||'auto';
+  let pal=localStorage.getItem(PALETTE_LS)||'';
+  /* "light"/"dark" vừa là tên theme CŨ vừa là mode MỚI: chỉ đổi khi CHƯA có palette
+     (tức chưa từng migrate). Có palette rồi thì chúng là mode thật — không đổi nữa. */
+  if(LEGACY_THEMES[mode] && (!pal || (mode!=='light' && mode!=='dark'))){
+    [mode,pal]=LEGACY_THEMES[mode];
+    localStorage.setItem(THEME_LS,mode); localStorage.setItem(PALETTE_LS,pal);
+  }
+  if(!MODE_LABEL[mode]) mode='auto';
+  if(!PALETTES.some(x=>x.id===pal)) pal='grape';
+  return {mode,pal};
+}
+function resolveMode(mode){
+  if(mode==='light'||mode==='dark') return mode;
+  try{ return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }catch(e){ return 'dark'; }
+}
+function applyTheme(){
+  const {mode,pal}=getThemePrefs(), res=resolveMode(mode), root=document.documentElement;
+  root.setAttribute('data-theme',res); root.setAttribute('data-palette',pal); root.dataset.scheme=res;
+  document.querySelectorAll('#mode-seg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  document.querySelectorAll('#theme-seg button').forEach(b=>b.classList.toggle('active', b.dataset.pal===pal));
+  const P=PALETTES.find(x=>x.id===pal);
+  const cur=$('#ts-current'); if(cur) cur.textContent=P.name+' \u00b7 '+MODE_LABEL[mode];
+  const lb=$('#theme-open-label'); if(lb) lb.textContent=P.name+' \u00b7 '+MODE_LABEL[mode]+' — change';
+  /* Thanh trạng thái iOS cũng đổi theo: đọc lại --bg vừa áp dụng ghi vào <meta theme-color>. */
   try{
-    const bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    const bg=getComputedStyle(root).getPropertyValue('--bg').trim();
     if(bg){ const m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', bg); }
   }catch(e){}
 }
+function setThemeMode(mode){ localStorage.setItem(THEME_LS,mode); applyTheme(); }
+function setThemePalette(pal){ localStorage.setItem(PALETTE_LS,pal); applyTheme(); }
+window.setThemeMode=setThemeMode; window.setThemePalette=setThemePalette;
+/* Dựng bảng chọn từ PALETTES — một nguồn duy nhất, thêm palette chỉ cần thêm một dòng + CSS. */
+function renderThemePicker(){
+  const ms=$('#mode-seg'), ps=$('#theme-seg'); if(!ms||!ps) return;
+  ms.innerHTML=Object.keys(MODE_LABEL).map(m=>
+    '<button class="ts-mode" data-mode="'+m+'" onclick="setThemeMode(\''+m+'\')">'+MODE_ICONS[m]+MODE_LABEL[m]+'</button>').join('');
+  ps.innerHTML=PALETTES.map(x=>
+    '<button class="ts-pal" data-pal="'+x.id+'" onclick="setThemePalette(\''+x.id+'\')">'
+    +'<span class="ts-pal-art"><i class="ts-pal-cta"></i><span class="ts-pal-dots"><i></i><i></i><i></i></span></span>'
+    +'<span class="ts-pal-name">'+x.name+'</span><span class="ts-pal-tag">'+x.tag+'</span>'
+    +'<span class="ts-check">\u2713</span></button>').join('');
+}
+try{
+  const mq=matchMedia('(prefers-color-scheme: dark)');
+  const onSys=()=>{ if(getThemePrefs().mode==='auto') applyTheme(); };
+  mq.addEventListener ? mq.addEventListener('change',onSys) : mq.addListener(onSys);
+}catch(e){}
 function openThemePop(){
   $('#theme-pop').classList.add('show');
   $('#theme-pop-backdrop').classList.add('show');
@@ -6046,10 +6118,7 @@ function wire(){
     $('#sort-label').textContent=SORT_LABEL[savedSort];
     renderSaved();
   });
-  document.querySelectorAll('#theme-seg button').forEach(b=>b.addEventListener('click',()=>{
-    localStorage.setItem(THEME_LS, b.dataset.theme); applyTheme(b.dataset.theme);
-    closeThemePop();
-  }));
+  renderThemePicker(); applyTheme();
   wireJar();
 
   $('#key').value=getKey(); $('#model').value=getModel(); $('#goal').value=getDailyGoal();
@@ -6178,7 +6247,7 @@ function wireOnboarding(){
 
 /* ---------- boot ---------- */
 (async function init(){
-  applyTheme(localStorage.getItem(THEME_LS)||'auto');
+  applyTheme();
   wire();
   wireOnboarding();
   renderHero();
