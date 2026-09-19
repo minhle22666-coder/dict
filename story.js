@@ -1910,18 +1910,13 @@ window.renderGameHub = function(){
     +'<img class="gm-tile-deco" src="./decor-magnifying-glass.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<span class="gm-tile-t">Match it</span>'
     +'<span class="gm-tile-s">Pick the word that fits the meaning</span></button>';
+  h+='<button class="gm-tile is-write" onclick="setPracticeMode(\'write\')">'
+    +'<span class="glow-border"></span>'
+    +'<img class="gm-tile-deco" src="./decor-note-and-pen.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<span class="gm-tile-t">Say it</span>'
+    +'<span class="gm-tile-s">Compose the English yourself — Focci checks it</span></button>';
   h+='</div></div>';
 
-  {
-    let target=0; try{ target=getState().dailyWordTarget||0; }catch(e){}
-    const done=window.__todaysCountCache||0;
-    const hit=target>0 && done>=target;
-    h+='<div class="gm-zone"><span class="gm-zone-t">Daily bonus</span>'
-      +'<span class="gm-zone-rule"></span>'
-      +'<span class="gm-zone-chip'+(hit?' on':'')+'">'
-      +(target?done+'/'+target:'—')+'</span></div>';
-  }
-  h+=renderBonusStrip();
   h+='</div>';
   area.innerHTML=h;
   fillGameCounts();

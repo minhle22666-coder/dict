@@ -1282,25 +1282,26 @@ function matchScore(query,cand){
 async function fuzzyLocalSearch(query){
   if(query.length<3) return null;
   const q=norm(query);
+  const hasSpace=/\s/.test(query.trim());
+  /* Pass 1: exact phrase — collocations/idioms/phrasal verbs are real,
+     known phrases already in the library; no guessing needed for these.
+     Dùng lại đúng CHỈ MỤC CỤM đã dựng sẵn (buildPhraseIndex, cùng chỉ mục
+     phraseLookup() dùng) thay vì tự quét lại idbAll() từ đầu.
+
+     Đây chính là lý do tra một CỤM TỪ (2+ từ) trông như "đứng yên không
+     phản ứng gì": hàm này trước đây luôn quét TOÀN BỘ thư viện (idbAll —
+     có thể hàng chục nghìn bản ghi) ở Pass 1, RỒI quét lại lần nữa ở Pass 2
+     (fuzzy theo matchScore, cho cả expressions từng bản ghi) — hai lượt
+     quét đầy đủ, đồng bộ, chặn luồng chính, chạy TRƯỚC KHI kịp gọi AI.
+     Trên máy yếu/thư viện lớn việc này tốn nhiều giây, và Pass 2 (dò lỗi
+     chính tả kiểu "wich"→"which") vốn chỉ có ý nghĩa cho TỪ ĐƠN — so một
+     cụm 2-3 từ với từng từ đơn trong thư viện gần như không bao giờ khớp,
+     nên với cụm từ nó chỉ tốn thời gian mà không ích gì. */
+  const idx=await buildPhraseIndex();
+  for(const e of idx){ if(e.vi && e.t===q) return {type:'expr', target:e.o, label:e.d, exact:true}; }
+  if(hasSpace) return null;
+  // Pass 2: fuzzy fallback — chỉ còn chạy cho TỪ ĐƠN, nơi nó thật sự hữu ích.
   const all=await idbAll();
-  // Pass 1: exact phrase — collocations/idioms/phrasal verbs are real,
-  // known phrases already in the library; no guessing needed for these.
-  // NHƯNG chỉ short-circuit khi mục đó THẬT SỰ có nghĩa tiếng Việt (e.vi).
-  // Trước đây bỏ qua điều kiện này: "I suppose so" khớp tuyệt đối một
-  // collocation cũ đã lưu cho "suppose" nhưng collocation đó chưa có vi
-  // (lỗ hổng chất lượng dữ liệu cũ), nên app nhảy thẳng vào trang từ
-  // "suppose" và dừng lại ở một dòng trống — không hề gọi AI dịch — trông
-  // y như "gõ vào không dịch ra gì cả". Cùng lỗi này đã được vá ở
-  // phraseLookup() (lọc theo o.vi) nhưng bỏ sót chỗ này.
-  for(const r of all){
-    if(r.alias) continue;
-    const buckets=[r.data&&r.data.expressions, r.data&&r.data.collocations, r.data&&r.data.phrasal_verbs, r.data&&r.data.idioms];
-    for(const arr of buckets){
-      if(!Array.isArray(arr)) continue;
-      for(const e of arr){ if(e.text && e.vi && norm(e.text)===q) return {type:'expr', target:r.word, label:e.text, exact:true}; }
-    }
-  }
-  // Pass 2: fuzzy fallback, as before
   let best=null,bestScore=0.6;
   for(const r of all){
     if(r.alias) continue;
@@ -2744,7 +2745,7 @@ async function showTypedSuggest(q){
   let results=[];
   try{ results=await idbPrefix(q); }catch(e){ results=[]; }
 
-  if(results.length) renderSuggestList('In your library', results, false, null);
+  if(results.length) renderSuggestList('', results, false, null);
 
   let phrases=[];
   try{
@@ -2756,7 +2757,7 @@ async function showTypedSuggest(q){
   if(norm($('#q').value)!==q) return;
 
   if(!results.length && !phrases.length){ hideSuggest(); return; }
-  renderSuggestList('In your library', results, false, phrases);
+  renderSuggestList('', results, false, phrases);
 }
 
 /* gõ phraseDebug('mileage out') trong console để xem chỉ mục có gì */
@@ -2813,8 +2814,8 @@ async function posTagMapFor(words){
 }
 function renderSuggestList(label, recs, deletable, phrases){
   const el=$('#suggest');
-  let h='<div class="suggest-lbl">'+label
-    +(recs.length>12?' <i>'+recs.length+'</i>':'')+'</div>';
+  let h=label ? '<div class="suggest-lbl">'+label
+    +(recs.length>12?' <i>'+recs.length+'</i>':'')+'</div>' : '';
   for(const r of recs.slice(0,SUGGEST_MAX)){
     const d=r.data||{};
     const safeW=esc(r.word).replace(/'/g,"\\'");
@@ -3277,24 +3278,7 @@ async function shakeTree(){
   }
 }
 
-/* Tap Focci on the hero banner and he says something back. */
-const FOCCI_TAPS=[
-  "Ready when you are, explorer!",
-  "Psst… try searching a word you heard today.",
-  "My notebook has room for one more word.",
-  "The best maps are drawn one step at a time.",
-  "I once got lost looking for 'serendipity'. Worth it.",
-  "Streaks are just tiny adventures in a row."
-];
-function tapFocci(){
-  const b=$('#hero-bubble'); if(!b) return;
-  b.textContent=pick(FOCCI_TAPS);
-  b.classList.add('show');
-  const c=$('#hero-char');
-  c.classList.remove('hop'); void c.offsetWidth; c.classList.add('hop');
-  clearTimeout(b._t); b._t=setTimeout(()=>b.classList.remove('show'),2800);
-}
-window.shakeTree=shakeTree; window.tapFocci=tapFocci;
+window.shakeTree=shakeTree;
 
 /* ============================================================
    SAVED
@@ -3626,7 +3610,7 @@ function getLevel(){ const l=localStorage.getItem(LEVEL_LS); return (l&&LEVEL_NA
 function setLevel(l){ localStorage.setItem(LEVEL_LS,String(l)); renderPracticeSetup(); }
 window.setQCount=setQCount; window.setPool=setPool; window.setLevel=setLevel;
 
-let practiceMode='type';     // 'type' | 'match'
+let practiceMode='type';     // 'type' | 'match' | 'write'
 let practiceStage='setup';   // 'setup' | 'playing'
 /* true CHỈ khi vào phiên ôn qua nút "Review now" trên Saved (số từ tới
    hạn hôm nay). Ép đúng bộ từ ĐÓ (không phải theo pool/qcount thường), và
@@ -3634,7 +3618,11 @@ let practiceStage='setup';   // 'setup' | 'playing'
    lượt sạch — coi như "đủ nhớ" mới thôi. Vào Type it/Match it theo cách
    thường (tab bar, đổi pool tay…) thì cờ này luôn tắt, hành vi y như cũ. */
 let dueReviewMode=false;
-function setPracticeMode(m){ practiceMode=m; practiceStage='setup'; renderPracticeSetup(); }
+function setPracticeMode(m){
+  practiceMode=m; practiceStage='setup';
+  if(m==='write'){ startWrite(); return; }
+  renderPracticeSetup();
+}
 window.setPracticeMode=setPracticeMode;
 
 /* the two games, presented as cards you switch between */
@@ -3652,6 +3640,7 @@ function gameSwitch(){
   return back+'<div class="game-switch">'
     +g('type','decor-note-and-pen','Type it','spell from memory')
     +g('match','decor-magnifying-glass','Match it','pick the right word')
+    +g('write','decor-note-and-pen','Say it','compose a sentence')
     +'</div>';
 }
 function chipRow(label, note, opts){
@@ -4006,22 +3995,244 @@ function nextMatch(){ matchIdx++; matchPicked=null; renderMatch(); }
 window.startMatch=startMatch; window.pickMatch=pickMatch; window.nextMatch=nextMatch;
 
 /* ============================================================
+   SAY IT — đặt câu tiếng Anh từ một tình huống + câu tiếng Việt, Gemini
+   chấm nhẹ nhàng rồi đưa thêm vài cách nói tự nhiên khác cùng sắc thái.
+
+   Kho câu hỏi nằm cứng trong app (không tốn API để SINH câu hỏi, chỉ tốn
+   API để CHẤM — đúng như yêu cầu). "Không lặp lại": nhớ id đã chơi vào
+   localStorage, chỉ rút từ những câu CHƯA chơi; hết kho thì mở lại vòng
+   mới (không tính là lặp trong CÙNG một lượt chơi, vì đã đi hết một vòng).
+   ============================================================ */
+const WRITE_PROMPTS=[
+  {id:'bus_interpret', topic:'public',
+   context:"You're stepping onto a bus and notice a foreigner who doesn't understand the Vietnamese bus attendant. You want to interpret for him. Say this in English:",
+   vi:"Bạn cần xuất trình giấy tờ cho tiếp viên hoặc dùng thẻ thanh toán digital hoặc thẻ vật lý đều được, tap vào máy để lấy vé."},
+  {id:'restaurant_allergy', topic:'restaurant',
+   context:"The waiter is about to take your order and you want to warn them about a food allergy first. Say this in English:",
+   vi:"Tôi bị dị ứng đậu phộng, nên nếu món nào có đậu phộng thì làm ơn nói cho tôi biết trước nhé."},
+  {id:'restaurant_split_bill', topic:'restaurant',
+   context:"Dinner with friends is over and you want to suggest splitting the bill evenly instead of figuring out who ordered what. Say this in English:",
+   vi:"Hay là mình chia đều hoá đơn ra cho dễ, khỏi phải tính ai ăn món gì cho mất công."},
+  {id:'work_late', topic:'work',
+   context:"You're going to be late for a morning meeting because of traffic, and you want to give your manager a heads-up. Say this in English:",
+   vi:"Em xin lỗi, đường đang kẹt xe nên chắc em trễ khoảng mười lăm phút, mọi người cứ bắt đầu trước ạ."},
+  {id:'work_help', topic:'work',
+   context:"You're stuck on a spreadsheet formula and want to ask a coworker sitting near you for a quick hand. Say this in English:",
+   vi:"Bạn rảnh chút xíu không, mình đang bí một công thức trong file Excel, chỉ mình với."},
+  {id:'work_deadline', topic:'work',
+   context:"Your manager just gave you a deadline that feels too tight, and you want to politely ask for one more day. Say this in English:",
+   vi:"Anh chị cho em xin thêm một ngày được không ạ, em muốn kiểm tra lại kỹ trước khi gửi."},
+  {id:'work_feedback', topic:'work',
+   context:"A coworker just pitched an idea in a meeting, and you want to add one gentle concern without shutting it down. Say this in English:",
+   vi:"Ý này hay đó, nhưng mình hơi lo về phần ngân sách, không biết mình tính tới chưa nhỉ?"},
+  {id:'work_email_clarify', topic:'work',
+   context:"You received a confusing email from a client and want to politely ask them to clarify what they meant. Say this in English:",
+   vi:"Cho tôi hỏi lại ý bạn ở đoạn này một chút được không, tôi chưa hiểu rõ lắm."},
+  {id:'work_dayoff', topic:'work',
+   context:"You need to ask your manager for a day off next week for a personal matter. Say this in English:",
+   vi:"Anh chị cho em xin nghỉ một ngày vào tuần sau được không ạ, em có việc gia đình cần giải quyết."},
+  {id:'debate_remote_work', topic:'debate',
+   context:"A friend says remote work is always better than working in an office, and you disagree — politely. Say this in English:",
+   vi:"Mình hiểu ý bạn, nhưng mình nghĩ còn tuỳ công việc nữa — việc nào cần trao đổi trực tiếp thì làm ở văn phòng vẫn hiệu quả hơn."},
+  {id:'debate_defend_choice', topic:'debate',
+   context:"Someone questions why you chose a cheaper phone over a flagship one, and you want to explain your reasoning calmly. Say this in English:",
+   vi:"Mình không cần hết mấy tính năng cao cấp đó, với lại mình muốn để dành tiền cho việc khác quan trọng hơn."},
+  {id:'debate_movie', topic:'debate',
+   context:"A friend loved a movie you thought was overrated, and you want to share your honest opinion without sounding harsh. Say this in English:",
+   vi:"Mình thấy phim cũng ổn, nhưng đoạn giữa hơi lê thê, mình suýt nữa thì ngủ quên luôn."},
+  {id:'public_directions', topic:'public',
+   context:"A tourist stops you on the street looking lost and asks how to get to the nearest train station. Say this in English:",
+   vi:"Bạn đi thẳng tới ngã tư phía trước, quẹo trái, ga tàu nằm ngay bên tay phải, đi bộ khoảng năm phút thôi."},
+  {id:'public_lost_wallet', topic:'public',
+   context:"You just realized you lost your wallet and need to explain the situation to airport staff. Say this in English:",
+   vi:"Tôi vừa phát hiện mình làm mất ví, chắc là để quên ở khu vực kiểm tra an ninh, anh chị giúp tôi kiểm tra được không ạ?"},
+  {id:'public_pharmacy', topic:'public',
+   context:"You have a mild headache and want to ask the pharmacist for something safe without a prescription. Say this in English:",
+   vi:"Tôi bị nhức đầu nhẹ thôi, anh chị có loại thuốc nào không cần toa mà uống được không ạ?"},
+  {id:'casual_weekend', topic:'casual',
+   context:"You're texting a friend to see if they're free to hang out this weekend. Say this in English:",
+   vi:"Cuối tuần này bạn có rảnh không, đi cà phê rồi xem phim chung nha?"},
+  {id:'casual_apology', topic:'casual',
+   context:"You showed up fifteen minutes late to meet a friend and want to apologize casually. Say this in English:",
+   vi:"Xin lỗi nha, mình bị kẹt xe nên tới trễ, đợi lâu chưa?"},
+  {id:'casual_smalltalk', topic:'casual',
+   context:"You're standing in a long line at the store and want to make small talk with the stranger next to you about the wait. Say this in English:",
+   vi:"Trời ơi xếp hàng lâu dữ vậy, chắc tại đông người mua đồ cuối tuần quá."},
+  {id:'casual_weather', topic:'casual',
+   context:"It's been raining nonstop and you want to complain lightly about it to a coworker. Say this in English:",
+   vi:"Mưa hoài kiểu này chắc tôi ở nhà luôn quá, ra đường ướt hết đồ."},
+  {id:'casual_invite', topic:'casual',
+   context:"You just found a great new café and want to invite a friend to check it out with you. Say this in English:",
+   vi:"Mình mới tìm được một quán cà phê ngon lắm, bữa nào rảnh đi thử với mình nha?"}
+];
+const WRITE_SEEN_LS='fc_write_seen';
+function writeSeenIds(){
+  try{ return new Set(JSON.parse(localStorage.getItem(WRITE_SEEN_LS)||'[]')); }catch(e){ return new Set(); }
+}
+function writeMarkSeen(id){
+  const s=writeSeenIds(); s.add(id);
+  try{ localStorage.setItem(WRITE_SEEN_LS, JSON.stringify([...s])); }catch(e){}
+}
+function pickWritePrompt(){
+  const seen=writeSeenIds();
+  let pool=WRITE_PROMPTS.filter(p=>!seen.has(p.id));
+  if(!pool.length){
+    try{ localStorage.removeItem(WRITE_SEEN_LS); }catch(e){}   // hết kho — mở vòng mới
+    pool=WRITE_PROMPTS;
+  }
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+let writeCur=null, writeBusy=false, writeResult=null;
+function startWrite(){
+  practiceStage='playing';
+  writeCur=pickWritePrompt();
+  writeBusy=false; writeResult=null;
+  renderWrite();
+}
+window.startWrite=startWrite;
+
+function renderWrite(){
+  const area=$('#review-area'); if(!area) return;
+  if(!writeCur){ startWrite(); return; }
+  let h=gameSwitch();
+  h+='<div class="write-card">';
+  h+='<div class="write-ctx"><img src="./mascot-wonder.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<p>'+esc(writeCur.context)+'</p></div>';
+  h+='<div class="write-vi">'+esc(writeCur.vi)+'</div>';
+  if(!writeResult){
+    h+='<textarea id="write-input" class="write-input" rows="3" placeholder="Type it in English…" autocapitalize="sentences" autocorrect="off" spellcheck="false"></textarea>';
+    h+='<button class="btn" id="write-check" onclick="submitWrite()">Check it \u2192</button>';
+  }else{
+    h+=writeResultHtml(writeResult);
+    h+='<button class="btn" onclick="startWrite()">Next sentence \u2192</button>';
+  }
+  h+='</div>';
+  area.innerHTML=h;
+  if(!writeResult){
+    const inp=$('#write-input');
+    if(inp){ inp.focus(); inp.addEventListener('keydown',e=>{
+      if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); submitWrite(); }
+    }); }
+  }
+}
+window.renderWrite=renderWrite;
+
+function writeResultHtml(result){
+  const v=result.verdict==='good'?'good':(result.verdict==='off'?'off':'close');
+  const label=v==='good'?'Sounds natural! \u2713':(v==='off'?"Let's adjust this":'Close — small tweak');
+  let h='<div class="write-fb write-fb-'+v+'">';
+  h+='<div class="write-fb-v">'+label+'</div>';
+  if(result.feedback_vi) h+='<div class="write-fb-t">'+esc(result.feedback_vi)+'</div>';
+  h+='</div>';
+  const alts=Array.isArray(result.natural_alternatives)?result.natural_alternatives:[];
+  if(alts.length){
+    h+='<div class="write-alts"><div class="write-alts-h">Other natural ways to say it</div>';
+    for(const a of alts){
+      if(!a||!a.en) continue;
+      h+='<div class="write-alt"><div class="write-alt-en">'+esc(a.en)+'</div>'
+        +(a.why_vi?'<div class="write-alt-w">'+esc(a.why_vi)+'</div>':'')+'</div>';
+    }
+    h+='</div>';
+  }
+  return h;
+}
+
+function gradeWritePrompt(promptObj, userAnswer){
+  return 'You are a warm, encouraging English coach helping a Vietnamese learner practice writing natural English sentences. Never be harsh — this is low-stakes practice, not an exam.\n\n'
+  +'SITUATION (context only, do not translate this part):\n'+promptObj.context+'\n\n'
+  +'THE VIETNAMESE SENTENCE THEY WERE ASKED TO EXPRESS IN ENGLISH:\n"'+promptObj.vi+'"\n\n'
+  +'WHAT THE LEARNER WROTE:\n"'+userAnswer+'"\n\n'
+  +'Grade generously. The goal is encouragement, not gatekeeping — only mark something as genuinely "off" if a native listener would actually be confused or the meaning changed; a slightly stiff phrasing or a small grammar slip with the meaning intact is "close" at worst, often still "good".\n\n'
+  +'Return ONLY this JSON:\n{\n'
+  +'  "verdict": "good" | "close" | "off",\n'
+  +'  "feedback_vi": "1-2 câu tiếng Việt NGẮN GỌN, khích lệ. Luôn có ít nhất một điểm khen cụ thể trước (từ vựng, cấu trúc, ngữ điệu đúng). Nếu có lỗi hoặc sound off thì chỉ ra NHẸ NHÀNG, không chỉ trích gay gắt.",\n'
+  +'  "natural_alternatives": [ {"en":"một cách nói tự nhiên khác, giữ đúng nghĩa và thái độ/cảm xúc tương đương", "why_vi":"khác biệt sắc thái so với câu trên, rất ngắn"} ]\n'
+  +'}\n'
+  +'Give exactly 2-3 natural_alternatives, ranked by how commonly a native speaker would actually say this in this exact situation. If the learner\'s sentence was already excellent, the alternatives should show OTHER equally-natural ways to phrase it, not "corrections".';
+}
+async function askGradeWrite(promptObj, userAnswer){
+  const key=getKey(); if(!key) throw new Error('NO_KEY');
+  const model=getModel();
+  const prompt=gradeWritePrompt(promptObj, userAnswer);
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
+      generationConfig:{temperature:0.4,maxOutputTokens:700}})});
+  if(!r.ok) throw new Error('HTTP_'+r.status);
+  const j=await r.json();
+  let txt=(j.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+  txt=txt.replace(/```json|```/g,'').trim();
+  const s=txt.indexOf('{'), e=txt.lastIndexOf('}');
+  if(s<0||e<0) throw new Error('BAD_JSON');
+  return JSON.parse(txt.slice(s,e+1));
+}
+/* Mỗi câu chơi xong TỰ ĐỘNG lưu vào The Cache — không cần bấm sao — để
+   user xem lại được câu mình viết, nhận xét của Focci, và các cách nói
+   khác. Mỗi lượt là MỘT bản ghi riêng (key có timestamp) nên chơi lại
+   cùng một câu ở vòng sau vẫn giữ được lịch sử, không ghi đè lượt cũ. */
+async function saveWriteAttempt(promptObj, userAnswer, result){
+  const alts=Array.isArray(result.natural_alternatives)?result.natural_alternatives:[];
+  const bestEn=(alts[0]&&alts[0].en)||userAnswer;
+  const key=norm('say-it '+promptObj.id+' '+now());
+  const data={
+    word:bestEn, phrase:true, write:true, vi_equivalent:promptObj.vi,
+    senses:[{pos:'sentence', vi:promptObj.vi, gloss:result.feedback_vi||'',
+             example:userAnswer, example_vi:promptObj.context}]
+  };
+  const rec={ word:key, data, source:'write', firstSeen:now(), saved:1, savedAt:now() };
+  await idbPut(rec);
+  return rec;
+}
+async function submitWrite(){
+  if(writeBusy || !writeCur) return;
+  const inp=$('#write-input'); if(!inp) return;
+  const answer=inp.value.trim();
+  if(!answer){ inp.focus(); return; }
+  if(!getKey()){ toast('Add your Gemini key in Settings first'); return; }
+  if(!navigator.onLine){ toast("You're offline — connect to check this"); return; }
+  writeBusy=true;
+  const btn=$('#write-check'); if(btn){ btn.disabled=true; btn.textContent='Checking…'; }
+  try{
+    const result=await askGradeWrite(writeCur, answer);
+    writeResult=result;
+    writeMarkSeen(writeCur.id);
+    await saveWriteAttempt(writeCur, answer, result);
+    addXP(2);
+    refreshStats();
+  }catch(err){
+    toast('Could not check that — try again');
+  }
+  writeBusy=false;
+  renderWrite();
+}
+window.submitWrite=submitWrite;
+
+/* ============================================================
    TYPE IT
    ============================================================ */
-/* The shape of the answer: first letter shown, every other letter an
-   underscore, real gaps between words. */
+/* The shape of the answer: first + last letter shown (was only the first
+   before — a single starting letter often isn't enough to place a word),
+   every other letter an underscore, real gaps between words. Words ending
+   in "-ed" (tired, excited, worried… V2/V3 forms) also reveal the whole
+   "ed" tail, not just its last letter — seeing one stray "d" barely hints
+   at the shape, seeing "…ed" immediately signals "this is a past form". */
 function maskHint(word){
   const w=String(word||'').trim();
   if(!w) return '';
-  let out='', first=true, letters=0;
+  const isLetter=ch=>/[a-zA-Z\u00C0-\u024F]/.test(ch);
+  const letters=[...w].filter(isLetter);
+  const total=letters.length;
+  const endsEd = total>=3 && letters[total-2].toLowerCase()==='e' && letters[total-1].toLowerCase()==='d';
+  let out='', li=0;
   for(const ch of w){
     if(/\s/.test(ch)){ out+='<span class="mh-gap"></span>'; continue; }
-    if(!/[a-zA-Z\u00C0-\u024F]/.test(ch)){ out+='<span class="mh-ch punct">'+esc(ch)+'</span>'; continue; }
-    letters++;
-    if(first){ out+='<span class="mh-ch first">'+esc(ch)+'</span>'; first=false; }
-    else out+='<span class="mh-ch blank">_</span>';
+    if(!isLetter(ch)){ out+='<span class="mh-ch punct">'+esc(ch)+'</span>'; continue; }
+    const reveal = li===0 || li===total-1 || (endsEd && li>=total-2);
+    out += reveal ? '<span class="mh-ch first">'+esc(ch)+'</span>' : '<span class="mh-ch blank">_</span>';
+    li++;
   }
-  return '<div class="mask-hint">'+out+'<span class="mh-count">'+letters+' letters</span></div>';
+  return '<div class="mask-hint">'+out+'<span class="mh-count">'+total+' letters</span></div>';
 }
 
 function renderReview(){
@@ -4605,9 +4816,15 @@ function parseWordList(text){
 }
 
 /* ---------- theme ---------- */
+/* Các theme nền SÁNG — dùng để gắn data-scheme="light" lên <html>, để mọi
+   khối "kính mờ" (glassmorphism) vốn chỉ thiết kế cho nền tối (info-card,
+   Daily challenge, onboarding…) có MỘT chỗ duy nhất để tự đổi màu kính +
+   chữ theo, thay vì phải liệt kê lại cả 6 theme sáng ở từng nơi. */
+const LIGHT_THEMES=new Set(['light','sakura-light','ocean-breeze','sunset-terracotta','lavender-fields','coral-reef']);
 function applyTheme(theme){
   if(theme==='auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', theme);
+  document.documentElement.dataset.scheme = LIGHT_THEMES.has(theme) ? 'light' : 'dark';
   document.querySelectorAll('#theme-seg button').forEach(b=>b.classList.toggle('active', b.dataset.theme===theme));
   /* Thanh trạng thái iOS (ngoài app, trên cùng màn hình) cũng nên đổi
      theo theme luôn, chứ không chỉ riêng header trong app — đọc lại
