@@ -449,13 +449,20 @@ async function viReverseLookup(term){
   if(exact && exact.length) return rank(exact).slice(0,14);
   // no exact entry — a loose "contains" pass catches close-enough phrasing
   const out=[]; const seen=new Set();
-  /* Nhánh q.includes(t) là nguồn rác: với câu "tôi cho là vậy", mọi nghĩa
-     ngắn nằm lọt trong câu đều khớp — "cho" kéo theo deem/accuses, "vậy"
-     kéo theo ah/er/well. Giờ chiều đó chỉ được nhận khi t đủ dài so với
-     câu hỏi, tức nó thật sự là phần lớn ý nghĩa chứ không phải một mẩu. */
+  /* Cả hai chiều "chứa nhau" đều là nguồn rác nếu không giới hạn tỉ lệ độ
+     dài: với câu "tôi cho là vậy", mọi nghĩa ngắn nằm lọt trong câu đều
+     khớp — "cho" kéo theo deem/accuses, "vậy" kéo theo ah/er/well (chiều
+     q chứa t, đã chặn). Chiều NGƯỢC LẠI (t chứa q) cũng rác y hệt: tra
+     "nói gì" khớp bừa vào "dumb" chỉ vì nghĩa của dumb có cụm "không biết
+     nói gì" — q chỉ là một mẩu nhỏ lọt thỏm trong t, không phải nghĩa
+     chính. Giờ CẢ HAI chiều đều bắt buộc bên ngắn phải chiếm ít nhất 60%
+     độ dài bên dài, không thì không tính là khớp. */
   const minSub=Math.max(4, Math.floor(q.length*0.6));
+  const maxTForQIn=Math.ceil(q.length/0.6);
   for(const [t,entries] of idx){
-    if(t.includes(q) || (q.includes(t) && t.length>=minSub)){
+    const qContainsT = q.includes(t) && t.length>=minSub;
+    const tContainsQ = t.includes(q) && t.length<=maxTForQIn;
+    if(qContainsT || tContainsQ){
       for(const w of rank(entries)) if(!seen.has(w)){ seen.add(w); out.push(w); }
       if(out.length>=14) break;
     }
@@ -1344,6 +1351,7 @@ async function search(rawWord, forceAI){
   if(!$('#v-home').classList.contains('active')) showView('home');
   enterResultMode();
   const box=$('#result');
+  try{
 
   // Vietnamese → offline reverse lookup, ALWAYS tried first, regardless of
   // spaces — most Vietnamese words are written with spaces between
@@ -1351,25 +1359,28 @@ async function search(rawWord, forceAI){
   if(!forceAI && isVN){
     currentWord=null;
     /* Ba âm tiết trở lên gần như luôn là một CÂU, và người ta muốn bản
-       dịch chứ không phải một rổ chip từ đơn. Tra ngược chỉ hợp với từ
-       hoặc cụm ngắn. */
+       dịch chứ không phải một rổ chip từ đơn — tra ngược cục bộ chỉ thử
+       với từ/cụm ngắn (dưới 3 âm tiết). */
     const viWords=word.trim().split(/\s+/).filter(Boolean).length;
-    if(viWords>=3){
-      if(!getKey()){ box.innerHTML=needKeyState(word); return; }
-      if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
-      box.innerHTML=questScene(word);
-      try{
-        const result=await translatePhrase(word);
-        box.innerHTML=phraseResultState(word, result);
-        const savedRec=await phraseHistoryRecord(word, result);
-        logEvent('search', savedRec?savedRec.word:norm(word));
-        addXP(1);
-      }catch(err){ box.innerHTML=errorState(word, err.message||''); }
-      return;
+    if(viWords<3){
+      const hits=await viReverseLookup(word);
+      if(hits.length){ box.innerHTML=viResultsState(word, hits); logEvent('search', null); addXP(1); return; }
     }
-    const hits=await viReverseLookup(word);
-    if(hits.length){ box.innerHTML=viResultsState(word, hits); logEvent('search', null); addXP(1); return; }
-    box.innerHTML=viNotFoundState(word);   // opt-in "Translate with AI" button lives in here — never automatic
+    /* Không có gì khớp tốt trong máy (hoặc câu đủ dài để chắc chắn cần
+       dịch) → dịch thẳng bằng AI, TỰ ĐỘNG — không bắt bấm thêm nút nào.
+       Trước đây case này dừng ở viNotFoundState với một nút "Dịch bằng AI"
+       phải bấm tay; giờ hợp nhất với nhánh câu dài ở trên, luôn tự gọi AI
+       ngay khi tra cục bộ không ra gì. */
+    if(!getKey()){ box.innerHTML=needKeyState(word); return; }
+    if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
+    box.innerHTML=questScene(word);
+    try{
+      const result=await translatePhrase(word);
+      box.innerHTML=phraseResultState(word, result);
+      const savedRec=await phraseHistoryRecord(word, result);
+      logEvent('search', savedRec?savedRec.word:norm(word));
+      addXP(1);
+    }catch(err){ box.innerHTML=errorState(word, err.message||''); }
     return;
   }
 
@@ -1379,7 +1390,7 @@ async function search(rawWord, forceAI){
     const local=await idbGet(word);
     if(local && local.alias){
       const canon=await idbGet(local.alias);
-      if(canon){
+      if(canon && canon.data){
         currentWord=canon.word;
         // alias do lemma sinh ra thì hiện khung "dạng biến đổi", không phải "đã sửa"
         if(local.formKind){
@@ -1393,8 +1404,16 @@ async function search(rawWord, forceAI){
         }
         maybeLoadYouglish(canon.word); logEvent('search',canon.word); addXP(2); return;
       }
+      /* alias "mồ côi" — trỏ tới một bản ghi gốc không còn .data (đã bị
+         xoá, hoặc chưa từng lưu xong). KHÔNG rơi xuống dùng "local" ở dưới
+         (nó cũng chỉ là bản ghi alias, không có .data) — coi như chưa có
+         gì trong máy và tra lại từ đầu, thay vì render một trang gần như
+         trắng/rỗng mà không hiểu vì sao. */
     }
-    if(local){ currentWord=word; box.innerHTML=renderEntry(local); maybeLoadYouglish(word); logEvent('search',word); addXP(2); return; }
+    /* Chỉ dùng bản ghi cục bộ khi nó THẬT SỰ có .data — một bản ghi mồ côi
+       (alias hỏng, hoặc lưu dở dang) mà vẫn đem render sẽ ra một trang
+       trống trơn không rõ lý do, trông y như "gõ vào không phản ứng gì". */
+    if(local && local.data){ currentWord=word; box.innerHTML=renderEntry(local); maybeLoadYouglish(word); logEvent('search',word); addXP(2); return; }
 
     /* Dạng biến đổi của một từ đã có trong máy: went→go, walked→walk,
        studies→study. Phải đứng TRƯỚC fuzzyLocalSearch, vì fuzzy chấm
@@ -1507,6 +1526,15 @@ async function search(rawWord, forceAI){
     refreshStats();
   }catch(err){
     box.innerHTML=errorState(word,err.message||'');
+  }
+  /* Lưới an toàn ngoài cùng: BẤT KỲ lỗi bất ngờ nào ở bất kỳ nhánh nào bên
+     trên (kể cả những nhánh vốn không có try/catch riêng, như tra cục bộ,
+     fuzzy, phraseLookup…) đều rơi vào đây thay vì bị nuốt im lặng thành
+     một trang trắng không hiểu vì sao — luôn có ít nhất một thông báo lỗi
+     hiện ra để biết là có trục trặc, chứ không phải "đứng yên không phản
+     ứng gì". */
+  }catch(outerErr){
+    try{ box.innerHTML=errorState(word, (outerErr&&outerErr.message)||'UNKNOWN'); }catch(e2){}
   }
 }
 function forceAI(word){ search(word,true); }
@@ -4066,6 +4094,13 @@ const WRITE_PROMPTS=[
    vi:"Mình mới tìm được một quán cà phê ngon lắm, bữa nào rảnh đi thử với mình nha?"}
 ];
 const WRITE_SEEN_LS='fc_write_seen';
+const WRITE_TOPICS={
+  casual:{label:'Casual', icon:'\u{1F4AC}', color:'blue'},
+  work:{label:'At work', icon:'\u{1F4BC}', color:'amber'},
+  restaurant:{label:'Restaurant', icon:'\u{1F35C}', color:'coral'},
+  public:{label:'Out and about', icon:'\u{1F9ED}', color:'mint'},
+  debate:{label:'Your take', icon:'\u{1F4AD}', color:'violet'}
+};
 function writeSeenIds(){
   try{ return new Set(JSON.parse(localStorage.getItem(WRITE_SEEN_LS)||'[]')); }catch(e){ return new Set(); }
 }
@@ -4095,11 +4130,13 @@ window.startWrite=startWrite;
 function renderWrite(){
   const area=$('#review-area'); if(!area) return;
   if(!writeCur){ startWrite(); return; }
+  const topic=WRITE_TOPICS[writeCur.topic]||{label:'Practice',icon:'\u2728',color:'blue'};
   let h=gameSwitch();
   h+='<div class="write-card">';
-  h+='<div class="write-ctx"><img src="./mascot-wonder.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<p>'+esc(writeCur.context)+'</p></div>';
-  h+='<div class="write-vi">'+esc(writeCur.vi)+'</div>';
+  h+='<div class="write-topic write-topic-'+topic.color+'"><span>'+topic.icon+'</span>'+esc(topic.label)+'</div>';
+  h+='<div class="write-ctx"><img class="write-ctx-img" src="./mascot-wonder.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<div class="write-ctx-bubble">'+esc(writeCur.context)+'</div></div>';
+  h+='<div class="write-vi write-vi-'+topic.color+'"><span class="write-vi-mark">\u201C</span>'+esc(writeCur.vi)+'</div>';
   if(!writeResult){
     h+='<textarea id="write-input" class="write-input" rows="3" placeholder="Type it in English…" autocapitalize="sentences" autocorrect="off" spellcheck="false"></textarea>';
     h+='<button class="btn" id="write-check" onclick="submitWrite()">Check it \u2192</button>';
@@ -4114,25 +4151,30 @@ function renderWrite(){
     if(inp){ inp.focus(); inp.addEventListener('keydown',e=>{
       if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); submitWrite(); }
     }); }
+  }else if(writeResult.verdict==='good'){
+    const card=area.querySelector('.write-card');
+    if(card) confettiBurst(card);
   }
 }
 window.renderWrite=renderWrite;
 
 function writeResultHtml(result){
   const v=result.verdict==='good'?'good':(result.verdict==='off'?'off':'close');
-  const label=v==='good'?'Sounds natural! \u2713':(v==='off'?"Let's adjust this":'Close — small tweak');
+  const icon=v==='good'?'\u{1F31F}':(v==='off'?'\u{1F914}':'\u{1F642}');
+  const label=v==='good'?'Sounds natural!':(v==='off'?"Let's adjust this":'Close — small tweak');
   let h='<div class="write-fb write-fb-'+v+'">';
-  h+='<div class="write-fb-v">'+label+'</div>';
+  h+='<div class="write-fb-v"><span class="write-fb-ico">'+icon+'</span>'+label+'</div>';
   if(result.feedback_vi) h+='<div class="write-fb-t">'+esc(result.feedback_vi)+'</div>';
   h+='</div>';
   const alts=Array.isArray(result.natural_alternatives)?result.natural_alternatives:[];
-  if(alts.length){
-    h+='<div class="write-alts"><div class="write-alts-h">Other natural ways to say it</div>';
-    for(const a of alts){
-      if(!a||!a.en) continue;
-      h+='<div class="write-alt"><div class="write-alt-en">'+esc(a.en)+'</div>'
-        +(a.why_vi?'<div class="write-alt-w">'+esc(a.why_vi)+'</div>':'')+'</div>';
-    }
+  const goodAlts=alts.filter(a=>a&&a.en);
+  if(goodAlts.length){
+    h+='<div class="write-alts"><div class="write-alts-h">\u2728 Other natural ways to say it</div>';
+    goodAlts.forEach((a,i)=>{
+      h+='<div class="write-alt" style="animation-delay:'+(i*90)+'ms"><span class="write-alt-n">'+(i+1)+'</span>'
+        +'<div class="write-alt-body"><div class="write-alt-en">'+esc(a.en)+'</div>'
+        +(a.why_vi?'<div class="write-alt-w">'+esc(a.why_vi)+'</div>':'')+'</div></div>';
+    });
     h+='</div>';
   }
   return h;
