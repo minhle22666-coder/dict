@@ -5,13 +5,22 @@
 
 /* ---------- tiny helpers ---------- */
 const $ = (s) => document.querySelector(s);
-const norm = (w) => w.trim().toLowerCase();
+const norm = (w) => String(w==null ? '' : w).trim().toLowerCase();   // an odd record must never throw here
 const now = () => Date.now();
 const DAY = 864e5;
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1900); }
 function dayStart(ts){ const d=new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
 function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+/* Chờ một promise tối đa `ms`; quá hạn (hoặc lỗi) thì trả `fallback`. Dùng cho
+   các bước TRA CỤC BỘ trong search(): chúng chỉ là đường tắt, không được phép
+   treo vô hạn và chặn mất lượt gọi AI. */
+function softWait(promise, ms, fallback){
+  return new Promise(res=>{
+    const t=setTimeout(()=>res(fallback), ms);
+    Promise.resolve(promise).then(v=>{ clearTimeout(t); res(v); }, ()=>{ clearTimeout(t); res(fallback); });
+  });
+}
 
 /* ---------- spelling-variant normalization (British -> American canonical) ---------- */
 const SPELLING_VARIANTS = {
@@ -427,7 +436,7 @@ async function buildViIndex(){
     if(r.alias) continue;
     const d=r.data; if(!d) continue;
     // primary: the word's own top 1-3 closest Vietnamese terms
-    if(d.vi_equivalent) for(const raw of d.vi_equivalent.split(',')) add(raw, r.word, true);
+    if(d.vi_equivalent) for(const raw of String(d.vi_equivalent).split(',')) add(raw, r.word, true);
     // secondary: every individual sense often carries its OWN Vietnamese
     // phrasing too (a word can mean several different things) — this data
     // was already being generated and stored, just never searched before
@@ -920,19 +929,27 @@ function buildPhraseIndex(){
     req.onsuccess=(e)=>{
       const c=e.target.result;
       if(!c || idx.length>=PHRASE_INDEX_CAP){ res(idx); return; }
-      const r=c.value;
-      if(r && r.data && !r.alias && !r.data.explain){
-        for(const f of PHRASE_FIELDS){
-          const arr=r.data[f];
-          if(!Array.isArray(arr)) continue;
-          for(const it of arr){
-            const t=norm(it && it.text);
-            if(t.length<3) continue;
-            idx.push({t, d:it.text, o:r.word, f, vi:it.vi||''});
-            if(idx.length>=PHRASE_INDEX_CAP) break;
+      /* Ngoại lệ ném ra TRONG callback của con trỏ không làm reject promise —
+         nó chỉ dừng con trỏ và promise này không bao giờ resolve, nên MỌI lần
+         tra tiếng Anh ngoài thư viện chờ mãi (màn hình trắng, không gọi AI).
+         Trước đây chỉ cần MỘT mục cụm thiếu trường "text" là đủ để gây ra.
+         Giờ mỗi bản ghi tự bọc try/catch và mục hỏng bị bỏ qua. */
+      try{
+        const r=c.value;
+        if(r && r.data && !r.alias && !r.data.explain){
+          for(const f of PHRASE_FIELDS){
+            const arr=r.data[f];
+            if(!Array.isArray(arr)) continue;
+            for(const it of arr){
+              if(!it || typeof it.text!=='string') continue;
+              const t=norm(it.text);
+              if(t.length<3) continue;
+              idx.push({t, d:it.text, o:r.word, f, vi:typeof it.vi==='string'?it.vi:''});
+              if(idx.length>=PHRASE_INDEX_CAP) break;
+            }
           }
         }
-      }
+      }catch(err){ /* bỏ qua bản ghi hỏng, đi tiếp */ }
       c.continue();
     };
     req.onerror=()=>res(idx);
@@ -1391,18 +1408,22 @@ async function search(rawWord, forceAI){
     return;
   }
 
-  if(typeof loadLevels==='function'){ try{ await loadLevels(); }catch(e){} }
+  if(typeof loadLevels==='function'){ try{ await softWait(loadLevels(), 2500, null); }catch(e){} }
 
   /* Gợi ý "ý bạn là…" từ tra mờ cục bộ. TRƯỚC ĐÂY nó chặn luôn việc gọi AI
      (hiện một thẻ bắt bấm tay rồi mới tra) — với thư viện chục nghìn từ thì
      gần như từ lạ nào cũng "na ná" một từ có sẵn nên AI hầu như không bao giờ
      được gọi. Giờ nó chỉ là gợi ý PHỤ hiện dưới kết quả; AI luôn được gọi. */
-  let nearMiss=null;
+  let nearMiss=null, phraseStalled=false;
   if(!forceAI){
     const local=await idbGet(word);
     if(local && local.alias){
       const canon=await idbGet(local.alias);
-      if(canon && canon.data){
+      if(canon && canon.data && local.formKind && !lemmaAliasValid(word, canon, local.formKind)){
+        /* alias cũ sai luật (programd→program…): xoá và coi như từ chưa biết */
+        try{ await new Promise(r=>{ tx('readwrite').then(st=>{ const q=st.delete(word); q.onsuccess=()=>r(); q.onerror=()=>r(); }).catch(()=>r()); }); }catch(e){}
+        _allRecordsCache=null; if(typeof lemmaResetKeys==='function') lemmaResetKeys();
+      }else if(canon && canon.data){
         currentWord=canon.word;
         // alias do lemma sinh ra thì hiện khung "dạng biến đổi", không phải "đã sửa"
         if(local.formKind){
@@ -1431,7 +1452,7 @@ async function search(rawWord, forceAI){
        studies→study. Phải đứng TRƯỚC fuzzyLocalSearch, vì fuzzy chấm
        điểm theo ký tự và sẽ đoán "went"→"want" — sai hẳn nghĩa. */
     if(!hasSpace){
-      const lem=await lemmaResolve(word);
+      const lem=await softWait(lemmaResolve(word), 2500, null);
       if(lem){
         currentWord=word;
         // Hiện nghĩa CỦA CHÍNH DẠNG NÀY, suy cơ học từ nghĩa gốc.
@@ -1447,7 +1468,12 @@ async function search(rawWord, forceAI){
       }
     }
 
-    const guess=await fuzzyLocalSearch(word);
+    /* Nếu chỉ mục cụm quá hạn ở bước này thì bỏ luôn bước khớp cụm phía dưới —
+       không để hai hạn chờ nối tiếp nhau kéo dài lượt gọi AI. */
+    const _STALL={};
+    const _g=await softWait(fuzzyLocalSearch(word), 2500, _STALL);
+    if(_g===_STALL) phraseStalled=true;
+    const guess=(_g===_STALL)?null:_g;
     if(guess && guess.exact){
       const rec=await idbGet(guess.target);
       if(rec){
@@ -1465,8 +1491,8 @@ async function search(rawWord, forceAI){
   /* Khớp cụm trong kho phải đứng TRƯỚC hai cửa này: 'mileage out of' có
      sẵn trong máy, không cần API key và cũng chẳng cần mạng. Đặt sau thì
      người chưa nhập key bị chặn khỏi chính dữ liệu của mình. */
-  if(hasSpace && !forceAI && !isExplainQuery(word)){
-    const pm=await phraseLookup(word, 10);
+  if(hasSpace && !forceAI && !phraseStalled && !isExplainQuery(word)){
+    const pm=await softWait(phraseLookup(word, 10), 2500, []);
     /* Chỉ DỪNG LẠI ở đây nếu ít nhất một kết quả đã có sẵn nghĩa tiếng
        Việt (o.vi) — trước đây chỉ cần khớp đúng CHUỖI là dừng, bất kể có
        nghĩa hay không, nên một câu như "I suppose so" (nếu tình cờ khớp
@@ -1945,10 +1971,11 @@ async function lemmaLookup(word){
     const isAdv =poses.some(p=>p.includes('adv'));
     const good = (wantVerb&&isVerb) || (wantNoun&&isNoun) || (wantAdj&&(isAdj||isAdv)) || !poses.length;
     if(good) return {rec, base:c.base, kind:c.kind};
-    /* -er / -est chỉ là so sánh của TÍNH/TRẠNG TỪ. Không cho lọt xuống "gần
-       đúng" như các dạng khác, nếu không corner→corn, hammer→ham, poster→post
-       sẽ hiện nghĩa sai thay vì hỏi AI. */
-    if(wantAdj) continue;
+    /* -er/-est chỉ là so sánh của TÍNH/TRẠNG TỪ; -ed/-ing chỉ là dạng của
+       ĐỘNG TỪ. Chúng không được lọt xuống "gần đúng" như -s/số nhiều (vốn nhập
+       nhằng danh từ/động từ), nếu không corner→corn, hammer→ham và
+       houred→hour ("đã giờ") sẽ hiện nghĩa sai thay vì hỏi AI. */
+    if(wantAdj || wantVerb && c.kind!=='s3') continue;
     if(!fallback) fallback={rec, base:c.base, kind:c.kind};
   }
   return fallback;
@@ -2038,6 +2065,60 @@ function inflectedData(baseData, kind, form){
 
 /* Ghi alias để lần sau tra dạng này là ra ngay, không phải suy lại.
    Bản ghi alias mang thêm formKind nên khung thông báo vẫn hiện đúng. */
+/* Một dòng alias "dạng biến đổi" có còn ĐÚNG theo luật hiện hành không? Alias
+   được LƯU vĩnh viễn vào IndexedDB, nên những dòng do luật cũ (đã sai) sinh ra
+   như programd→program hay houred→hour cứ sống mãi dù luật đã sửa. Kiểm lại
+   mỗi lần dùng và dọn một lần lúc khởi động. */
+function lemmaAliasValid(form, baseRec, kind){
+  if(!kind) return true;
+  const base=baseRec && baseRec.word; if(!base) return false;
+  const irr=IRREGULAR_FORMS[form];
+  if(irr && irr[0]===base) return true;
+  const viaFwd=lemmaCandidates(form).some(c=>c.base===base && c.kind===kind);
+  const viaRev=lemmaDerives(base, form)===kind;
+  if(!viaFwd && !viaRev) return false;
+  const poses=((baseRec.data&&baseRec.data.senses)||[]).map(x=>String(x.pos||'').toLowerCase());
+  if(!poses.length) return true;
+  const has=k=>poses.some(p=>p.includes(k));
+  if(['past','pastp','ing'].includes(kind)) return has('verb');
+  if(kind==='s3') return has('verb');
+  if(kind==='plural') return has('noun');
+  if(kind==='comparative'||kind==='superlative') return has('adj')||has('adv');
+  return true;
+}
+async function lemmaAliasPurgeOnce(){
+  const FLAG='fc_alias_purged_v2';
+  if(localStorage.getItem(FLAG)==='1') return;
+  try{
+    const d=await db();
+    const bad=await new Promise((res)=>{
+      const out=[]; const req=d.transaction(STORE,'readonly').objectStore(STORE).openCursor();
+      const pending=[];
+      req.onsuccess=(e)=>{
+        const c=e.target.result;
+        if(!c){ res({out,pending}); return; }
+        try{ const v=c.value; if(v && v.alias && v.formKind) pending.push({k:v.word, a:v.alias, kind:v.formKind}); }catch(_){}
+        c.continue();
+      };
+      req.onerror=()=>res({out,pending});
+    });
+    const dead=[];
+    for(const it of bad.pending){
+      const rec=await idbGet(it.a);
+      if(!rec || !rec.data || !lemmaAliasValid(it.k, rec, it.kind)) dead.push(it.k);
+    }
+    if(dead.length){
+      await new Promise(res=>{
+        const t=d.transaction(STORE,'readwrite'); const st=t.objectStore(STORE);
+        dead.forEach(k=>st.delete(k));
+        t.oncomplete=()=>res(); t.onerror=()=>res(); t.onabort=()=>res();
+      });
+      _allRecordsCache=null; if(typeof lemmaResetKeys==='function') lemmaResetKeys();
+    }
+    localStorage.setItem(FLAG,'1');
+  }catch(e){ /* thử lại lần mở sau */ }
+}
+window.lemmaAliasPurgeOnce=lemmaAliasPurgeOnce;
 async function lemmaSaveAlias(form, rec, kind){
   try{
     const ex=await idbGet(form);
@@ -4264,8 +4345,8 @@ const SCENE_BGS=[
   {f:'bg-peaceful-field-arc-1', c:['#c6e6a6','#5c9a4a']}
 ];
 const SCENE_POSES={
-  type:  ['mascot-take_note','mascot-read_map','mascot-explore'],
-  match: ['mascot-investigate','mascot-wonder','mascot-explore'],
+  type:  ['mascot-take_note','mascot-read_map','mascot-explore','mascot-wander'],
+  match: ['mascot-investigate','mascot-wonder','mascot-explore','mascot-badass'],
   say:   ['mascot-wonder','mascot-drink_tea_cup','mascot-explore','mascot-read_map','mascot-take_note'],
   good:  ['mascot-champion','mascot-jump','mascot-badass'],
   close: ['mascot-take_note','mascot-wonder','mascot-drink_tea_cup'],
@@ -4283,10 +4364,10 @@ function sceneBgStyle(b){
   return 'background-image:url(./'+b.f+'.webp),linear-gradient(160deg,'+b.c[0]+','+b.c[1]+')';
 }
 function pickScenePose(kind, avoid){
+  const no=Array.isArray(avoid)?avoid:[avoid];          // một dáng hoặc cả danh sách dáng cần tránh
   const a=SCENE_POSES[kind]||SCENE_POSES.say;
-  let p=pick(a);
-  if(a.length>1 && p===avoid) p=pick(a.filter(x=>x!==avoid));
-  return p;
+  const ok=a.filter(x=>!no.includes(x));
+  return pick(ok.length?ok:a);
 }
 window.FocciScenes={ pickBgs:pickSceneBgs, bgStyle:sceneBgStyle, pickPose:pickScenePose };
 
@@ -5956,7 +6037,7 @@ function wireOnboarding(){
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
   /* Dọn các lượt Say it cũ ra khỏi từ điển TRƯỚC khi dựng các chỉ mục, để
      chỉ mục không bao giờ chứa chúng. Lần đầu xong thì các lần sau trả về ngay. */
-  sayMigrateOnce().catch(()=>{}).then(()=>{
+  sayMigrateOnce().catch(()=>{}).then(()=>lemmaAliasPurgeOnce()).catch(()=>{}).then(()=>{
     buildWordIndex().catch(()=>{});
     buildViIndex().catch(()=>{});
     buildSavedPhraseKeys().catch(()=>{});

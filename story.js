@@ -1910,11 +1910,15 @@ window.renderGameHub = function(){
     +'<img class="gm-card-char" src="./'+pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
     +'<span class="gm-card-txt"><span class="gm-card-t">'+title+'</span>'
     +'<span class="gm-card-s">'+sub+'</span></span></button>';
-  h+='<div class="gm-pair-wrap"><div class="gm-trio">';
-  h+=card('is-type','type',bgs[0],FS.pickPose('type'),'Type it','Spell your saved words');
-  h+=card('is-match','match',bgs[1],FS.pickPose('match'),'Match it','Pick the right word');
-  h+=card('is-write','write',bgs[2],FS.pickPose('say'),'Say it','Write it, Focci checks');
-  h+='</div></div>';
+  /* Ba dáng Focci luôn KHÁC nhau: bốc lần lượt, mỗi lần tránh các dáng đã bốc. */
+  const pT=FS.pickPose('type');
+  const pM=FS.pickPose('match',[pT]);
+  const pS=FS.pickPose('say',[pT,pM]);
+  h+='<div class="gm-trio">';
+  h+=card('is-type','type',bgs[0],pT,'Type it','Spell it out');
+  h+=card('is-match','match',bgs[1],pM,'Match it','Pick the word');
+  h+=card('is-write','write',bgs[2],pS,'Say it','Write a line');
+  h+='</div>';
 
   h+='</div>';
   area.innerHTML=h;

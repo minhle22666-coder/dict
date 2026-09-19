@@ -2299,27 +2299,30 @@
      rõ ràng, và Bonus thu về MỘT dòng nói thật trạng thái.
      ============================================================ */
   #v-review{padding-bottom:8px}
-  /* Ba game = ba thẻ dọc CÙNG cỡ. Nền là phong cảnh ngẫu nhiên (đặt inline từ
-     story.js, có dải màu dự phòng dưới ảnh); màn tối phủ phía trên để chữ trắng
-     luôn đọc được dù ảnh nào được bốc; Focci đứng ở đáy thẻ. Vạch màu 3px ở đáy
-     là thứ duy nhất phân biệt game này với game kia. */
-  .gm-trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
-  .gm-card{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;
-    aspect-ratio:3/4.3;min-height:158px;padding:0;text-align:left;border-radius:18px;
+  /* Ba game = ba thẻ CÙNG cỡ, thấp và rộng (7:8) để phần Mini games không nặng
+     hơn bản đồ phía trên. Không còn khung panel bao ngoài — thẻ nằm thẳng trên
+     nền trang nên không có dải nền thừa ở rìa. Nền là phong cảnh ngẫu nhiên đặt
+     inline từ story.js (có dải màu dự phòng dưới ảnh); lớp tối phủ trên cùng để
+     chữ trắng luôn đọc được; Focci ló nửa người từ đáy thẻ. Màu riêng của mỗi
+     game chỉ nằm ở viền mảnh — không có vạch/nhãn phụ nào khác. */
+  .gm-trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:4px}
+  .gm-card{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;
+    aspect-ratio:7/8;padding:0;text-align:left;border-radius:20px;
     background-color:var(--surface-2);background-size:cover;background-position:center;
-    border:1px solid rgba(255,255,255,.16);box-shadow:var(--shadow);transition:transform .14s}
+    border:1.5px solid color-mix(in srgb, var(--gm-accent,var(--primary)) 62%, transparent);
+    box-shadow:var(--shadow);transition:transform .14s}
   .gm-card:active{transform:scale(.965)}
   .gm-card::before{content:'';position:absolute;inset:0;z-index:0;
-    background:linear-gradient(180deg,rgba(6,14,24,.8) 0%,rgba(6,14,24,.34) 46%,rgba(6,14,24,.08) 70%,rgba(6,14,24,.4) 100%)}
-  .gm-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;z-index:3;background:var(--gm-accent,var(--primary))}
+    background:linear-gradient(180deg,rgba(6,14,24,.78) 0%,rgba(6,14,24,.3) 48%,rgba(6,14,24,.04) 72%,rgba(6,14,24,.26) 100%)}
   .gm-card.is-type{--gm-accent:#5aa9ff}
   .gm-card.is-match{--gm-accent:#4ade80}
   .gm-card.is-write{--gm-accent:#ff9f45}
-  .gm-card-char{position:absolute;z-index:1;left:50%;bottom:-2px;height:64%;width:auto;max-width:118%;
-    transform:translateX(-50%);object-fit:contain;filter:drop-shadow(0 8px 10px rgba(0,0,0,.45))}
-  .gm-card-txt{position:relative;z-index:2;display:flex;flex-direction:column;gap:3px;padding:11px 10px 0}
-  .gm-card-t{font-size:15px;font-weight:800;letter-spacing:-.015em;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.55)}
-  .gm-card-s{font-size:10.5px;line-height:1.35;color:rgba(255,255,255,.9);text-shadow:0 1px 5px rgba(0,0,0,.6)}
+  .gm-card-char{position:absolute;z-index:1;left:50%;bottom:-13%;height:68%;width:auto;max-width:110%;
+    transform:translateX(-50%);object-fit:contain;filter:drop-shadow(0 6px 8px rgba(0,0,0,.4))}
+  .gm-card-txt{position:relative;z-index:2;display:flex;flex-direction:column;gap:2px;padding:10px 10px 0}
+  .gm-card-t{font-size:14.5px;font-weight:800;letter-spacing:-.015em;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.55)}
+  .gm-card-s{font-size:10.5px;line-height:1.3;color:rgba(255,255,255,.92);text-shadow:0 1px 5px rgba(0,0,0,.6);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media (max-width:340px){ .gm-card-s{display:none} }
 
   .gm-bonus{display:flex;align-items:center;gap:12px;padding:14px 15px;
