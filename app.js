@@ -1149,9 +1149,6 @@ function phraseResultState(original, result){
 
   h+='<div class="tr-opts">'+optRow(primary,true)+alts.map(a=>optRow(a,false)).join('')+'</div>';
 
-  if(result.literal && result.literal!==primary.text)
-    h+='<div class="tr-lit"><span>Dịch sát chữ</span>'+esc(result.literal)+'</div>';
-
   const gloss=(result.gloss||[]).filter(g=>g&&g.src&&g.dst).slice(0,6);
   if(gloss.length){
     h+='<div class="tr-gloss"><div class="tr-gloss-h">Từng phần</div>';
@@ -1283,6 +1280,13 @@ function tokenOverlap(q,c){
 }
 function matchScore(query,cand){
   const a=norm(query), b=norm(cand); if(!a||!b) return 0;
+  /* Levenshtein đầy đủ tốn O(dài_a × dài_b) — với thư viện hàng chục
+     nghìn từ, tính phép này cho MỌI từ dù độ dài lệch nhau rất xa (so
+     "jdkkee" với "internationalization" chẳng hạn) là lãng phí và chính
+     là lý do tra một từ vô nghĩa/gõ sai nặng có thể treo máy vài giây.
+     Lệch quá xa thì dù giống nhau tuyệt đối phần chung cũng không thể đạt
+     ngưỡng 0.6 — bỏ qua sớm, khỏi cần tính. */
+  if(Math.abs(a.length-b.length) > Math.max(3, Math.ceil(a.length*0.5))) return 0;
   const levSim=1-lev(a,b)/Math.max(a.length,b.length);
   return Math.max(levSim, tokenOverlap(a,b));
 }
@@ -1308,16 +1312,19 @@ async function fuzzyLocalSearch(query){
   for(const e of idx){ if(e.vi && e.t===q) return {type:'expr', target:e.o, label:e.d, exact:true}; }
   if(hasSpace) return null;
   // Pass 2: fuzzy fallback — chỉ còn chạy cho TỪ ĐƠN, nơi nó thật sự hữu ích.
+  // Bỏ hẳn vòng lặp con so khớp mờ với TỪNG expression của TỪNG bản ghi —
+  // đó là chi phí lớn nhất trong hàm này (mỗi bản ghi có thể có cả chục
+  // expression, mỗi lần so khớp lại là một phép Levenshtein đầy đủ), mà
+  // giá trị thực tế thấp: gõ liền một "từ" không dấu cách để fuzzy-match
+  // ra một CỤM nhiều từ vốn đã hiếm khi xảy ra. matchScore() bên dưới
+  // cũng tự bỏ qua sớm những ứng viên lệch độ dài quá xa, nên chỉ còn lại
+  // đúng phần việc thật sự hữu ích: đoán lỗi chính tả của một từ đơn.
   const all=await idbAll();
   let best=null,bestScore=0.6;
   for(const r of all){
     if(r.alias) continue;
     const s=matchScore(query,r.word);
     if(s>bestScore){ bestScore=s; best={type:'word',target:r.word,label:r.word}; }
-    const exs=(r.data&&r.data.expressions)||[];
-    for(const e of exs){ if(!e.text) continue;
-      const s2=matchScore(query,e.text);
-      if(s2>bestScore){ bestScore=s2; best={type:'expr',target:r.word,label:e.text}; } }
   }
   return best;
 }
@@ -1863,7 +1870,13 @@ function lemmaDerives(base, form){
   if(base.endsWith('f')  && form===base.slice(0,-1)+'ves') return 'plural';
   if(base.endsWith('fe') && form===base.slice(0,-2)+'ves') return 'plural';
 
-  if(form===base+'ed' || form===base+'d') return 'past';
+  if(form===base+'ed') return 'past';
+  /* "+d" (không phải "+ed") CHỈ đúng chính tả khi gốc đã kết thúc bằng
+     "e" câm — like→liked, hope→hoped. Trước đây thiếu điều kiện này nên
+     "programd" (gõ sai/gõ liều) bị nhận nhầm là quá khứ của "program",
+     dù "program" kết thúc bằng phụ âm và quá khứ đúng phải là "programmed"
+     (hoặc "programed"), không bao giờ là "programd". */
+  if(base.endsWith('e') && form===base+'d') return 'past';
   if(form===dbl+'ed') return 'past';
   if(yToI && form===yToI+'ed') return 'past';
   if(base.endsWith('c') && form===base+'ked') return 'past';
