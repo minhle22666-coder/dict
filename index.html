@@ -960,6 +960,38 @@
     margin-top:1px}
   .write-alt-en{font-size:14.5px;font-weight:700;color:var(--text);line-height:1.4}
   .write-alt-w{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
+  .write-fb-neutral{background:var(--surface-2)}
+
+  /* Say it — a scene, not a form: random landscape, Focci beside a speech bubble
+     that carries the situation, then the Vietnamese line and the answer box. */
+  .write-card.sy-card{padding:0}
+  .sy-scene{position:relative;isolation:isolate;display:flex;flex-direction:column;justify-content:space-between;
+    min-height:214px;padding:12px 12px 0;background-color:var(--surface-2);background-size:cover;background-position:center}
+  .sy-scrim{position:absolute;inset:0;z-index:0;
+    background:linear-gradient(180deg,rgba(6,14,24,.36),rgba(6,14,24,.04) 42%,rgba(6,14,24,.34))}
+  .sy-topic{position:relative;z-index:1;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;
+    padding:6px 12px 6px 9px;border-radius:99px;font-size:11.5px;font-weight:800;
+    background:rgba(255,255,255,.93);color:#1d2b3a;box-shadow:0 2px 8px rgba(0,0,0,.22)}
+  .sy-topic span{font-size:13px}
+  .sy-stage{position:relative;z-index:1;display:flex;align-items:flex-end;gap:4px;margin-top:14px}
+  .sy-bubble{position:relative;flex:1;min-width:0;margin-bottom:16px;padding:11px 13px;
+    border-radius:16px 16px 4px 16px;background:rgba(255,255,255,.96);color:#22303f;
+    font-size:12.5px;font-weight:600;line-height:1.5;box-shadow:0 6px 16px rgba(0,0,0,.24)}
+  .sy-bubble::after{content:'';position:absolute;right:-5px;bottom:13px;width:13px;height:13px;
+    background:inherit;transform:rotate(45deg);border-radius:0 0 3px 0}
+  .sy-focci{flex:none;width:104px;height:auto;max-height:134px;object-fit:contain;transform-origin:50% 100%;
+    filter:drop-shadow(0 8px 10px rgba(0,0,0,.42));animation:sy-idle 3.4s ease-in-out infinite}
+  .sy-focci.hop{animation:sy-hop .55s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes sy-idle{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  @keyframes sy-hop{0%{transform:translateY(0) scale(.94)}45%{transform:translateY(-14px) scale(1.06)}100%{transform:translateY(0) scale(1)}}
+  @media (prefers-reduced-motion:reduce){.sy-focci,.sy-focci.hop{animation:none}}
+  .sy-body{padding:16px 16px 18px}
+  .sy-body .write-vi{margin-bottom:14px}
+  .sy-you{margin:0 0 14px;padding:11px 14px;border-radius:14px;background:var(--surface-2);border:1px dashed var(--line)}
+  .sy-you span{display:block;margin-bottom:3px;font-size:11px;font-weight:800;color:var(--muted-2)}
+  .sy-you p{margin:0;font-size:14.5px;font-weight:600;line-height:1.5;color:var(--text)}
+  .sy-saved-link{display:block;width:100%;margin-top:10px;padding:8px;font-size:12px;font-weight:700;color:var(--muted-2);text-align:center}
+  .sy-saved-link b{color:var(--primary)}
   .fb-icon{display:inline-flex;width:21px;height:21px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;margin-right:5px;background:currentColor;color:var(--surface)}
   .rev-fb .ex{color:var(--muted);font-weight:500}
   .rev-fb .ex .evi{display:block;margin-top:2px}
@@ -1425,13 +1457,13 @@
   /* ============ PRACTICE ============ */
 
   /* the two games, as cards you switch between */
-  .game-switch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-  .game-tab{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;gap:3px;
-    background:var(--surface);border:1.5px solid var(--line);border-radius:20px;padding:14px 14px 13px;
-    text-align:left;transition:transform .14s,border-color .2s,box-shadow .2s}
+  .game-switch{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:16px}
+  .game-tab{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:3px;
+    background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:11px 6px 10px;
+    text-align:center;transition:transform .14s,border-color .2s,box-shadow .2s}
   .game-tab .gt-ico{font-size:21px;line-height:1;margin-bottom:3px}
-  .game-tab .gt-name{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.01em}
-  .game-tab .gt-tag{font-size:10.5px;font-weight:600;color:var(--muted-2);line-height:1.35}
+  .game-tab .gt-name{font-size:13.5px;font-weight:800;color:var(--text);letter-spacing:-.01em}
+  .game-tab .gt-tag{font-size:10px;font-weight:600;color:var(--muted-2);line-height:1.3}
   .game-tab:active{transform:scale(.97)}
   .game-tab.on{border-color:var(--primary);box-shadow:var(--glow);
     background:linear-gradient(150deg,var(--primary-bg),var(--surface) 65%)}
@@ -2267,26 +2299,28 @@
      rõ ràng, và Bonus thu về MỘT dòng nói thật trạng thái.
      ============================================================ */
   #v-review{padding-bottom:8px}
-  .gm-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .gm-tile{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;
-    align-items:flex-start;gap:3px;padding:15px 14px 16px;border-radius:20px;overflow:hidden;
-    background:linear-gradient(158deg,var(--surface-2),var(--surface) 76%);
-    border:1px solid var(--line);box-shadow:var(--shadow);text-align:left}
-  .gm-tile:active{transform:scale(.975)}
-  .gm-tile-deco{position:absolute;right:-6px;bottom:-6px;width:56px;height:56px;
-    object-fit:contain;opacity:.16;pointer-events:none}
-  .gm-tile-t{position:relative;z-index:1;font-size:15.5px;font-weight:800;
-    letter-spacing:-.015em;color:var(--text)}
-  .gm-tile-s{position:relative;z-index:1;font-size:11.5px;line-height:1.4;color:var(--muted-2);
-    max-width:14ch}
-  .gm-tile.is-type{border-color:rgba(122,178,255,.32)}
-  .gm-tile.is-match{border-color:rgba(74,222,128,.28)}
-  /* Say it — cụm câu ghép chứ không phải một từ, nên xứng đáng một hàng
-     riêng full-width thay vì ép hẹp bằng hai ô kia. */
-  .gm-tile.is-write{grid-column:1 / -1;flex-direction:row;align-items:center;gap:13px;
-    border-color:rgba(255,159,69,.32);padding:14px 16px}
-  .gm-tile.is-write .gm-tile-deco{position:static;width:34px;height:34px;opacity:.85;flex:none}
-  .gm-tile.is-write .gm-tile-s{max-width:none}
+  /* Ba game = ba thẻ dọc CÙNG cỡ. Nền là phong cảnh ngẫu nhiên (đặt inline từ
+     story.js, có dải màu dự phòng dưới ảnh); màn tối phủ phía trên để chữ trắng
+     luôn đọc được dù ảnh nào được bốc; Focci đứng ở đáy thẻ. Vạch màu 3px ở đáy
+     là thứ duy nhất phân biệt game này với game kia. */
+  .gm-trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+  .gm-card{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;
+    aspect-ratio:3/4.3;min-height:158px;padding:0;text-align:left;border-radius:18px;
+    background-color:var(--surface-2);background-size:cover;background-position:center;
+    border:1px solid rgba(255,255,255,.16);box-shadow:var(--shadow);transition:transform .14s}
+  .gm-card:active{transform:scale(.965)}
+  .gm-card::before{content:'';position:absolute;inset:0;z-index:0;
+    background:linear-gradient(180deg,rgba(6,14,24,.8) 0%,rgba(6,14,24,.34) 46%,rgba(6,14,24,.08) 70%,rgba(6,14,24,.4) 100%)}
+  .gm-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;z-index:3;background:var(--gm-accent,var(--primary))}
+  .gm-card.is-type{--gm-accent:#5aa9ff}
+  .gm-card.is-match{--gm-accent:#4ade80}
+  .gm-card.is-write{--gm-accent:#ff9f45}
+  .gm-card-char{position:absolute;z-index:1;left:50%;bottom:-2px;height:64%;width:auto;max-width:118%;
+    transform:translateX(-50%);object-fit:contain;filter:drop-shadow(0 8px 10px rgba(0,0,0,.45))}
+  .gm-card-txt{position:relative;z-index:2;display:flex;flex-direction:column;gap:3px;padding:11px 10px 0}
+  .gm-card-t{font-size:15px;font-weight:800;letter-spacing:-.015em;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.55)}
+  .gm-card-s{font-size:10.5px;line-height:1.35;color:rgba(255,255,255,.9);text-shadow:0 1px 5px rgba(0,0,0,.6)}
+  @media (max-width:340px){ .gm-card-s{display:none} }
 
   .gm-bonus{display:flex;align-items:center;gap:12px;padding:14px 15px;
     border-radius:18px;background:var(--surface);border:1px dashed var(--line)}
@@ -2381,6 +2415,8 @@
 
   /* icon hai game: asset thật thay cho emoji hệ thống */
   .gt-ico-img{width:26px;height:26px;object-fit:contain;display:block;margin:0 auto 2px}
+  .gt-ico-svg{width:26px;height:26px;display:block;margin:0 auto 2px;color:var(--muted-2)}
+  .game-tab.on .gt-ico-svg{color:var(--primary);filter:drop-shadow(0 2px 5px rgba(0,0,0,.25))}
   .game-tab.on .gt-ico-img{filter:drop-shadow(0 2px 5px rgba(0,0,0,.35))}
 
 
@@ -2438,7 +2474,7 @@
      ============================================================ */
   .sv-tabs{display:flex;gap:6px;padding:4px;margin-bottom:14px;border-radius:14px;
     background:var(--surface-2);border:1px solid var(--line)}
-  .sv-tab{flex:1;padding:10px 8px;border-radius:11px;font-size:12.5px;font-weight:800;
+  .sv-tab{flex:1;min-width:0;padding:10px 4px;border-radius:11px;font-size:12px;font-weight:800;white-space:nowrap;
     color:var(--muted-2);transition:background .2s,color .2s}
   .sv-tab.on{background:var(--surface);color:var(--primary);box-shadow:var(--shadow)}
   .sv-tab:active{transform:scale(.98)}
@@ -2590,6 +2626,35 @@
     text-transform:uppercase;color:var(--primary)}
 
   .hist-item.is-why .hist-top .w{font-size:13.5px;font-weight:700}
+
+  /* Saved › Say it — thẻ gập: đóng = câu bạn đã gõ, mở = phản hồi của Focci */
+  .sy-row{margin-bottom:9px;border-radius:16px;overflow:hidden;background:var(--surface);border:1px solid var(--line)}
+  .sy-head{display:flex;align-items:center;gap:11px;padding:13px 14px}
+  .sy-head:active{background:var(--surface-2)}
+  .sy-dot{flex:none;width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+    font-size:17px;background:var(--surface-2)}
+  .sy-v-good .sy-dot{background:color-mix(in srgb, var(--mint) 20%, transparent)}
+  .sy-v-close .sy-dot{background:color-mix(in srgb, var(--amber) 20%, transparent)}
+  .sy-v-off .sy-dot{background:color-mix(in srgb, var(--coral) 20%, transparent)}
+  .sy-mid{flex:1;min-width:0}
+  .sy-you-t{font-size:14.5px;font-weight:700;line-height:1.4;color:var(--text);word-break:break-word;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .sy-row.open .sy-you-t{-webkit-line-clamp:unset;display:block}
+  .sy-meta{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;font-size:11px;font-weight:600;color:var(--muted-2)}
+  .sy-head .wf-x{flex:none;color:var(--muted-2);font-size:12px;transition:transform .22s}
+  .sy-row.open .wf-x{transform:rotate(180deg)}
+  .sy-detail{display:none;padding:2px 14px 14px}
+  .sy-row.open .sy-detail{display:block}
+  .sy-blk{margin-bottom:12px}
+  .sy-blk-l{margin-bottom:4px;font-size:11px;font-weight:800;color:var(--muted-2)}
+  .sy-blk-t{font-size:13px;line-height:1.55;color:var(--muted)}
+  .sy-blk-t.vi{color:var(--text);font-weight:600}
+  .sy-detail .write-alts{margin-top:2px}
+  .sy-acts{display:flex;gap:8px;margin-top:14px}
+  .sy-acts button{flex:1;padding:11px 10px;border-radius:12px;font-size:12.5px;font-weight:800}
+  .sy-acts .go{color:#3A1E00;background:var(--grad-hero)}
+  .sy-acts .rm{color:var(--muted);background:var(--surface-2);border:1px solid var(--line)}
+  .sy-acts button:active{transform:scale(.97)}
 
   /* The Casebook: dùng lại đúng các lớp trên trong thẻ gập */
   .wf-body .wh-root{margin-bottom:11px}
@@ -2798,6 +2863,7 @@
     <div class="sv-tabs">
       <button class="sv-tab on" data-tab="vault" onclick="setSavedTab('vault')">The Cache</button>
       <button class="sv-tab" data-tab="why" onclick="setSavedTab('why')">The Casebook</button>
+      <button class="sv-tab" data-tab="say" onclick="setSavedTab('say')">Say it</button>
     </div>
     <div class="saved-head">
       <div class="saved-count" id="saved-count">0 words saved</div>

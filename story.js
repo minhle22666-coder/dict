@@ -1899,22 +1899,21 @@ window.renderGameHub = function(){
   h+='<div class="gm-zone"><span class="gm-zone-t">Mini games</span>'
     +'<span class="gm-zone-rule"></span>'
     +'<span class="gm-zone-chip" id="gm-ready">…</span></div>';
-  h+='<div class="gm-pair-wrap"><div class="gm-pair">';
-  h+='<button class="gm-tile is-type" onclick="setPracticeMode(\'type\')">'
-    +'<span class="glow-border blue"></span>'
-    +'<img class="gm-tile-deco" src="./decor-note-and-pen.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<span class="gm-tile-t">Type it</span>'
-    +'<span class="gm-tile-s">Spell your saved words from memory</span></button>';
-  h+='<button class="gm-tile is-match" onclick="setPracticeMode(\'match\')">'
-    +'<span class="glow-border mint"></span>'
-    +'<img class="gm-tile-deco" src="./decor-magnifying-glass.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<span class="gm-tile-t">Match it</span>'
-    +'<span class="gm-tile-s">Pick the word that fits the meaning</span></button>';
-  h+='<button class="gm-tile is-write" onclick="setPracticeMode(\'write\')">'
-    +'<span class="glow-border"></span>'
-    +'<img class="gm-tile-deco" src="./decor-note-and-pen.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<span class="gm-tile-t">Say it</span>'
-    +'<span class="gm-tile-s">Compose the English yourself — Focci checks it</span></button>';
+  /* Ba game là ba thẻ CÙNG KÍCH THƯỚC — trước đây Say it là một thanh dài
+     chiếm cả hàng dưới hai ô kia nên trông lệch. Mỗi lần vào sảnh, mỗi thẻ
+     bốc một phong cảnh khác nhau (không trùng nhau) và một dáng Focci hợp với
+     game đó, nên sảnh không bao giờ giống hệt lần trước. */
+  const FS=window.FocciScenes;
+  const bgs=FS.pickBgs(3);
+  const card=(cls,mode,bg,pose,title,sub)=>
+    '<button class="gm-card '+cls+'" style="'+FS.bgStyle(bg)+'" onclick="setPracticeMode(\''+mode+'\')">'
+    +'<img class="gm-card-char" src="./'+pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+    +'<span class="gm-card-txt"><span class="gm-card-t">'+title+'</span>'
+    +'<span class="gm-card-s">'+sub+'</span></span></button>';
+  h+='<div class="gm-pair-wrap"><div class="gm-trio">';
+  h+=card('is-type','type',bgs[0],FS.pickPose('type'),'Type it','Spell your saved words');
+  h+=card('is-match','match',bgs[1],FS.pickPose('match'),'Match it','Pick the right word');
+  h+=card('is-write','write',bgs[2],FS.pickPose('say'),'Say it','Write it, Focci checks');
   h+='</div></div>';
 
   h+='</div>';

@@ -1393,6 +1393,11 @@ async function search(rawWord, forceAI){
 
   if(typeof loadLevels==='function'){ try{ await loadLevels(); }catch(e){} }
 
+  /* Gợi ý "ý bạn là…" từ tra mờ cục bộ. TRƯỚC ĐÂY nó chặn luôn việc gọi AI
+     (hiện một thẻ bắt bấm tay rồi mới tra) — với thư viện chục nghìn từ thì
+     gần như từ lạ nào cũng "na ná" một từ có sẵn nên AI hầu như không bao giờ
+     được gọi. Giờ nó chỉ là gợi ý PHỤ hiện dưới kết quả; AI luôn được gọi. */
+  let nearMiss=null;
   if(!forceAI){
     const local=await idbGet(word);
     if(local && local.alias){
@@ -1452,9 +1457,9 @@ async function search(rawWord, forceAI){
         return;
       }
     }
-    // A near-miss is only ever OFFERED. suggestState's primary button sends
-    // the word the user actually typed to the AI — it never rewrites it.
-    if(guess && !hasSpace){ box.innerHTML=suggestState(word, guess); return; }
+    // A near-miss is only ever OFFERED (never substituted) — and it no longer
+    // stands in the way of the AI lookup for what the user actually typed.
+    if(guess && !hasSpace) nearMiss=guess;
   }
 
   /* Khớp cụm trong kho phải đứng TRƯỚC hai cửa này: 'mileage out of' có
@@ -1469,7 +1474,14 @@ async function search(rawWord, forceAI){
        hiện một thẻ trống trơn — trông như "gõ vào không dịch ra gì cả".
        Giờ nếu không có nghĩa nào sẵn, rơi xuống nhánh dịch bằng AI bên
        dưới để luôn có một bản dịch thật, thay vì một ngõ cụt. */
-    const pmWithVi=pm.filter(o=>o.vi);
+    /* Chỉ dừng ở kho cục bộ khi khớp MẠNH: đúng cụm đó, hoặc thứ người dùng
+       gõ nằm TRỌN trong một cụm đã lưu ("mileage out" ⊂ "get mileage out of").
+       Khớp yếu — câu dài chỉ tình cờ CHỨA một cụm ngắn ("I want to go home
+       now" ⊃ "go home") hay chỉ trùng vài từ — không phải là bản dịch của câu
+       đó; trước đây vẫn chặn AI lại nên câu tiếng Anh nào cũng "không dịch".
+       phraseScore: đúng cụm ≈100, gõ ⊂ cụm ≈70–80, cụm ⊂ gõ ≈50–60, còn lại ≤32. */
+    const minScore = looksLikeSentence(word) ? 90 : 70;
+    const pmWithVi=pm.filter(o=>o.vi && o.score>=minScore);
     if(pmWithVi.length){
       box.innerHTML=phraseMatchState(word, pmWithVi);
       logEvent('search', norm(word));
@@ -1477,8 +1489,8 @@ async function search(rawWord, forceAI){
     }
   }
 
-  if(!getKey()){ box.innerHTML=needKeyState(word); return; }
-  if(!navigator.onLine){ box.innerHTML=offlineState(word); return; }
+  if(!getKey()){ box.innerHTML=needKeyState(word)+nearMissFooter(nearMiss); return; }
+  if(!navigator.onLine){ box.innerHTML=offlineState(word)+nearMissFooter(nearMiss); return; }
 
   // Multiple English words with no local match — this reads as "translate
   // this for me", not "look this word up", so it gets its own AI call and
@@ -1526,13 +1538,14 @@ async function search(rawWord, forceAI){
       await idbPut({word, alias:canon, firstSeen:now(), saved:0, savedAt:0});
     }
     currentWord=canon;
-    box.innerHTML=renderEntry(rec, canon!==word?word:null);
+    box.innerHTML=renderEntry(rec, canon!==word?word:null)
+      +(nearMiss && nearMiss.target!==canon ? nearMissFooter(nearMiss) : '');
     maybeLoadYouglish(canon);
     logEvent('search',canon);
     addXP(2);
     refreshStats();
   }catch(err){
-    box.innerHTML=errorState(word,err.message||'');
+    box.innerHTML=errorState(word,err.message||'')+nearMissFooter(nearMiss);
   }
   /* Lưới an toàn ngoài cùng: BẤT KỲ lỗi bất ngờ nào ở bất kỳ nhánh nào bên
      trên (kể cả những nhánh vốn không có try/catch riêng, như tra cục bộ,
@@ -1929,8 +1942,13 @@ async function lemmaLookup(word){
     const wantVerb=['past','pastp','ing','s3'].includes(c.kind);
     const wantNoun=c.kind==='plural';
     const wantAdj =c.kind==='comparative'||c.kind==='superlative';
-    const good = (wantVerb&&isVerb) || (wantNoun&&isNoun) || (wantAdj&&isAdj) || !poses.length;
+    const isAdv =poses.some(p=>p.includes('adv'));
+    const good = (wantVerb&&isVerb) || (wantNoun&&isNoun) || (wantAdj&&(isAdj||isAdv)) || !poses.length;
     if(good) return {rec, base:c.base, kind:c.kind};
+    /* -er / -est chỉ là so sánh của TÍNH/TRẠNG TỪ. Không cho lọt xuống "gần
+       đúng" như các dạng khác, nếu không corner→corn, hammer→ham, poster→post
+       sẽ hiện nghĩa sai thay vì hỏi AI. */
+    if(wantAdj) continue;
     if(!fallback) fallback={rec, base:c.base, kind:c.kind};
   }
   return fallback;
@@ -1946,6 +1964,17 @@ async function lemmaResolve(word){
   let rec=await idbGet(rev.base);
   if(rec && rec.alias) rec=await idbGet(rec.alias);
   if(!rec || !rec.data) return null;
+  /* Đường quét ngược rộng hơn luật xuôi nên PHẢI kiểm loại từ: dạng động từ
+     thì gốc phải có nghĩa động từ, v.v. Không khớp → coi như chưa biết. */
+  const _p=(rec.data.senses||[]).map(s=>String(s.pos||'').toLowerCase());
+  if(_p.length){
+    const has=k=>_p.some(p=>p.includes(k));
+    const k=rev.kind;
+    const ok=(['past','pastp','ing','s3'].includes(k)&&has('verb'))
+          || (k==='plural'&&has('noun'))
+          || ((k==='comparative'||k==='superlative')&&(has('adj')||has('adv')));
+    if(!ok) return null;
+  }
   return {rec, base:rev.base, kind:rev.kind, viaReverse:true};
 }
 window.lemmaResolve=lemmaResolve;
@@ -2734,6 +2763,16 @@ function suggestState(query,guess){
     +'<span class="nm-go">→</span></div></div>';
   return h;
 }
+/* Dòng "Or did you mean…" đứng dưới kết quả — thay cho thẻ suggestState cũ
+   vốn chặn mất lượt gọi AI. Trả chuỗi rỗng khi không có gợi ý. */
+function nearMissFooter(guess){
+  if(!guess || !guess.target) return '';
+  const safeT=esc(guess.target).replace(/'/g,"\\'");
+  const kind = guess.type==='expr' ? ' <span style="opacity:.72">(inside “'+esc(guess.target)+'”)</span>' : '';
+  return '<div class="near-miss"><div class="near-miss-h">Or did you mean…</div>'
+    +'<div class="near-miss-row" onclick="jump(\''+safeT+'\')"><span class="nm-w">'+esc(guess.label)+'</span>'+kind
+    +'<span class="nm-go">→</span></div></div>';
+}
 function needKeyState(w){ return '<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/><h3>“'+esc(w)+'” isn\'t in your library yet</h3><p>Add your Gemini API key in Settings so Focci can chart new words for you.</p></div>'
    +'<button class="btn" onclick="showView(\'settings\')">Open Settings</button>'; }
 function offlineState(w){ return '<div class="empty"><img class="ill" src="./mascot-tired.webp" alt=""/><h3>“'+esc(w)+'” isn\'t saved yet</h3><p>You\'re offline right now, so Focci can\'t look it up. Connect and try again — words you\'ve already found still work offline.</p></div>'; }
@@ -3370,7 +3409,7 @@ function srsWhen(due){
 
 let savedTab='vault';
 window.setSavedTab=function(t){
-  savedTab = t==='why' ? 'why' : 'vault';
+  savedTab = t==='why' ? 'why' : (t==='say' ? 'say' : 'vault');
   document.querySelectorAll('.sv-tab').forEach(b=>
     b.classList.toggle('on', b.dataset.tab===savedTab));
   renderSaved();
@@ -3392,6 +3431,7 @@ function svRow(r, due, box){
 async function renderSaved(){
   const box=$('#saved-list');
   const head=$('#saved-count');
+  if(savedTab==='say'){ await renderSaySaved(box, head); return; }
   const all=await idbAll();
 
   if(savedTab==='why'){
@@ -3541,6 +3581,98 @@ async function renderSaved(){
   box.innerHTML=h;
 }
 
+/* ------------------------------------------------------------------
+   SAVED › SAY IT — mỗi lượt là một thẻ gập. Thẻ đóng chỉ hiện CÂU BẠN ĐÃ
+   GÕ (không phải mã nội bộ), mở ra mới thấy tình huống, câu tiếng Việt gốc,
+   nhận xét của Focci và các cách nói tự nhiên khác do Gemini đưa ra.
+   ------------------------------------------------------------------ */
+const SAY_VERDICT={
+  good:{ico:'\u{1F31F}', lbl:'Sounds natural!'},
+  close:{ico:'\u{1F642}', lbl:'Close \u2014 small tweak'},
+  off:{ico:'\u{1F914}', lbl:"Let's adjust this"}
+};
+function sayWhen(ts){
+  const days=Math.round((dayStart(now())-dayStart(ts))/DAY);
+  if(days<=0) return 'Today';
+  if(days===1) return 'Yesterday';
+  if(days<7) return days+' days ago';
+  return new Date(ts).toLocaleDateString(undefined,{day:'numeric',month:'short'});
+}
+async function renderSaySaved(box, head){
+  await sayMigrateOnce();
+  const list=sayLoad();
+  if(head) head.innerHTML='<svg class="hdr-ico hdr-ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+    +'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.2 3.6a.6.6 0 0 1-1-.46V15h-.3A2.5 2.5 0 0 1 4 12.5v-7Z"/></svg>'
+    +list.length+' sentence'+(list.length===1?'':'s')+' saved';
+  if(!list.length){
+    box.innerHTML='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/>'
+      +'<h3>No sentences yet</h3>'
+      +'<p>Play <b>Say it</b> and every sentence you write lands here \u2014 with Focci\u2019s feedback and other natural ways to say it.</p></div>'
+      +'<button class="btn" onclick="showView(\'review\');setPracticeMode(\'write\')">Play Say it</button>';
+    return;
+  }
+  if(savedSort==='oldest') list.sort((a,b)=>a.ts-b.ts);
+  else if(savedSort==='az') list.sort((a,b)=>String(a.you).localeCompare(String(b.you)));
+  else if(savedSort==='za') list.sort((a,b)=>String(b.you).localeCompare(String(a.you)));
+  else list.sort((a,b)=>b.ts-a.ts);
+
+  let h='';
+  for(const a of list){
+    const v=SAY_VERDICT[a.verdict]?a.verdict:'';
+    const vm=v?SAY_VERDICT[v]:null;
+    const topic=WRITE_TOPICS[a.topic]||{label:'Practice',icon:'\u2728',color:'blue'};
+    const id=esc(a.id);
+    h+='<div class="sy-row'+(v?' sy-v-'+v:'')+'">';
+    h+='<div class="sy-head" onclick="this.parentNode.classList.toggle(\'open\')">'
+      +'<span class="sy-dot">'+(vm?vm.ico:'\u{1F4AC}')+'</span>'
+      +'<div class="sy-mid"><div class="sy-you-t">'+esc(a.you)+'</div>'
+      +'<div class="sy-meta"><span>'+topic.icon+' '+esc(topic.label)+'</span><span>'+sayWhen(a.ts)+'</span></div></div>'
+      +'<span class="wf-x">\u25be</span></div>';
+    h+='<div class="sy-detail">';
+    if(a.ctx) h+='<div class="sy-blk"><div class="sy-blk-l">Situation</div><div class="sy-blk-t">'+esc(a.ctx)+'</div></div>';
+    if(a.vi)  h+='<div class="sy-blk"><div class="sy-blk-l">You were asked to say</div><div class="sy-blk-t vi">\u201C'+esc(a.vi)+'\u201D</div></div>';
+    if(a.fb || vm){
+      h+='<div class="write-fb write-fb-'+(v||'neutral')+'">'
+        +(vm?'<div class="write-fb-v"><span class="write-fb-ico">'+vm.ico+'</span>'+vm.lbl+'</div>':'')
+        +(a.fb?'<div class="write-fb-t">'+esc(a.fb)+'</div>':'')+'</div>';
+    }
+    const alts=Array.isArray(a.alts)?a.alts.filter(x=>x&&x.en):[];
+    if(alts.length){
+      h+='<div class="write-alts"><div class="write-alts-h">\u2728 Other natural ways to say it</div>';
+      alts.forEach((x,i)=>{
+        h+='<div class="write-alt"><span class="write-alt-n">'+(i+1)+'</span><div class="write-alt-body">'
+          +'<div class="write-alt-en">'+esc(x.en)+'</div>'
+          +(x.why?'<div class="write-alt-w">'+esc(x.why)+'</div>':'')+'</div></div>';
+      });
+      h+='</div>';
+    }
+    const canRetry=WRITE_PROMPTS.some(p=>p.id===a.pid);
+    h+='<div class="sy-acts">'
+      +(canRetry?'<button class="go" onclick="sayRetry(\''+esc(a.pid)+'\')">Try this one again</button>':'')
+      +'<button class="rm" onclick="sayRemove(\''+id+'\')">Remove</button></div>';
+    h+='</div></div>';
+  }
+  box.innerHTML=h;
+}
+window.sayRemove=function(id){
+  saySave(sayLoad().filter(x=>x.id!==id));
+  toast('Removed');
+  renderSaved();
+};
+window.sayRetry=function(pid){
+  const p=WRITE_PROMPTS.find(x=>x.id===pid); if(!p) return;
+  showView('review');
+  practiceMode='write'; practiceStage='playing';
+  writeCur=p; writeBusy=false; writeResult=null; writeAnswer='';
+  writeScene=newWriteScene();
+  renderWrite();
+};
+window.openSaySaved=function(){
+  savedTab='say';
+  document.querySelectorAll('.sv-tab').forEach(b=>b.classList.toggle('on', b.dataset.tab==='say'));
+  showView('saved');
+};
+
 /* Bắt đầu một vòng luyện chỉ với các từ tới hạn — nối vào phần Practice
    đã có, không dựng một cơ chế chơi thứ hai. */
 async function startSavedReview(){
@@ -3668,20 +3800,24 @@ window.setPracticeMode=setPracticeMode;
 
 /* the two games, presented as cards you switch between */
 function gameSwitch(){
-  // Dùng asset của chính hai game thay cho emoji ✍️ / 🎯 — hai emoji đó
-  // render khác nhau trên mỗi hệ máy và không khớp với phần còn lại của app.
-  const g=(id,asset,name,tag)=>'<button class="game-tab'+(practiceMode===id?' on':'')+'" onclick="setPracticeMode(\''+id+'\')">'
-    +'<img class="gt-ico-img" src="./'+asset+'.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<span class="gt-name">'+name+'</span><span class="gt-tag">'+tag+'</span></button>';
+  // Icon của Type it / Match it là asset thật (không dùng emoji vì mỗi máy
+  // vẽ một kiểu); Say it dùng SVG bong bóng thoại vẽ tay — không phụ thuộc
+  // file ngoài nên không bao giờ vỡ ảnh, và không còn trùng icon với Type it.
+  const img=(asset)=>'<img class="gt-ico-img" src="./'+asset+'.webp" alt="" onerror="this.style.display=\'none\'"/>';
+  const SAY_ICO='<svg class="gt-ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+    +'stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.2 3.6a.6.6 0 0 1-1-.46V15h-.3A2.5 2.5 0 0 1 4 12.5v-7Z"/>'
+    +'<path d="M8.5 8.5h7M8.5 11h4"/></svg>';
+  const g=(id,icon,name,tag)=>'<button class="game-tab'+(practiceMode===id?' on':'')+'" onclick="setPracticeMode(\''+id+'\')">'
+    +icon+'<span class="gt-name">'+name+'</span><span class="gt-tag">'+tag+'</span></button>';
   // Hub back-link: only shows once the story engine has actually taken over
   // this tab (renderGameHub defined) — the mini-games still work standalone
   // if story.js ever fails to load.
   const back=(typeof renderGameHub==='function')
     ? '<button class="hub-back" onclick="renderGameHub()">← Games</button>' : '';
   return back+'<div class="game-switch">'
-    +g('type','decor-note-and-pen','Type it','spell from memory')
-    +g('match','decor-magnifying-glass','Match it','pick the right word')
-    +g('write','decor-note-and-pen','Say it','compose a sentence')
+    +g('type',img('decor-note-and-pen'),'Type it','spell from memory')
+    +g('match',img('decor-magnifying-glass'),'Match it','pick the word')
+    +g('write',SAY_ICO,'Say it','write a sentence')
     +'</div>';
 }
 function chipRow(label, note, opts){
@@ -4114,6 +4250,46 @@ const WRITE_TOPICS={
   public:{label:'Out and about', icon:'\u{1F9ED}', color:'mint'},
   debate:{label:'Your take', icon:'\u{1F4AD}', color:'violet'}
 };
+/* ---------- cảnh nền + dáng Focci ngẫu nhiên (Say it, sảnh game) ----------
+   Nền dùng lại đúng các ảnh đã có trong app. Mỗi nền có một dải màu dự phòng
+   xếp DƯỚI ảnh: ảnh nào thiếu/lỗi thì thẻ vẫn ra một khung màu đẹp chứ không
+   trắng trơn. Dáng Focci lấy từ bộ mascot đã có, chia theo TÂM TRẠNG để dáng
+   hợp với việc đang làm (không dùng dáng gắn với cốt truyện như cắm cờ). */
+const SCENE_BGS=[
+  {f:'bg-arc1',                 c:['#b7dc8a','#4f8a3c']},
+  {f:'bg-arc2',                 c:['#f3ddb0','#c98f3a']},
+  {f:'bg-arc3',                 c:['#7cc596','#1f5a3c']},
+  {f:'bg-arc4',                 c:['#dfaad9','#7a4a8f']},
+  {f:'bg-desert',               c:['#f0c98a','#b9783a']},
+  {f:'bg-peaceful-field-arc-1', c:['#c6e6a6','#5c9a4a']}
+];
+const SCENE_POSES={
+  type:  ['mascot-take_note','mascot-read_map','mascot-explore'],
+  match: ['mascot-investigate','mascot-wonder','mascot-explore'],
+  say:   ['mascot-wonder','mascot-drink_tea_cup','mascot-explore','mascot-read_map','mascot-take_note'],
+  good:  ['mascot-champion','mascot-jump','mascot-badass'],
+  close: ['mascot-take_note','mascot-wonder','mascot-drink_tea_cup'],
+  off:   ['mascot-investigate','mascot-read_map','mascot-wonder']
+};
+let _lastSceneBg=-1;
+function pickSceneBgs(n){
+  const idx=SCENE_BGS.map((_,i)=>i).sort(()=>Math.random()-0.5);
+  if(n===1 && idx[0]===_lastSceneBg && idx.length>1) idx.push(idx.shift());   // không lặp lại nền vừa dùng
+  const out=idx.slice(0,n).map(i=>SCENE_BGS[i]);
+  if(n===1) _lastSceneBg=SCENE_BGS.indexOf(out[0]);
+  return out;
+}
+function sceneBgStyle(b){
+  return 'background-image:url(./'+b.f+'.webp),linear-gradient(160deg,'+b.c[0]+','+b.c[1]+')';
+}
+function pickScenePose(kind, avoid){
+  const a=SCENE_POSES[kind]||SCENE_POSES.say;
+  let p=pick(a);
+  if(a.length>1 && p===avoid) p=pick(a.filter(x=>x!==avoid));
+  return p;
+}
+window.FocciScenes={ pickBgs:pickSceneBgs, bgStyle:sceneBgStyle, pickPose:pickScenePose };
+
 function writeSeenIds(){
   try{ return new Set(JSON.parse(localStorage.getItem(WRITE_SEEN_LS)||'[]')); }catch(e){ return new Set(); }
 }
@@ -4131,11 +4307,15 @@ function pickWritePrompt(){
   return pool[Math.floor(Math.random()*pool.length)];
 }
 
-let writeCur=null, writeBusy=false, writeResult=null;
+let writeCur=null, writeBusy=false, writeResult=null, writeScene=null, writeAnswer='';
+function newWriteScene(){
+  return { bg:pickSceneBgs(1)[0], pose:pickScenePose('say', writeScene&&writeScene.pose) };
+}
 function startWrite(){
   practiceStage='playing';
   writeCur=pickWritePrompt();
-  writeBusy=false; writeResult=null;
+  writeBusy=false; writeResult=null; writeAnswer='';
+  writeScene=newWriteScene();
   renderWrite();
 }
 window.startWrite=startWrite;
@@ -4143,21 +4323,30 @@ window.startWrite=startWrite;
 function renderWrite(){
   const area=$('#review-area'); if(!area) return;
   if(!writeCur){ startWrite(); return; }
+  if(!writeScene) writeScene=newWriteScene();
   const topic=WRITE_TOPICS[writeCur.topic]||{label:'Practice',icon:'\u2728',color:'blue'};
   let h=gameSwitch();
-  h+='<div class="write-card">';
-  h+='<div class="write-topic write-topic-'+topic.color+'"><span>'+topic.icon+'</span>'+esc(topic.label)+'</div>';
-  h+='<div class="write-ctx"><img class="write-ctx-img" src="./mascot-wonder.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<div class="write-ctx-bubble">'+esc(writeCur.context)+'</div></div>';
+  h+='<div class="write-card sy-card">';
+  /* Cảnh: nền ngẫu nhiên + Focci đứng cạnh bong bóng nói chứa tình huống. */
+  h+='<div class="sy-scene" style="'+sceneBgStyle(writeScene.bg)+'">'
+    +'<span class="sy-scrim"></span>'
+    +'<div class="sy-topic"><span>'+topic.icon+'</span>'+esc(topic.label)+'</div>'
+    +'<div class="sy-stage">'
+    +'<div class="sy-bubble">'+esc(writeCur.context)+'</div>'
+    +'<img class="sy-focci'+(writeResult?' hop':'')+'" src="./'+writeScene.pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+    +'</div></div>';
+  h+='<div class="sy-body">';
   h+='<div class="write-vi write-vi-'+topic.color+'"><span class="write-vi-mark">\u201C</span>'+esc(writeCur.vi)+'</div>';
   if(!writeResult){
     h+='<textarea id="write-input" class="write-input" rows="3" placeholder="Type it in English…" autocapitalize="sentences" autocorrect="off" spellcheck="false"></textarea>';
     h+='<button class="btn" id="write-check" onclick="submitWrite()">Check it \u2192</button>';
   }else{
+    h+='<div class="sy-you"><span>You wrote</span><p>'+esc(writeAnswer)+'</p></div>';
     h+=writeResultHtml(writeResult);
     h+='<button class="btn" onclick="startWrite()">Next sentence \u2192</button>';
+    h+='<button class="sy-saved-link" onclick="openSaySaved()">Saved under <b>Say it</b> in Saved \u2197</button>';
   }
-  h+='</div>';
+  h+='</div></div>';
   area.innerHTML=h;
   if(!writeResult){
     const inp=$('#write-input');
@@ -4222,23 +4411,96 @@ async function askGradeWrite(promptObj, userAnswer){
   if(s<0||e<0) throw new Error('BAD_JSON');
   return JSON.parse(txt.slice(s,e+1));
 }
-/* Mỗi câu chơi xong TỰ ĐỘNG lưu vào The Cache — không cần bấm sao — để
-   user xem lại được câu mình viết, nhận xét của Focci, và các cách nói
-   khác. Mỗi lượt là MỘT bản ghi riêng (key có timestamp) nên chơi lại
-   cùng một câu ở vòng sau vẫn giữ được lịch sử, không ghi đè lượt cũ. */
-async function saveWriteAttempt(promptObj, userAnswer, result){
-  const alts=Array.isArray(result.natural_alternatives)?result.natural_alternatives:[];
-  const bestEn=(alts[0]&&alts[0].en)||userAnswer;
-  const key=norm('say-it '+promptObj.id+' '+now());
-  const data={
-    word:bestEn, phrase:true, write:true, vi_equivalent:promptObj.vi,
-    senses:[{pos:'sentence', vi:promptObj.vi, gloss:result.feedback_vi||'',
-             example:userAnswer, example_vi:promptObj.context}]
+/* ------------------------------------------------------------------
+   LỊCH SỬ SAY IT — mỗi câu chơi xong TỰ ĐỘNG được lưu, nhưng KHÔNG nằm trong
+   từ điển (IndexedDB "entries") nữa. Trước đây mỗi lượt là một bản ghi từ
+   điển giả với khoá "say-it <id> <giờ>", nên nó: hiện trong The Cache với
+   chính cái khoá đó làm tiêu đề, chui vào Recent Searches khi bấm mở, bị đếm
+   vào số từ đã học, và lọt vào chỉ mục tra ngược Việt→Anh. Giờ nó sống trong
+   localStorage (cùng chỗ với tiến trình Story — cũng để yên schema IndexedDB
+   dùng chung với generate.html) và chỉ hiện ở tab "Say it" của Saved.
+   Mỗi lượt là MỘT bản ghi riêng, nên chơi lại cùng một câu vẫn giữ được các
+   lần trước. Xếp cũ → mới; tối đa SAY_MAX lượt gần nhất.
+   ------------------------------------------------------------------ */
+const SAY_LOG_LS='fc_say_log', SAY_MIGRATED_LS='fc_say_migrated', SAY_MAX=500;
+function sayLoad(){
+  try{ const v=JSON.parse(localStorage.getItem(SAY_LOG_LS)||'[]'); return Array.isArray(v)?v:[]; }
+  catch(e){ return []; }
+}
+function saySave(list){
+  const l=list.length>SAY_MAX ? list.slice(-SAY_MAX) : list;
+  try{ localStorage.setItem(SAY_LOG_LS, JSON.stringify(l)); }
+  catch(e){ try{ localStorage.setItem(SAY_LOG_LS, JSON.stringify(l.slice(-Math.floor(SAY_MAX/2)))); }catch(_){} }
+}
+function saveWriteAttempt(promptObj, userAnswer, result){
+  const alts=(Array.isArray(result.natural_alternatives)?result.natural_alternatives:[])
+    .filter(a=>a&&a.en).map(a=>({en:String(a.en), why:String(a.why_vi||'')}));
+  const rec={
+    id: now().toString(36)+Math.random().toString(36).slice(2,6), ts: now(),
+    pid: promptObj.id, topic: promptObj.topic, ctx: promptObj.context, vi: promptObj.vi,
+    you: userAnswer,
+    verdict: (result.verdict==='good'||result.verdict==='off') ? result.verdict : 'close',
+    fb: String(result.feedback_vi||''),
+    alts
   };
-  const rec={ word:key, data, source:'write', firstSeen:now(), saved:1, savedAt:now() };
-  await idbPut(rec);
+  const list=sayLoad(); list.push(rec); saySave(list);
   return rec;
 }
+/* Dọn một lần: chuyển các lượt Say it CŨ đang nằm trong từ điển sang danh
+   sách riêng, xoá khỏi từ điển, và xoá dấu vết của chúng khỏi lịch sử tra
+   từ / Recent Searches. Chỉ đặt cờ "đã xong" khi chạy trọn vẹn — lỗi giữa
+   chừng thì lần mở sau chạy lại (id = "m"+giờ nên không bao giờ nhân đôi). */
+async function sayMigrateOnce(){
+  if(localStorage.getItem(SAY_MIGRATED_LS)==='1') return;
+  const isSay=w=>typeof w==='string' && /^say-it /.test(w);
+  try{
+    const d=await db();
+    const keys=await new Promise((res,rej)=>{
+      const r=d.transaction(STORE,'readonly').objectStore(STORE).getAllKeys();
+      r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error);
+    });
+    const sayKeys=keys.filter(isSay);
+    if(sayKeys.length){
+      const list=sayLoad(); const have=new Set(list.map(x=>x.id));
+      for(const k of sayKeys){
+        const rec=await idbGet(k); if(!rec) continue;
+        const m=k.match(/^say-it (.+) (\d{9,})$/);
+        const pid=m?m[1]:''; const ts=m?+m[2]:(rec.firstSeen||now());
+        const id='m'+ts;
+        if(have.has(id)) continue;
+        const dd=rec.data||{}, s0=(dd.senses||[])[0]||{};
+        const P=WRITE_PROMPTS.find(x=>x.id===pid);
+        const you=String(s0.example||dd.word||'');
+        const alts=[]; if(dd.word && dd.word!==you) alts.push({en:String(dd.word), why:''});
+        list.push({ id, ts, pid, topic:P?P.topic:'casual',
+          ctx:String(s0.example_vi||(P&&P.context)||''), vi:String(s0.vi||dd.vi_equivalent||(P&&P.vi)||''),
+          you, verdict:'', fb:String(s0.gloss||''), alts });
+        have.add(id);
+      }
+      list.sort((a,b)=>a.ts-b.ts); saySave(list);
+      await new Promise(res=>{
+        const t=d.transaction(STORE,'readwrite'); const st=t.objectStore(STORE);
+        sayKeys.forEach(k=>st.delete(k));
+        t.oncomplete=()=>res(); t.onerror=()=>res(); t.onabort=()=>res();
+      });
+    }
+    // lịch sử tra từ (sổ trong localStorage) + bảng log
+    const hist=histLoad(); const cleaned=hist.filter(e=>!(e && isSay(e.w)));
+    if(cleaned.length!==hist.length) histSave(cleaned);
+    await logTx('readwrite').then(st=>new Promise(res=>{
+      const req=st.openCursor();
+      req.onsuccess=e=>{ const c=e.target.result; if(!c){ res(); return; }
+        if(c.value && isSay(c.value.word)) c.delete(); c.continue(); };
+      req.onerror=()=>res();
+    }));
+    _allRecordsCache=null;
+    if(typeof lemmaResetKeys==='function') lemmaResetKeys();
+    if(typeof phraseIndexReset==='function') phraseIndexReset();
+    localStorage.setItem(SAY_MIGRATED_LS,'1');
+  }catch(e){ /* thử lại lần mở sau */ }
+}
+window.sayMigrateOnce=sayMigrateOnce;
+
 async function submitWrite(){
   if(writeBusy || !writeCur) return;
   const inp=$('#write-input'); if(!inp) return;
@@ -4251,8 +4513,11 @@ async function submitWrite(){
   try{
     const result=await askGradeWrite(writeCur, answer);
     writeResult=result;
+    writeAnswer=answer;
+    const vk=result.verdict==='good'?'good':(result.verdict==='off'?'off':'close');
+    if(writeScene) writeScene.pose=pickScenePose(vk, writeScene.pose);   // Focci phản ứng theo kết quả
     writeMarkSeen(writeCur.id);
-    await saveWriteAttempt(writeCur, answer, result);
+    saveWriteAttempt(writeCur, answer, result);
     addXP(2);
     refreshStats();
   }catch(err){
@@ -5689,9 +5954,13 @@ function wireOnboarding(){
   renderDashboard();                    // paint the real screen immediately — never wait on background sync
   logEvent('open', null);
   if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
-  buildWordIndex().catch(()=>{});
-  buildViIndex().catch(()=>{});
-  buildSavedPhraseKeys().catch(()=>{});
+  /* Dọn các lượt Say it cũ ra khỏi từ điển TRƯỚC khi dựng các chỉ mục, để
+     chỉ mục không bao giờ chứa chúng. Lần đầu xong thì các lần sau trả về ngay. */
+  sayMigrateOnce().catch(()=>{}).then(()=>{
+    buildWordIndex().catch(()=>{});
+    buildViIndex().catch(()=>{});
+    buildSavedPhraseKeys().catch(()=>{});
+  });
   syncSeedFiles().catch(()=>{});        // fire-and-forget — re-renders itself if it actually merged anything new
 })();
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;
