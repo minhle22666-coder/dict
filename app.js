@@ -3258,6 +3258,9 @@ function renderWeekBars(offset){
       +'<b class="wk-n">'+w.count+'</b></div>';
   });
   const bars=$('#week-bars'); if(bars) bars.innerHTML=h;
+  const sum=$('#week-sum');
+  if(sum){ const act=week.filter(w=>w.count>0).length, tot=week.reduce((a,w)=>a+w.count,0);
+    sum.innerHTML='<b>'+act+'/7</b> days active · '+tot+' word'+(tot===1?'':'s'); }
 
   const lbl=$('#week-range-label');
   if(lbl){
@@ -3395,11 +3398,11 @@ function countUp(el, to, ms){
    lần mỗi nhiệm vụ mỗi ngày; sang ngày mới tự đặt lại. */
 const QUEST_LS='fc_quests';
 const QUESTS=[
-  {id:'search', t:'Look up 5 words',        target:5, xp:10,
+  {id:'search', hue:'cyan', t:'Look up 5 words',        target:5, xp:10,
    ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>'},
-  {id:'save',   t:'Save a word', target:1, xp:10,
+  {id:'save',   hue:'pink', t:'Save a word', target:1, xp:10,
    ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m12 3.5 2.5 5.3 5.8.7-4.3 4 1.1 5.7L12 16.3 6.9 19.2 8 13.5l-4.3-4 5.8-.7L12 3.5Z"/></svg>'},
-  {id:'game',   t:'Play a mini-game', target:1, xp:15,
+  {id:'game',   hue:'mint', t:'Play a game', target:1, xp:15,
    ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="11" rx="5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r=".9" fill="currentColor"/><circle cx="17.5" cy="13.5" r=".9" fill="currentColor"/></svg>'}
 ];
 const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
@@ -3431,15 +3434,16 @@ async function renderQuests(){
     const claimed=st.claimed.includes(q.id);
     const ready=!claimed && cur>=q.target;
     if(claimed) done++;
-    h+='<div class="q-row'+(ready?' ready':'')+(claimed?' done':'')+'" data-q="'+q.id+'">'
-      +'<span class="q-ico">'+q.ico+'</span>'
+    h+='<div class="q-row'+(ready?' ready':'')+(claimed?' done':'')+'" data-q="'+q.id+'" data-hue="'+q.hue+'"><div class="q-card">'
+      +'<div class="q-main"><span class="orb q-orb">'+q.ico+'</span>'
       +'<div class="q-mid"><div class="q-t">'+q.t+'</div>'
       +'<div class="q-bar"><i style="width:'+Math.round(cur/q.target*100)+'%"></i></div>'
-      +'<div class="q-n">'+cur+' / '+q.target+'</div></div>'
+      +'<div class="q-n">'+cur+' / '+q.target+'</div></div></div>'
+      +'<div class="q-side">'
       +(claimed ? '<span class="q-done">'+CHECK_SVG+'</span>'
         : ready ? '<button class="q-claim" onclick="claimQuest(\''+q.id+'\')">Claim +'+q.xp+'</button>'
-        : '<span class="q-rw">+'+q.xp+' XP</span>')
-      +'</div>';
+        : '<span class="q-rw"><i class="coin"></i>+'+q.xp+'</span>')
+      +'</div></div></div>';
   }
   box.innerHTML=h;
   const c=$('#q-count'); if(c) c.textContent=done+'/'+QUESTS.length;
@@ -5137,11 +5141,11 @@ async function renderHero(){
   streakEl.classList.toggle('is-zero', streak===0);
   streakEl.classList.toggle('at-risk', streak>0 && !hasToday);
   streakEl.innerHTML = streak>0
-    ? '<span class="hud-fl">🔥</span><b>'+streak+'</b> day'+(streak===1?'':'s')
-    : '<span class="hud-fl">🔥</span>Start a streak';
+    ? '<span class="orb orb-flame">🔥</span><span class="hud-v"><b>'+streak+'</b> day'+(streak===1?'':'s')+'</span>'
+    : '<span class="orb orb-flame">🔥</span><span class="hud-v">Start a streak</span>';
   subEl.textContent=heroLine(t, streak, hasToday, getDailyXP(), getDailyGoal());
   const lvl=levelFromXP(getXP());
-  if(levelEl) levelEl.innerHTML='<span class="hud-fl">⚡</span>Level <b>'+lvl+'</b>';
+  if(levelEl) levelEl.innerHTML='Level <b>'+lvl+'</b>';
   const xpIn=getXP()%100;
   const lf=$('#lvl-fill'); if(lf) lf.style.width=Math.max(4,xpIn)+'%';
   const lt=$('#lvl-txt'); if(lt) lt.textContent=xpIn+'/100';
