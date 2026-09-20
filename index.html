@@ -3074,6 +3074,24 @@
   .fw-quote.show{opacity:1;transform:translateY(0) scale(1)}
   .fw-quote img{flex:none;width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))}
   .fw-quote p{margin:2px 0 0;color:#fff;font-size:13px;line-height:1.5;font-weight:400;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+  /* A tap on an ordinary pickup (letter/mushroom) is a passing aside, not a
+     moment — small, centered, quick, no avatar (that would make it look as
+     weighty as the tree's actual dialogue). */
+  .fw-quote.reaction{left:50%;right:auto;transform:translate(-50%,8px) scale(.97);
+    bottom:calc(env(safe-area-inset-bottom,0px) + 100px);padding:9px 16px;max-width:260px;
+    background:rgba(20,18,14,.58)}
+  .fw-quote.reaction.show{transform:translate(-50%,0) scale(1)}
+  .fw-quote.reaction img{display:none}
+  .fw-quote.reaction p{font-size:12.5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* The wisdom tree is the one deliberate, "sit with this" moment — warm
+     gold glass instead of the plain dark bar, a soft ring around Focci's
+     own avatar (he's listening, not just talking), and it stays up longer
+     (see the JS timer) since these lines are long life-advice quotes, not
+     a one-liner. */
+  .fw-quote.wisdom{background:linear-gradient(155deg,rgba(255,217,138,.22),rgba(120,84,20,.42));
+    border-color:rgba(255,224,150,.45);box-shadow:0 16px 36px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.2)}
+  .fw-quote.wisdom img{border-radius:50%;box-shadow:0 0 0 2px rgba(255,224,150,.6),0 0 18px rgba(255,200,100,.5)}
+  .fw-quote.wisdom p{font-size:13.5px;line-height:1.6}
 
   /* Saved / Game / Progress / Settings now float ABOVE the 3D world as glass
      sheets instead of being flat 2D pages you navigate to — the world stays
@@ -3839,7 +3857,9 @@
         openStory();
       },
       onOpenSayIt: () => { closeFocciWorld3D(); showView('review'); setPracticeMode('write'); },
-      onWordFound: () => { /* TODO: award EXP here */ },
+      // Was a bare TODO stub — every mushroom pickup fired this and got
+      // silently discarded, so "collecting" one visibly did nothing at all.
+      onWordFound: () => { addXP(2); },
       getNextTargetWord: async () => {
         const levels = await loadLevels();
         const words = await dsAllWords();
@@ -3898,20 +3918,24 @@
   }
   window.fwToast = fwToast;
 
-  // world.js dispatches this when Focci taps the vine tree or any scattered
-  // tree/bush (see onInteract's 'vine-tree'/'quote-prop' cases) — nothing
-  // anywhere was listening for it before, so tapping those produced no
-  // visible line at all despite the interaction firing correctly.
+  // world.js dispatches this when Focci taps the wisdom tree (kind:'wisdom',
+  // a long affirmation quote) or an ordinary pickup like a letter/mushroom
+  // (kind:'reaction', a short aside) — nothing anywhere was listening for
+  // it before, so tapping the tree produced no visible line at all despite
+  // the interaction firing correctly.
   document.addEventListener('focci-quote', (e) => {
     const q = e.detail;
     if (!q || !q.message) return;
     const bubble = document.getElementById('fw-quote');
+    const kind = q.kind === 'reaction' ? 'reaction' : 'wisdom';
+    bubble.classList.remove('wisdom', 'reaction');
+    bubble.classList.add(kind);
     const avatarFile = (typeof mascotPick === 'function' && mascotPick()) || (typeof TIME_CONTENT !== 'undefined' && typeof timeOfDay === 'function' ? TIME_CONTENT[timeOfDay()].char : 'wander');
     document.getElementById('fw-quote-avatar').src = './mascot-' + avatarFile + '.webp';
     document.getElementById('fw-quote-text').textContent = q.message;
     bubble.classList.add('show');
     clearTimeout(bubble._hideTimer);
-    bubble._hideTimer = setTimeout(() => bubble.classList.remove('show'), 5200);
+    bubble._hideTimer = setTimeout(() => bubble.classList.remove('show'), kind === 'reaction' ? 2000 : 6200);
   });
 
   window.toggleFwMenu = function () {

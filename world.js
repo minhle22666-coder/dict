@@ -253,12 +253,67 @@ export async function bootFocciWorld(root, opts) {
     ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
     return new THREE.CanvasTexture(c);
   }
+  const GLOW_TEX = makeGlowTexture(); // one shared texture for every burst — no reason to re-render the canvas per pickup
+
+  /* ============================================================
+     PICKUP EFFECTS — mushrooms/letters used to just vanish with no
+     feedback at all ("chưa có hiệu ứng gì cho việc nhặt được... user k
+     biết nhặt để làm gì"). A short burst of glowing motes plus a quick
+     light flash reads as "you got something" without needing any new
+     art asset. `activeEffects` is ticked once per frame from animate()
+     and self-removes when its animation finishes.
+     ============================================================ */
+  const activeEffects = [];
+  function spawnPickupBurst(room, x, y, z, color) {
+    const N = 7, DURATION = 0.65;
+    const light = new THREE.PointLight(color, 1.6, 4, 2);
+    light.position.set(x, y, z);
+    room.group.add(light);
+    const sprites = [];
+    for (let i = 0; i < N; i++) {
+      const mat = new THREE.SpriteMaterial({ map: GLOW_TEX, color, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending });
+      const sp = new THREE.Sprite(mat);
+      const ang = (i / N) * Math.PI * 2 + Math.random() * 0.4;
+      sp.userData.vx = Math.cos(ang) * (1.1 + Math.random() * 0.7);
+      sp.userData.vz = Math.sin(ang) * (1.1 + Math.random() * 0.7);
+      sp.userData.vy = 1.6 + Math.random() * 0.9;
+      sp.scale.setScalar(0.32);
+      sp.position.set(x, y, z);
+      room.group.add(sp);
+      sprites.push(sp);
+    }
+    let age = 0;
+    activeEffects.push((dt) => {
+      age += dt;
+      const k = Math.min(1, age / DURATION);
+      sprites.forEach((sp) => {
+        sp.position.x += sp.userData.vx * dt;
+        sp.position.z += sp.userData.vz * dt;
+        sp.userData.vy -= 3.4 * dt;
+        sp.position.y += sp.userData.vy * dt;
+        sp.material.opacity = 1 - k;
+        sp.scale.setScalar(0.32 * (1 - k * 0.55));
+      });
+      light.intensity = 1.6 * (1 - k);
+      if (age < DURATION) return true;
+      sprites.forEach((sp) => { room.group.remove(sp); sp.material.dispose(); });
+      room.group.remove(light);
+      return false;
+    });
+  }
 
   function tagWater(root3d) {
     root3d.traverse((n) => {
       if (n.isMesh && n.material && n.material.transparent && n.material.color) {
         const c = n.material.color;
-        if (c.b >= c.r && c.b >= c.g * 0.9) n.userData.isWater = true;
+        // The hub's actual water material is teal (#06A08F — green
+        // slightly higher than blue), which narrowly failed the old
+        // "blue-dominant" check (needed b >= g*0.9, teal's b sits just
+        // under that) and went completely untagged — bushes/props kept
+        // landing on it as if it were dry ground. Water reads as
+        // cyan-ish: red clearly low, green AND blue both clearly above
+        // red, not "blue is the single highest channel."
+        if (c.r < 0.25 && c.b > 0.3 && c.g > c.r * 1.8 && c.b > c.r * 1.8) n.userData.isWater = true;
       }
     });
   }
@@ -413,11 +468,22 @@ export async function bootFocciWorld(root, opts) {
     // dimension, in world units) rather than a flat multiplier on whatever
     // scale the kit happened to export at; see scatterClone's comment.
     // Radii scaled up 1.5x to match the bigger hub above.
-    const forestProps = extractPropGroups(forestKit.scene);
-    forestProps.forEach((p) => scatterClone(station, p, 3, 4, 12, 5, { tapForQuote: true }));
+    // The forest kit's own scene includes a few small flower props
+    // (named "flower1"/"flower2"/"flower3" in the source file) alongside
+    // the actual trees — scatterClone normalizes EVERY template it's given
+    // to the same targetSize (5, meant for a full tree), so a flower ended
+    // up blown up to tree-sized and scattered with no purpose. Dropped
+    // entirely rather than given their own separate smaller scatter pass —
+    // asked to just remove them, not re-tune them.
+    const forestProps = extractPropGroups(forestKit.scene).filter((p) => !/flower/i.test(p.name));
+    // Random "tap this tree/bush for a quote" was asked to be removed —
+    // that reaction belongs ONLY to the one dedicated wisdom tree now, not
+    // every scattered prop, so tapForQuote (and its invisible hitbox) is
+    // gone from both kits below.
+    forestProps.forEach((p) => scatterClone(station, p, 3, 4, 12, 5));
 
     const bushProps = extractPropGroups(bushKit.scene);
-    bushProps.forEach((p) => scatterClone(station, p, 3, 4, 12, 1.6, { tapForQuote: true }));
+    bushProps.forEach((p) => scatterClone(station, p, 3, 4, 12, 1.6));
 
     // mushrooms — 15 individual finds, tucked near bushes/rocks. Same two
     // fixes as scatterClone: measured + normalized scale instead of a flat
@@ -627,12 +693,15 @@ export async function bootFocciWorld(root, opts) {
     wordHunt.word = word;
     wordHunt.respawnPending = false;
     for (let i = 0; i < word.length; i++) {
-      const ang = Math.random() * Math.PI * 2, r = 5 + Math.random() * 24;
-      const x = Math.cos(ang) * r, z = Math.sin(ang) * r;
-      const surf = surfaceYIn(station, x, z);
+      // Used to pick a raw random point up to 29 units out with only a bare
+      // surfaceYIn check (no stability/reachability validation) — the
+      // island's real walkable radius is much smaller than that, so a good
+      // few letters every hunt landed past the edge, over open air/water.
+      // Same validated search every other prop on this island uses.
+      const spot = findGroundSpot(station, 3, 14);
       const tex = makeLetterTexture(word[i], LETTER_BG[i % LETTER_BG.length]);
       const cube = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ map: tex, flatShading: true }));
-      cube.position.set(x, surf.y + 0.75, z);
+      cube.position.set(spot.x, spot.y + 0.75, spot.z);
       cube.rotation.set(0.3, Math.random() * Math.PI, 0.1);
       cube.userData.interactType = 'letter';
       station.group.add(cube);
@@ -646,6 +715,7 @@ export async function bootFocciWorld(root, opts) {
   function collectLetter(l) {
     if (l.found) return;
     l.found = true; l.obj.visible = false;
+    spawnPickupBurst(station, l.obj.position.x, l.obj.position.y, l.obj.position.z, 0xFFD54A);
     onLetterProgress(wordHunt.word, progressMask());
     if (wordHunt.letters.every((x) => x.found)) completeWordHunt();
   }
@@ -838,6 +908,33 @@ export async function bootFocciWorld(root, opts) {
   function randomQuote() {
     return ANGEL_MESSAGES.length ? ANGEL_MESSAGES[Math.floor(Math.random() * ANGEL_MESSAGES.length)] : null;
   }
+  // Short, light lines for tapping an ordinary object (letter/mushroom) —
+  // the wisdom-tree quotes above are deliberately deep, life-advice-length
+  // affirmations, wrong tone entirely for "picked up a letter cube".
+  const TAP_REACTIONS = [
+    "Ooh, found one!", "A little treasure!", "Focci wonders what this is for.",
+    "Neat!", "Focci tucks it away carefully.", "One more piece of the puzzle.",
+  ];
+  // A separate, small pool for the moments the doe wanders off on its own —
+  // framed as Focci noticing, since the speech bubble is Focci's, not a
+  // second UI for the deer to "talk" through.
+  const DOE_LINES = [
+    "Off you go, then.", "She's exploring again.", "Focci watches her go.",
+    "Careful out there.", "She never sits still for long.",
+  ];
+  function focciReact(pool) {
+    const list = pool || TAP_REACTIONS;
+    const message = list[Math.floor(Math.random() * list.length)];
+    root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message, kind: 'reaction' } }));
+  }
+  // Turns Focci to actually face a point (the wisdom tree, mainly) instead
+  // of just popping a speech bubble while he's still looking wherever he
+  // last walked — charState.angle is what the per-frame lerp in animate()
+  // already rotates the character towards, so setting it once is enough;
+  // it holds until the player moves again.
+  function faceToward(x, z) {
+    charState.angle = Math.atan2(x - charState.x, z - charState.z);
+  }
   function onInteract(obj) {
     const room = activeRoom();
     const type = obj.userData.interactType;
@@ -881,23 +978,26 @@ export async function bootFocciWorld(root, opts) {
       const m = room.mushrooms.find((m) => m.hitbox === obj);
       if (m && !m.found) {
         m.found = true; obj.visible = false; m.obj.visible = false;
+        spawnPickupBurst(room, m.x, m.obj.position.y, m.z, 0xFF8A5C);
         onWordFound({ type: 'mushroom-exp' });
         maybeScheduleRespawn(room.mushrooms);
+        focciReact();
       }
     } else if (type === 'letter') {
       const l = wordHunt.letters.find((l) => l.obj === obj);
-      if (l) collectLetter(l);
+      if (l) { collectLetter(l); focciReact(); }
     } else if (type === 'word-treasure') {
       collectTreasure(room);
     } else if (type === 'vine-tree') {
+      // "Focci must focus on the wisdom tree" — turn to actually face it
+      // and give its glow a pronounced boost, so this reads as a moment of
+      // Focci listening to the tree, not just a text box popping up while
+      // he's still facing wherever he last walked.
       const doe = room.doe;
       if (doe) { doe.calledHome = true; doe.wanderTarget = null; }
-      root.dispatchEvent(new CustomEvent('focci-quote', { detail: randomQuote() }));
-    } else if (type === 'quote-prop') {
-      // "tap any tree/bush → a random line" — the same quote pool and event
-      // as the vine tree, just for the ordinary scattered decoration instead
-      // of the one dedicated wisdom tree.
-      root.dispatchEvent(new CustomEvent('focci-quote', { detail: randomQuote() }));
+      if (room.vineTree) { faceToward(room.vineTree.x, room.vineTree.z); room.vineTree.listenBoost = 1; }
+      const q = randomQuote();
+      root.dispatchEvent(new CustomEvent('focci-quote', { detail: q ? { ...q, kind: 'wisdom' } : null }));
     }
   }
 
@@ -953,8 +1053,8 @@ export async function bootFocciWorld(root, opts) {
       const dx = doe.wanderTarget.x - doe.obj.position.x, dz = doe.wanderTarget.z - doe.obj.position.z;
       const d = Math.hypot(dx, dz);
       if (d > 0.3) {
-        doe.obj.position.x += (dx / d) * 1.4 * dt;
-        doe.obj.position.z += (dz / d) * 1.4 * dt;
+        doe.obj.position.x += (dx / d) * 2.2 * dt;
+        doe.obj.position.z += (dz / d) * 2.2 * dt;
         doe.obj.rotation.y = Math.atan2(dx, dz);
         if (doe.state !== 'Dear_walk') playDoeClip(doe, 'Dear_walk', true);
       } else {
@@ -967,13 +1067,21 @@ export async function bootFocciWorld(root, opts) {
     doe.cooldown -= dt;
     if (doe.cooldown <= 0) {
       const roll = Math.random();
-      if (roll < 0.35) {
-        doe.wanderTarget = { x: doe.homeX + (Math.random() - 0.5) * 6, z: doe.homeZ + (Math.random() - 0.5) * 6 };
+      // Was 35% wander / 65% idle-clip, and the idle pool weighted
+      // 'Dear_shake' the same as everything else with no repeat-guard —
+      // in practice it kept re-rolling the same head-shake clip back to
+      // back, reading as "just shakes its head constantly" instead of a
+      // living animal. Now mostly wanders around its home point (bigger
+      // radius, a bit faster) like Focci does, and idle picks avoid
+      // repeating whatever clip is already playing.
+      if (roll < 0.65) {
+        doe.wanderTarget = { x: doe.homeX + (Math.random() - 0.5) * 9, z: doe.homeZ + (Math.random() - 0.5) * 9 };
+        if (Math.random() < 0.2) focciReact(DOE_LINES);
       } else {
-        const idleClips = ['Dear_look', 'Dear_eat', 'Dear_shake', 'Dear_idle'];
+        const idleClips = ['Dear_look', 'Dear_eat', 'Dear_idle', 'Dear_shake'].filter((c) => c !== doe.state);
         playDoeClip(doe, idleClips[Math.floor(Math.random() * idleClips.length)], true);
       }
-      doe.cooldown = 14 + Math.random() * 12; // deliberately infrequent — not a flicker-fest
+      doe.cooldown = 8 + Math.random() * 8;
     }
   }
 
@@ -982,6 +1090,7 @@ export async function bootFocciWorld(root, opts) {
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
     const room = activeRoom();
+    for (let i = activeEffects.length - 1; i >= 0; i--) { if (!activeEffects[i](dt)) activeEffects.splice(i, 1); }
 
     const fwdX = -Math.sin(cam.theta), fwdZ = -Math.cos(cam.theta);
     const rightX = Math.cos(cam.theta), rightZ = -Math.sin(cam.theta);
@@ -1019,9 +1128,15 @@ export async function bootFocciWorld(root, opts) {
     }
     if (room.vineTree && room.vineTree.glowSprite) {
       const pulse = 0.82 + Math.sin(t * 1.1) * 0.18;
-      room.vineTree.glowSprite.material.opacity = 0.65 + pulse * 0.25;
-      room.vineTree.glowSprite.scale.setScalar(6.4 + pulse * 1.2);
-      room.vineTree.glowLight.intensity = 1.1 + pulse * 0.6;
+      // listenBoost: a brief brighter/bigger glow while Focci is "listening"
+      // right after tapping the tree (set in onInteract), decaying back to
+      // the normal ambient pulse — makes the moment read as the tree
+      // actually responding, not just a text box appearing out of nowhere.
+      const boost = room.vineTree.listenBoost || 0;
+      if (boost > 0) room.vineTree.listenBoost = Math.max(0, boost - dt / 2.2);
+      room.vineTree.glowSprite.material.opacity = 0.65 + pulse * 0.25 + boost * 0.35;
+      room.vineTree.glowSprite.scale.setScalar(6.4 + pulse * 1.2 + boost * 2.6);
+      room.vineTree.glowLight.intensity = 1.1 + pulse * 0.6 + boost * 1.8;
     }
     if (room._birdMixer) {
       room._birdMixer.update(dt);
