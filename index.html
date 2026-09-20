@@ -3727,21 +3727,20 @@
     if (worldApi) return;
 
     const arcTitles = window.ARC_LANDS.slice(0, 4).map(a => a.name);
-    const arcUnlockedFlags = window.ARC_LANDS.slice(0, 4).map(a => arcUnlocked(a.id));
 
+    // Every land is walkable in the 3D world any time now (world.js no
+    // longer gates the teleport diamonds on arc-unlock state at all) — only
+    // whether the STORY TEXT auto-opens when you arrive still depends on
+    // real progress, checked here.
     worldApi = await bootFocciWorld(document, {
       angelMessages: FOCCI_ANGEL_MESSAGES,
       arcTitles,
-      arcUnlocked: arcUnlockedFlags,
       onOpenArc: (index) => {
         const arcId = index + 1;
         if (!arcUnlocked(arcId)) return;
         closeFocciWorld3D();
         updateContinueCard(arcId);
         openStory();
-      },
-      onArcLocked: (index, title) => {
-        showInfoCard('mascot-wonder', '🔒 ' + title, 'This land is not finished yet — check back soon!');
       },
       onOpenSayIt: () => { closeFocciWorld3D(); showView('review'); setPracticeMode('write'); },
       onWordFound: () => { /* TODO: award EXP here */ },

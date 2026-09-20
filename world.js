@@ -27,9 +27,10 @@ export async function bootFocciWorld(root, opts) {
   opts = opts || {};
   const ANGEL_MESSAGES = opts.angelMessages || [];       // pass FOCCI_ANGEL_MESSAGES here
   const ARC_TITLES = opts.arcTitles || ['The Nameless Field', 'The Unspoken Sands', 'The Unmarked Woods', 'The Unchanging Garden'];
-  const ARC_UNLOCKED = opts.arcUnlocked || ARC_TITLES.map(() => true); // default: open, until the real app tells us otherwise
+  // Every land is walkable any time now (see onInteract's 'teleport' case) —
+  // opts.arcUnlocked/opts.onArcLocked are no longer read here at all. Left
+  // harmless to pass from index.html; just unused.
   const onOpenArc = typeof opts.onOpenArc === 'function' ? opts.onOpenArc : function () {};
-  const onArcLocked = typeof opts.onArcLocked === 'function' ? opts.onArcLocked : function () {};
   const onOpenSayIt = typeof opts.onOpenSayIt === 'function' ? opts.onOpenSayIt : function () {};
   const onWordFound = typeof opts.onWordFound === 'function' ? opts.onWordFound : function () {};
   const onLetterProgress = typeof opts.onLetterProgress === 'function' ? opts.onLetterProgress : function () {};
@@ -120,13 +121,99 @@ export async function bootFocciWorld(root, opts) {
   function heightAtFallback(x, z) { return 0; }
   const raycaster = new THREE.Raycaster();
   const DOWN = new THREE.Vector3(0, -1, 0);
+  /* `hit:false` means the ray found nothing at all at this x/z — off the
+     edge of the island, over open air, not "ground at height 0". Callers
+     that hand-pick fixed coordinates (teleport diamonds, chests) used to
+     trust heightAtFallback()'s y:0 blindly, which is exactly how they ended
+     up floating in mid-air past the island's actual (irregular, non-circular)
+     footprint — a fixed radius that looked fine on one island shape can
+     land in empty space on another. findGroundSpot() below uses this to
+     retry instead of guessing. */
   function surfaceYIn(room, x, z) {
     for (const obj of room.collidables) {
       raycaster.set(new THREE.Vector3(x, 200, z), DOWN);
       const hits = raycaster.intersectObject(obj, true);
-      if (hits.length) return { y: hits[0].point.y, water: !!(hits[0].object.userData && hits[0].object.userData.isWater) };
+      if (hits.length) return { y: hits[0].point.y, water: !!(hits[0].object.userData && hits[0].object.userData.isWater), hit: true };
     }
-    return { y: heightAtFallback(x, z), water: false };
+    return { y: heightAtFallback(x, z), water: false, hit: false };
+  }
+  /* A raycast hit alone isn't enough proof of solid, walkable ground on a
+     lumpy sculpted rock island: a downward ray can slip through a gap at
+     the top and land on the underside of an overhang, or graze a thin
+     outcropping — a real hit, but nowhere Focci could actually stand, and
+     exactly how a diamond/chest ended up looking like it was floating in
+     open air despite a "hit" being found. Requiring the four points right
+     around it to also hit, at close to the same height, rejects those
+     isolated/unstable spots without needing to know the island's actual
+     shape. */
+  function isStableGround(room, x, z, y) {
+    const NEIGHBOR_R = 0.7, MAX_STEP = 1.5;
+    for (const [dx, dz] of [[NEIGHBOR_R, 0], [-NEIGHBOR_R, 0], [0, NEIGHBOR_R], [0, -NEIGHBOR_R]]) {
+      const n = surfaceYIn(room, x + dx, z + dz);
+      if (!n.hit || n.water || Math.abs(n.y - y) > MAX_STEP) return false;
+    }
+    return true;
+  }
+  /* Local stability isn't enough either: this island is a chunky sculpted
+     rock formation with real mountains on it (its raw bounding box is
+     ~45 units tall — this is not a flat disc), so a small ledge or a
+     separate outcropping can easily pass the 4-neighbor check above while
+     still being nowhere near where Focci can actually walk from spawn.
+     Walking a straight line of samples from the room's spawn point to the
+     candidate, and requiring every step to also be solid ground with no
+     sudden cliff (a big single-step height jump), is a cheap stand-in for
+     "is this reachable" without needing real pathfinding or a navmesh. */
+  function isReachableFromSpawn(room, x, z, y) {
+    const STEPS = 10, MAX_JUMP = 2.2;
+    const sx = room.spawn.x, sz = room.spawn.z;
+    let prevY = surfaceYIn(room, sx, sz).y;
+    for (let i = 1; i <= STEPS; i++) {
+      const t = i / STEPS;
+      const px = sx + (x - sx) * t, pz = sz + (z - sz) * t;
+      const s = surfaceYIn(room, px, pz);
+      if (!s.hit || s.water || Math.abs(s.y - prevY) > MAX_JUMP) return false;
+      prevY = s.y;
+    }
+    return Math.abs(prevY - y) < 0.5; // the walked path actually arrives at the candidate's own height
+  }
+  /* Pick a random point within [minR,maxR] of the room's own center that's
+     confirmed solid, stable dry land — retries instead of trusting a
+     hand-picked fixed coordinate is on-island. */
+  function findGroundSpot(room, minR, maxR, tries) {
+    tries = tries || 40;
+    for (let i = 0; i < tries; i++) {
+      const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const surf = surfaceYIn(room, x, z);
+      if (surf.hit && !surf.water && isStableGround(room, x, z, surf.y) && isReachableFromSpawn(room, x, z, surf.y)) return { x, z, y: surf.y };
+    }
+    return { x: room.spawn.x, z: room.spawn.z, y: surfaceYIn(room, room.spawn.x, room.spawn.z).y }; // last resort: spawn itself, definitely valid
+  }
+  /* Same as findGroundSpot, but samples only within [angleFrom,angleTo) —
+     used to spread the 4 teleport diamonds one per compass quadrant so they
+     don't all land bunched together on whichever side of the island happens
+     to be biggest. */
+  function findGroundSpotInSlice(room, minR, maxR, angleFrom, angleTo, tries) {
+    tries = tries || 40;
+    for (let i = 0; i < tries; i++) {
+      const a = angleFrom + Math.random() * (angleTo - angleFrom), r = minR + Math.random() * (maxR - minR);
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const surf = surfaceYIn(room, x, z);
+      if (surf.hit && !surf.water && isStableGround(room, x, z, surf.y) && isReachableFromSpawn(room, x, z, surf.y)) return { x, z, y: surf.y };
+    }
+    return findGroundSpot(room, minR, maxR, tries); // fall back to the full circle
+  }
+  /* A soft radial-gradient sprite texture for glow effects (wisdom tree,
+     any future magic prop) — cheap, no image asset needed. */
+  function makeGlowTexture() {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.4, 'rgba(255,240,200,.6)');
+    g.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
   }
 
   function tagWater(root3d) {
@@ -168,18 +255,23 @@ export async function bootFocciWorld(root, opts) {
     const baseScale = targetSize / Math.max(size.x, size.y, size.z, 0.0001);
     const placed = [];
     for (let i = 0; i < count; i++) {
-      let x, z, tries = 0, ok = false;
-      do {
-        const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
-        x = Math.cos(a) * r; z = Math.sin(a) * r;
-        ok = room.collidables.length > 0; tries++;
-      } while (!ok && tries < 30);
+      // findGroundSpot only accepts a confirmed raycast hit on dry land —
+      // the old retry condition here (`room.collidables.length > 0`) never
+      // actually checked the SAMPLED x/z was valid ground, so a prop whose
+      // random angle/radius landed past the island's (irregular) edge, over
+      // open air, still got placed at fallback y:0 — floating with nothing
+      // under it. This is what avoidWater alone couldn't catch.
+      const spot = findGroundSpot(room, minR, maxR);
       const inst = template.clone(true);
       inst.scale.setScalar(baseScale * (0.85 + Math.random() * 0.3));
       inst.rotation.y = Math.random() * Math.PI * 2;
-      const surf = surfaceYIn(room, x, z);
-      if (opts.avoidWater && surf.water) { i--; continue; }
-      inst.position.set(x, surf.y - box.min.y * baseScale, z);
+      inst.position.set(spot.x, spot.y - box.min.y * baseScale, spot.z);
+      if (opts.tapForQuote) {
+        // "tap any tree/bush -> a random line", same idea as the one
+        // dedicated wisdom tree, applied to the ordinary scattered decoration
+        inst.userData.interactType = 'quote-prop';
+        room.interactive.push(inst);
+      }
       room.group.add(inst);
       placed.push(inst);
     }
@@ -221,7 +313,7 @@ export async function bootFocciWorld(root, opts) {
     hub.scene.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(hub.scene);
     const size = box.getSize(new THREE.Vector3());
-    const scale = 34 / Math.max(size.x, size.z); // keep the whole hub compact — no more tired legs
+    const scale = 51 / Math.max(size.x, size.z); // 1.5x the old 34 — asked for a bigger hub
     hub.scene.scale.setScalar(scale);
     hub.scene.position.y = -box.min.y * scale;
     tagWater(hub.scene);
@@ -231,53 +323,47 @@ export async function bootFocciWorld(root, opts) {
 
     // decorate with the two vegetation kits you sent — target sizes (largest
     // dimension, in world units) rather than a flat multiplier on whatever
-    // scale the kit happened to export at; see scatterClone's comment
+    // scale the kit happened to export at; see scatterClone's comment.
+    // Radii scaled up 1.5x to match the bigger hub above.
     const forestProps = extractPropGroups(forestKit.scene);
-    forestProps.forEach((p) => scatterClone(station, p, 3, 4, 15, 5, { avoidWater: true }));
+    forestProps.forEach((p) => scatterClone(station, p, 3, 4, 12, 5, { tapForQuote: true }));
 
     const bushProps = extractPropGroups(bushKit.scene);
-    bushProps.forEach((p) => scatterClone(station, p, 3, 4, 15, 1.6, { avoidWater: true }));
+    bushProps.forEach((p) => scatterClone(station, p, 3, 4, 12, 1.6, { tapForQuote: true }));
 
-    // mushrooms — 15 individual finds, tucked near bushes/rocks, never in water.
-    // Same fix as scatterClone: was a flat inst.scale.setScalar(0.35), which
-    // only comes out "human(fox)-scale" if the source file's raw units
-    // happen to match that assumption — measured + normalized instead.
+    // mushrooms — 15 individual finds, tucked near bushes/rocks. Same two
+    // fixes as scatterClone: measured + normalized scale instead of a flat
+    // guess, and findGroundSpot instead of a water-only retry (a miss
+    // entirely — off the island's edge — used to fall back to y:0, floating).
     const mushProps = extractPropGroups(mushGlb.scene);
     const MUSH_TARGET = 0.45;
     mushProps.forEach((p) => {
-      let x, z, surf, tries = 0;
-      do {
-        const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * 14;
-        x = Math.cos(a) * r; z = Math.sin(a) * r;
-        surf = surfaceYIn(station, x, z);
-        tries++;
-      } while (surf.water && tries < 20);
+      const spot = findGroundSpot(station, 3, 11);
       const inst = p.clone(true);
       const mBox = new THREE.Box3().setFromObject(inst);
       const mSize = mBox.getSize(new THREE.Vector3());
       const mScale = MUSH_TARGET / Math.max(mSize.x, mSize.y, mSize.z, 0.0001);
       inst.scale.setScalar(mScale);
-      inst.position.set(x, surf.y - mBox.min.y * mScale, z);
+      inst.position.set(spot.x, spot.y - mBox.min.y * mScale, spot.z);
       inst.userData.interactType = 'mushroom';
       station.group.add(inst);
       station.interactive.push(inst);
-      station.mushrooms.push({ obj: inst, x, z, found: false });
+      station.mushrooms.push({ obj: inst, x: spot.x, z: spot.z, found: false });
     });
 
-    // 3 chests
+    // 3 chests — same findGroundSpot fix (was a fixed-radius guess that
+    // could land off-island depending on the hub's actual, irregular shape)
     for (let i = 0; i < 3; i++) {
+      const spot = findGroundSpot(station, 4, 11);
       const inst = chestGlb.scene.clone(true);
       const mixer = new THREE.AnimationMixer(inst);
-      const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 12;
-      const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      const surf = surfaceYIn(station, x, z);
       inst.scale.setScalar(0.55);
-      inst.position.set(x, surf.y, z);
+      inst.position.set(spot.x, spot.y, spot.z);
       inst.rotation.y = Math.random() * Math.PI * 2;
       inst.userData.interactType = 'chest';
       station.group.add(inst);
       station.interactive.push(inst);
-      station.chests.push({ obj: inst, mixer, clips: chestGlb.animations, opened: false });
+      station.chests.push({ obj: inst, mixer, clips: chestGlb.animations, opened: false, x: spot.x, z: spot.z });
     }
 
     // birds — a small flying loop, purely decorative
@@ -287,65 +373,74 @@ export async function bootFocciWorld(root, opts) {
     birdGlb.scene.position.set(0, 14, 0);
     station.group.add(birdGlb.scene);
     station._birdMixer = birdMixer;
-    station._birdOrbit = { r: 12, speed: 0.15, y: 14 };
+    station._birdOrbit = { r: 18, speed: 0.15, y: 20 };
     station._birdRig = birdGlb.scene;
 
-    // vine tree + doe — placed on a flat mid-height ledge, NOT the summit
+    // vine tree + doe — findGroundSpot instead of a fixed {x:-6,z:5} guess,
+    // which was tuned for the old, smaller island and not guaranteed to
+    // land on solid ground on this one (or the new 1.5x-bigger hub)
     const treeBox = new THREE.Box3().setFromObject(treeGlb.scene);
     const treeScale = 6 / Math.max(treeBox.getSize(new THREE.Vector3()).x, treeBox.getSize(new THREE.Vector3()).z);
     treeGlb.scene.scale.setScalar(treeScale);
-    const treePos = { x: -6, z: 5 }; // a mid-slope spot near the water, not the peak
-    const treeSurf = surfaceYIn(station, treePos.x, treePos.z);
-    treeGlb.scene.position.set(treePos.x, treeSurf.y - treeBox.min.y * treeScale, treePos.z);
+    const treeSpot = findGroundSpot(station, 3, 10);
+    treeGlb.scene.position.set(treeSpot.x, treeSpot.y - treeBox.min.y * treeScale, treeSpot.z);
     treeGlb.scene.userData.interactType = 'vine-tree';
     station.group.add(treeGlb.scene);
     station.interactive.push(treeGlb.scene);
-    station.vineTree = { obj: treeGlb.scene, x: treePos.x, z: treePos.z };
+    station.vineTree = { obj: treeGlb.scene, x: treeSpot.x, z: treeSpot.z };
+
+    // "wisdom tree" glow — a warm point light plus a soft additive sprite
+    // glowing at the canopy, so it reads as the map's one magical landmark
+    // rather than just another tree
+    const treeGlowColor = 0xffd98a;
+    const treeLight = new THREE.PointLight(treeGlowColor, 1.4, 14, 2);
+    treeLight.position.set(treeSpot.x, (treeSpot.y - treeBox.min.y * treeScale) + treeBox.getSize(new THREE.Vector3()).y * treeScale * 0.6, treeSpot.z);
+    station.group.add(treeLight);
+    const glowTex = makeGlowTexture();
+    const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: treeGlowColor, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
+    glowSprite.scale.setScalar(7);
+    glowSprite.position.copy(treeLight.position);
+    station.group.add(glowSprite);
+    station.vineTree.glowSprite = glowSprite;
+    station.vineTree.glowLight = treeLight;
 
     const doeMixer = new THREE.AnimationMixer(doeGlb.scene);
     const clipByName = {};
     doeGlb.animations.forEach((c) => { clipByName[c.name.split('|').pop()] = c; });
     doeGlb.scene.scale.setScalar(1.1);
-    const doeSurf = surfaceYIn(station, treePos.x + 2.5, treePos.z + 1.5);
-    doeGlb.scene.position.set(treePos.x + 2.5, doeSurf.y, treePos.z + 1.5);
+    const doeSurf = surfaceYIn(station, treeSpot.x + 2.5, treeSpot.z + 1.5);
+    const doeSpot = doeSurf.hit ? { x: treeSpot.x + 2.5, z: treeSpot.z + 1.5, y: doeSurf.y } : treeSpot;
+    doeGlb.scene.position.set(doeSpot.x, doeSpot.y, doeSpot.z);
     station.group.add(doeGlb.scene);
     station.doe = {
       obj: doeGlb.scene, mixer: doeMixer, clips: clipByName,
-      homeX: treePos.x + 2.5, homeZ: treePos.z + 1.5,
+      homeX: doeSpot.x, homeZ: doeSpot.z,
       state: 'idle', cooldown: 6 + Math.random() * 6, current: null,
       wanderTarget: null, calledHome: false
     };
     playDoeClip(station.doe, 'Dear_idle', true);
 
-    // 4 teleport diamonds -> the 4 arc worlds, spaced around the station
-    const spots = [{ x: 12, z: -8 }, { x: -12, z: -9 }, { x: 10, z: 11 }, { x: -10, z: 12 }];
+    // 4 teleport diamonds -> the 4 arc worlds. findGroundSpot instead of 4
+    // fixed {x,z} guesses (same off-island-floating risk as everything else
+    // above), spread around the station by giving each a angular slice of
+    // the compass to sample within rather than the full circle, so they
+    // don't cluster on the same side by chance.
     ARC_TITLES.slice(0, 4).forEach((title, i) => {
-      const p = spots[i];
+      const sliceStart = (Math.PI / 2) * i, spot = findGroundSpotInSlice(station, 4, 10, sliceStart, sliceStart + Math.PI / 2);
       const d = diamondGlb.scene.clone(true);
       const mixer = new THREE.AnimationMixer(d);
       if (diamondGlb.animations[0]) mixer.clipAction(diamondGlb.animations[0]).play();
       d.scale.setScalar(1.4);
-      const surf = surfaceYIn(station, p.x, p.z);
-      d.position.set(p.x, surf.y, p.z);
+      d.position.set(spot.x, spot.y, spot.z);
       d.userData.interactType = 'teleport';
       d.userData.targetArc = i;
-      if (!ARC_UNLOCKED[i]) {
-        // dim + desaturate a locked land's diamond so it visibly reads as "not open yet"
-        // without hiding it — Focci can still walk up to and tap it (per your instructions),
-        // it just won't take him through.
-        d.traverse((n) => {
-          if (n.isMesh && n.material) {
-            n.material = n.material.clone();
-            n.material.color.lerp(new THREE.Color(0x888888), 0.6);
-            n.material.transparent = true;
-            n.material.opacity = 0.55;
-          }
-        });
-        mixer.timeScale = 0.4;
-      }
+      // Every land is explorable regardless of story progress now — Focci
+      // can walk into any of the 4 arcs any time; only the auto-opened
+      // story text (gated separately, in the app's own onOpenArc handler)
+      // still depends on what's actually been unlocked there.
       station.group.add(d);
       station.interactive.push(d);
-      station.teleports.push({ obj: d, mixer, x: p.x, z: p.z, arcIndex: i, title, locked: !ARC_UNLOCKED[i] });
+      station.teleports.push({ obj: d, mixer, x: spot.x, z: spot.z, arcIndex: i, title, locked: false });
     });
   }
 
@@ -385,18 +480,18 @@ export async function bootFocciWorld(root, opts) {
     room._homeTeleport = { obj: d, mixer };
 
     // one "whole word" treasure per arc land — an occasional shortcut to
-    // finding the current hunted word without spelling it letter by letter
+    // finding the current hunted word without spelling it letter by letter.
+    // findGroundSpot instead of an unvalidated random angle/radius, same
+    // floating-prop fix as everywhere else.
     {
       const tex = makeWordTreasureTexture('?');
       const treasure = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshStandardMaterial({ map: tex, flatShading: true, emissive: 0xffdd88, emissiveIntensity: 0.3 }));
-      const ang = Math.random() * Math.PI * 2, r = 4 + Math.random() * 6;
-      const tx = Math.cos(ang) * r, tz = Math.sin(ang) * r;
-      const surf = surfaceYIn(room, tx, tz);
-      treasure.position.set(tx, surf.y + 0.6, tz);
+      const spot = findGroundSpot(room, 4, 10);
+      treasure.position.set(spot.x, spot.y + 0.6, spot.z);
       treasure.userData.interactType = 'word-treasure';
       room.group.add(treasure);
       room.interactive.push(treasure);
-      room.wordTreasure = { obj: treasure, x: tx, z: tz, y: surf.y, tex, found: false };
+      room.wordTreasure = { obj: treasure, x: spot.x, z: spot.z, y: spot.y, tex, found: false };
     }
   }
 
@@ -504,6 +599,15 @@ export async function bootFocciWorld(root, opts) {
   /* ---------- camera state (declared early: enterRoom() below needs it) ---------- */
   const DEFAULT_CAM = { theta: 0.7, phi: 1.05, radius: 14 };
   const cam = { theta: 0.7, phi: 1.05, radius: 14, tTheta: 0.7, tPhi: 1.05, tRadius: 14 };
+  // Old cap (36) couldn't back far enough off the hub to see or rotate the
+  // whole island once it went from 34 to 51 units across — raised so
+  // pinch/wheel zoom-out actually reaches a full-island view on its own,
+  // and overviewCamera() (an explicit "see the whole island" jump) has
+  // real room to zoom out to.
+  const MAX_ZOOM = 60;
+  function overviewCamera() {
+    cam.tPhi = 0.85; cam.tRadius = MAX_ZOOM;
+  }
 
   const character = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.5, 0.42), orangeMat); body.position.y = 0.5; character.add(body);
@@ -590,7 +694,7 @@ export async function bootFocciWorld(root, opts) {
       if (lastOrbitMid) { cam.tTheta -= (mid.x - lastOrbitMid.x) * 0.006; cam.tPhi = Math.min(1.5, Math.max(0.32, cam.tPhi - (mid.y - lastOrbitMid.y) * 0.005)); }
       lastOrbitMid = mid;
       const d = pinchDist();
-      if (lastPinch && d) cam.tRadius = Math.min(36, Math.max(6, cam.tRadius - (d - lastPinch) * 0.05));
+      if (lastPinch && d) cam.tRadius = Math.min(MAX_ZOOM, Math.max(6, cam.tRadius - (d - lastPinch) * 0.05));
       lastPinch = d;
     }
   });
@@ -606,7 +710,7 @@ export async function bootFocciWorld(root, opts) {
   }
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.tRadius = Math.min(36, Math.max(6, cam.tRadius + e.deltaY * 0.02)); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.tRadius = Math.min(MAX_ZOOM, Math.max(6, cam.tRadius + e.deltaY * 0.02)); }, { passive: false });
 
   const ndcVec = new THREE.Vector2();
   function handleTap(clientX, clientY) {
@@ -637,12 +741,20 @@ export async function bootFocciWorld(root, opts) {
     }, RESPAWN_DELAY_MS);
   }
 
+  const CHEST_RESPAWN_MS = 45000; // shorter than the word-hunt respawn — chests are a bonus, not the main loop
+  function randomQuote() {
+    return ANGEL_MESSAGES.length ? ANGEL_MESSAGES[Math.floor(Math.random() * ANGEL_MESSAGES.length)] : null;
+  }
   function onInteract(obj) {
     const room = activeRoom();
     const type = obj.userData.interactType;
     if (type === 'teleport') {
+      // Every land is walkable any time now, regardless of story/arc
+      // progress — the diamond used to check ARC_UNLOCKED and refuse to
+      // teleport at all if the arc wasn't finished yet. Whether the story
+      // text itself auto-opens still depends on real progress (that check
+      // lives in the app's own onOpenArc handler, not here).
       const idx = obj.userData.targetArc;
-      if (!ARC_UNLOCKED[idx]) { onArcLocked(idx, ARC_TITLES[idx]); return; }
       enterRoom(arcRoomKeys[idx]);
       onOpenArc(idx, ARC_TITLES[idx]);
     } else if (type === 'teleport-home') {
@@ -654,6 +766,19 @@ export async function bootFocciWorld(root, opts) {
         const openClip = c.clips.find((cl) => /open/i.test(cl.name));
         if (openClip) { const a = c.mixer.clipAction(openClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.reset().play(); }
         onOpenSayIt();
+        // Chests used to open exactly once, forever — asked to make them a
+        // repeatable bonus instead: after a shorter breather than the
+        // word-hunt respawn, close (reverse the clip if there is one so it
+        // doesn't just snap shut) and become tappable again.
+        setTimeout(() => {
+          c.opened = false;
+          const closeClip = c.clips.find((cl) => /close/i.test(cl.name));
+          if (closeClip) {
+            const a = c.mixer.clipAction(closeClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.reset().play();
+          } else if (openClip) {
+            const a = c.mixer.clipAction(openClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.paused = false; a.timeScale = -1; a.time = a.getClip().duration; a.play();
+          }
+        }, CHEST_RESPAWN_MS);
       }
     } else if (type === 'mushroom') {
       const m = room.mushrooms.find((m) => m.obj === obj);
@@ -670,8 +795,12 @@ export async function bootFocciWorld(root, opts) {
     } else if (type === 'vine-tree') {
       const doe = room.doe;
       if (doe) { doe.calledHome = true; doe.wanderTarget = null; }
-      const msg = ANGEL_MESSAGES.length ? ANGEL_MESSAGES[Math.floor(Math.random() * ANGEL_MESSAGES.length)] : null;
-      root.dispatchEvent(new CustomEvent('focci-quote', { detail: msg }));
+      root.dispatchEvent(new CustomEvent('focci-quote', { detail: randomQuote() }));
+    } else if (type === 'quote-prop') {
+      // "tap any tree/bush → a random line" — the same quote pool and event
+      // as the vine tree, just for the ordinary scattered decoration instead
+      // of the one dedicated wisdom tree.
+      root.dispatchEvent(new CustomEvent('focci-quote', { detail: randomQuote() }));
     }
   }
 
@@ -791,6 +920,12 @@ export async function bootFocciWorld(root, opts) {
       room.wordTreasure.obj.rotation.y = t * 0.8;
       room.wordTreasure.obj.position.y = room.wordTreasure.y + 0.6 + Math.sin(t * 1.6) * 0.1;
     }
+    if (room.vineTree && room.vineTree.glowSprite) {
+      const pulse = 0.82 + Math.sin(t * 1.1) * 0.18;
+      room.vineTree.glowSprite.material.opacity = 0.65 + pulse * 0.25;
+      room.vineTree.glowSprite.scale.setScalar(6.4 + pulse * 1.2);
+      room.vineTree.glowLight.intensity = 1.1 + pulse * 0.6;
+    }
     if (room._birdMixer) {
       room._birdMixer.update(dt);
       const o = room._birdOrbit;
@@ -805,7 +940,7 @@ export async function bootFocciWorld(root, opts) {
   resize();
   animate();
 
-  return { toggleSound, nextTrack, enterRoom, arcRoomKeys, get currentRoom() { return currentRoomKey; } };
+  return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, get currentRoom() { return currentRoomKey; } };
   } catch (err) {
     // Surface the real error on-screen instead of a silent black canvas —
     // this is what to screenshot/read out if boot fails again.
@@ -818,6 +953,6 @@ export async function bootFocciWorld(root, opts) {
       + '\n\nOpen your browser\'s console (or share a screenshot of this) to see exactly what broke.';
     var overlay = root.querySelector ? root.querySelector('#fw-overlay') : null;
     if (overlay) overlay.appendChild(msg);
-    return { toggleSound: function () {}, nextTrack: function () {}, enterRoom: function () {}, arcRoomKeys: [], currentRoom: 'error' };
+    return { toggleSound: function () {}, nextTrack: function () {}, enterRoom: function () {}, arcRoomKeys: [], overviewCamera: function () {}, currentRoom: 'error' };
   }
 }
