@@ -2211,4 +2211,16 @@ if(typeof todaysActivityCount==='function'){
    are called on-demand by app.js's showView().
    ============================================================ */
 
+/* The Focci's World 3D bridge (index.html, right after this script tag)
+   needs ARC_LANDS/arcUnlocked/showWordSheet/condensedEntryHTML, but this
+   whole file is one IIFE — none of them are real globals from outside it,
+   so `window.ARC_LANDS = ARC_LANDS` out there was throwing ReferenceError
+   before it could even read the const. Exposing them from in here, where
+   they're actually in scope, is what makes that bridge work at all. */
+window.ARC_LANDS = ARC_LANDS;
+window.arcUnlocked = arcUnlocked;
+window.showWordSheet = showWordSheet;
+window.condensedEntryHTML = condensedEntryHTML;
+window.assetUrl = assetUrl;
+
 })();

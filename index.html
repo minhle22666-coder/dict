@@ -2954,6 +2954,116 @@
   .sy-detail .write-fb-t{color:inherit}
   .sy-detail .write-alt{border:0;border-radius:18px;background:var(--surface-2)}
   .sy-detail .write-alt-n{background:var(--grad-hero);color:#fff}
+
+  /* ============================================================
+     3D-FIRST SHELL — Focci's World is the permanent home screen now,
+     not a modal you open and close. Everything below floats on top of
+     it: a search bar that's always there (not an icon you tap to reveal
+     one), and a menu of glass buttons anchored to the bottom-left corner
+     that fan out — vertically for wand/sound/map, horizontally for
+     saved/games/progress/guide — instead of a bottom tab bar. Real glass
+     (blur + translucency + a hairline highlight border), not solid
+     panels, and a lighter, thinner typeface (Raleway, already loaded at
+     300–800 for the old settings screen) instead of the heavy rounded
+     game font used everywhere else — this layer is meant to feel quiet
+     next to the 3D scene, not shout over it.
+     ============================================================ */
+  .fw-ui{font-family:'Raleway',system-ui,sans-serif}
+
+  .fw-searchbar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);left:14px;right:14px;z-index:3;
+    display:flex;align-items:center;gap:10px;padding:13px 16px;border-radius:20px;
+    background:rgba(255,255,255,.14);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
+    border:1px solid rgba(255,255,255,.3);border-top-color:rgba(255,255,255,.45);
+    box-shadow:0 10px 30px rgba(0,0,0,.22)}
+  .fw-searchbar svg{flex:none;width:18px;height:18px;color:#fff;opacity:.85}
+  .fw-searchbar input{flex:1;min-width:0;border:none;background:none;outline:none;color:#fff;
+    font-family:'Raleway',system-ui,sans-serif;font-size:15px;font-weight:400;letter-spacing:.01em}
+  .fw-searchbar input::placeholder{color:rgba(255,255,255,.65);font-weight:300}
+
+  .fw-gear{position:absolute;top:calc(env(safe-area-inset-top,0px) + 18px);right:20px;z-index:3;
+    width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.14);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.28);color:#fff;box-shadow:0 8px 20px rgba(0,0,0,.2)}
+  .fw-gear svg{width:17px;height:17px}
+  .fw-gear:active{transform:scale(.92)}
+
+  .fw-menu-cluster{position:absolute;left:18px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:3;
+    width:50px;height:50px}
+  .fw-fab{position:absolute;left:0;bottom:0;width:50px;height:50px;border-radius:50%;border:none;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:#fff;
+    background:rgba(255,255,255,.14);backdrop-filter:blur(18px) saturate(1.3);-webkit-backdrop-filter:blur(18px) saturate(1.3);
+    border:1px solid rgba(255,255,255,.3);border-top-color:rgba(255,255,255,.48);
+    box-shadow:0 8px 22px rgba(0,0,0,.22);
+    transition:transform .38s cubic-bezier(.25,1.4,.4,1),opacity .2s ease}
+  .fw-fab svg{width:19px;height:19px;position:relative;z-index:1}
+  .fw-fab:active{transform:scale(.92) translate(var(--tx,0),var(--ty,0))!important}
+  .fw-fab-menu{position:relative;z-index:2;opacity:1;pointer-events:auto;transform:none;
+    background:rgba(255,255,255,.2)}
+  .fw-fab-menu svg{transition:transform .3s ease}
+  .fw-menu-cluster.open .fw-fab-menu svg{transform:rotate(90deg)}
+  .fw-fan{opacity:0;pointer-events:none;transform:translate(0,0) scale(.5)}
+  .fw-menu-cluster.open .fw-fan{opacity:1;pointer-events:auto;transform:translate(var(--tx,0),var(--ty,0)) scale(1)}
+  .fw-fab-wand{--ty:-192px} .fw-fab-sound{--ty:-128px} .fw-fab-map{--ty:-64px}
+  .fw-fab-saved{--tx:64px} .fw-fab-games{--tx:128px} .fw-fab-progress{--tx:192px} .fw-fab-guide{--tx:256px}
+  .fw-menu-cluster.open .fw-fab-wand{transition-delay:.02s}
+  .fw-menu-cluster.open .fw-fab-sound{transition-delay:.055s}
+  .fw-menu-cluster.open .fw-fab-map{transition-delay:.09s}
+  .fw-menu-cluster.open .fw-fab-saved{transition-delay:.02s}
+  .fw-menu-cluster.open .fw-fab-games{transition-delay:.055s}
+  .fw-menu-cluster.open .fw-fab-progress{transition-delay:.09s}
+  .fw-menu-cluster.open .fw-fab-guide{transition-delay:.125s}
+
+  .fw-toast{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);z-index:4;
+    transform:translateX(-50%);padding:9px 18px;border-radius:99px;color:#fff;font-size:12.5px;font-weight:500;
+    background:rgba(255,255,255,.16);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.28);opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+  .fw-toast.show{opacity:1}
+
+  /* Saved / Game / Progress / Settings now float ABOVE the 3D world as glass
+     sheets instead of being flat 2D pages you navigate to — the world stays
+     visible (blurred) behind them, so the app never feels like it "leaves"
+     Focci's World. */
+  .view.fw-panel{display:none;position:fixed;inset:0;z-index:50;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:calc(env(safe-area-inset-top,0px) + 74px) 14px calc(env(safe-area-inset-bottom,0px) + 30px);
+    background:linear-gradient(180deg, rgba(15,12,20,.62), rgba(15,12,20,.5) 40%, rgba(15,12,20,.68));
+    backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3)}
+  .view.fw-panel.active{display:block;animation:view-in .26s ease}
+  :root[data-theme="light"] .view.fw-panel{
+    background:linear-gradient(180deg, rgba(255,255,255,.68), rgba(255,255,255,.56) 40%, rgba(255,255,255,.72))}
+  .fw-panel-close{position:fixed;top:calc(env(safe-area-inset-top,0px) + 18px);right:18px;z-index:52;
+    width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;color:var(--text);
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.22);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.3);box-shadow:0 8px 20px rgba(0,0,0,.18)}
+  :root[data-theme="dark"] .fw-panel-close{color:#fff}
+  .fw-panel-close:active{transform:scale(.9)}
+
+  /* ---- Map (teleport) panel ---- */
+  .fw-map-pop{position:fixed;inset:0;z-index:51;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:calc(env(safe-area-inset-top,0px) + 74px) 18px calc(env(safe-area-inset-bottom,0px) + 30px);
+    background:linear-gradient(180deg, rgba(15,12,20,.66), rgba(15,12,20,.54) 40%, rgba(15,12,20,.72));
+    backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3);
+    opacity:0;transition:opacity .2s}
+  .fw-map-pop.show{opacity:1}
+  .fw-map-card{max-width:420px;margin:0 auto}
+  .fw-map-t{font-family:'Raleway',system-ui,sans-serif;font-weight:300;font-size:22px;color:#fff;
+    letter-spacing:.01em;margin:0 2px 4px}
+  .fw-map-s{font-family:'Raleway',system-ui,sans-serif;font-weight:300;font-size:13px;color:rgba(255,255,255,.7);
+    margin:0 2px 20px}
+  .fw-map-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .fw-map-cell{position:relative;overflow:hidden;border-radius:22px;aspect-ratio:1/1;border:none;cursor:pointer;
+    background-color:rgba(255,255,255,.08);background-size:cover;background-position:center;
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.22);box-shadow:0 10px 26px rgba(0,0,0,.28);
+    display:flex;align-items:flex-end;padding:12px;transition:transform .15s}
+  .fw-map-cell:active{transform:scale(.96)}
+  .fw-map-cell::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.55));z-index:0}
+  .fw-map-cell.locked::before{background:rgba(20,16,14,.55)}
+  .fw-map-cell-n{position:relative;z-index:1;font-family:'Raleway',system-ui,sans-serif;font-weight:400;
+    font-size:13.5px;color:#fff;text-align:left;line-height:1.25}
+  .fw-map-cell.locked .fw-map-cell-n{opacity:.6}
+  .fw-map-cell-lock{position:absolute;z-index:1;top:10px;right:10px;font-size:13px;opacity:.85}
+  .fw-map-cell.here{border-color:rgba(255,255,255,.7)}
 </style>
 <link rel="stylesheet" href="./theme-overrides.css">
 </head>
@@ -3177,7 +3287,7 @@
   </section>
 
   <!-- SAVED -->
-  <section class="view" id="v-saved">
+  <section class="view fw-panel" id="v-saved">
     <div class="sv-tabs">
       <button class="sv-tab on" data-tab="vault" onclick="setSavedTab('vault')">The Cache</button>
       <button class="sv-tab" data-tab="why" onclick="setSavedTab('why')">The Casebook</button>
@@ -3194,17 +3304,17 @@
   </section>
 
   <!-- PRACTICE (review) -->
-  <section class="view" id="v-review">
+  <section class="view fw-panel" id="v-review">
     <div id="review-area"></div>
   </section>
 
   <!-- PROGRESS -->
-  <section class="view" id="v-stats">
+  <section class="view fw-panel" id="v-stats">
     <div id="insights-area"></div>
   </section>
 
   <!-- SETTINGS -->
-  <section class="view" id="v-settings">
+  <section class="view fw-panel" id="v-settings">
 
     <!-- Dải trạng thái: ba con số cần biết ngay, không phải hai thẻ lớn -->
     <div class="sx-status">
@@ -3429,6 +3539,15 @@
     <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.4h9.2M17.6 7.4H20"/><circle cx="15.4" cy="7.4" r="2.2"/><path d="M4 16.6h3.2M11.6 16.6H20"/><circle cx="9.4" cy="16.6" r="2.2"/></svg></span>Settings</button>
 </nav>
 
+<!-- The bottom tab bar above is kept in the DOM (showView() still looks up its
+     .tab elements to track "active"), just visually retired — Focci's World's
+     floating glass menu replaces it as the real navigation now. -->
+<style>.tabs{display:none!important}</style>
+
+<button class="fw-panel-close" id="fw-panel-close" style="display:none" aria-label="Close" onclick="closeFwPanel()">
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+</button>
+
 <!--
   FIXED VERSION — replace your existing overlay + import-map + module-script
   block (the one right before </body>) with everything below.
@@ -3455,17 +3574,54 @@
 
 <div id="fw-overlay" style="position:fixed;inset:0;z-index:40;display:none;background:#000;">
   <canvas id="fw-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;"></canvas>
-  <button id="fw-close" aria-label="Close 3D world"
-    style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);right:14px;z-index:2;
-           width:38px;height:38px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:18px;">✕</button>
-  <button id="fw-search-btn" aria-label="Search a word" class="fw-search-btn"
-    style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);left:14px;z-index:2;">
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-  </button>
-  <div id="fw-search-pill" class="fw-search-pill" style="display:none;">
+
+  <!-- always-on search bar — no tap-to-reveal icon, this IS the home screen now -->
+  <div class="fw-searchbar fw-ui">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
     <input id="fw-search-input" type="search" inputmode="search" placeholder="Search a word…" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
   </div>
+
+  <!-- Settings didn't have a spot in the requested menu but the API key / theme /
+       daily-goal controls still need to live somewhere, so it gets its own quiet
+       corner icon instead of crowding the fan menu. -->
+  <button class="fw-gear" id="fw-settings-btn" aria-label="Settings" onclick="openFwPanel('settings')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3h-4l-.3 2.9a8 8 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.9 7.9 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a8 8 0 0 0 1.7 1L11 21h4l.3-2.9a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6Z"/></svg>
+  </button>
+
   <div id="fw-word-progress" class="fw-word-progress"></div>
+  <div class="fw-toast fw-ui" id="fw-toast"></div>
+
+  <!-- floating glass menu: menu toggle is the fixed anchor (bottom-left); the other
+       7 fan out from it — up for wand/sound/map, right for saved/games/progress/guide -->
+  <div class="fw-menu-cluster" id="fw-menu-cluster">
+    <button class="fw-fab fw-fan fw-fab-wand" aria-label="Change companion" onclick="openMascotPicker()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 15 9"/><path d="M17 4l.8 1.9L20 6.7l-2.2.8L17 9.4l-.8-1.9L14 6.7l2.2-.8L17 4Z"/><path d="M19.5 12.5l.5 1.2 1.2.5-1.2.5-.5 1.2-.5-1.2-1.2-.5 1.2-.5.5-1.2Z"/></svg>
+    </button>
+    <button class="fw-fab fw-fan fw-fab-sound" id="fw-sound-btn" aria-label="Sound">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>
+    </button>
+    <button class="fw-fab fw-fan fw-fab-map" aria-label="Map" onclick="openFwMap()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
+    </button>
+    <button class="fw-fab fw-fab-menu" id="fw-menu-toggle" aria-label="Menu" onclick="toggleFwMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg>
+    </button>
+    <button class="fw-fab fw-fan fw-fab-saved" aria-label="Saved" onclick="openFwPanel('saved')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v16l-6-4-6 4V4Z"/></svg>
+    </button>
+    <button class="fw-fab fw-fan fw-fab-games" aria-label="Mini games" onclick="openFwPanel('review')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r="1"/><circle cx="18" cy="14" r="1"/></svg>
+    </button>
+    <button class="fw-fab fw-fan fw-fab-progress" aria-label="Progress" onclick="openFwPanel('stats')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="9" cy="7" rx="3" ry="4"/><ellipse cx="16" cy="15" rx="3" ry="4"/></svg>
+    </button>
+    <button class="fw-fab fw-fan fw-fab-guide" aria-label="Before you begin" onclick="showStoryIntro()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.3-3.5-2-6-2v13c2.5 0 4.5.7 6 2 1.5-1.3 3.5-2 6-2V4c-2.5 0-4.5.7-6 2Z"/><path d="M12 6v13"/></svg>
+    </button>
+  </div>
+
+  <!-- teleport / island picker (see openFwMap()) -->
+  <div class="fw-map-pop" id="fw-map-pop" style="display:none"></div>
 </div>
 
 <script src="./app.js"></script>
@@ -3474,7 +3630,11 @@
 <script src="./dict-system.js"></script>
 
 <script>
-  window.ARC_LANDS = ARC_LANDS;
+  /* story.js now exposes ARC_LANDS/arcUnlocked/showWordSheet/condensedEntryHTML
+     itself (see the end of that file) — it's wrapped in its own IIFE, so this
+     script can't reach those consts/functions to assign them itself. norm is
+     a true top-level const in app.js (not IIFE-wrapped), so it still needs
+     bridging here. */
   window.norm = norm;
 </script>
 
@@ -3546,20 +3706,11 @@
       }
     });
   };
-  window.closeFocciWorld3D = function () {
-    document.querySelector('#fw-overlay').style.display = 'none';
-    if (worldApi) worldApi.toggleSound();
-  };
-  document.querySelector('#fw-close').addEventListener('click', closeFocciWorld3D);
+  // Focci's World no longer has a close button — it's the permanent home
+  // screen now, not something you back out of into a 2D dashboard.
+  window.closeFocciWorld3D = function () {};
 
-  const searchBtn = document.querySelector('#fw-search-btn');
-  const searchPill = document.querySelector('#fw-search-pill');
   const searchInput = document.querySelector('#fw-search-input');
-  searchBtn.addEventListener('click', () => {
-    const opening = searchPill.style.display === 'none';
-    searchPill.style.display = opening ? 'block' : 'none';
-    if (opening) searchInput.focus();
-  });
   searchInput.addEventListener('keydown', async (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -3567,8 +3718,6 @@
     if (!raw) return;
     const word = window.norm(normalizeSpelling(raw));
     searchInput.blur();
-    searchPill.style.display = 'none';
-    searchInput.value = '';
     const rec = await idbGet(word);
     if (rec) showWordSheet(condensedEntryHTML(rec));
     else wordPopupForceAI(raw);
@@ -3576,6 +3725,92 @@
 
   // 3D world IS the home screen now — open it as soon as everything's ready.
   window.addEventListener('load', () => { openFocciWorld3D(); });
+
+  /* ============================================================
+     FLOATING GLASS MENU — the fan-out menu (wand/sound/map above the
+     toggle, saved/games/progress/guide to its right) and the panels
+     it opens. See the "3D-FIRST SHELL" CSS block for the visuals.
+     ============================================================ */
+  function fwToast(msg) {
+    const t = document.getElementById('fw-toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._hideTimer);
+    t._hideTimer = setTimeout(() => t.classList.remove('show'), 1600);
+  }
+  window.fwToast = fwToast;
+
+  window.toggleFwMenu = function () {
+    document.getElementById('fw-menu-cluster').classList.toggle('open');
+  };
+
+  window.openFwPanel = function (view) {
+    document.getElementById('fw-menu-cluster').classList.remove('open');
+    showView(view);
+    document.getElementById('fw-panel-close').style.display = 'flex';
+  };
+  window.closeFwPanel = function () {
+    document.querySelectorAll('.view').forEach((x) => x.classList.remove('active'));
+    document.getElementById('fw-panel-close').style.display = 'none';
+  };
+
+  // Sound: one tap mutes/unmutes; a second tap within 350ms cycles the track
+  // instead (ambient-lofi -> calm-piano -> feeling-content -> back around).
+  (function () {
+    const btn = document.getElementById('fw-sound-btn');
+    let tapTimer = null;
+    const TRACK_LABEL = { 'ambient-lofi.mp3': 'Ambient lofi', 'calm-piano.mp3': 'Calm piano', 'feeling-content.mp3': 'Feeling content' };
+    btn.addEventListener('click', () => {
+      if (!worldApi) return;
+      if (tapTimer) {
+        clearTimeout(tapTimer); tapTimer = null;
+        const track = worldApi.nextTrack();
+        fwToast('♪ ' + (TRACK_LABEL[track] || track));
+      } else {
+        tapTimer = setTimeout(() => {
+          tapTimer = null;
+          const on = worldApi.toggleSound();
+          fwToast(on ? 'Sound on' : 'Sound off');
+        }, 320);
+      }
+    });
+  })();
+
+  // Map: teleport straight to an island instead of walking to its portal.
+  window.openFwMap = function () {
+    document.getElementById('fw-menu-cluster').classList.remove('open');
+    const pop = document.getElementById('fw-map-pop');
+    const lands = window.ARC_LANDS.slice(0, 4);
+    let h = '<button class="fw-panel-close" style="position:sticky;float:right;top:0" aria-label="Close" onclick="closeFwMap()">'
+      + '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>'
+      + '<div class="fw-map-card">'
+      + '<div class="fw-map-t">The Map</div>'
+      + '<div class="fw-map-s">Jump straight to a land — no walking required.</div>'
+      + '<div class="fw-map-grid">';
+    h += '<button class="fw-map-cell here" style="background-image:none" onclick="teleportTo(\'station\')">'
+      + '<span class="fw-map-cell-n">Hub Island</span></button>';
+    lands.forEach((land, i) => {
+      const unlocked = window.arcUnlocked(land.id);
+      h += '<button class="fw-map-cell' + (unlocked ? '' : ' locked') + '" style="background-image:url(\'' + assetUrl('bg-arc' + land.id) + '\')"'
+        + (unlocked ? ' onclick="teleportTo(\'arc' + (i + 1) + '\')"' : ' disabled') + '>'
+        + (unlocked ? '' : '<span class="fw-map-cell-lock">\u{1F512}</span>')
+        + '<span class="fw-map-cell-n">' + esc(land.name) + '</span></button>';
+    });
+    h += '</div></div>';
+    pop.innerHTML = h;
+    pop.style.display = 'block';
+    requestAnimationFrame(() => pop.classList.add('show'));
+  };
+  window.closeFwMap = function () {
+    const pop = document.getElementById('fw-map-pop');
+    pop.classList.remove('show');
+    setTimeout(() => { pop.style.display = 'none'; }, 200);
+  };
+  window.teleportTo = function (roomKey) {
+    if (worldApi) worldApi.enterRoom(roomKey);
+    closeFwMap();
+  };
 </script>
 </body>
 </html>

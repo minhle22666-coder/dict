@@ -390,6 +390,7 @@
   window.dsImport = dsImport;
   window.dsCount  = dsCount;
   window.dsState  = dsState;
+  window.dsAllWords = dsAllWords;
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
   else wire();

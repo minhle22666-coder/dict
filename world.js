@@ -637,7 +637,9 @@ export async function bootFocciWorld(root, opts) {
      SOUND — starts automatically; if the browser blocks autoplay
      (common without a prior tap), it unlocks on the first tap anywhere.
      ============================================================ */
-  const bgm = new Audio(AUDIO('ambient-lofi.mp3'));
+  const TRACKS = ['ambient-lofi.mp3', 'calm-piano.mp3', 'feeling-content.mp3'];
+  let trackIdx = 0;
+  const bgm = new Audio(AUDIO(TRACKS[trackIdx]));
   bgm.loop = true; bgm.volume = 0.35;
   let soundOn = true;
   bgm.play().catch(function () {
@@ -648,6 +650,12 @@ export async function bootFocciWorld(root, opts) {
     soundOn = !soundOn;
     if (soundOn) bgm.play().catch(() => {}); else bgm.pause();
     return soundOn;
+  }
+  function nextTrack() {
+    trackIdx = (trackIdx + 1) % TRACKS.length;
+    bgm.src = AUDIO(TRACKS[trackIdx]);
+    if (soundOn) bgm.play().catch(() => {});
+    return TRACKS[trackIdx];
   }
 
   /* ============================================================
@@ -755,7 +763,7 @@ export async function bootFocciWorld(root, opts) {
   resize();
   animate();
 
-  return { toggleSound, enterRoom, get currentRoom() { return currentRoomKey; } };
+  return { toggleSound, nextTrack, enterRoom, arcRoomKeys, get currentRoom() { return currentRoomKey; } };
   } catch (err) {
     // Surface the real error on-screen instead of a silent black canvas —
     // this is what to screenshot/read out if boot fails again.
@@ -768,6 +776,6 @@ export async function bootFocciWorld(root, opts) {
       + '\n\nOpen your browser\'s console (or share a screenshot of this) to see exactly what broke.';
     var overlay = root.querySelector ? root.querySelector('#fw-overlay') : null;
     if (overlay) overlay.appendChild(msg);
-    return { toggleSound: function () {}, enterRoom: function () {}, currentRoom: 'error' };
+    return { toggleSound: function () {}, nextTrack: function () {}, enterRoom: function () {}, arcRoomKeys: [], currentRoom: 'error' };
   }
 }
