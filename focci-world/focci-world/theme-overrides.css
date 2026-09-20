@@ -1,0 +1,141 @@
+/* Focci's World — theme overrides, part 1: the 3 game-hub cards.
+   Uses the app's EXISTING CSS variables (--primary, --surface, --shadow,
+   --r, --gm-accent) so it still respects whichever of the 10 palettes the
+   player has chosen — nothing here is a hardcoded color swap.
+   Add this file AFTER the app's own <style> block (or paste into it),
+   e.g.: <link rel="stylesheet" href="./focci-world/theme-overrides.css"> */
+
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap');
+
+.gm-card-t {
+  font-family: 'Baloo 2', sans-serif;
+  font-weight: 700;
+}
+
+.gm-card {
+  border-radius: 26px; /* softer, rounder than the base 20px — matches the world's toy-diorama shapes */
+  border-width: 2px;
+  box-shadow: var(--shadow), 0 6px 0 color-mix(in srgb, var(--gm-accent, var(--primary)) 55%, transparent);
+  transition: transform .14s, box-shadow .14s;
+}
+.gm-card:active {
+  transform: scale(.96) translateY(2px);
+  box-shadow: var(--shadow), 0 2px 0 color-mix(in srgb, var(--gm-accent, var(--primary)) 55%, transparent);
+}
+
+/* a soft glass sheen across the top of each card, purely decorative */
+.gm-card::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,0) 35%);
+  border-radius: inherit;
+}
+
+/* the new "Explore in 3D" entry button, styled to sit naturally under the trio */
+.fw-explore-btn {
+  font-family: 'Baloo 2', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; margin-top: 10px; padding: 14px;
+  border: none; border-radius: 999px; cursor: pointer;
+  color: var(--on-hero, #fff);
+  background: var(--grad-hero, var(--primary));
+  box-shadow: var(--shadow), 0 5px 0 color-mix(in srgb, var(--primary) 55%, transparent);
+  transition: transform .12s;
+}
+.fw-explore-btn:active { transform: scale(.97) translateY(2px); }
+
+/* ---- 3D world overlay: compact search entry (reuses the real word-sheet) ---- */
+.fw-search-btn {
+  width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; background: rgba(0,0,0,.45);
+}
+.fw-search-pill {
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 60px); left: 14px; right: 14px; z-index: 2;
+  background: rgba(255,255,255,.92); border-radius: 999px; padding: 4px 6px;
+  box-shadow: var(--shadow), 0 4px 16px rgba(0,0,0,.25);
+}
+.fw-search-pill input {
+  width: 100%; border: none; background: transparent; outline: none;
+  font-size: 14px; padding: 8px 12px; font-family: inherit;
+}
+.fw-word-progress {
+  position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); left: 50%; transform: translateX(-50%);
+  z-index: 2; font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: .3em;
+  color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.5); padding: 8px 18px;
+  background: rgba(0,0,0,.35); border-radius: 999px;
+}
+
+/* ============================================================
+   Part 2: Saved / Progress / Settings — same rule as before, every
+   color still comes from the app's own variables (--primary, --surface,
+   --text, --muted, --line...), so all 10 palettes keep working.
+   ============================================================ */
+
+/* ---- Saved tab ---- */
+.sv-tabs { border-radius: 20px; }
+.sv-tab { font-family: 'Baloo 2', sans-serif; }
+.sv-tab.on {
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 45%, transparent);
+}
+.saved-count { font-family: 'Baloo 2', sans-serif; font-weight: 800; color: var(--text); }
+
+/* ---- Progress tab ---- */
+.pg-rank { border-radius: 22px; }
+.pg-ring {
+  background: conic-gradient(var(--primary) calc(var(--p)*1%), var(--surface-2) 0);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+.pg-rank-txt b { font-family: 'Baloo 2', sans-serif; }
+.pg-streak {
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--line);
+}
+.pg-streak.lit { box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 45%, transparent); }
+.pg-streak b { font-family: 'Baloo 2', sans-serif; font-size: 19px; }
+.jfig { border-radius: 20px; }
+
+/* ---- Settings ---- */
+.sx-card { border-radius: 22px; }
+.sx-lbl { font-family: 'Baloo 2', sans-serif; font-weight: 700; }
+.sx-status { border-radius: 18px; background: var(--surface-2); }
+.theme-pop-open-btn { border-radius: 999px; }
+
+/* ============================================================
+   Part 3: Type it / Match it / Say it + the word-sheet — same rule,
+   every color still comes from the app's own variables.
+   ============================================================ */
+
+/* ---- shared "setup" screen (choose a mode before playing) ---- */
+.setup-card { border-radius: 24px; }
+.setup-t { font-family: 'Baloo 2', sans-serif; }
+
+/* ---- Type it ---- */
+.type-input { box-shadow: 0 3px 0 var(--line); }
+.type-input:focus { box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 45%, transparent), var(--glow); }
+
+/* ---- Match it ---- */
+.match-meaning { border-radius: 22px; }
+.match-opt { border-radius: 18px; box-shadow: 0 3px 0 var(--line); }
+.match-opt.right { box-shadow: 0 3px 0 color-mix(in srgb, var(--mint) 55%, transparent); }
+.match-opt.wrong { box-shadow: 0 3px 0 color-mix(in srgb, var(--coral) 55%, transparent); }
+
+/* ---- Say it ---- */
+.sy-scene { border-radius: 26px; }
+.sy-bubble { border-radius: 18px; }
+.sy-mission { border-radius: 24px; }
+.sy-topic, .sy-reward { font-family: 'Baloo 2', sans-serif; }
+.write-card { border-radius: 24px; }
+.write-fb, .sy-body .write-fb { border-radius: 20px; }
+.write-fb-v { font-family: 'Baloo 2', sans-serif; }
+.write-input, .sy-input .write-input { border-radius: 20px; }
+.write-alt, .sy-body .write-alt { border-radius: 16px; }
+.write-alt-en { font-weight: 700; }
+
+/* ---- the word-sheet (used everywhere: search, saves, this world's tree/treasure finds) ---- */
+.ws-card { border-radius: 26px 26px 0 0; }
+.ws-word { font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 21px; }
+.ws-vi { font-family: 'Baloo 2', sans-serif; }
+.ws-full { box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 40%, transparent); }
