@@ -1,5 +1,11 @@
 # Focci's World — real engine, setup guide
 
+> **⚠️ Path note for your actual repo layout:** your `index.html` lives
+> INSIDE the same flat folder as `world.js`/`vendor/`/`theme-overrides.css`
+> (not one level above it). Every `./focci-world/...` path below should be
+> `./...` for you — see `index-fixed-block.html` for the corrected,
+> ready-to-paste version of step 2's script block.
+
 ## 1. Copy files into your repo
 Drop the whole `focci-world/` folder into your repo root, next to `index.html`.
 It's self-contained: `world.js`, `vendor/three/*`, `assets/glb/*.glb`, `assets/audio/*.mp3`.

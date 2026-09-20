@@ -139,3 +139,58 @@
 .ws-word { font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 21px; }
 .ws-vi { font-family: 'Baloo 2', sans-serif; }
 .ws-full { box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 40%, transparent); }
+
+/* ============================================================
+   Part 4: full calming re-theme — Tunic / Monument Valley direction.
+   This OVERRIDES the app's palette variables directly (not a new
+   data-palette choice) — it wins regardless of which of the 10 original
+   palettes is active, and replaces the neon glow/gloss/bright-gradient
+   look with a quiet, warm, low-saturation one. Everything downstream
+   (every .gm-card, .sy-*, .write-*, .ws-*, .pg-*, .sx-* rule from Parts
+   1-3 above) is written against these SAME variable names, so it all
+   just inherits the new mood automatically — no further edits needed.
+   ============================================================ */
+:root {
+  --surface: #F3ECDD;
+  --surface-2: #E9DFC9;
+  --surface-3: #DED2B7;
+  --line: #DAD0B7;
+  --text: #3A3226;
+  --muted: #6E6252;
+  --muted-2: #8C7F6A;
+
+  --primary: #BE7C4E;
+  --primary-bg: color-mix(in srgb, #BE7C4E 14%, transparent);
+  --amber: #C99A4A;    --amber-bg: color-mix(in srgb, #C99A4A 14%, transparent);
+  --blue: #7B93A8;     --blue-bg: color-mix(in srgb, #7B93A8 14%, transparent);
+  --mint: #8CA37E;     --mint-bg: color-mix(in srgb, #8CA37E 14%, transparent);
+  --coral: #B97159;    --coral-bg: color-mix(in srgb, #B97159 14%, transparent);
+  --violet: #93879E;   --violet-bg: color-mix(in srgb, #93879E 14%, transparent);
+
+  --grad-hero: linear-gradient(160deg, #C68A5C, #B4744A);
+  --on-hero: #FBF6EC;
+
+  /* the two effects most responsible for the "candy" look — turned off */
+  --gloss: none;
+  --glow: 0 0 0 rgba(0,0,0,0);
+  --shadow: 0 6px 16px rgba(50, 40, 25, .12);
+}
+body {
+  background: linear-gradient(180deg, #F6EFE1 0%, #F1E8D5 45%, #EADFC5 100%);
+}
+
+/* the deeper layer of hardcoded bright tokens (per-palette t1/t2/t3 duos
+   feeding the 3 stat pills, quest-card accents, and the hero gradient) —
+   overriding these here means every downstream var(--k-t1) etc. recomputes
+   with the calm palette automatically, no need to touch each consumer. */
+:root {
+  --tint: #BE7C4E; --pri-l: #A6653F; --pri-d: #D79868;
+  --p1: #C68A5C; --p2: #BE7C4E; --p3: #A6653F;
+  --a1: #E8D9BC; --a2: #D4B98D;
+  --cta-ink: #3A3226; --cta-glow: rgba(80, 60, 40, .22);
+  --t1a: #93A9BD; --t1b: #71889E;   /* dusty blue duo */
+  --t2a: #A3B491; --t2b: #82966F;   /* sage duo */
+  --t3a: #CDA07C; --t3b: #B98661;   /* terracotta duo */
+  --spark: none;                    /* the confetti-sparkle pattern — off */
+}
+.q-row { filter: drop-shadow(0 8px 14px rgba(50, 40, 25, .16)); }
