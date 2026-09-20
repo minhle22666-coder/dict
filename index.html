@@ -3023,13 +3023,41 @@
      sheets instead of being flat 2D pages you navigate to — the world stays
      visible (blurred) behind them, so the app never feels like it "leaves"
      Focci's World. */
+  /* Every card/tab/input in the app is already written against shared
+     tokens (--surface, --line, --text, --muted…) rather than hardcoded
+     colors (see theme-overrides.css) — so retheming everything INSIDE a
+     glass panel to be transparent + minimal is one variable override
+     here, not hundreds of edits to .q-card/.jfig/.sx-card/etc. Custom
+     properties cascade to descendants, so every component just inherits
+     the glass versions automatically. */
   .view.fw-panel{display:none;position:fixed;inset:0;z-index:50;overflow-y:auto;-webkit-overflow-scrolling:touch;
     padding:calc(env(safe-area-inset-top,0px) + 74px) 14px calc(env(safe-area-inset-bottom,0px) + 30px);
-    background:linear-gradient(180deg, rgba(15,12,20,.62), rgba(15,12,20,.5) 40%, rgba(15,12,20,.68));
-    backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3)}
+    background:linear-gradient(180deg, rgba(10,9,14,.38), rgba(10,9,14,.28) 40%, rgba(10,9,14,.42));
+    backdrop-filter:blur(34px) saturate(1.4);-webkit-backdrop-filter:blur(34px) saturate(1.4);
+    --surface: rgba(255,255,255,.08);
+    --surface-2: rgba(255,255,255,.055);
+    --surface-3: rgba(255,255,255,.1);
+    --bg-2: rgba(255,255,255,.07);
+    --line: rgba(255,255,255,.16);
+    --text: #F7F2E7;
+    --muted: rgba(247,242,231,.72);
+    --muted-2: rgba(247,242,231,.52);
+    --shadow: 0 10px 28px rgba(0,0,0,.28);
+    --cta-glow: rgba(0,0,0,.3);
+    /* the colored "info card" gradients (stat cards, greeting card, streak
+       board, right/wrong feedback) were solid/opaque — thinned out to match,
+       CTAs/buttons excluded on purpose so they still read as tappable */
+    --k-t1: linear-gradient(140deg, color-mix(in srgb, var(--t1a) 55%, transparent), color-mix(in srgb, var(--t1b) 55%, transparent));
+    --k-t2: linear-gradient(140deg, color-mix(in srgb, var(--t2a) 55%, transparent), color-mix(in srgb, var(--t2b) 55%, transparent));
+    --k-t3: linear-gradient(140deg, color-mix(in srgb, var(--t3a) 55%, transparent), color-mix(in srgb, var(--t3b) 55%, transparent));
+    --k-hero: linear-gradient(135deg, color-mix(in srgb, var(--p1) 62%, transparent) 0%, color-mix(in srgb, var(--p2) 62%, transparent) 46%, color-mix(in srgb, var(--p3) 62%, transparent) 100%);
+    --k-night: linear-gradient(160deg, color-mix(in srgb, var(--p1) 55%, transparent) 0%, color-mix(in srgb, var(--p1) 70%, transparent) 58%, color-mix(in srgb, var(--p2) 75%, transparent) 100%);
+    --scrim: color-mix(in srgb, var(--p1) 26%, rgba(10,9,14,.5))}
   .view.fw-panel.active{display:block;animation:view-in .26s ease}
-  :root[data-theme="light"] .view.fw-panel{
-    background:linear-gradient(180deg, rgba(255,255,255,.68), rgba(255,255,255,.56) 40%, rgba(255,255,255,.72))}
+  .view.fw-panel .q-card,.view.fw-panel .jfig,.view.fw-panel .hist-item,.view.fw-panel .sx-card,
+  .view.fw-panel .sx-status,.view.fw-panel .gm-card,.view.fw-panel .jstory,.view.fw-panel .jhead,
+  .view.fw-panel .jweek,.view.fw-panel .tree-widget{
+    border:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
   .fw-panel-close{position:fixed;top:calc(env(safe-area-inset-top,0px) + 18px);right:18px;z-index:52;
     width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;color:var(--text);
     display:flex;align-items:center;justify-content:center;
@@ -3572,8 +3600,8 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="fw-overlay" style="position:fixed;inset:0;z-index:40;display:none;background:#000;">
-  <canvas id="fw-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;"></canvas>
+<div id="fw-overlay" style="position:fixed;inset:0;z-index:40;background:#000;">
+  <canvas id="fw-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;-webkit-user-select:none;user-select:none;"></canvas>
 
   <!-- always-on search bar — no tap-to-reveal icon, this IS the home screen now -->
   <div class="fw-searchbar fw-ui">
@@ -3723,8 +3751,12 @@
     else wordPopupForceAI(raw);
   });
 
-  // 3D world IS the home screen now — open it as soon as everything's ready.
-  window.addEventListener('load', () => { openFocciWorld3D(); });
+  // 3D world IS the home screen now. Used to wait for window.onload, which
+  // only fires once EVERY image/font on the page has finished — pointlessly
+  // late, since #fw-overlay is already the only thing visible from first
+  // paint (no display:none anymore) and none of the GLB loading below
+  // depends on the rest of the page. Start immediately instead.
+  openFocciWorld3D();
 
   /* ============================================================
      FLOATING GLASS MENU — the fan-out menu (wand/sound/map above the

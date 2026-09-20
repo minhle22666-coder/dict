@@ -172,11 +172,37 @@ export async function bootFocciWorld(root, opts) {
   }
 
   /* ============================================================
+     ASSET LOADING — every GLB used to load one at a time (an `await`
+     per file, ~17 of them back to back), which meant the network round
+     trips just added up in serial before the first frame could ever
+     render. None of these files depend on each other to FETCH — only
+     to place afterwards — so they all load in parallel now instead.
+     teleport-diamond.glb also used to get fetched 5 separate times (once
+     for the hub, once per arc room); loaded once here and cloned instead.
+     ============================================================ */
+  const ARC_ENV_FILES = ['island.glb', 'camp.glb', 'waterfall.glb', 'secretcamp.glb'];
+  const arcCount = Math.min(ARC_TITLES.length, 4);
+  const [
+    hub, forestKit, bushKit, mushGlb, chestGlb, birdGlb, treeGlb, doeGlb, diamondGlb,
+    ...arcGltfs
+  ] = await Promise.all([
+    loadGLB(ASSET('hub-island.glb')),
+    loadGLB(ASSET('forest-kit.glb')),
+    loadGLB(ASSET('bush-kit.glb')),
+    loadGLB(ASSET('mushrooms.glb')),
+    loadGLB(ASSET('chest.glb')),
+    loadGLB(ASSET('birds.glb')),
+    loadGLB(ASSET('vine-tree.glb')),
+    loadGLB(ASSET('doe.glb')),
+    loadGLB(ASSET('teleport-diamond.glb')),
+    ...Array.from({ length: arcCount }, (_, i) => loadGLB(ASSET(ARC_ENV_FILES[i]))),
+  ]);
+
+  /* ============================================================
      STATION ROOM (hub) — built on the flying island you sent
      ============================================================ */
   const station = makeRoom('station', 'Station');
   {
-    const hub = await loadGLB(ASSET('hub-island.glb'));
     hub.scene.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(hub.scene);
     const size = box.getSize(new THREE.Vector3());
@@ -189,16 +215,13 @@ export async function bootFocciWorld(root, opts) {
     station.spawn = { x: 0, z: box.getCenter(new THREE.Vector3()).z * scale * 0.15 };
 
     // decorate with the two vegetation kits you sent (real files, real scale)
-    const forestKit = await loadGLB(ASSET('forest-kit.glb'));
     const forestProps = extractPropGroups(forestKit.scene);
     forestProps.forEach((p) => scatterClone(station, p, 3, 4, 15, 0.7, { avoidWater: true }));
 
-    const bushKit = await loadGLB(ASSET('bush-kit.glb'));
     const bushProps = extractPropGroups(bushKit.scene);
     bushProps.forEach((p) => scatterClone(station, p, 3, 4, 15, 0.9, { avoidWater: true }));
 
     // mushrooms — 15 individual finds, tucked near bushes/rocks, never in water
-    const mushGlb = await loadGLB(ASSET('mushrooms.glb'));
     const mushProps = extractPropGroups(mushGlb.scene);
     mushProps.forEach((p) => {
       let x, z, surf, tries = 0;
@@ -218,7 +241,6 @@ export async function bootFocciWorld(root, opts) {
     });
 
     // 3 chests
-    const chestGlb = await loadGLB(ASSET('chest.glb'));
     for (let i = 0; i < 3; i++) {
       const inst = chestGlb.scene.clone(true);
       const mixer = new THREE.AnimationMixer(inst);
@@ -235,7 +257,6 @@ export async function bootFocciWorld(root, opts) {
     }
 
     // birds — a small flying loop, purely decorative
-    const birdGlb = await loadGLB(ASSET('birds.glb'));
     const birdMixer = new THREE.AnimationMixer(birdGlb.scene);
     if (birdGlb.animations[0]) birdMixer.clipAction(birdGlb.animations[0]).play();
     birdGlb.scene.scale.setScalar(0.4);
@@ -246,7 +267,6 @@ export async function bootFocciWorld(root, opts) {
     station._birdRig = birdGlb.scene;
 
     // vine tree + doe — placed on a flat mid-height ledge, NOT the summit
-    const treeGlb = await loadGLB(ASSET('vine-tree.glb'));
     const treeBox = new THREE.Box3().setFromObject(treeGlb.scene);
     const treeScale = 6 / Math.max(treeBox.getSize(new THREE.Vector3()).x, treeBox.getSize(new THREE.Vector3()).z);
     treeGlb.scene.scale.setScalar(treeScale);
@@ -258,7 +278,6 @@ export async function bootFocciWorld(root, opts) {
     station.interactive.push(treeGlb.scene);
     station.vineTree = { obj: treeGlb.scene, x: treePos.x, z: treePos.z };
 
-    const doeGlb = await loadGLB(ASSET('doe.glb'));
     const doeMixer = new THREE.AnimationMixer(doeGlb.scene);
     const clipByName = {};
     doeGlb.animations.forEach((c) => { clipByName[c.name.split('|').pop()] = c; });
@@ -275,7 +294,6 @@ export async function bootFocciWorld(root, opts) {
     playDoeClip(station.doe, 'Dear_idle', true);
 
     // 4 teleport diamonds -> the 4 arc worlds, spaced around the station
-    const diamondGlb = await loadGLB(ASSET('teleport-diamond.glb'));
     const spots = [{ x: 12, z: -8 }, { x: -12, z: -9 }, { x: 10, z: 11 }, { x: -10, z: 12 }];
     ARC_TITLES.slice(0, 4).forEach((title, i) => {
       const p = spots[i];
@@ -312,13 +330,12 @@ export async function bootFocciWorld(root, opts) {
      NOTE: none of your 4 environment files is literally a desert — this is
      a placeholder pairing until you have (or want) a proper desert asset.
      ============================================================ */
-  const ARC_ENV_FILES = ['island.glb', 'camp.glb', 'waterfall.glb', 'secretcamp.glb'];
   const arcRoomKeys = [];
-  for (let i = 0; i < ARC_TITLES.length && i < 4; i++) {
+  for (let i = 0; i < arcCount; i++) {
     const key = 'arc' + (i + 1);
     arcRoomKeys.push(key);
     const room = makeRoom(key, ARC_TITLES[i]);
-    const gltf = await loadGLB(ASSET(ARC_ENV_FILES[i]));
+    const gltf = arcGltfs[i];
     gltf.scene.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(gltf.scene);
     const size = box.getSize(new THREE.Vector3());
@@ -330,8 +347,9 @@ export async function bootFocciWorld(root, opts) {
     room.collidables.push(gltf.scene);
     room.spawn = { x: 0, z: 4 };
 
-    // a "return to station" diamond in every arc room
-    const diamondGlb = await loadGLB(ASSET('teleport-diamond.glb'));
+    // a "return to station" diamond in every arc room (reuses the same
+    // loaded diamondGlb from the station room above, cloned again — no
+    // need to fetch teleport-diamond.glb a 2nd..5th time)
     const d = diamondGlb.scene.clone(true);
     const mixer = new THREE.AnimationMixer(d);
     if (diamondGlb.animations[0]) mixer.clipAction(diamondGlb.animations[0]).play();
