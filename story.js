@@ -1899,17 +1899,15 @@ window.renderGameHub = function(){
   _reviewArcId=null; _reviewPos=null; _reviewHistory=[];
   if(_waitTimer){ clearInterval(_waitTimer); _waitTimer=null; }
   const area=$('#review-area'); if(!area) return;
+  const map=renderWorldMap(); // { hero, more, mapSection } — banner is itself the Play/Continue button
   let h='<div class="game-hub">';
 
-  h+=renderWorldMap(); // banner is itself the Play/Continue button, plus the 12-land strip
+  h+=map.hero;
 
-  /* Ba vùng của trang trước đây nằm liền nhau không nhãn, nên The Map
-     trông như một game thứ ba ngang hàng với Type it / Match it. Mỗi
-     vùng giờ có tiêu đề và một câu nói rõ nó là gì. */
-  /* Phân vùng bằng SỐ LIỆU THẬT, không bằng câu mô tả. Câu kiểu "Short
-     drills on words you saved" chỉ nói lại cái đang thấy — đọc như app
-     mẫu. Giờ mỗi tiêu đề mang một chip dữ liệu sống, và cặp game nằm
-     trong một panel lõm để mắt thấy ngay đây là vùng khác với bản đồ. */
+  /* Games panel — the actual games belong right under the hero, not
+     buried below the full land map. The Map (12-land strip) moved down
+     to a secondary section since it's reference material you check
+     occasionally, not the thing you came here to tap. */
   h+='<div class="gm-zone"><span class="gm-zone-t">Mini games</span>'
     +'<span class="gm-zone-rule"></span>'
     +'<span class="gm-zone-chip" id="gm-ready">…</span></div>';
@@ -1933,6 +1931,9 @@ window.renderGameHub = function(){
   h+=card('is-match','match',bgs[1],pM,'Match it','Pick the word');
   h+=card('is-write','write',bgs[2],pS,'Say it','Write a line');
   h+='</div>';
+
+  h+=map.more;
+  h+=map.mapSection;
 
   h+='</div>';
   area.innerHTML=h;
@@ -2069,62 +2070,61 @@ function renderWorldMap(){
   }
   const charImg = (curArcContent && curArcContent.chapters[0] && curArcContent.chapters[0].scenes[0].mascot) || 'mascot-wander';
 
-  let h='<button class="saved-banner playable" id="continue-card" onclick="openStory()" style="background-image:url(\''+assetUrl('bg-arc'+curArcId)+'\')" data-arc="'+curArcId+'">';
-  h+='<div class="sb-scrim"></div><div class="sb-corner-shadow"></div>';
-  h+='<img class="sb-char" src="'+assetUrl(charImg)+'" alt="" onerror="this.style.display=\'none\'"/>';
-  h+='<div class="sb-txt"><div class="sb-t">'+esc(curMeta.name)+'</div>';
-  h+='<div class="sb-s">'+esc(curMeta.tagline)+'</div>';
-  h+='<div class="sb-bars">'+VISIBLE_KEYS.map(k=>{
+  let hero='<button class="saved-banner playable" id="continue-card" onclick="openStory()" style="background-image:url(\''+assetUrl('bg-arc'+curArcId)+'\')" data-arc="'+curArcId+'">';
+  hero+='<div class="sb-scrim"></div><div class="sb-corner-shadow"></div>';
+  hero+='<img class="sb-char" src="'+assetUrl(charImg)+'" alt="" onerror="this.style.display=\'none\'"/>';
+  hero+='<div class="sb-txt"><div class="sb-t">'+esc(curMeta.name)+'</div>';
+  hero+='<div class="sb-s">'+esc(curMeta.tagline)+'</div>';
+  hero+='<div class="sb-bars">'+VISIBLE_KEYS.map(k=>{
       const bpct=Math.max(2,Math.min(100, Math.round((st.stats[k]/caps.maxStat)*100)));
       return '<i style="width:'+bpct+'%"></i>';
     }).join('')+'</div>';
-  h+='<span class="sb-cta">'+(isStoryStarted()?'Continue →':'Play →')+'</span>';
-  h+='</div></button>';
+  hero+='<span class="sb-cta">'+(isStoryStarted()?'Continue →':'Play →')+'</span>';
+  hero+='</div></button>';
 
   if(nextMeta && CONTENT.find(a=>a.id===nextMeta.id)){
     // Bỏ <div class="sb-bar"> — banner ngay trên đã có dải thanh .sb-bars,
     // hai thanh chồng nhau trong một khối chỉ làm loãng.
-    h+='<div class="sb-progress"><span>🔒 Finish this land to reach <b>'+esc(nextMeta.name)+'</b></span></div>';
+    hero+='<div class="sb-progress"><span>🔒 Finish this land to reach <b>'+esc(nextMeta.name)+'</b></span></div>';
   } else if(nextMeta){
-    h+='<div class="sb-progress"><span>🛠️ More lands are still being drawn.</span></div>';
+    hero+='<div class="sb-progress"><span>🛠️ More lands are still being drawn.</span></div>';
   } else {
-    h+='<div class="sb-progress"><span>🏆 Every built land explored.</span></div>';
+    hero+='<div class="sb-progress"><span>🏆 Every built land explored.</span></div>';
   }
 
-  h+='<button class="lesson-entry" onclick="showLifeLessons()">'
-    +'<div class="lesson-particles"><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i></div>'
-    +'<img class="lesson-mascot" src="./mascot-withflag-3.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'<div class="lesson-text">'
-      +'<div class="lesson-entry-t">What Focci Has Learned?</div>'
-      +'<div class="lesson-entry-sub">Every lesson Focci reflects on after each event</div>'
-    +'</div>'
-    +'<span class="lesson-play">▶</span>'
-    +'<img class="lesson-bushes" src="./other-bushes.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +'</button>';
+  // Used to be two separate full-width bars stacked one after another —
+  // both are "one more thing to do" shortcuts, not primary content, so
+  // they're paired into one compact row instead of taking two full rows.
+  const more='<div class="gm-more-row">'
+    +'<button class="gm-more-card lesson" onclick="showLifeLessons()">'
+      +'<div class="lesson-particles"><i class="lp"></i><i class="lp"></i><i class="lp"></i><i class="lp"></i></div>'
+      +'<img class="lesson-mascot" src="./mascot-withflag-3.webp" alt="" onerror="this.style.display=\'none\'"/>'
+      +'<span class="gm-more-t">What Focci Has Learned</span>'
+      +'<span class="lesson-play">▶</span>'
+    +'</button>'
+    +'<button class="gm-more-card explore" onclick="openFocciWorld3D()">'
+      +'<span class="fw-explore-ico">🌍</span>'
+      +'<span class="gm-more-t">Explore in 3D</span>'
+      +'<span class="fw-explore-arrow">→</span>'
+    +'</button>'
+  +'</div>';
 
-  h+='<div class="hub-section-label">The Map</div>';
-  h+='<div class="region-strip">';
+  let mapSection='<div class="hub-section-label">The Map</div>';
+  mapSection+='<div class="region-strip">';
   ARC_LANDS.forEach(meta=>{
     const unlocked = arcUnlocked(meta.id);
     const finished = unlocked && meta.id<curArcId;
     const status = finished ? 'tap to replay' : unlocked ? 'in progress' : 'locked';
-    h+='<div class="region'+(unlocked?' on':'')+(meta.id===curArcId?' cur':'')+'" onclick="worldMapInfo('+meta.id+');updateContinueCard('+meta.id+')">'
+    mapSection+='<div class="region'+(unlocked?' on':'')+(meta.id===curArcId?' cur':'')+'" onclick="worldMapInfo('+meta.id+');updateContinueCard('+meta.id+')">'
       +'<div class="region-img" style="background-image:url(\''+assetUrl('bg-arc'+meta.id)+'\')"></div>'
       +'<div class="region-lock">'+(unlocked?'✓':'🔒')+'</div>'
       +'<div class="region-n">'+esc(meta.name)+'</div>'
       +'<div class="region-a">'+status+'</div>'
       +'</div>';
   });
-  h+='</div>';
+  mapSection+='</div>';
 
-  h+='<button class="gm-card fw-explore-btn" onclick="openFocciWorld3D()">'
-    +'<span class="fw-explore-ico">🌍</span>'
-    +'<span class="fw-explore-txt"><span class="fw-explore-t">Explore in 3D</span>'
-    +'<span class="fw-explore-s">Walk around this land yourself</span></span>'
-    +'<span class="fw-explore-arrow">→</span>'
-    +'</button>';
-
-  return h;
+  return { hero, more, mapSection };
 }
 window.worldMapInfo = function(arcId){
   const meta = ARC_LANDS.find(a=>a.id===arcId); if(!meta) return;
