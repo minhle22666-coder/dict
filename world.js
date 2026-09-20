@@ -42,6 +42,7 @@ export async function bootFocciWorld(root, opts) {
   // can see. world.js only handles the 3D scatter/collect mechanic.
   const getNextTargetWord = typeof opts.getNextTargetWord === 'function' ? opts.getNextTargetWord : async () => opts.targetWord || 'focci';
 
+  try {
   const canvas = root.querySelector('#fw-canvas');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -62,10 +63,10 @@ export async function bootFocciWorld(root, opts) {
   /* ============================================================
      DAY / NIGHT — driven by the visitor's real clock
      ============================================================ */
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x4a7a3e, 0.7);
-  const sun = new THREE.DirectionalLight(0xfff6dd, 1.4);
+  const hemi = new THREE.HemisphereLight(0xfff3e6, 0x6a8a63, 0.85);
+  const sun = new THREE.DirectionalLight(0xfff2df, 0.85);
   sun.position.set(30, 45, 20);
-  const ambient = new THREE.AmbientLight(0xffffff, 0.1);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.28);
   scene.add(hemi, sun, ambient);
 
   const DAY_SKY = new THREE.Color(0x5fbdea), NIGHT_SKY = new THREE.Color(0x0d1a3a);
@@ -92,9 +93,9 @@ export async function bootFocciWorld(root, opts) {
     scene.background = sky;
     scene.fog = scene.fog || new THREE.Fog(sky.getHex(), 60, 220);
     scene.fog.color.copy(sky);
-    hemi.intensity = 0.35 + d * 0.45;
-    sun.intensity = 0.35 + d * 1.05;
-    ambient.intensity = 0.06 + d * 0.06;
+    hemi.intensity = 0.5 + d * 0.35;
+    sun.intensity = 0.4 + d * 0.55;
+    ambient.intensity = 0.22 + d * 0.12;
     sunDisc.material.opacity = d;
     moonDisc.material.opacity = 1 - d;
   }
@@ -633,11 +634,16 @@ export async function bootFocciWorld(root, opts) {
   }
 
   /* ============================================================
-     SOUND
+     SOUND — starts automatically; if the browser blocks autoplay
+     (common without a prior tap), it unlocks on the first tap anywhere.
      ============================================================ */
   const bgm = new Audio(AUDIO('ambient-lofi.mp3'));
   bgm.loop = true; bgm.volume = 0.35;
-  let soundOn = false;
+  let soundOn = true;
+  bgm.play().catch(function () {
+    var unlock = function () { bgm.play().catch(function () {}); canvas.removeEventListener('pointerdown', unlock); };
+    canvas.addEventListener('pointerdown', unlock);
+  });
   function toggleSound() {
     soundOn = !soundOn;
     if (soundOn) bgm.play().catch(() => {}); else bgm.pause();
@@ -750,4 +756,18 @@ export async function bootFocciWorld(root, opts) {
   animate();
 
   return { toggleSound, enterRoom, get currentRoom() { return currentRoomKey; } };
+  } catch (err) {
+    // Surface the real error on-screen instead of a silent black canvas —
+    // this is what to screenshot/read out if boot fails again.
+    if (window.console) console.error('Focci World failed to boot:', err);
+    var msg = document.createElement('div');
+    msg.style.cssText = 'position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;'
+      + 'padding:28px;color:#fff;font-family:system-ui,sans-serif;font-size:14px;line-height:1.5;text-align:center;'
+      + 'background:#241a12;white-space:pre-wrap;';
+    msg.textContent = 'Focci World failed to load:\n\n' + (err && err.message ? err.message : String(err))
+      + '\n\nOpen your browser\'s console (or share a screenshot of this) to see exactly what broke.';
+    var overlay = root.querySelector ? root.querySelector('#fw-overlay') : null;
+    if (overlay) overlay.appendChild(msg);
+    return { toggleSound: function () {}, enterRoom: function () {}, currentRoom: 'error' };
+  }
 }
