@@ -5,7 +5,7 @@
    every image is cached automatically the first time it's fetched
    successfully, which happens naturally the first time you open the
    app online. */
-const CACHE = 'focci-v94';
+const CACHE = 'focci-v95';
 const SHELL = [
   './',
   './index.html',
@@ -13,12 +13,22 @@ const SHELL = [
   './dict-system.js',
   './story-content.js',
   './story.js',
+  './random-quotes.js',
+  './levels.txt',
   './manifest.json',
   './seed.json',
   './seed-files.txt',
   './icon-180.png',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './focci-world/world.js',
+  './focci-world/theme-overrides.css',
+  './focci-world/vendor/three/three.module.js',
+  './focci-world/vendor/three/GLTFLoader.js'
+  // the .glb/.mp3 files under focci-world/assets/ are NOT in this list on
+  // purpose — the fetch handler below already caches any same-origin GET
+  // the first time it succeeds, so they'll be cached automatically the
+  // first time someone opens the 3D world, without bloating initial install.
 ];
 
 self.addEventListener('install', (e) => {

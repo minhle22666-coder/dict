@@ -2965,6 +2965,7 @@
   .sy-detail .write-alt{border:0;border-radius:18px;background:var(--surface-2)}
   .sy-detail .write-alt-n{background:var(--grad-hero);color:#fff}
 </style>
+<link rel="stylesheet" href="./focci-world/theme-overrides.css">
 </head>
 <body>
 
@@ -3440,9 +3441,151 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Focci's World (3D) — full-screen overlay, opened from the Game tab's
+     "Explore in 3D" button. Runs alongside the existing 2D World Map, not
+     instead of it. -->
+<div id="fw-overlay" style="position:fixed;inset:0;z-index:40;display:none;background:#000;">
+  <canvas id="fw-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;"></canvas>
+  <button id="fw-close" aria-label="Close 3D world"
+    style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);right:14px;z-index:2;
+           width:38px;height:38px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:18px;">✕</button>
+  <button id="fw-search-btn" aria-label="Search a word" class="fw-search-btn"
+    style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);left:14px;z-index:2;">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+  </button>
+  <div id="fw-search-pill" class="fw-search-pill" style="display:none;">
+    <input id="fw-search-input" type="search" inputmode="search" placeholder="Search a word…" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
+  </div>
+  <div id="fw-word-progress" class="fw-word-progress"></div>
+</div>
+
 <script src="./app.js"></script>
 <script src="./story-content.js"></script>
 <script src="./story.js"></script>
 <script src="./dict-system.js"></script>
+
+<!-- Bridge: story.js/app.js load as plain (non-module) scripts, and most of
+     their top-level functions become window properties automatically — but
+     ARC_LANDS and norm are declared with const, which does NOT attach to
+     window, so the module script below can't see them without this. -->
+<script>
+  window.ARC_LANDS = ARC_LANDS;
+  window.norm = norm;
+</script>
+
+<script type="importmap">
+{ "imports": { "three": "./focci-world/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+  import { bootFocciWorld } from './focci-world/world.js';
+  import { FOCCI_ANGEL_MESSAGES } from './random-quotes.js';
+
+  // Loads/parses levels.txt once (word<TAB>level, 1=A1 ... 6=C2) and caches
+  // the result. Ship levels.txt at the repo root and it's precached by
+  // sw.js, so it's available offline right after "Add to Home Screen".
+  let _levelsPromise = null;
+  function loadLevels() {
+    if (_levelsPromise) return _levelsPromise;
+    _levelsPromise = fetch('./levels.txt').then(r => r.text()).then(text => {
+      const map = new Map();
+      for (const line of text.split('\n')) {
+        if (!line) continue;
+        const idx = line.lastIndexOf('\t');
+        if (idx === -1) continue;
+        const word = line.slice(0, idx).trim();
+        const level = parseInt(line.slice(idx + 1).trim(), 10);
+        if (word && !isNaN(level)) map.set(word, level);
+      }
+      return map;
+    });
+    return _levelsPromise;
+  }
+
+  let worldApi = null;
+  window.openFocciWorld3D = async function () {
+    document.querySelector('#fw-overlay').style.display = 'block';
+    if (worldApi) return; // already booted — just re-showing the overlay
+
+    // Real land names/unlock-state — ARC_LANDS + arcUnlocked() live in
+    // story.js. Do NOT use story-content.js's ARCS[].title ("The Field") —
+    // that's a different, shorter internal label than the real name
+    // players see on the map ("The Nameless Field").
+    const arcTitles = window.ARC_LANDS.slice(0, 4).map(a => a.name);
+    const arcUnlockedFlags = window.ARC_LANDS.slice(0, 4).map(a => arcUnlocked(a.id));
+
+    worldApi = await bootFocciWorld(document, {
+      angelMessages: FOCCI_ANGEL_MESSAGES,
+      arcTitles,
+      arcUnlocked: arcUnlockedFlags,
+      onOpenArc: (index) => {
+        const arcId = index + 1;
+        if (!arcUnlocked(arcId)) return; // safety net, world.js already guards this too
+        // Stepping onto the island IS how you continue that chapter — no
+        // need for the 3D room itself to look like the arc; hand straight
+        // off to the real 2D story:
+        closeFocciWorld3D();
+        updateContinueCard(arcId);
+        openStory();
+      },
+      onArcLocked: (index, title) => {
+        showInfoCard('mascot-wonder', '🔒 ' + title, 'This land is not finished yet — check back soon!');
+      },
+      onOpenSayIt: () => { closeFocciWorld3D(); showView('review'); setPracticeMode('write'); },
+      onWordFound: () => { /* TODO: award EXP here */ },
+
+      // word hunt: letters scattered in the station background spell a real
+      // word; islands each hold one "whole word" treasure shortcut. world.js
+      // only handles the 3D scatter/collect side — picking a real B1-C2 word
+      // that's also actually in your dictionary happens here:
+      getNextTargetWord: async () => {
+        const levels = await loadLevels();
+        const words = await dsAllWords(); // words with a real dict-00X.json entry in IndexedDB
+        const pool = words.filter(w => {
+          const lvl = levels.get(w);
+          return lvl >= 3 && lvl <= 6 && w.length >= 4 && w.length <= 9 && !w.includes(' ');
+        });
+        return pool[Math.floor(Math.random() * pool.length)] || 'focci';
+      },
+      onLetterProgress: (word, mask) => {
+        const el = document.querySelector('#fw-word-progress');
+        if (el) el.textContent = mask; // e.g. "C A _" style hint
+      },
+      onWordComplete: async (word) => {
+        const rec = await idbGet(word);
+        if (rec) { showWordSheet(condensedEntryHTML(rec)); addXP(3); }
+      }
+    });
+  };
+  window.closeFocciWorld3D = function () {
+    document.querySelector('#fw-overlay').style.display = 'none';
+    if (worldApi) worldApi.toggleSound(); // mute when leaving, so it doesn't play under the 2D UI
+  };
+  document.querySelector('#fw-close').addEventListener('click', closeFocciWorld3D);
+
+  // Compact search — reuses your REAL lookup + bottom-sheet pipeline
+  // (idbGet / condensedEntryHTML / showWordSheet / wordPopupForceAI), so a
+  // word found here is the exact same card as searching from the topbar.
+  const searchBtn = document.querySelector('#fw-search-btn');
+  const searchPill = document.querySelector('#fw-search-pill');
+  const searchInput = document.querySelector('#fw-search-input');
+  searchBtn.addEventListener('click', () => {
+    const opening = searchPill.style.display === 'none';
+    searchPill.style.display = opening ? 'block' : 'none';
+    if (opening) searchInput.focus();
+  });
+  searchInput.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const raw = searchInput.value.trim();
+    if (!raw) return;
+    const word = window.norm(normalizeSpelling(raw));
+    searchInput.blur();
+    searchPill.style.display = 'none';
+    searchInput.value = '';
+    const rec = await idbGet(word);
+    if (rec) showWordSheet(condensedEntryHTML(rec));
+    else wordPopupForceAI(raw);
+  });
+</script>
 </body>
 </html>

@@ -2116,6 +2116,10 @@ function renderWorldMap(){
       +'</div>';
   });
   h+='</div>';
+
+  h+='<button class="gm-card fw-explore-btn" onclick="openFocciWorld3D()">'
+    +'🌍 Explore in 3D</button>';
+
   return h;
 }
 window.worldMapInfo = function(arcId){
