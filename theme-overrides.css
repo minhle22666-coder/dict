@@ -14,37 +14,20 @@
 
 .gm-card {
   border-radius: 26px; /* softer, rounder than the base 20px — matches the world's toy-diorama shapes */
-  border-width: 2px;
-  box-shadow: var(--shadow), 0 6px 0 color-mix(in srgb, var(--gm-accent, var(--primary)) 55%, transparent);
+  border-width: 1.5px;
+  box-shadow: var(--shadow);
   transition: transform .14s, box-shadow .14s;
 }
 .gm-card:active {
-  transform: scale(.96) translateY(2px);
-  box-shadow: var(--shadow), 0 2px 0 color-mix(in srgb, var(--gm-accent, var(--primary)) 55%, transparent);
+  transform: scale(.97);
+  box-shadow: var(--shadow);
 }
 
-/* a soft glass sheen across the top of each card, purely decorative */
-.gm-card::after {
-  content: '';
-  position: absolute; inset: 0; z-index: 1; pointer-events: none;
-  background: linear-gradient(180deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,0) 35%);
-  border-radius: inherit;
-}
-
-/* the new "Explore in 3D" entry button, styled to sit naturally under the trio */
-.fw-explore-btn {
-  font-family: 'Baloo 2', sans-serif;
-  font-weight: 700;
-  font-size: 14px;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  width: 100%; margin-top: 10px; padding: 14px;
-  border: none; border-radius: 999px; cursor: pointer;
-  color: var(--on-hero, #fff);
-  background: var(--grad-hero, var(--primary));
-  box-shadow: var(--shadow), 0 5px 0 color-mix(in srgb, var(--primary) 55%, transparent);
-  transition: transform .12s;
-}
-.fw-explore-btn:active { transform: scale(.97) translateY(2px); }
+/* "Explore in 3D" button markup/sizing/color now lives entirely in index.html's
+   .fw-explore-btn rule (it needs the icon/text/arrow layout that button's
+   markup uses) — keeping a second competing rule here caused cascade fights
+   over background/border-radius/justify-content since both files load in
+   the same document. Don't redefine .fw-explore-btn in this file. */
 
 /* ---- 3D world overlay: compact search entry (reuses the real word-sheet) ---- */
 .fw-search-btn {
@@ -150,7 +133,9 @@
    1-3 above) is written against these SAME variable names, so it all
    just inherits the new mood automatically — no further edits needed.
    ============================================================ */
-:root {
+:root, :root[data-palette] {
+  --bg: #F8F3E6;
+  --bg-2: #EFE6D3;
   --surface: #F3ECDD;
   --surface-2: #E9DFC9;
   --surface-3: #DED2B7;
@@ -183,7 +168,7 @@ body {
    feeding the 3 stat pills, quest-card accents, and the hero gradient) —
    overriding these here means every downstream var(--k-t1) etc. recomputes
    with the calm palette automatically, no need to touch each consumer. */
-:root {
+:root, :root[data-palette] {
   --tint: #BE7C4E; --pri-l: #A6653F; --pri-d: #D79868;
   --p1: #C68A5C; --p2: #BE7C4E; --p3: #A6653F;
   --a1: #E8D9BC; --a2: #D4B98D;
@@ -192,5 +177,13 @@ body {
   --t2a: #A3B491; --t2b: #82966F;   /* sage duo */
   --t3a: #CDA07C; --t3b: #B98661;   /* terracotta duo */
   --spark: none;                    /* the confetti-sparkle pattern — off */
+
+  /* correct/close/wrong feedback colors were hardcoded neon (#1FD69A green,
+     #FF4F9A pink, #14C2F2 cyan) and ignored the palette entirely — muted to
+     match the same calm family as everything else. */
+  --k-mint: linear-gradient(140deg, #8CA37E, #6E8560);
+  --k-pink: linear-gradient(140deg, #B97159, #9A5C46);
+  --k-gold: linear-gradient(140deg, #C99A4A, #AD7F38);
+  --k-cyan: linear-gradient(140deg, #7B93A8, #63788C);
 }
-.q-row { filter: drop-shadow(0 8px 14px rgba(50, 40, 25, .16)); }
+.q-row { filter: drop-shadow(0 8px 14px rgba(50, 40, 25, .12)); }

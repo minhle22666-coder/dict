@@ -5383,17 +5383,13 @@ function parseWordList(text){
    <html> nhận data-theme (light|dark ĐÃ RESOLVE), data-palette, data-scheme.
    ------------------------------------------------------------------ */
 const PALETTE_LS='sd_palette';
+/* Focci giờ chỉ có MỘT vibe (ấm, dịu, low-poly — xem theme-overrides.css),
+   nên bảng 10 màu neon cũ đã bỏ: chọn màu nào cũng ra cùng một giao diện,
+   để lại 10 lựa chọn giả sẽ gây hiểu lầm. Palette 'grape' vẫn là id mặc định
+   nội bộ (khỏi phải sửa logic getThemePrefs/legacy migration), chỉ đổi tên
+   hiển thị cho đúng với vẻ ngoài thật. */
 const PALETTES=[
-  {id:'grape', name:'Grape Soda', tag:'Fizzy and bold'},
-  {id:'bubblegum', name:'Bubblegum', tag:'Sweet and playful'},
-  {id:'ocean', name:'Deep Ocean', tag:'Cool and focused'},
-  {id:'mint', name:'Mint Fizz', tag:'Fresh and calm'},
-  {id:'sunset', name:'Sunset Pop', tag:'Warm and loud'},
-  {id:'berry', name:'Berry Blast', tag:'Juicy and rich'},
-  {id:'neon', name:'Neon Nights', tag:'Electric'},
-  {id:'forest', name:'Forest Sprite', tag:'Earthy and lively'},
-  {id:'cocoa', name:'Cocoa Caramel', tag:'Cozy and warm'},
-  {id:'slate', name:'Slate Calm', tag:'Quiet and steady'}
+  {id:'grape', name:'Focci Calm', tag:'Warm, quiet, low-poly'}
 ];
 const LEGACY_THEMES={
   'light':['light','sunset'],'dark':['dark','sunset'],'obsidian-ember':['dark','sunset'],
@@ -5447,8 +5443,13 @@ function renderThemePicker(){
   const ms=$('#mode-seg'), ps=$('#theme-seg'); if(!ms||!ps) return;
   ms.innerHTML=Object.keys(MODE_LABEL).map(m=>
     '<button class="ts-mode" data-mode="'+m+'" onclick="setThemeMode(\''+m+'\')">'+MODE_ICONS[m]+MODE_LABEL[m]+'</button>').join('');
+  /* Kh\u00f4ng g\u1eafn data-pal n\u1eefa: thu\u1ed9c t\u00ednh \u0111\u00f3 v\u1ed1n \u0111\u1ec3 card xem tr\u01b0\u1edbc hi\u1ec7n \u0111\u00fang
+     m\u00e0u G\u1ed0C c\u1ee7a t\u1eebng palette b\u1ea5t k\u1ec3 theme \u0111ang b\u1eadt (xem [data-pal="\u2026"] \u1edf
+     kh\u1ed1i CSS \u0111\u1ea7u file) \u2014 h\u1eefu \u00edch khi c\u00f3 10 l\u1ef1a ch\u1ecdn, nh\u01b0ng gi\u1edd ch\u1ec9 c\u00f2n m\u1ed9t
+     "Focci Calm", n\u00ean card n\u00e0y ph\u1ea3i hi\u1ec7n \u0111\u00fang m\u00e0u \u0110ANG D\u00d9NG TH\u1eacT, kh\u00f4ng ph\u1ea3i
+     m\u00e0u g\u1ed1c grape c\u0169. */
   ps.innerHTML=PALETTES.map(x=>
-    '<button class="ts-pal" data-pal="'+x.id+'" onclick="setThemePalette(\''+x.id+'\')">'
+    '<button class="ts-pal" onclick="setThemePalette(\''+x.id+'\')">'
     +'<span class="ts-pal-art"><i class="ts-pal-cta"></i><span class="ts-pal-dots"><i></i><i></i><i></i></span></span>'
     +'<span class="ts-pal-name">'+x.name+'</span><span class="ts-pal-tag">'+x.tag+'</span>'
     +'<span class="ts-check">\u2713</span></button>').join('');
