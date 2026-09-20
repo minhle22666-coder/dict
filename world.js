@@ -149,8 +149,23 @@ export async function bootFocciWorld(root, opts) {
     return node.children.slice();
   }
 
-  function scatterClone(room, template, count, minR, maxR, scale, opts) {
+  /* `targetSize` is the real-world size (largest dimension, in the same units
+     as the hub/tree/arc scaling elsewhere) this prop should end up at — NOT a
+     raw multiplier on the model's own scale. The hub, vine tree, and each arc
+     environment all normalize themselves this way (measure their bounding
+     box, scale so its largest side hits a target number) specifically so it
+     doesn't matter what units the source file was exported in. This used to
+     apply a flat multiplier (e.g. *0.7) straight to the prop's imported
+     scale instead — fine only if the kit happened to already be exported at
+     roughly 1 world-unit scale, and very wrong otherwise: whatever the true
+     cause, decorative props were coming out screen-fillingly huge (Focci
+     nearly lost inside oversized leaf shapes), which this fixes regardless
+     of the source file's actual scale. */
+  function scatterClone(room, template, count, minR, maxR, targetSize, opts) {
     opts = opts || {};
+    const box = new THREE.Box3().setFromObject(template);
+    const size = box.getSize(new THREE.Vector3());
+    const baseScale = targetSize / Math.max(size.x, size.y, size.z, 0.0001);
     const placed = [];
     for (let i = 0; i < count; i++) {
       let x, z, tries = 0, ok = false;
@@ -160,11 +175,11 @@ export async function bootFocciWorld(root, opts) {
         ok = room.collidables.length > 0; tries++;
       } while (!ok && tries < 30);
       const inst = template.clone(true);
-      inst.scale.setScalar(scale * (0.85 + Math.random() * 0.3));
+      inst.scale.setScalar(baseScale * (0.85 + Math.random() * 0.3));
       inst.rotation.y = Math.random() * Math.PI * 2;
       const surf = surfaceYIn(room, x, z);
       if (opts.avoidWater && surf.water) { i--; continue; }
-      inst.position.set(x, surf.y, z);
+      inst.position.set(x, surf.y - box.min.y * baseScale, z);
       room.group.add(inst);
       placed.push(inst);
     }
@@ -214,15 +229,21 @@ export async function bootFocciWorld(root, opts) {
     station.collidables.push(hub.scene);
     station.spawn = { x: 0, z: box.getCenter(new THREE.Vector3()).z * scale * 0.15 };
 
-    // decorate with the two vegetation kits you sent (real files, real scale)
+    // decorate with the two vegetation kits you sent — target sizes (largest
+    // dimension, in world units) rather than a flat multiplier on whatever
+    // scale the kit happened to export at; see scatterClone's comment
     const forestProps = extractPropGroups(forestKit.scene);
-    forestProps.forEach((p) => scatterClone(station, p, 3, 4, 15, 0.7, { avoidWater: true }));
+    forestProps.forEach((p) => scatterClone(station, p, 3, 4, 15, 5, { avoidWater: true }));
 
     const bushProps = extractPropGroups(bushKit.scene);
-    bushProps.forEach((p) => scatterClone(station, p, 3, 4, 15, 0.9, { avoidWater: true }));
+    bushProps.forEach((p) => scatterClone(station, p, 3, 4, 15, 1.6, { avoidWater: true }));
 
-    // mushrooms — 15 individual finds, tucked near bushes/rocks, never in water
+    // mushrooms — 15 individual finds, tucked near bushes/rocks, never in water.
+    // Same fix as scatterClone: was a flat inst.scale.setScalar(0.35), which
+    // only comes out "human(fox)-scale" if the source file's raw units
+    // happen to match that assumption — measured + normalized instead.
     const mushProps = extractPropGroups(mushGlb.scene);
+    const MUSH_TARGET = 0.45;
     mushProps.forEach((p) => {
       let x, z, surf, tries = 0;
       do {
@@ -232,8 +253,11 @@ export async function bootFocciWorld(root, opts) {
         tries++;
       } while (surf.water && tries < 20);
       const inst = p.clone(true);
-      inst.scale.setScalar(0.35); // mushrooms were comically huge before — this is human(fox)-scale now
-      inst.position.set(x, surf.y, z);
+      const mBox = new THREE.Box3().setFromObject(inst);
+      const mSize = mBox.getSize(new THREE.Vector3());
+      const mScale = MUSH_TARGET / Math.max(mSize.x, mSize.y, mSize.z, 0.0001);
+      inst.scale.setScalar(mScale);
+      inst.position.set(x, surf.y - mBox.min.y * mScale, z);
       inst.userData.interactType = 'mushroom';
       station.group.add(inst);
       station.interactive.push(inst);
