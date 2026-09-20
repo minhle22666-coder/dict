@@ -3613,6 +3613,17 @@ window.setSavedTab=function(t){
   renderSaved();
 };
 
+/* Settings used to be one long scroll through every section at once —
+   category pills page through Setup/Library/Backup/Device instead, so
+   opening Settings doesn't mean scrolling past four sections' worth of
+   maintenance tools to reach the one you actually came for. */
+window.setSettingsTab=function(cat){
+  document.querySelectorAll('#v-settings .sx-tab').forEach(b=>
+    b.classList.toggle('on', b.dataset.cat===cat));
+  document.querySelectorAll('#v-settings .sx-tabpage').forEach(p=>
+    p.style.display = p.dataset.cat===cat ? '' : 'none');
+};
+
 function svRow(r, due, box){
   const eq=(r.data&&r.data.vi_equivalent)||'';
   const w=esc(r.word);
@@ -5014,6 +5025,23 @@ async function renderInsights(){
 
   let h='';
 
+  /* Reordered into "dashboard" priority instead of "report" priority:
+     quick stat strip first (glanceable, like the Settings status strip),
+     then rank+streak, then the trophy case (achievements are the
+     game-like payoff, not an afterthought at the bottom), and the
+     detailed chart/notes last since they're the "read more" analytics
+     rather than the headline. */
+  h+='<div class="jfigs pg-figs">';
+  h+='<div class="jfig"><span class="jfig-n">'+s.totalWords.toLocaleString()+'</span>'
+    +'<span class="jfig-l">words in library</span></div>';
+  h+='<span class="jfig-rule"></span>';
+  h+='<div class="jfig"><span class="jfig-n">'+s.savedCount+'</span>'
+    +'<span class="jfig-l">saved</span></div>';
+  h+='<span class="jfig-rule"></span>';
+  h+='<div class="jfig"><span class="jfig-n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</span>'
+    +'<span class="jfig-l">practice accuracy</span></div>';
+  h+='</div>';
+
   /* Rank co lại thành MỘT dòng: nó là phần thưởng, không phải thông tin
      chính của trang. Vòng tròn XP thay cho thanh ngang để nó không tranh
      chấp thị giác với biểu đồ cột bên dưới. */
@@ -5029,25 +5057,17 @@ async function renderInsights(){
     +'<b>'+s.streak+'</b><span>day'+(s.streak===1?'':'s')+'</span></div>';
   h+='</div>';
 
-  h+=progressChart(s);
+  const {list, unlocked}=await checkAchievements();
+  h+=renderBadges(list, unlocked);
 
-  h+='<div class="jfigs pg-figs">';
-  h+='<div class="jfig"><span class="jfig-n">'+s.totalWords.toLocaleString()+'</span>'
-    +'<span class="jfig-l">words in library</span></div>';
-  h+='<span class="jfig-rule"></span>';
-  h+='<div class="jfig"><span class="jfig-n">'+s.savedCount+'</span>'
-    +'<span class="jfig-l">saved</span></div>';
-  h+='<span class="jfig-rule"></span>';
-  h+='<div class="jfig"><span class="jfig-n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</span>'
-    +'<span class="jfig-l">practice accuracy</span></div>';
-  h+='</div>';
+  h+=progressChart(s);
 
   /* Tối đa 3 quan sát. Bản cũ có thể đổ ra 5 thẻ một lúc, đọc thành một
      bức tường. Ưu tiên thứ có thể HÀNH ĐỘNG được trước. */
   const notes=[];
   if(s.forgetful.length){
-    const list=s.forgetful.map(f=>'<b>'+esc(f.word)+'</b>').join(', ');
-    notes.push(insightRow(s.forgetful.length, 'Words that keep slipping', list+' — worth a round of practice.'));
+    const list2=s.forgetful.map(f=>'<b>'+esc(f.word)+'</b>').join(', ');
+    notes.push(insightRow(s.forgetful.length, 'Words that keep slipping', list2+' — worth a round of practice.'));
   }
   if(s.savedNotReviewed>0)
     notes.push(insightRow(s.savedNotReviewed, 'Saved but never practiced', 'Start your next round with these.'));
@@ -5069,8 +5089,6 @@ async function renderInsights(){
     h+=notes.slice(0,3).join('');
   }
 
-  const {list, unlocked}=await checkAchievements();
-  h+=renderBadges(list, unlocked);
   area.innerHTML=h;
 }
 

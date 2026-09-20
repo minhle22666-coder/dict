@@ -2442,6 +2442,14 @@
   .sv-tab.on{background:var(--surface);color:var(--primary);box-shadow:var(--shadow)}
   .sv-tab:active{transform:scale(.98)}
 
+  /* Settings category pills — same pill-bar language as .sv-tabs above. */
+  .sx-tabs{display:flex;gap:6px;padding:4px;margin-bottom:18px;border-radius:14px;
+    background:var(--surface-2);border:1px solid var(--line)}
+  .sx-tab{flex:1;min-width:0;padding:10px 4px;border-radius:11px;font-size:12px;font-weight:800;white-space:nowrap;
+    color:var(--muted-2);transition:background .2s,color .2s}
+  .sx-tab.on{background:var(--surface);color:var(--primary);box-shadow:var(--shadow)}
+  .sx-tab:active{transform:scale(.98)}
+
   .sv-hero{display:flex;align-items:center;gap:13px;padding:14px 15px;margin-bottom:18px;
     border-radius:18px;background:linear-gradient(150deg,var(--primary-bg),var(--surface) 72%);
     border:1px solid color-mix(in srgb, var(--primary) 30%, transparent)}
@@ -2905,6 +2913,9 @@
   .sv-tabs{padding:5px;border-radius:24px;border:0;background:var(--surface-2)}
   .sv-tab{border-radius:19px;font-family:var(--font-d);font-weight:600}
   .sv-tab.on{background:var(--grad-hero);color:#fff;box-shadow:var(--shadow)}
+  .sx-tabs{padding:5px;border-radius:24px;border:0;background:var(--surface-2)}
+  .sx-tab{border-radius:19px;font-family:var(--font-d);font-weight:600}
+  .sx-tab.on{background:var(--grad-hero);color:#fff;box-shadow:var(--shadow)}
 
   /* ---- Bảng chọn theme: bottom sheet — xem trước sống, chọn chế độ, chọn palette ---- */
   .theme-pop-backdrop{position:fixed;inset:0;z-index:44;background:rgba(8,4,26,.5);
@@ -3199,7 +3210,7 @@
      translucent + blurred (glass) instead of an opaque gradient fill with
      just a border added on top. */
   body .view.fw-panel, body .view.fw-panel *{font-family:'Exo 2',var(--font-d),sans-serif}
-  body .view.fw-panel .sb-cta, body .view.fw-panel .btn, body .view.fw-panel .info-action{
+  body .view.fw-panel .sb-cta, body .view.fw-panel .btn:not(.ghost), body .view.fw-panel .info-action{
     /* color-mix(...) nested inside a gradient inside a var() rendered as a
      literal blank fill here (computed style looked correct — right text,
      right color — but nothing actually painted). Plain rgba() of the same
@@ -3520,7 +3531,19 @@
       <div class="sx-stat"><b id="sx-ai">—</b><i>AI connection</i></div>
     </div>
 
+    <!-- Was one long scroll through every section at once — category
+         pills split it into pages, so "Setup" (what most people actually
+         touch) isn't buried below four other sections' worth of maintenance
+         tools every time you open Settings. -->
+    <div class="sx-tabs">
+      <button class="sx-tab on" data-cat="setup" onclick="setSettingsTab('setup')">Setup</button>
+      <button class="sx-tab" data-cat="library" onclick="setSettingsTab('library')">Library</button>
+      <button class="sx-tab" data-cat="backup" onclick="setSettingsTab('backup')">Backup</button>
+      <button class="sx-tab" data-cat="device" onclick="setSettingsTab('device')">Device</button>
+    </div>
+
     <!-- ============ 1 · thứ bạn thật sự chạm tới ============ -->
+    <div class="sx-tabpage" data-cat="setup">
     <div class="sx-lbl">Setup</div>
     <div class="sx-card">
       <div class="sx-field">
@@ -3559,8 +3582,10 @@
         <div class="saved-flash" id="settings-flash"></div>
       </div>
     </div>
+    </div>
 
     <!-- ============ 2 · thư viện: mở khi cần ============ -->
+    <div class="sx-tabpage" data-cat="library" style="display:none">
     <div class="sx-lbl">Library</div>
     <div class="sx-card">
 
@@ -3660,8 +3685,10 @@
       </details>
 
     </div>
+    </div>
 
     <!-- ============ 3 · sao lưu ============ -->
+    <div class="sx-tabpage" data-cat="backup" style="display:none">
     <div class="sx-lbl">Backup</div>
     <div class="sx-card">
       <div class="sx-row">
@@ -3684,8 +3711,10 @@
       <input id="import-file" type="file" accept="application/json,.json" style="display:none"/>
       <p class="sx-hint" style="margin:12px 2px 0">The activity log keeps roughly the last 2,500 events — older history is already gone.</p>
     </div>
+    </div>
 
     <!-- ============ 4 · thiết bị, và các hành động không hoàn tác được ============ -->
+    <div class="sx-tabpage" data-cat="device" style="display:none">
     <div class="sx-lbl">Device</div>
     <div class="sx-card">
       <div class="sx-row">
@@ -3714,6 +3743,7 @@
         <button class="btn ghost sm danger" id="restart-story-btn" style="margin-top:0">Restart</button>
       </div>
       <div class="saved-flash" id="restart-story-flash"></div>
+    </div>
     </div>
 
     <p class="status" style="margin-top:26px">Focci · runs 100% on your device<br/><b id="app-version" style="color:var(--primary)">v78. 09.11.2026 - Focci&rsquo;s Learning App</b></p>
