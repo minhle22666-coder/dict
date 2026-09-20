@@ -2233,6 +2233,26 @@
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media (max-width:340px){ .gm-card-s{display:none} }
 
+  /* "Explore in 3D" reuses .gm-card for its border/shadow language but is a single
+     full-width row, not a grid photo-tile — so it needs its own sizing (no 7:8
+     aspect-ratio) and its own overlay-free background, plus text lifted above
+     .gm-card::before's dark gradient (that gradient is what was swallowing the
+     plain "🌍 Explore in 3D" text before, leaving what looked like an empty box). */
+  .fw-explore-btn{aspect-ratio:unset;flex-direction:row;align-items:center;justify-content:flex-start;
+    gap:12px;padding:14px 16px;margin-bottom:4px;
+    background:linear-gradient(100deg,#1c2b3d 0%,#243b52 100%);
+    border-color:color-mix(in srgb, var(--primary) 45%, transparent)}
+  .fw-explore-btn::before{content:none}
+  .fw-explore-btn:active{transform:scale(.98)}
+  .fw-explore-ico{position:relative;z-index:2;flex:none;width:38px;height:38px;border-radius:50%;
+    background:var(--grad-hero);color:var(--on-hero);display:flex;align-items:center;justify-content:center;
+    font-size:17px;box-shadow:var(--glow)}
+  .fw-explore-txt{position:relative;z-index:2;flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .fw-explore-t{font-size:14px;font-weight:800;letter-spacing:-.01em;color:#fff;
+    text-shadow:0 1px 6px rgba(0,0,0,.5)}
+  .fw-explore-s{font-size:10.5px;color:rgba(255,255,255,.8);text-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .fw-explore-arrow{position:relative;z-index:2;flex:none;font-size:16px;font-weight:800;color:rgba(255,255,255,.85)}
+
   .gm-bonus{display:flex;align-items:center;gap:12px;padding:14px 15px;
     border-radius:18px;background:var(--surface);border:1px dashed var(--line)}
   .gm-bonus.is-open{border-style:solid;border-color:var(--primary);background:var(--primary-bg)}

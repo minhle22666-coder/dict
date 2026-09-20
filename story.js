@@ -2118,7 +2118,11 @@ function renderWorldMap(){
   h+='</div>';
 
   h+='<button class="gm-card fw-explore-btn" onclick="openFocciWorld3D()">'
-    +'🌍 Explore in 3D</button>';
+    +'<span class="fw-explore-ico">🌍</span>'
+    +'<span class="fw-explore-txt"><span class="fw-explore-t">Explore in 3D</span>'
+    +'<span class="fw-explore-s">Walk around this land yourself</span></span>'
+    +'<span class="fw-explore-arrow">→</span>'
+    +'</button>';
 
   return h;
 }
