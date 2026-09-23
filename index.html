@@ -926,50 +926,66 @@
      whatever the total scroll height ends up being.
      ============================================================ */
   .su-page{background:#0d2622;border-radius:var(--r);padding:14px 14px 4px;margin:0 -2px;color:#F3F7F5}
-  .su-hero{position:relative;overflow:hidden;display:flex;align-items:center;gap:10px;padding:16px 100px 16px 18px;
-    margin-bottom:16px;border-radius:22px;min-height:104px;
+  /* Speak Up is its own mint/emerald identity, deliberately different from
+     the violet accent the other 3 dashboard panels got — a prior pass
+     wrongly let the dashboard-wide violet override (body .view.fw-panel)
+     bleed into here too, since .su-page lives inside that same panel.
+     Re-declaring the tokens every button/slider on this screen actually
+     reads (--grad-hero) at equal-or-higher specificity, placed after that
+     rule in the file, wins it back to mint for Speak Up only. */
+  body .view.fw-panel .su-page{
+    --p1:#22D3A8; --p2:#0DA678; --primary:#6EEFC0;
+    --grad-hero:linear-gradient(135deg,#22D3A8,#0DA678)}
+  body .view.fw-panel .su-page .btn:not(.ghost){
+    background:linear-gradient(135deg, rgba(34,211,168,.62), rgba(13,166,120,.62))}
+  .su-hero{position:relative;overflow:visible;display:flex;align-items:flex-start;gap:10px;padding:18px 100px 18px 20px;
+    margin-bottom:20px;border-radius:24px;min-height:110px;
     background:linear-gradient(155deg,rgba(20,46,42,.92),rgba(10,26,24,.94));
     border:1px solid rgba(255,255,255,.14);box-shadow:0 14px 30px rgba(0,0,0,.35)}
+  .su-hero-spark{position:absolute;font-size:15px;color:#8CF0D8;opacity:.8;pointer-events:none}
+  .su-hero-spark.a{top:-8px;left:26px;transform:rotate(-12deg)}
+  .su-hero-spark.b{top:-4px;right:96px;color:#9AB4FF;transform:rotate(10deg)}
   .su-hero-txt{position:relative;z-index:1}
-  .su-hero-t{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.01em}
+  .su-hero-t{font-size:23px;font-weight:800;color:#fff;letter-spacing:-.01em}
   .su-hero-txt p{margin:6px 0 0;font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.82);max-width:420px}
-  .su-hero-focci{position:absolute;right:6px;bottom:0;height:96%;max-height:118px;width:auto;z-index:1;
+  .su-hero-focci{position:absolute;right:0;bottom:0;height:128%;max-height:150px;width:auto;z-index:1;
     filter:drop-shadow(0 8px 12px rgba(0,0,0,.4));animation:sway 5s ease-in-out infinite}
-  .su-hero-compact{min-height:0;padding:12px 16px;flex-direction:row;align-items:center;justify-content:space-between}
+  .su-hero-compact{min-height:0;padding:12px 16px;flex-direction:row;align-items:center;justify-content:space-between;
+    overflow:hidden}
   .su-hero-compact .su-hero-t{font-size:16px}
   .su-progress{font-size:12px;font-weight:700;color:rgba(255,255,255,.75)}
   .su-progress b{color:#fff;font-size:14px;margin:0 2px}
 
-  .su-slider-row{display:flex;align-items:center;justify-content:space-between;padding:0 4px;margin-bottom:6px;
+  .su-slider-row{display:flex;align-items:center;justify-content:space-between;padding:0 4px;margin-bottom:8px;
     font-size:13px;font-weight:700;color:rgba(255,255,255,.85)}
   .su-slider-row b{font-size:16px;color:#fff}
-  .su-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;margin-bottom:18px;
-    background:rgba(255,255,255,.22);outline:none}
-  .su-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;
-    background:var(--grad-hero);box-shadow:0 0 0 4px rgba(255,255,255,.15),0 4px 10px rgba(0,0,0,.4);cursor:pointer}
-  .su-slider::-moz-range-thumb{width:22px;height:22px;border:0;border-radius:50%;background:var(--grad-hero);
-    box-shadow:0 0 0 4px rgba(255,255,255,.15),0 4px 10px rgba(0,0,0,.4);cursor:pointer}
+  .su-slider{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:99px;margin-bottom:20px;
+    background:rgba(255,255,255,.2);outline:none}
+  .su-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+    background:var(--grad-hero);box-shadow:0 0 0 4px rgba(255,255,255,.12),0 4px 10px rgba(0,0,0,.4);cursor:pointer}
+  .su-slider::-moz-range-thumb{width:18px;height:18px;border:0;border-radius:50%;background:var(--grad-hero);
+    box-shadow:0 0 0 4px rgba(255,255,255,.12),0 4px 10px rgba(0,0,0,.4);cursor:pointer}
 
-  .su-scene{position:relative;overflow:hidden;min-height:260px;padding:16px 16px 76px;margin-bottom:14px;
+  .su-scene{position:relative;overflow:hidden;min-height:230px;padding:18px 16px 76px;margin-bottom:14px;
     border-radius:22px;background-image:url('./bg-speakup-village.webp'),linear-gradient(160deg,#1c463f,#0a2320);
     background-size:cover;background-position:top center;background-repeat:no-repeat;
     border:1px solid rgba(255,255,255,.14);box-shadow:0 14px 30px rgba(0,0,0,.35)}
   .su-scene::before{content:'';position:absolute;inset:0;z-index:0;
-    background:linear-gradient(180deg,rgba(6,20,18,.15) 0%,rgba(6,20,18,.55) 60%,rgba(6,20,18,.85) 100%)}
-  .su-top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-  .su-topic{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#fff;
-    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:6px 12px;
-    backdrop-filter:blur(8px)}
-  .su-reward{font-size:12.5px;font-weight:800;color:#FFE9A8;text-shadow:0 1px 4px rgba(0,0,0,.5);
+    background:linear-gradient(180deg,rgba(6,20,18,.1) 0%,rgba(6,20,18,.5) 55%,rgba(6,20,18,.85) 100%)}
+  .su-context{position:relative;z-index:1;font-size:13px;line-height:1.5;color:rgba(255,255,255,.85);
+    margin:0 0 14px;max-width:80%}
+  .su-mission{position:relative;z-index:1;display:flex;align-items:flex-start;gap:10px;
+    font-size:14.5px;font-weight:700;line-height:1.55;color:#fff;
+    padding:14px 16px;border-radius:16px;max-width:90%;
+    background:rgba(10,28,25,.6);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(6px)}
+  .su-quote-mark{flex:none;font-size:26px;font-weight:800;color:#6EEFC0;
+    font-family:Georgia,serif;line-height:1;margin-top:-2px}
+  .su-mission-body{flex:1;min-width:0}
+  .su-mission-foot{display:flex;align-items:center;gap:6px;margin-top:10px;justify-content:flex-end}
+  .su-reward{font-size:12px;font-weight:800;color:#FFE9A8;text-shadow:0 1px 4px rgba(0,0,0,.5);
     transition:transform .2s}
   .su-reward.got{color:#8CF0B0;animation:sy-got .5s ease}
-  .su-context{position:relative;z-index:1;font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.82);
-    margin-bottom:10px;max-width:82%}
-  .su-mission{position:relative;z-index:1;font-size:15px;font-weight:700;line-height:1.55;color:#fff;
-    padding:14px 16px 14px 34px;border-radius:16px;max-width:88%;
-    background:rgba(10,28,25,.55);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(6px)}
-  .su-quote-mark{position:absolute;left:10px;top:2px;font-size:34px;font-weight:800;color:rgba(255,255,255,.35);
-    font-family:Georgia,serif;line-height:1}
+  .su-mission-moon{font-size:13px;opacity:.85}
   .su-focci{position:absolute;right:8px;bottom:0;z-index:1;height:150px;width:auto;
     filter:drop-shadow(0 10px 14px rgba(0,0,0,.45));animation:sway 5s ease-in-out infinite}
   .su-focci.hop{animation:sy-hop .6s ease}

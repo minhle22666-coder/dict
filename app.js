@@ -4565,7 +4565,8 @@ function renderSpeakUpIntro(){
   speakUpTotal=loadSpeakUpTotal();
   let h=gameSwitch();
   h+='<div class="su-page su-intro">';
-  h+='<div class="su-hero"><div class="su-hero-txt"><div class="su-hero-t">Speak Up</div>'
+  h+='<div class="su-hero"><span class="su-hero-spark a">✦</span><span class="su-hero-spark b">✧</span>'
+    +'<div class="su-hero-txt"><div class="su-hero-t">Speak Up</div>'
     +'<p>Welcome to Speak Up! Just read the scenario, type your best English translation and our AI will give you instant feedback with native tips.</p></div>'
     +'<img class="su-hero-focci" src="./mascot-badass.webp" alt="" onerror="this.style.visibility=\'hidden\'"/></div>';
   h+='<div class="su-slider-row"><span>Number of questions</span><b id="su-total-label">'+speakUpTotal+'</b></div>';
@@ -4616,13 +4617,15 @@ function genSpeakUpPrompt(topicKey){
   const topic=WRITE_TOPICS[topicKey]||WRITE_TOPICS.casual;
   return 'You write ONE short roleplay scenario for a Vietnamese learner practicing SPOKEN English.\n\n'
   +'TOPIC: '+topic.label+'\n\n'
-  +'Write a Vietnamese sentence a real person would actually SAY OUT LOUD in this situation (spoken register, not written/formal) — '
-  +'two clauses with a little real texture (a reason, a small aside, a softener), not a bare one-line command. It should be meaningfully '
-  +'longer and more specific than a textbook example sentence.\n\n'
-  +'Then write ONE short English sentence describing WHO is speaking to WHOM and WHY, in neutral terms only.\n\n'
-  +'CRITICAL: that English sentence must NEVER contain, or closely paraphrase, any of the specific words/idioms an ideal '
-  +'English translation of the Vietnamese sentence would use — it only sets up who/where/why. A learner reading ONLY the '
-  +'English sentence should not be able to guess the target phrasing at all.\n\n'
+  +'"vi" must be a real little SPEECH, not a single short clause — always TWO sentences:\n'
+  +'  Sentence 1: the actual thing said out loud to the other person (can itself have 2 clauses — an ask/warning plus a softener like "cho ... hơn", "được không", "nhé").\n'
+  +'  Sentence 2: a SEPARATE short sentence giving the reason/explanation why, usually starting with "Vì..." — this is what makes it a real spoken moment, not a textbook line.\n'
+  +'Match this length and shape exactly (topic/content must be DIFFERENT from this example, only the shape/length matters):\n'
+  +'  vi: "Chào anh, tôi không muốn anh vô tình bị cửa đập vào người, anh có thể đứng lên bậc này cho an toàn hơn. Vì xe bus này là xe cũ nên cơ chế đóng cửa không an toàn."\n'
+  +'  context: "You see a foreigner standing near the bus door and remind him."\n\n'
+  +'"context" is ONE short English sentence (10-14 words) describing WHO is speaking to WHOM and WHY, in neutral terms only — '
+  +'CRITICAL: it must NEVER contain, or closely paraphrase, any of the specific words/idioms an ideal English translation of "vi" '
+  +'would use. A learner reading ONLY "context" should not be able to guess the target phrasing at all — it sets up the scene, nothing more.\n\n'
   +'Return ONLY this JSON: {"context":"...", "vi":"..."}';
 }
 async function askGenSpeakUpScenario(topicKey){
@@ -4742,11 +4745,11 @@ function renderWrite(){
     area.innerHTML=h;
     return;
   }
-  const topic=WRITE_TOPICS[writeCur.topic]||{label:'Practice',icon:'✨',color:'blue'};
-  h+='<div class="su-scene"><div class="su-top"><div class="su-topic"><span>'+topic.icon+'</span>'+esc(topic.label)+'</div>'
-    +'<span class="su-reward'+(writeResult?' got':'')+'">'+(writeResult?'✓ ':'⚡ ')+'+5 XP</span></div>';
+  h+='<div class="su-scene">';
   h+='<div class="su-context">'+esc(writeCur.context)+'</div>';
-  h+='<div class="su-mission"><span class="su-quote-mark">“</span>'+esc(writeCur.vi)+'</div>';
+  h+='<div class="su-mission"><span class="su-quote-mark">“</span><div class="su-mission-body">'+esc(writeCur.vi)
+    +'<div class="su-mission-foot"><span class="su-reward'+(writeResult?' got':'')+'">'+(writeResult?'✓ ':'⚡ ')+'+5 XP</span>'
+    +'<span class="su-mission-moon">\u{1F319}</span></div></div></div>';
   h+='<img class="su-focci'+(writeResult?' hop':'')+'" src="./'+writeScene.pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>';
   h+='</div>';
   h+='<div class="su-body">';
