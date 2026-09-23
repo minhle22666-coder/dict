@@ -3851,19 +3851,25 @@ async function renderSaySaved(box, head, stale){
         +(vm?'<div class="write-fb-v"><span class="write-fb-ico">'+vm.ico+'</span>'+vm.lbl+'</div>':'')
         +(a.fb?'<div class="write-fb-t">'+esc(a.fb)+'</div>':'')+'</div>';
     }
-    const alts=Array.isArray(a.alts)?a.alts.filter(x=>x&&x.en):[];
-    if(alts.length){
-      h+='<div class="write-alts"><div class="write-alts-h">\u2728 Other natural ways to say it</div>';
-      alts.forEach((x,i)=>{
-        h+='<div class="write-alt"><span class="write-alt-n">'+(i+1)+'</span><div class="write-alt-body">'
-          +'<div class="write-alt-en">'+esc(x.en)+'</div>'
-          +(x.why?'<div class="write-alt-w">'+esc(x.why)+'</div>':'')+'</div></div>';
+    const mistakes=Array.isArray(a.mistakes)?a.mistakes.filter(x=>x&&(x.wrong||x.right)):[];
+    if(mistakes.length){
+      h+='<ul class="su-mistakes">';
+      mistakes.forEach(m=>{
+        h+='<li><b class="wrong">'+esc(m.wrong||'')+'</b> \u2192 <b class="ok">'+esc(m.right||'')+'</b>'
+          +(m.note?' <span>('+esc(m.note)+')</span>':'')+'</li>';
       });
+      h+='</ul>';
+    }
+    if(a.fixed || a.natural){
+      h+='<div class="write-alts">';
+      if(a.fixed) h+='<div class="write-alt'+(a.liked==='fixed'?' liked':'')+'"><span class="write-alt-n">\u2b50</span>'
+        +'<div class="write-alt-body"><div class="write-alt-en">'+esc(a.fixed)+'</div></div></div>';
+      if(a.natural) h+='<div class="write-alt'+(a.liked==='natural'?' liked':'')+'"><span class="write-alt-n">\u{1F319}</span>'
+        +'<div class="write-alt-body"><div class="write-alt-en">'+esc(a.natural)+'</div></div></div>';
       h+='</div>';
     }
-    const canRetry=WRITE_PROMPTS.some(p=>p.id===a.pid);
     h+='<div class="sy-acts">'
-      +(canRetry?'<button class="go" onclick="sayRetry(\''+esc(a.pid)+'\')">Try this one again</button>':'')
+      +'<button class="go" onclick="sayRetry(\''+id+'\')">Try this one again</button>'
       +'<button class="rm" onclick="sayRemove(\''+id+'\')">Remove</button></div>';
     h+='</div></div>';
   }
@@ -3874,11 +3880,17 @@ window.sayRemove=function(id){
   toast('Removed');
   renderSaved();
 };
-window.sayRetry=function(pid){
-  const p=WRITE_PROMPTS.find(x=>x.id===pid); if(!p) return;
+window.sayRetry=function(id){
+  // The scenario itself is saved right on the history record now (AI-generated
+  // scenarios don't live in a static bank to look up by id like the old ones did).
+  const a=sayLoad().find(x=>x.id===id); if(!a) return;
   showView('review');
-  practiceMode='write'; practiceStage='playing';
-  writeCur=p; writeBusy=false; writeResult=null; writeAnswer='';
+  practiceMode='write';
+  window.__sayItActive=true;
+  speakUpStage='playing'; practiceStage='playing';
+  speakUpIndex=1; speakUpTotal=1; speakUpScore=0;   // a retry is its own standalone one-question round
+  writeCur={ id:'retry_'+id, topic:a.topic, context:a.ctx, vi:a.vi, ai:true };
+  writeBusy=false; writeResult=null; writeAnswer=''; writeLiked=null; writeSavedId=null;
   writeScene=newWriteScene();
   renderWrite();
 };
@@ -4008,7 +4020,8 @@ let practiceStage='setup';   // 'setup' | 'playing'
 let dueReviewMode=false;
 function setPracticeMode(m){
   practiceMode=m; practiceStage='setup';
-  if(m==='write'){ startWrite(); return; }
+  if(m==='write'){ window.__sayItActive=true; renderSpeakUpIntro(); return; }
+  window.__sayItActive=false;
   renderPracticeSetup();
 }
 window.setPracticeMode=setPracticeMode;
@@ -4522,21 +4535,134 @@ function pickWritePrompt(){
   return pool[Math.floor(Math.random()*pool.length)];
 }
 
-let writeCur=null, writeBusy=false, writeResult=null, writeScene=null, writeAnswer='';
+let writeCur=null, writeBusy=false, writeResult=null, writeScene=null, writeAnswer='', writeLiked=null, writeSavedId=null;
 function newWriteScene(){
-  return { bg:pickSceneBgs(1)[0], pose:pickScenePose('say', writeScene&&writeScene.pose) };
+  // Speak Up now has its own fixed backdrop (bg-speakup-village.webp, set
+  // in CSS) instead of a random one — only the mascot pose still rotates.
+  return { pose:pickScenePose('say', writeScene&&writeScene.pose) };
 }
-function startWrite(){
+
+/* ============================================================
+   SPEAK UP SESSION — a real round now: pick a question count (5-30,
+   remembered across sessions), play exactly that many, then a summary
+   screen. The old version had no limit at all beyond a cosmetic "5/day"
+   dot tracker that never actually stopped play.
+   ============================================================ */
+const SPEAKUP_TOTAL_LS='fc_speakup_total';
+let speakUpStage='intro', speakUpTotal=10, speakUpIndex=0, speakUpScore=0;
+function loadSpeakUpTotal(){
+  const v=parseInt(localStorage.getItem(SPEAKUP_TOTAL_LS),10);
+  return (v>=5 && v<=30) ? v : 10;
+}
+window.setSpeakUpTotal=function(n){
+  speakUpTotal=Math.max(5,Math.min(30,parseInt(n,10)||10));
+  try{ localStorage.setItem(SPEAKUP_TOTAL_LS, String(speakUpTotal)); }catch(e){}
+  const lab=$('#su-total-label'); if(lab) lab.textContent=speakUpTotal;
+};
+function renderSpeakUpIntro(){
+  const area=$('#review-area'); if(!area) return;
+  speakUpStage='intro';
+  speakUpTotal=loadSpeakUpTotal();
+  let h=gameSwitch();
+  h+='<div class="su-page su-intro">';
+  h+='<div class="su-hero"><div class="su-hero-txt"><div class="su-hero-t">Speak Up</div>'
+    +'<p>Welcome to Speak Up! Just read the scenario, type your best English translation and our AI will give you instant feedback with native tips.</p></div>'
+    +'<img class="su-hero-focci" src="./mascot-badass.webp" alt="" onerror="this.style.visibility=\'hidden\'"/></div>';
+  h+='<div class="su-slider-row"><span>Number of questions</span><b id="su-total-label">'+speakUpTotal+'</b></div>';
+  h+='<input class="su-slider" type="range" min="5" max="30" step="1" value="'+speakUpTotal+'" oninput="setSpeakUpTotal(this.value)"/>';
+  h+='<button class="btn" onclick="startSpeakUpRound()">Start</button>';
+  h+='</div>';
+  area.innerHTML=h;
+}
+window.renderSpeakUpIntro=renderSpeakUpIntro;
+window.startSpeakUpRound=function(){
+  speakUpIndex=0; speakUpScore=0; speakUpStage='playing';
+  window.__sayItActive=true;
+  startWrite();
+};
+function speakUpRoundDoneHtml(){
+  const score=Math.round(speakUpScore*10)/10, total=speakUpTotal;
+  const perfect=score>=total;
+  const pose=perfect?'champion':(score>=total/2?'jump':'run_and_think');
+  const say=perfect?'A flawless round! Every single one.'
+    :(score>=total/2?'Good round! Keep it up.':"Every explorer stumbles. Let's go again.");
+  const pct=total?Math.round(score/total*100):0;
+  return '<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+    +'<div class="speech big">'+esc(say)+'</div>'
+    +'<div class="rd-score">'+score+' <span>/ '+total+'</span></div>'
+    +'<div class="rd-ring"><i style="width:'+pct+'%"></i></div>'
+    +'<div class="rd-sub">'+pct+'% strong answers</div></div>'
+    +'<button class="btn" onclick="renderSpeakUpIntro()">Play again</button>';
+}
+window.finishSpeakUpRound=function(){
+  speakUpStage='done';
+  window.__sayItActive=false;
+  renderWrite();
+};
+
+/* ---------- scenario generation — AI writes a fresh one each question ----------
+   Old version picked from 20 hardcoded sentences forever ("too short, too
+   easy to guess from the English context hint"). The prompt below both
+   asks for a longer/richer Vietnamese sentence AND explicitly forbids the
+   English scene-setting line from leaking the target vocabulary. Falls
+   back to the old static bank (still kept, just demoted to a fallback) if
+   there's no key / no connection / the AI call hiccups — the round should
+   never just break. */
+function pickSpeakUpTopic(avoid){
+  const keys=Object.keys(WRITE_TOPICS).filter(k=>k!==avoid);
+  return pick(keys.length?keys:Object.keys(WRITE_TOPICS));
+}
+function genSpeakUpPrompt(topicKey){
+  const topic=WRITE_TOPICS[topicKey]||WRITE_TOPICS.casual;
+  return 'You write ONE short roleplay scenario for a Vietnamese learner practicing SPOKEN English.\n\n'
+  +'TOPIC: '+topic.label+'\n\n'
+  +'Write a Vietnamese sentence a real person would actually SAY OUT LOUD in this situation (spoken register, not written/formal) — '
+  +'two clauses with a little real texture (a reason, a small aside, a softener), not a bare one-line command. It should be meaningfully '
+  +'longer and more specific than a textbook example sentence.\n\n'
+  +'Then write ONE short English sentence describing WHO is speaking to WHOM and WHY, in neutral terms only.\n\n'
+  +'CRITICAL: that English sentence must NEVER contain, or closely paraphrase, any of the specific words/idioms an ideal '
+  +'English translation of the Vietnamese sentence would use — it only sets up who/where/why. A learner reading ONLY the '
+  +'English sentence should not be able to guess the target phrasing at all.\n\n'
+  +'Return ONLY this JSON: {"context":"...", "vi":"..."}';
+}
+async function askGenSpeakUpScenario(topicKey){
+  if(!getKey() || !navigator.onLine) return pickWritePrompt();
+  try{
+    const model=getModel();
+    const prompt=genSpeakUpPrompt(topicKey);
+    const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(getKey())}`;
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
+        generationConfig:{temperature:0.95,maxOutputTokens:400,responseMimeType:'application/json'}})});
+    if(!r.ok) throw new Error('HTTP_'+r.status);
+    const j=await r.json();
+    let txt=(j.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+    txt=txt.replace(/```json|```/g,'').trim();
+    const s=txt.indexOf('{'), e=txt.lastIndexOf('}');
+    if(s<0||e<0) throw new Error('BAD_JSON');
+    const data=JSON.parse(txt.slice(s,e+1));
+    if(!data.vi || !data.context) throw new Error('EMPTY');
+    return { id:'ai_'+now().toString(36)+Math.random().toString(36).slice(2,5), topic:topicKey,
+      context:String(data.context), vi:String(data.vi), ai:true };
+  }catch(e){
+    return pickWritePrompt();   // AI hiccup — never let the round just break
+  }
+}
+
+async function startWrite(){
   practiceStage='playing';
-  writeCur=pickWritePrompt();
-  writeBusy=false; writeResult=null; writeAnswer='';
-  writeScene=newWriteScene();
+  speakUpIndex++;
+  writeBusy=true; writeResult=null; writeAnswer=''; writeLiked=null; writeSavedId=null;
+  writeCur=null;
+  renderWrite();   // writeCur is null here — shows the "thinking up a scenario" loading state
+  const topicKey=pickSpeakUpTopic(writeCur&&writeCur.topic);
+  const p=await askGenSpeakUpScenario(topicKey);
+  writeCur=p;
+  writeBusy=false;
+  if(!writeScene) writeScene=newWriteScene();
   renderWrite();
 }
 window.startWrite=startWrite;
-
-const SAY_DAILY_GOAL=5;
-function sayToday(){ const d0=dayStart(now()); return sayLoad().filter(a=>a.ts>=d0).length; }
 /* Đếm từ trực tiếp + chỉ bật nút Check khi đã gõ gì đó (nút xám → sáng lên là một
    tín hiệu nhỏ "sẵn sàng"). */
 function syInput(el){
@@ -4551,36 +4677,102 @@ function syInput(el){
 }
 window.syInput=syInput;
 
+/* ---------- 3-level mistake highlighting on the learner's own sentence ----------
+   level 1 = correct & natural, level 2 = grammatically fine but a native
+   wouldn't phrase it that way, level 3 = wrong/confusing — struck through,
+   immediately followed by the AI's fix in green+bold. */
+function speakUpSegmentsHtml(segments){
+  const segs=Array.isArray(segments)?segments:[];
+  if(!segs.length) return '';
+  let h='<div class="su-diff">';
+  segs.forEach(seg=>{
+    const text=String(seg&&seg.text||'');
+    if(!text.trim()) return;
+    const lvl=seg.level===3?3:(seg.level===2?2:1);
+    if(lvl===3){
+      h+='<span class="su-seg su-seg-3">'+esc(text)+'</span> ';
+      if(seg.fix) h+='<span class="su-fix">'+esc(seg.fix)+'</span> ';
+    }else if(lvl===2){
+      h+='<span class="su-seg su-seg-2">'+esc(text)+'</span> ';
+    }else{
+      h+='<span class="su-seg su-seg-1">'+esc(text)+'</span> ';
+    }
+  });
+  h+='</div>';
+  return h;
+}
+function speakUpMistakesHtml(mistakes){
+  const list=(Array.isArray(mistakes)?mistakes:[]).filter(m=>m&&(m.wrong||m.right));
+  if(!list.length) return '';
+  let h='<ul class="su-mistakes">';
+  list.forEach(m=>{
+    h+='<li><b class="wrong">'+esc(m.wrong||'')+'</b> → <b class="ok">'+esc(m.right||'')+'</b>'
+      +(m.note?' <span>('+esc(m.note)+')</span>':'')+'</li>';
+  });
+  h+='</ul>';
+  return h;
+}
+window.pickSpeakUpAnswer=function(kind){
+  if(!writeResult) return;
+  writeLiked=kind;
+  const headline=kind==='fixed'?writeResult.fixed_sentence:writeResult.natural_sample;
+  if(writeSavedId){
+    const list=sayLoad();
+    const rec=list.find(x=>x.id===writeSavedId);
+    if(rec){ rec.you=String(headline||rec.you); rec.liked=kind; saySave(list); }
+  }
+  renderWrite();
+};
+
 function renderWrite(){
   const area=$('#review-area'); if(!area) return;
-  if(!writeCur){ startWrite(); return; }
+  if(speakUpStage==='intro'){ renderSpeakUpIntro(); return; }
+  if(speakUpStage==='done'){
+    area.innerHTML=gameSwitch()+'<div class="su-page">'+speakUpRoundDoneHtml()+'</div>';
+    return;
+  }
   if(!writeScene) writeScene=newWriteScene();
-  const topic=WRITE_TOPICS[writeCur.topic]||{label:'Practice',icon:'\u2728',color:'blue'};
-  const done=sayToday();
-  const dots=Array.from({length:SAY_DAILY_GOAL},(_,i)=>'<i class="'+(i<done?'on':'')+'"></i>').join('');
   let h=gameSwitch();
-  h+='<div class="sy-page">';
-  h+='<div class="sy-daily"><span>Sentences today<b>'+Math.min(done,SAY_DAILY_GOAL)+'/'+SAY_DAILY_GOAL+'</b></span>'
-    +'<span class="sy-dots">'+dots+'</span></div>';
-  /* Cảnh: nền ngẫu nhiên, chip chủ đề + chip thưởng, Focci đứng cạnh bong bóng tình huống. */
-  h+='<div class="sy-scene" style="'+sceneBgStyle(writeScene.bg)+'"><span class="sy-scrim"></span>'
-    +'<div class="sy-top"><div class="sy-topic"><span>'+topic.icon+'</span>'+esc(topic.label)+'</div>'
-    +'<span class="sy-reward'+(writeResult?' got':'')+'">'+(writeResult?'\u2713 ':'\u26A1 ')+'+2 XP</span></div>'
-    +'<div class="sy-stage"><div class="sy-bubble">'+esc(writeCur.context)+'</div>'
-    +'<img class="sy-focci'+(writeResult?' hop':'')+'" src="./'+writeScene.pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/></div></div>';
-  /* Thẻ nhiệm vụ: câu tiếng Việt nổi đè lên mép cảnh. */
-  h+='<div class="sy-mission sy-m-'+topic.color+(writeResult?' compact':'')+'">'+esc(writeCur.vi)+'</div>';
-  h+='<div class="sy-body">';
+  h+='<div class="su-page">';
+  h+='<div class="su-hero su-hero-compact"><div class="su-hero-t">Speak Up</div>'
+    +'<div class="su-progress"><span>Question</span> <b>'+speakUpIndex+'</b> <span>/ '+speakUpTotal+'</span></div></div>';
+  if(!writeCur){
+    h+='<div class="su-loading"><img src="./mascot-wonder.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+      +'<p>Focci is thinking up a scenario…</p></div></div>';
+    area.innerHTML=h;
+    return;
+  }
+  const topic=WRITE_TOPICS[writeCur.topic]||{label:'Practice',icon:'✨',color:'blue'};
+  h+='<div class="su-scene"><div class="su-top"><div class="su-topic"><span>'+topic.icon+'</span>'+esc(topic.label)+'</div>'
+    +'<span class="su-reward'+(writeResult?' got':'')+'">'+(writeResult?'✓ ':'⚡ ')+'+5 XP</span></div>';
+  h+='<div class="su-context">'+esc(writeCur.context)+'</div>';
+  h+='<div class="su-mission"><span class="su-quote-mark">“</span>'+esc(writeCur.vi)+'</div>';
+  h+='<img class="su-focci'+(writeResult?' hop':'')+'" src="./'+writeScene.pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>';
+  h+='</div>';
+  h+='<div class="su-body">';
   if(!writeResult){
     h+='<div class="sy-input"><textarea id="write-input" class="write-input" rows="3" placeholder="Type it in English…" '
       +'autocapitalize="sentences" autocorrect="off" spellcheck="false" oninput="syInput(this)"></textarea>'
       +'<span class="sy-count" id="sy-count">0 words</span></div>';
     h+='<button class="btn" id="write-check" disabled onclick="submitWrite()">Check it</button>';
   }else{
-    h+='<div class="sy-you"><span>You wrote</span><p>'+esc(writeAnswer)+'</p></div>';
-    h+=writeResultHtml(writeResult);
-    h+='<button class="btn" onclick="startWrite()">Next sentence</button>';
-    h+='<button class="sy-saved-link" onclick="openSaySaved()">Saved under <b>Say it</b> in Saved \u2197</button>';
+    h+='<div class="su-coach"><img src="./mascot-investigate.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+      +'<div><b>Coach’s Feedback:</b> '+esc(writeResult.feedback_vi||'')+'</div></div>';
+    h+='<div class="su-feedback">';
+    h+=speakUpSegmentsHtml(writeResult.segments);
+    h+=speakUpMistakesHtml(writeResult.mistakes);
+    h+='<div class="su-ans-box su-ans-fixed'+(writeLiked==='fixed'?' picked':'')+'">'
+      +'<button class="su-ans-pick" onclick="pickSpeakUpAnswer(\'fixed\')"><span class="su-ans-ico">⭐</span>'
+      +'<span class="su-ans-lbl">Nếu theo câu của bạn thì bạn nên nói:</span></button>'
+      +'<div class="su-tappable su-ans-text">'+tokenizeForTap(writeResult.fixed_sentence||'')+'</div></div>';
+    h+='<div class="su-ans-box su-ans-natural'+(writeLiked==='natural'?' picked':'')+'">'
+      +'<button class="su-ans-pick" onclick="pickSpeakUpAnswer(\'natural\')"><span class="su-ans-ico">\u{1F319}</span>'
+      +'<span class="su-ans-lbl">Còn đây là cách của Focci nếu bạn thích tự nhiên hơn:</span></button>'
+      +'<div class="su-tappable su-ans-text">'+tokenizeForTap(writeResult.natural_sample||'')+'</div></div>';
+    h+='</div>';
+    const isLast=speakUpIndex>=speakUpTotal;
+    h+='<button class="btn" onclick="'+(isLast?'finishSpeakUpRound()':'startWrite()')+'">'+(isLast?'Finish round':'Next question')+'</button>';
+    h+='<button class="sy-saved-link" onclick="openSaySaved()">Saved under <b>Say it</b> in Saved ↗</button>';
   }
   h+='</div></div>';
   area.innerHTML=h;
@@ -4591,66 +4783,66 @@ function renderWrite(){
     }); }
   }else{
     if(writeResult.verdict==='good'){
-      const card=area.querySelector('.sy-mission');
+      const card=area.querySelector('.su-mission');
       if(card) confettiBurst(card, 28);
     }
-    /* Kết quả nằm dưới thẻ đề bài — tự cuộn tới nhận xét để thấy ngay, khỏi phải tìm. */
-    const fb=area.querySelector('.write-fb');
+    const fb=area.querySelector('.su-feedback');
     if(fb) setTimeout(()=>{ try{ fb.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} }, 120);
   }
 }
 window.renderWrite=renderWrite;
 
-function writeResultHtml(result){
-  const v=result.verdict==='good'?'good':(result.verdict==='off'?'off':'close');
-  const icon=v==='good'?'\u{1F31F}':(v==='off'?'\u{1F914}':'\u{1F642}');
-  const label=v==='good'?'Sounds natural!':(v==='off'?"Let's adjust this":'Close — small tweak');
-  let h='<div class="write-fb write-fb-'+v+'">';
-  h+='<div class="write-fb-v"><span class="write-fb-ico">'+icon+'</span>'+label+'</div>';
-  if(result.feedback_vi) h+='<div class="write-fb-t">'+esc(result.feedback_vi)+'</div>';
-  h+='</div>';
-  const alts=Array.isArray(result.natural_alternatives)?result.natural_alternatives:[];
-  const goodAlts=alts.filter(a=>a&&a.en);
-  if(goodAlts.length){
-    h+='<div class="write-alts"><div class="write-alts-h">\u2728 Other natural ways to say it</div>';
-    goodAlts.forEach((a,i)=>{
-      h+='<div class="write-alt" style="animation-delay:'+(i*90)+'ms"><span class="write-alt-n">'+(i+1)+'</span>'
-        +'<div class="write-alt-body"><div class="write-alt-en">'+esc(a.en)+'</div>'
-        +(a.why_vi?'<div class="write-alt-w">'+esc(a.why_vi)+'</div>':'')+'</div></div>';
-    });
-    h+='</div>';
-  }
-  return h;
-}
-
-function gradeWritePrompt(promptObj, userAnswer){
-  return 'You are a warm, encouraging English coach helping a Vietnamese learner practice writing natural English sentences. Never be harsh — this is low-stakes practice, not an exam.\n\n'
+/* ---------- grading — word-level 3-tier mistake tagging + two answers ----------
+   Old schema returned one free-text paragraph plus 2-3 "other natural ways
+   to say it" (explicitly NOT corrections). New schema tags the learner's
+   own sentence segment-by-segment for the 3-level highlight, lists each
+   mistake with a short Vietnamese note, and returns two distinct answers:
+   their own sentence corrected (fixed_sentence) and Focci's own casual
+   natural phrasing (natural_sample) — either can be picked as the headline
+   that gets saved. */
+function gradeSpeakUpPrompt(promptObj, userAnswer){
+  return 'You are a warm, encouraging English coach helping a Vietnamese learner practice speaking natural English. Never be harsh — this is low-stakes practice, not an exam.\n\n'
   +'SITUATION (context only, do not translate this part):\n'+promptObj.context+'\n\n'
   +'THE VIETNAMESE SENTENCE THEY WERE ASKED TO EXPRESS IN ENGLISH:\n"'+promptObj.vi+'"\n\n'
-  +'WHAT THE LEARNER WROTE:\n"'+userAnswer+'"\n\n'
-  +'Grade generously. The goal is encouragement, not gatekeeping — only mark something as genuinely "off" if a native listener would actually be confused or the meaning changed; a slightly stiff phrasing or a small grammar slip with the meaning intact is "close" at worst, often still "good".\n\n'
+  +'WHAT THE LEARNER SAID:\n"'+userAnswer+'"\n\n'
+  +'Break the learner\'s EXACT sentence into ordered segments covering it completely — concatenating every segment\'s '
+  +'"text" in order (space-separated) must reproduce their sentence, EXCEPT level-3 segments, where "text" is their '
+  +'ORIGINAL wrong wording and "fix" is the correction. Classify each segment:\n'
+  +'  level 1 = correct AND natural, no change needed.\n'
+  +'  level 2 = grammatically correct but a native speaker would not phrase it this way — stiff/translated-sounding, still understandable.\n'
+  +'  level 3 = grammatically wrong, or confusing/unclear to a native listener. MUST include "fix".\n'
+  +'Keep segments as short natural phrase chunks, not single letters, and not the whole sentence as one blob unless it truly has zero issues.\n\n'
   +'Return ONLY this JSON:\n{\n'
   +'  "verdict": "good" | "close" | "off",\n'
-  +'  "feedback_vi": "1-2 câu tiếng Việt NGẮN GỌN, khích lệ. Luôn có ít nhất một điểm khen cụ thể trước (từ vựng, cấu trúc, ngữ điệu đúng). Nếu có lỗi hoặc sound off thì chỉ ra NHẸ NHÀNG, không chỉ trích gay gắt.",\n'
-  +'  "natural_alternatives": [ {"en":"một cách nói tự nhiên khác, giữ đúng nghĩa và thái độ/cảm xúc tương đương", "why_vi":"khác biệt sắc thái so với câu trên, rất ngắn"} ]\n'
+  +'  "feedback_vi": "Nếu câu ĐÃ ĐÚNG VÀ TỰ NHIÊN HOÀN TOÀN: khen 1 câu ngắn gọn. Nếu KHÔNG: 1 câu tiếng Việt NGẮN GọN nêu ĐÚNG vấn đề CHÍNH của cả câu (không liệt kê từng lỗi ở đây, chỉ tóm tắt vấn đề lớn nhất, ví dụ tư duy dịch word-by-word, sai giới từ, sai thời...).",\n'
+  +'  "segments": [ {"text":"...", "level":1|2|3, "fix":"chỉ có nếu level 3"} ],\n'
+  +'  "mistakes": [ {"wrong":"cụm sai/không tự nhiên (khớp với 1 segment level 2 hoặc 3)", "right":"cụm đúng/tự nhiên hơn", "note_vi":"giải thích RẤT ngắn gọn bằng tiếng Việt"} ],\n'
+  +'  "fixed_sentence": "Sửa lại CHÍNH CÂU CỦA HỌC VIÊN cho tự nhiên/đúng hơn — giữ tối đa cấu trúc/từ vựng của học viên, chỉ sửa đúng chỗ sai.",\n'
+  +'  "natural_sample": "Một câu HOÀN TOÀN khác, casual/tự nhiên như người bản xứ THẬT SỰ sẽ nói, không cần bám theo cấu trúc câu của học viên."\n'
   +'}\n'
-  +'Give exactly 2-3 natural_alternatives, ranked by how commonly a native speaker would actually say this in this exact situation. If the learner\'s sentence was already excellent, the alternatives should show OTHER equally-natural ways to phrase it, not "corrections".';
+  +'If the learner\'s sentence was already fully correct and natural: verdict="good", segments is one level:1 segment for the whole sentence, mistakes is empty, fixed_sentence equals their own sentence, and natural_sample is a genuinely different (not a correction) natural alternative.\n'
+  +'"mistakes" must have exactly one entry per level-2 or level-3 segment, same order, nothing else.';
 }
-async function askGradeWrite(promptObj, userAnswer){
+async function askGradeSpeakUp(promptObj, userAnswer){
   const key=getKey(); if(!key) throw new Error('NO_KEY');
   const model=getModel();
-  const prompt=gradeWritePrompt(promptObj, userAnswer);
+  const prompt=gradeSpeakUpPrompt(promptObj, userAnswer);
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.4,maxOutputTokens:700}})});
+      generationConfig:{temperature:0.4,maxOutputTokens:1200,responseMimeType:'application/json'}})});
   if(!r.ok) throw new Error('HTTP_'+r.status);
   const j=await r.json();
   let txt=(j.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
   txt=txt.replace(/```json|```/g,'').trim();
   const s=txt.indexOf('{'), e=txt.lastIndexOf('}');
   if(s<0||e<0) throw new Error('BAD_JSON');
-  return JSON.parse(txt.slice(s,e+1));
+  const data=JSON.parse(txt.slice(s,e+1));
+  if(!Array.isArray(data.segments) || !data.segments.length) data.segments=[{text:userAnswer, level:1}];
+  if(!Array.isArray(data.mistakes)) data.mistakes=[];
+  if(!data.fixed_sentence) data.fixed_sentence=userAnswer;
+  if(!data.natural_sample) data.natural_sample=userAnswer;
+  return data;
 }
 /* ------------------------------------------------------------------
    LỊCH SỬ SAY IT — mỗi câu chơi xong TỰ ĐỘNG được lưu, nhưng KHÔNG nằm trong
@@ -4674,15 +4866,17 @@ function saySave(list){
   catch(e){ try{ localStorage.setItem(SAY_LOG_LS, JSON.stringify(l.slice(-Math.floor(SAY_MAX/2)))); }catch(_){} }
 }
 function saveWriteAttempt(promptObj, userAnswer, result){
-  const alts=(Array.isArray(result.natural_alternatives)?result.natural_alternatives:[])
-    .filter(a=>a&&a.en).map(a=>({en:String(a.en), why:String(a.why_vi||'')}));
+  const mistakes=(Array.isArray(result.mistakes)?result.mistakes:[]).filter(m=>m)
+    .map(m=>({wrong:String(m.wrong||''), right:String(m.right||''), note:String(m.note_vi||'')}));
   const rec={
     id: now().toString(36)+Math.random().toString(36).slice(2,6), ts: now(),
     pid: promptObj.id, topic: promptObj.topic, ctx: promptObj.context, vi: promptObj.vi,
-    you: userAnswer,
+    you: userAnswer, originalAnswer: userAnswer, liked: null,
     verdict: (result.verdict==='good'||result.verdict==='off') ? result.verdict : 'close',
     fb: String(result.feedback_vi||''),
-    alts
+    mistakes,
+    fixed: String(result.fixed_sentence||userAnswer),
+    natural: String(result.natural_sample||userAnswer)
   };
   const list=sayLoad(); list.push(rec); saySave(list);
   return rec;
@@ -4752,15 +4946,18 @@ async function submitWrite(){
   writeBusy=true;
   const btn=$('#write-check'); if(btn){ btn.disabled=true; btn.textContent='Checking…'; }
   try{
-    const result=await askGradeWrite(writeCur, answer);
+    const result=await askGradeSpeakUp(writeCur, answer);
     writeResult=result;
     writeAnswer=answer;
+    writeLiked=null;
     const vk=result.verdict==='good'?'good':(result.verdict==='off'?'off':'close');
     if(writeScene) writeScene.pose=pickScenePose(vk, writeScene.pose);   // Focci phản ứng theo kết quả
-    writeMarkSeen(writeCur.id);
-    saveWriteAttempt(writeCur, answer, result);
+    if(!writeCur.ai) writeMarkSeen(writeCur.id);
+    const rec=saveWriteAttempt(writeCur, answer, result);
+    writeSavedId=rec.id;
+    speakUpScore += (vk==='good'?1:(vk==='close'?0.5:0));
     questBump('game');
-    addXP(2);
+    addXP(5);
     refreshStats();
   }catch(err){
     toast('Could not check that — try again');

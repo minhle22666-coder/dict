@@ -767,7 +767,7 @@ let _selLastWord=null;   // mốc để dính dòng khi ngón tay chệch
 
 function clearSelBtn(){ if(_selBtn){ _selBtn.remove(); _selBtn=null; } }
 
-function selHostOf(el){ return el ? el.closest('.story-passage, .dlg-line') : null; }
+function selHostOf(el){ return el ? el.closest('.story-passage, .dlg-line, .su-tappable') : null; }
 
 /* Danh sách từ theo đúng thứ tự DOM trong khối đang chọn. */
 function selWordsIn(host){
@@ -1007,14 +1007,22 @@ async function openPhrasePopup(text){
     _phraseCache[t] = result;
     /* Cụm bôi đen trong bài đọc cũng phải vào Recent như cụm tra ở thanh
        tìm kiếm — trước đây log word:null nên nó biến mất không dấu vết. */
+    const prim=(result&&result.primary&&result.primary.text)||result.translation||'';
     try{
-      const prim=(result&&result.primary&&result.primary.text)||result.translation||'';
       if(prim && typeof phraseHistoryRecord==='function')
         await phraseHistoryRecord(t, prim, result);
       await logEvent('search', norm(t));
     }catch(e){ await logEvent('search', null); }
     addXP(1);
-    showWordSheet(phraseSheetHTML(t, result, !!(existing&&existing.saved)));
+    // Speak Up asked for highlighted words/phrases to land in real Saved
+    // automatically, not just Recent — normal reading lookups elsewhere
+    // still require the explicit star tap, this is scoped to that one flow.
+    let saved=!!(existing&&existing.saved);
+    if(window.__sayItActive && !saved && typeof savePhraseRecord==='function'){
+      await savePhraseRecord(t, prim, result.primary);
+      saved=true;
+    }
+    showWordSheet(phraseSheetHTML(t, result, saved));
   }catch(err){
     showWordSheet(errorSheetHTML(t, err.message||''));
   }
@@ -1038,6 +1046,11 @@ async function openWordPopup(rawWord){
       if(lem){
         await logEvent('search', lem.rec.word);
         addXP(1);
+        // Same Speak-Up-only auto-save as the main branch below — see its comment.
+        if(window.__sayItActive && !lem.rec.saved){
+          lem.rec.saved=1; lem.rec.savedAt=Date.now();
+          await idbPut(lem.rec);
+        }
         const shown={ word:word, saved:lem.rec.saved,
           data:(typeof inflectedData==='function')
                  ? inflectedData(lem.rec.data, lem.kind, word) : lem.rec.data };
@@ -1058,6 +1071,13 @@ async function openWordPopup(rawWord){
     }
     await logEvent('search', rec.word);   // same table as the search bar — unifies history + fires word-bank hook
     addXP(1);
+    // Speak Up asked for highlighted words to land in real Saved
+    // automatically, not just Recent — normal reading lookups elsewhere
+    // still require the explicit star tap, this is scoped to that one flow.
+    if(window.__sayItActive && !rec.saved){
+      rec.saved=1; rec.savedAt=Date.now();
+      await idbPut(rec);
+    }
     showWordSheet(condensedEntryHTML(rec));
   }catch(err){
     showWordSheet(errorSheetHTML(word, err.message||''));
@@ -1898,6 +1918,7 @@ function isStoryStarted(){ return Object.keys(getState().storyLog).length>0; }
 window.renderGameHub = function(){
   _reviewArcId=null; _reviewPos=null; _reviewHistory=[];
   if(_waitTimer){ clearInterval(_waitTimer); _waitTimer=null; }
+  window.__sayItActive=false;   // leaving Speak Up's play screen — stop auto-saving word lookups
   const area=$('#review-area'); if(!area) return;
   const map=renderWorldMap(); // { hero, more, mapSection } — banner is itself the Play/Continue button
   let h='<div class="game-hub">';
@@ -2222,5 +2243,10 @@ window.arcUnlocked = arcUnlocked;
 window.showWordSheet = showWordSheet;
 window.condensedEntryHTML = condensedEntryHTML;
 window.assetUrl = assetUrl;
+// Speak Up (app.js) reuses the exact same tap-to-select-a-word system
+// this file already built for story passages — rendering its two answer
+// sentences through the same tokenizer is what makes .wtap/hold-to-select
+// work on them for free, no separate lookup plumbing needed.
+window.tokenizeForTap = tokenizeForTap;
 
 })();
