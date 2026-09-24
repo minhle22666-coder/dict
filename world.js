@@ -631,7 +631,7 @@ export async function bootFocciWorld(root, opts) {
   const ARC_ENV_FILES = ['island.glb', 'camp.glb', 'waterfall.glb', 'secretcamp.glb'];
   const arcCount = Math.min(ARC_TITLES.length, 4);
   const [
-    hub, mushGlb, birdGlb, skyGlb, pondGlb, doeGlb, diamondGlb,
+    hub, mushGlb, birdGlb, skyGlb, pondGlb, boatGlb, doeGlb, diamondGlb,
     ...arcGltfs
   ] = await Promise.all([
     loadGLB(ASSET('fox-island.glb')),
@@ -639,6 +639,7 @@ export async function bootFocciWorld(root, opts) {
         loadGLB(ASSET('birds.glb')),
     loadGLB(ASSET('sky-island.glb')),
     loadGLB(ASSET('pond.glb')),
+    loadGLB(ASSET('boat.glb')),
     loadGLB(ASSET('doe.glb')),
     loadGLB(ASSET('teleport-diamond.glb')),
     ...Array.from({ length: arcCount }, (_, i) => loadGLB(ASSET(ARC_ENV_FILES[i]))),
@@ -872,7 +873,12 @@ export async function bootFocciWorld(root, opts) {
       const pScale = (SKY_SPAN * 0.085) / Math.max(pSize.x, pSize.z);
       pondGlb.scene.scale.setScalar(pScale);
       const spot = skyPoint(0, LAWN_Y, 80);
-      pondGlb.scene.position.set(spot.x, spot.y - pBox.min.y * pScale - 0.04, spot.z);
+      /* Sunk, not stood on top. Anchoring the model's lowest point at ground
+         level left the whole 5.3-unit bowl above the grass. The rim is at
+         about y 0.45 in model space, so putting THAT at the surface buries
+         the bowl and leaves only the rim and its stones showing. */
+      const RIM_Y = 0.45;
+      pondGlb.scene.position.set(spot.x, spot.y - RIM_Y * pScale, spot.z);
       pondGlb.scene.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
       station.group.add(pondGlb.scene);
       if (pondGlb.animations && pondGlb.animations.length) {
@@ -918,9 +924,20 @@ export async function bootFocciWorld(root, opts) {
         if (!best || b.max.y > best.max.y) best = b;
       });
       if (best) {
-        const c = best.getCenter(new THREE.Vector3());
-        const su = surfaceYIn(station, c.x, c.z, GROUND_CEIL);
-        const peakY = su.hit ? su.y : best.max.y;
+        /* The bounding-box centre of the tallest mesh is not the top of the
+           tower — that mesh is the weather vane, whose box centre sits off
+           the tower's own axis. Sweep a small grid around it and take the
+           highest point you could actually stand on; that is the cap. */
+        const c0 = best.getCenter(new THREE.Vector3());
+        let c = c0, peakY = -Infinity;
+        for (let dx = -2.5; dx <= 2.5; dx += 0.25) {
+          for (let dz = -2.5; dz <= 2.5; dz += 0.25) {
+            const px = c0.x + dx, pz = c0.z + dz;
+            const su2 = surfaceYIn(station, px, pz, GROUND_CEIL);
+            if (su2.hit && !su2.water && su2.y > peakY) { peakY = su2.y; c = new THREE.Vector3(px, su2.y, pz); }
+          }
+        }
+        if (peakY === -Infinity) { const su = surfaceYIn(station, c0.x, c0.z, GROUND_CEIL); peakY = su.hit ? su.y : best.max.y; c = c0; }
         const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xB07CFF, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
         halo.scale.setScalar(4.2);
         halo.position.set(c.x, peakY + 1.3, c.z);
@@ -1001,6 +1018,53 @@ export async function bootFocciWorld(root, opts) {
           });
         }
       }
+
+
+    /* ============================================================
+       THE RESCUE BOAT
+
+       Moored at the shore. Step aboard and Focci sails out to look for
+       someone who needs a home — the boat drifts off, the screen hands over
+       to the rescue board, and whoever he brings back steps off with him.
+       Sail with nobody and he simply comes home.
+
+       The mooring is the lowest walkable ground the island has, which is
+       its beach shelf; the boat sits just beyond it, on the water.
+       ============================================================ */
+    {
+      let dock = null, lowest = Infinity;
+      for (let i = 0; i < 400; i++) {
+        const a = Math.random() * Math.PI * 2, r = 14 + Math.random() * 9;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        const su = surfaceYIn(station, x, z, GROUND_CEIL);
+        if (!su.hit || su.water || su.building) continue;
+        if (su.y < lowest && isStableGround(station, x, z, su.y)) { lowest = su.y; dock = { x, z, y: su.y }; }
+      }
+      if (dock) {
+        const out = Math.hypot(dock.x, dock.z) || 1;
+        const bx = dock.x + (dock.x / out) * 2.6, bz = dock.z + (dock.z / out) * 2.6;
+        const bBox = new THREE.Box3().setFromObject(boatGlb.scene);
+        const bSize = bBox.getSize(new THREE.Vector3());
+        const bScale = 3.4 / Math.max(bSize.x, bSize.z, 0.0001);
+        boatGlb.scene.scale.setScalar(bScale);
+        boatGlb.scene.position.set(bx, dock.y - bBox.min.y * bScale - 0.25, bz);
+        boatGlb.scene.rotation.y = Math.atan2(-dock.x, -dock.z);
+        boatGlb.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+        station.group.add(boatGlb.scene);
+
+        const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0x8FD8FF, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+        glow.scale.setScalar(3.2);
+        glow.position.set(dock.x, dock.y + 1, dock.z);
+        station.group.add(glow);
+
+        station.boat = {
+          obj: boatGlb.scene, glow,
+          dockX: dock.x, dockZ: dock.z, dockY: dock.y,
+          x: bx, z: bz, y: boatGlb.scene.position.y,
+          homeX: bx, homeZ: bz, sailing: 0
+        };
+      }
+    }
 
       // The gate up top is the way back down.
       addInvisibleHitbox(station, gate.x, gate.y + SKY_SPAN * 0.045, gate.z, SKY_SPAN * 0.04, 'sky-gate');
@@ -1282,6 +1346,60 @@ export async function bootFocciWorld(root, opts) {
     }
   }
 
+
+  /* Focci climbs in, the boat drifts out and fades, and the rescue board
+     takes over. resolveVoyage() brings it back — with a passenger or
+     without one, the return leg is the same. */
+  function startVoyage(room) {
+    const b = room.boat; if (!b || b.sailing) return;
+    b.sailing = 1;
+    character.visible = false;
+    charState.x = b.x; charState.z = b.z;
+    b.t = 0;
+    root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'out' } }));
+  }
+  window.__fwVoyageReturn = function (species) {
+    const b = station.boat; if (!b) return;
+    b.sailing = 2; b.t = 0; b.bringing = species || null;
+  };
+  function tickBoat(room, dt, t) {
+    const b = room.boat; if (!b) return;
+    // idle bob on the water
+    if (!b.sailing) {
+      b.obj.position.y = b.y + Math.sin(t * 1.1) * 0.06;
+      b.obj.rotation.z = Math.sin(t * 0.9) * 0.02;
+      b.glow.material.opacity = 0.34 + Math.sin(t * 1.7) * 0.16;
+      return;
+    }
+    b.t += dt;
+    const away = new THREE.Vector3(b.homeX, 0, b.homeZ).normalize();
+    if (b.sailing === 1) {
+      // out: 2.2s of drifting, fading as it goes
+      const k = Math.min(1, b.t / 2.2);
+      b.obj.position.set(b.homeX + away.x * k * 16, b.y + Math.sin(t * 1.1) * 0.06, b.homeZ + away.z * k * 16);
+      charState.x = b.obj.position.x; charState.z = b.obj.position.z;
+      b.obj.traverse((o) => { if (o.isMesh && o.material) { o.material.transparent = true; o.material.opacity = 1 - k; } });
+      if (k >= 1) { b.sailing = 1.5; root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'board' } })); }
+    } else if (b.sailing === 2) {
+      // back: fades in as it returns to the mooring
+      const k = Math.min(1, b.t / 2.2);
+      b.obj.position.set(b.homeX + away.x * (1 - k) * 16, b.y + Math.sin(t * 1.1) * 0.06, b.homeZ + away.z * (1 - k) * 16);
+      b.obj.traverse((o) => { if (o.isMesh && o.material) o.material.opacity = k; });
+      charState.x = b.obj.position.x; charState.z = b.obj.position.z;
+      if (k >= 1) {
+        b.sailing = 0;
+        b.obj.traverse((o) => { if (o.isMesh && o.material) { o.material.opacity = 1; o.material.transparent = false; } });
+        // Focci hops out onto the mooring
+        charState.x = b.dockX; charState.z = b.dockZ;
+        character.visible = (camMode !== 'fpv');
+        startJump(room);
+        spawnPickupBurst(room, b.dockX, b.dockY + 0.4, b.dockZ, 0x8FD8FF);
+        if (b.bringing) { b.bringing = null; syncResidents(room); }
+        root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'home' } }));
+      }
+    }
+  }
+
   function tickResidents(room, dt, t) {
     if (!room.residents || !room.residents.length) return;
     const recs = window.resLoad ? window.resLoad() : [];
@@ -1397,16 +1515,30 @@ export async function bootFocciWorld(root, opts) {
             flyTo(room, { x: g.x, y: g.y + 0.2, z: g.z + 3.2 }, () => {
               root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'The gate lets Focci through. Everything up here smells of blossom.', kind: 'reaction' } }));
             });
-          });
+          }, 'sky');
+      } else if (Math.hypot(p.x - cx, p.z - cz) > 7) declined.delete('sky');
+    }
+    /* The boat. Stepping onto the mooring offers the trip. */
+    if (room === station && room.boat && !flight && !pendingTravel && !room.boat.sailing) {
+      const b = room.boat;
+      const d = Math.hypot(b.dockX - cx, b.dockZ - cz);
+      if (d > 7) declined.delete('boat');
+      if (d < 1.7) {
+        askTravel('boat', 'Set sail',
+          'Somewhere out there is someone with no island to go home to. Take the boat and look?',
+          'Cast off', () => startVoyage(room), 'boat');
       }
     }
     /* Same for the four diamonds: step in, get asked, decide. */
     if (room.teleports && room.teleports.length && !flight && !pendingTravel) {
       for (const tp of room.teleports) {
-        if (Math.hypot(tp.x - cx, tp.z - cz) > 1.8) continue;
+        const key = 'arc' + tp.arcIndex;
+        const d = Math.hypot(tp.x - cx, tp.z - cz);
+        if (d > 7) declined.delete(key);        // far enough away to re-arm
+        if (d > 1.8) continue;
         askTravel('arc', tp.title || 'Another land',
           'A gateway hums here. Travel to ' + (tp.title || 'another land') + '?',
-          'Yes, take me', () => { enterRoom(arcRoomKeys[tp.arcIndex]); onOpenArc(tp.arcIndex, ARC_TITLES[tp.arcIndex]); });
+          'Yes, take me', () => { enterRoom(arcRoomKeys[tp.arcIndex]); onOpenArc(tp.arcIndex, ARC_TITLES[tp.arcIndex]); }, key);
         break;
       }
     }
@@ -1585,16 +1717,22 @@ export async function bootFocciWorld(root, opts) {
      question and waits for an answer — accidentally brushing past a
      diamond used to fling you to another land with no warning. */
   let pendingTravel = null;
-  function askTravel(kind, title, body, confirmLabel, run) {
+  const declined = new Set();
+  function askTravel(kind, title, body, confirmLabel, run, key) {
     if (pendingTravel || flight) return;
-    pendingTravel = { run };
+    if (key && declined.has(key)) return;
+    pendingTravel = { run, key };
     root.dispatchEvent(new CustomEvent('focci-ask', {
       detail: { kind, title, body, confirm: confirmLabel, cancel: 'Not now' }
     }));
   }
   window.__fwAnswer = function (yes) {
     const p = pendingTravel; pendingTravel = null;
-    if (yes && p && p.run) p.run();
+    if (yes) { if (p && p.run) p.run(); if (p && p.key) declined.delete(p.key); }
+    // "Not now" means not now — walking past the same gateway again is
+    // almost always an accident, and being asked every single time was the
+    // whole complaint. It re-arms once Focci has gone properly away.
+    else if (p && p.key) declined.add(p.key);
   };
 
   let camCinematic = null;
@@ -2071,6 +2209,7 @@ export async function bootFocciWorld(root, opts) {
     }
     character.position.set(charState.x, surf.y + bob + charState.jumpY, charState.z);
 
+    tickBoat(room, dt, t);
     tickResidents(room, dt, t);
     checkWalkOverPickups(room);
     if (room.doe) tickDoe(room, room.doe, dt, t);

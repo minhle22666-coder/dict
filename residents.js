@@ -230,6 +230,75 @@
   }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
 
+  /* ---------------- the rescue board ----------------
+     Focci is not shopping. Each of these is someone stranded with nowhere
+     to go, and the XP is what it costs him to sail out and bring them
+     back — provisions for the trip, not a price on a life. The roster is
+     fixed per day so it feels like news from the water rather than a
+     slot machine you can reroll. */
+  var RESCUE_XP = { rabbit: 60, duck: 80, sheep: 120, cat: 160, wolf: 240 };
+  var STORIES = {
+    rabbit: 'Found sheltering under a hull, too small to be out there alone.',
+    duck:   'Blown off the migration route and paddling in circles since.',
+    sheep:  'Left behind when the flock was moved off the far shore.',
+    cat:    'Has been living off a fishing jetty and trusts nobody yet.',
+    wolf:   'Separated from the pack in a storm. Wary, but not unkind.'
+  };
+  function resRescueCost(species) { return RESCUE_XP[species] || 100; }
+  function resRescueRoster() {
+    // deterministic for the day, so it is the same board all day
+    var seed = 0, k = today();
+    for (var i = 0; i < k.length; i++) seed = (seed * 31 + k.charCodeAt(i)) >>> 0;
+    var pool = ORDER.slice();
+    var out = [];
+    while (pool.length && out.length < 3) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      out.push(pool.splice(seed % pool.length, 1)[0]);
+    }
+    return out.map(function (sp) {
+      var s = SPECIES[sp];
+      // they arrive already part-grown, at a plausible age for a stray
+      var ageDays = Math.floor(s.adultDays * 0.22);
+      return {
+        species: sp, label: s.label, born: s.born, story: STORIES[sp],
+        cost: resRescueCost(sp), ageDays: ageDays
+      };
+    });
+  }
+  function resRescue(species) {
+    var cost = resRescueCost(species);
+    var xp = (window.getXP && window.getXP()) || 0;
+    if (xp < cost) return { ok: false, reason: 'no-xp', cost: cost, have: xp };
+    if (window.addXP) window.addXP(-cost);
+    var s = SPECIES[species];
+    var rec = resCreate(species, { bornAt: Date.now() - Math.floor(s.adultDays * 0.22) * DAY });
+    resPairUp();
+    return { ok: true, resident: rec };
+  }
+
+  /* One partner each, for life. Two of a species pair up; a third of the
+     same kind stays single rather than breaking a pair, and no pair ever
+     takes a second partner. */
+  function resPairUp() {
+    var list = resLoad(), changed = false;
+    var bySpecies = {};
+    list.forEach(function (x) { (bySpecies[x.species] = bySpecies[x.species] || []).push(x); });
+    Object.keys(bySpecies).forEach(function (sp) {
+      var free = bySpecies[sp].filter(function (x) { return !x.mateId; });
+      while (free.length >= 2) {
+        var a = free.shift(), b = free.shift();
+        a.mateId = b.id; b.mateId = a.id; changed = true;
+      }
+    });
+    if (changed) resSave(list);
+    return list;
+  }
+
+  window.resRescueRoster = resRescueRoster;
+  window.resRescueCost = resRescueCost;
+  window.resRescue = resRescue;
+  window.resPairUp = resPairUp;
+
   /* ---------------- exports ---------------- */
   window.RES_SPECIES = SPECIES;
   window.resLoad = resLoad;
