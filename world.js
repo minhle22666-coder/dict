@@ -918,6 +918,7 @@ export async function bootFocciWorld(root, opts) {
     if (document.hidden) return true;                       // tab in the background
     var ov = document.getElementById('fw-overlay');
     if (ov && ov.style.display === 'none') return true;     // world not on screen at all
+    if (document.documentElement.classList.contains('dict-open')) return true; // word entry
     return !!document.querySelector('.view.fw-panel.active'); // Games/Saved/Progress/Settings
   }
   function releaseGesture() {

@@ -683,8 +683,11 @@ window.openFullEntry = function(word){
   };
 
   closeWordSheet();
-  showView('home');
-  search(word);
+  // openDictPage, not showView('home') — #v-home is under the 3D world's
+  // overlay in the normal flow, so showView alone made the entry render
+  // where nobody could see it.
+  if (window.openDictPage) window.openDictPage(word);
+  else { showView('home'); search(word); }
 };
 
 function notFoundSheetHTML(w, suggestion){

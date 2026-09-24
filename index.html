@@ -917,6 +917,56 @@
   .sy-body .write-alt-n{width:24px;height:24px;font-size:12px;color:var(--on-hero);background-image:var(--gloss),var(--grad-hero)}
 
   /* ============================================================
+     DICTIONARY PAGE, ON TOP OF THE 3D WORLD
+
+     #v-home is a plain .view sitting in normal document flow
+     (position:static, z-index:auto) while #fw-overlay — the 3D island —
+     is position:fixed at z-index 40 and, since the world became the home
+     screen, is never hidden. So the full word entry, the most important
+     screen in the app, was being built correctly by renderEntry() and
+     then painted over by the island. Nothing was broken inside
+     renderEntry or the YouGlish embed; the page simply had no way to get
+     on top. html.dict-open lifts it to z-index 51, above the world and
+     below the .fw-panel screens.
+
+     Its own mint identity, built on #67DEE1 and kept light. --cta and
+     --grad-hero are redeclared directly rather than left to re-derive
+     from --a1/--a2/--p1/--p2: they are computed once at :root and do not
+     re-resolve just because their inputs are overridden further down.
+     ============================================================ */
+  html.dict-open #v-home{
+    position:fixed;inset:0;z-index:51;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding-bottom:calc(env(safe-area-inset-bottom,0px) + 76px);
+    background:linear-gradient(180deg,#F2FDFC 0%,#DEF6F5 40%,#C8EFEE 100%);
+    --tint:#1FAFB4; --pri-l:#178E93; --pri-d:#67DEE1;
+    --p1:#2FBFC3; --p2:#67DEE1; --p3:#9BEDEA; --primary:#1FAFB4;
+    --a1:#67DEE1; --a2:#2AAFB4; --cta-ink:#04333A; --cta-glow:rgba(103,222,225,.5);
+    --grad-hero:linear-gradient(135deg,#2FBFC3,#67DEE1);
+    --cta:linear-gradient(180deg,#67DEE1 0%,#2AAFB4 100%);
+    --surface:rgba(255,255,255,.78);
+    --surface-2:rgba(255,255,255,.58);
+    --line:rgba(31,175,180,.2)}
+  html.dict-open #v-home .topbar{
+    background:linear-gradient(180deg,rgba(242,253,252,.94),rgba(233,250,249,.86));
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid rgba(31,175,180,.16)}
+  /* Floating exit, bottom-right: the sticky .topbar already owns the top
+     of this page, so the shared .fw-panel-close would have landed on it. */
+  #dict-back{display:none;position:fixed;z-index:52;right:14px;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
+    align-items:center;gap:7px;padding:11px 17px;border-radius:999px;
+    font-size:13.5px;font-weight:700;color:#04333A;border:none;
+    background:linear-gradient(180deg,#8CE9EB,#33BCC1);
+    box-shadow:0 10px 24px rgba(4,51,58,.32)}
+  html.dict-open #dict-back{display:flex}
+  #dict-back:active{transform:scale(.95)}
+  /* The completed word becomes the way back into its entry. */
+  .fw-word-progress.done{cursor:pointer;color:#0B3F3A;
+    background:linear-gradient(180deg,#9BEDEA,#3FC3C7);
+    box-shadow:0 6px 18px rgba(4,51,58,.3)}
+  .fw-word-progress.done:active{transform:scale(.96)}
+
+  /* ============================================================
      SPEAK UP — every number below was measured off the mockup with
      a pixel sampler, not estimated by eye. The mockup renders a
      387px-wide phone, i.e. ~1:1 with CSS px on a 390px viewport, so
@@ -4024,6 +4074,7 @@
 
 <div class="toast" id="toast"></div>
 
+<button id="dict-back" onclick="closeDictPage()" aria-label="Back to the island">← Back to the island</button>
 <div id="fw-overlay" style="position:fixed;inset:0;z-index:40;background:#000;">
   <canvas id="fw-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;-webkit-user-select:none;user-select:none;"></canvas>
   <div id="fw-word-progress" class="fw-word-progress"></div>
@@ -4170,11 +4221,17 @@
       },
       onLetterProgress: (word, mask) => {
         const el = document.querySelector('#fw-word-progress');
-        if (el) el.textContent = mask;
+        if (el) { el.textContent = mask; el.classList.remove('done'); }
       },
       onWordComplete: async (word) => {
         const rec = await idbGet(word);
         if (rec) { showWordSheet(condensedEntryHTML(rec)); addXP(3); }
+        // Keep the finished word tappable: the progress pill turns into a
+        // button that reopens the full entry as many times as wanted,
+        // rather than the sheet being a one-shot you can't get back.
+        window.__fwLastWord = word;
+        const el = document.querySelector('#fw-word-progress');
+        if (el) { el.textContent = word.toUpperCase(); el.classList.add('done'); }
       }
     });
   };
@@ -4246,9 +4303,31 @@
     showView(view);
     document.getElementById('fw-panel-close').style.display = 'flex';
   };
+  /* The full word entry lives in #v-home, which the 3D world covers — see
+     the html.dict-open rules. These two are the only supported way in and
+     out of it now, so every caller gets the lift, the pause and the exit
+     button together instead of some of them. */
+  window.openDictPage = function (word) {
+    document.documentElement.classList.add('dict-open');
+    if (window.showView) window.showView('home');
+    const home = document.getElementById('v-home');
+    if (home) home.scrollTop = 0;
+    if (word && window.search) window.search(word);
+  };
+  window.closeDictPage = function () {
+    document.documentElement.classList.remove('dict-open');
+  };
+  (function () {
+    const pill = document.getElementById('fw-word-progress');
+    if (pill) pill.addEventListener('click', () => {
+      if (pill.classList.contains('done') && window.__fwLastWord) window.openDictPage(window.__fwLastWord);
+    });
+  })();
+
   window.closeFwPanel = function () {
     document.querySelectorAll('.view').forEach((x) => x.classList.remove('active'));
     document.getElementById('fw-panel-close').style.display = 'none';
+    document.documentElement.classList.remove('dict-open');
     // Speak Up darkens the document root so the PWA's home-indicator strip
     // doesn't show the cream page background; undo it on every exit path,
     // not just the ones that route back through the games hub.
