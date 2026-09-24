@@ -937,19 +937,30 @@
   html.dict-open #v-home{
     position:fixed;inset:0;z-index:51;overflow-y:auto;-webkit-overflow-scrolling:touch;
     padding-bottom:calc(env(safe-area-inset-bottom,0px) + 76px);
-    /* Frosted, not opaque. Fully white made it a flat slab; the island now
-       shows faintly through a heavy blur, which keeps the page clearly its
-       own screen without hiding the world behind it. */
-    background:linear-gradient(180deg,rgba(255,255,255,.82) 0%,rgba(246,253,253,.8) 38%,rgba(226,246,245,.78) 100%);
-    backdrop-filter:blur(26px) saturate(1.25);-webkit-backdrop-filter:blur(26px) saturate(1.25);
+    /* Real glass needs LIGHT behind it. Blurring the island — which is
+       mostly mid-tone orange rock — and laying white over it just averaged
+       out to grey mud, which is why the last attempt read as dull rather
+       than glassy. brightness() lifts the blurred world into a pale
+       luminous haze first and saturate() keeps a hint of its colour, so the
+       white sits on light instead of on sludge. */
+    background:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(244,253,252,.5) 40%,rgba(216,245,244,.48) 100%);
+    backdrop-filter:blur(30px) saturate(1.7) brightness(1.4);
+    -webkit-backdrop-filter:blur(30px) saturate(1.7) brightness(1.4);
     --tint:#1FAFB4; --pri-l:#178E93; --pri-d:#67DEE1;
     --p1:#2FBFC3; --p2:#67DEE1; --p3:#9BEDEA; --primary:#1FAFB4;
     --a1:#67DEE1; --a2:#2AAFB4; --cta-ink:#04333A; --cta-glow:rgba(103,222,225,.5);
     --grad-hero:linear-gradient(135deg,#2FBFC3,#67DEE1);
     --cta:linear-gradient(180deg,#67DEE1 0%,#2AAFB4 100%);
-    --surface:rgba(255,255,255,.72);
-    --surface-2:rgba(240,251,250,.66);
-    --line:rgba(31,175,180,.2)}
+    --surface:rgba(255,255,255,.88);
+    --surface-2:rgba(255,255,255,.66);
+    --line:rgba(31,175,180,.22)}
+  /* The panes themselves get an edge and a soft lift, so they read as
+     separate sheets of glass over the haze rather than flat fills. */
+  html.dict-open #v-home .entry > div{
+    box-shadow:0 2px 14px rgba(18,120,125,.07)}
+  /* The world's own fan-out menu sits at z-index 56, above this page, and
+     was hanging over the entry. It belongs to the island, not here. */
+  html.dict-open .fw-menu-cluster{display:none}
   /* The headword came through in the app's warm brown, which on a mint page
      is the one thing that reads as belonging to a different design. */
   html.dict-open #v-home .headword{color:#12787D}
