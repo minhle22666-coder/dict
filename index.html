@@ -946,12 +946,29 @@
      artwork averages luma 157 — it is a BRIGHT pastel scene, and the
      heavy .46→.78 scrim of the previous attempt is what turned it
      into grey mud. */
-  /* #v-review is inset:0, but in the installed PWA the home-indicator strip
-     below it still shows the page's own cream background — a white band under
-     the Check it button. Paint the root the same teal while Speak Up is up;
-     the class is toggled alongside .su-active in suPanelOn(). */
-  html.su-root, html.su-root body{background:#0d4c48}
+  /* The village is painted by <html>, not by the panel. #v-review is
+     inset:0, which stops at the layout viewport — in the installed PWA the
+     home-indicator strip underneath kept showing the page's cream
+     background. Painting the root instead means one element covers the
+     whole viewport, safe area included, so the scene simply continues down
+     there: no flat fill patched over the gap, and no seam where two copies
+     of a `cover` image would have met. The panel goes transparent on top.
 
+     The overlay is deliberately light (.30 -> .54): the artwork averages
+     luma 157 — a bright pastel scene — and a heavier scrim just greys it. */
+  html.su-root, html.su-root body{
+    background:
+      linear-gradient(180deg,rgba(4,44,44,.30) 0%,rgba(3,38,38,.40) 58%,rgba(2,30,30,.54) 100%),
+      url('./bg-speakup-village.webp') center top/cover no-repeat,
+      #0d4c48}
+  html.su-root body{background:transparent}
+  /* The panel needs its OWN copy of the same stack, not just the root's:
+     the 3D world (#fw-overlay, z-index 40) sits between <html> and this
+     panel (z-index 50), so a transparent panel shows the island through it
+     instead of the village. Both layers use the identical
+     `center top / cover` stack, so the strip the root covers below the
+     panel continues the same picture rather than patching the gap with a
+     flat colour. */
   body .view.fw-panel.su-active{
     background:
       linear-gradient(180deg,rgba(4,44,44,.30) 0%,rgba(3,38,38,.40) 58%,rgba(2,30,30,.54) 100%),
@@ -1030,12 +1047,15 @@
      measured #07CEC4 is only ~1.9:1, so the bar is deepened along the same
      hue until white clears 4.5:1 — the mint identity survives, the text is
      actually readable. */
-  .su-coach{position:relative;margin:0 0 12px;padding:10px 14px 10px 32px;border-radius:16px;
+  .su-coach{position:relative;margin:0 0 12px;padding:10px 14px 10px 34px;border-radius:16px;
     background:linear-gradient(135deg,#0D968D 0%,#0A7871 100%);color:#fff;
     font-size:13px;line-height:1.34;font-style:italic;font-weight:600}
   .su-coach b{font-weight:800;font-style:italic;color:#fff}
-  .su-coach-fox{position:absolute;left:-2px;bottom:0;width:26px;height:auto;
-    filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))}
+  /* Deliberately taller than the bar (40px wide -> ~42px tall on a ~44px
+     bar) and hung off the left edge, so it breaks the rectangle instead of
+     sitting flat inside it. The shadow falls onto the bar to sell the lift. */
+  .su-coach-fox{position:absolute;left:-13px;bottom:1px;width:40px;height:auto;
+    filter:drop-shadow(1px 3px 5px rgba(0,0,0,.45))}
 
   .su-feedback{border-radius:22px;padding:20px;margin:0 0 4px;background:rgba(1,46,42,.66);
     backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
@@ -1053,6 +1073,20 @@
   .su-seg-2{color:#F0A874;font-weight:500;text-decoration:none}
   .su-seg-3{color:#F0776A;font-weight:500;text-decoration:line-through;text-decoration-thickness:1.5px}
   .su-fix{color:#7BE052;font-weight:800;text-decoration:none}
+
+  /* Score badge. Naturalness, not grammar — so the colours run from the
+     same green the AI's fix uses down through amber to the red the
+     strikethrough uses, keeping one meaning per hue across the screen. */
+  .su-score{display:flex;align-items:center;gap:9px;margin:0 0 14px}
+  .su-score-g{flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:15px;font-weight:800;color:#06251F}
+  .su-score-n{font-size:15px;font-weight:800;color:#fff}
+  .su-score-n i{font-style:normal;font-weight:600;font-size:11.5px;opacity:.62;margin-left:1px}
+  .su-score-l{font-size:12px;font-style:italic;font-weight:600;opacity:.8;margin-left:auto;color:#fff}
+  .su-score-a .su-score-g{background:#7BE052}
+  .su-score-b .su-score-g{background:#BEE55A}
+  .su-score-c .su-score-g{background:#F0A874}
+  .su-score-d .su-score-g{background:#F0776A}
 
   .su-mistakes{list-style:disc;margin:0;padding:0 0 0 19px;display:flex;flex-direction:column;gap:9px}
   .su-mistakes li{font-size:13px;line-height:1.34;color:#fff}
@@ -1087,6 +1121,21 @@
   body .view.fw-panel .su-page .btn:not(.ghost){
     background:linear-gradient(135deg,#3FA866,#27804D);
     border-color:rgba(255,255,255,.22);box-shadow:0 8px 20px rgba(0,0,0,.32)}
+
+  /* Saved list: the same letter, same colours, as a chip on each row. */
+  .sy-grade{flex:none;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;
+    justify-content:center;font-size:13px;font-weight:800;color:#06251F;background:var(--line)}
+  .sy-grade-a{background:#7BE052}
+  .sy-grade-b{background:#BEE55A}
+  .sy-grade-c{background:#F0A874}
+  .sy-grade-d{background:#F0776A}
+  .sy-legend{margin:0 0 12px;padding:10px 14px;border-radius:14px;background:var(--surface-2);
+    border:1px solid var(--line)}
+  .sy-legend summary{font-size:13px;font-weight:700;cursor:pointer;color:var(--text)}
+  .sy-legend ul{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .sy-legend li{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;line-height:1.4;color:var(--muted)}
+  .sy-legend li b{color:var(--text);font-weight:700;white-space:nowrap}
+  .sy-legend p{margin:10px 0 0;font-size:11.5px;font-style:italic;color:var(--muted)}
 
   .fb-icon{display:inline-flex;width:21px;height:21px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;margin-right:5px;background:currentColor;color:var(--surface)}
   .rev-fb .ex{color:var(--muted);font-weight:500}

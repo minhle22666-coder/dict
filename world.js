@@ -233,6 +233,37 @@ export async function bootFocciWorld(root, opts) {
      sphere as its actual raycast target instead of relying on its exact
      (gappy) visible geometry — the sphere is what goes in room.interactive,
      the visible model stays purely decorative. */
+  /* findGroundSpot only proves a point is solid and reachable — it says
+     nothing about what the ground does across a prop's whole footprint. A
+     6-unit-wide tree placed by its centre point alone kept landing where the
+     terrain falls away, so its trunk buried itself on the high side while
+     the roots hung out over the drop ("cắm và lòi ra 1 khúc đất"). This
+     samples candidates and keeps the one whose ground varies least across a
+     ring the size of the prop. */
+  function findFlatGroundSpot(room, rMin, rMax, footprint, tries) {
+    // Measured on the real hub: sampling 400 random walkable points, the
+    // MEDIAN height spread across a 2.2-unit ring is 2.44 units and the
+    // flattest point found was 0.45. Genuinely flat ground is rare here, so
+    // this needs a lot of candidates and a realistic "good enough" bar —
+    // 14 tries and a 0.25 threshold effectively never hit either.
+    let best = null;
+    for (let i = 0; i < (tries || 60); i++) {
+      const spot = findGroundSpot(room, rMin, rMax);
+      let lo = spot.y, hi = spot.y, ok = true;
+      for (let a = 0; a < 8; a++) {
+        const ang = (Math.PI / 4) * a;
+        const surf = surfaceYIn(room, spot.x + Math.cos(ang) * footprint, spot.z + Math.sin(ang) * footprint);
+        if (!surf.hit || surf.water) { ok = false; break; }
+        lo = Math.min(lo, surf.y); hi = Math.max(hi, surf.y);
+      }
+      if (!ok) continue;
+      const spread = hi - lo;
+      if (!best || spread < best.spread) best = { x: spot.x, y: spot.y, z: spot.z, spread: spread, lowest: lo };
+      if (spread < 0.5) break;   // flat enough for this terrain, stop looking
+    }
+    return best || findGroundSpot(room, rMin, rMax);
+  }
+
   function addInvisibleHitbox(room, x, y, z, radius, interactType) {
     const hit = new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
     hit.position.set(x, y, z);
@@ -329,50 +360,9 @@ export async function bootFocciWorld(root, opts) {
     return node.children.slice();
   }
 
-  /* `targetSize` is the real-world size (largest dimension, in the same units
-     as the hub/tree/arc scaling elsewhere) this prop should end up at — NOT a
-     raw multiplier on the model's own scale. The hub, vine tree, and each arc
-     environment all normalize themselves this way (measure their bounding
-     box, scale so its largest side hits a target number) specifically so it
-     doesn't matter what units the source file was exported in. This used to
-     apply a flat multiplier (e.g. *0.7) straight to the prop's imported
-     scale instead — fine only if the kit happened to already be exported at
-     roughly 1 world-unit scale, and very wrong otherwise: whatever the true
-     cause, decorative props were coming out screen-fillingly huge (Focci
-     nearly lost inside oversized leaf shapes), which this fixes regardless
-     of the source file's actual scale. */
-  function scatterClone(room, template, count, minR, maxR, targetSize, opts) {
-    opts = opts || {};
-    const box = new THREE.Box3().setFromObject(template);
-    const size = box.getSize(new THREE.Vector3());
-    const baseScale = targetSize / Math.max(size.x, size.y, size.z, 0.0001);
-    const placed = [];
-    for (let i = 0; i < count; i++) {
-      // findGroundSpot only accepts a confirmed raycast hit on dry land —
-      // the old retry condition here (`room.collidables.length > 0`) never
-      // actually checked the SAMPLED x/z was valid ground, so a prop whose
-      // random angle/radius landed past the island's (irregular) edge, over
-      // open air, still got placed at fallback y:0 — floating with nothing
-      // under it. This is what avoidWater alone couldn't catch.
-      const spot = findGroundSpot(room, minR, maxR);
-      const propScale = baseScale * (0.85 + Math.random() * 0.3);
-      const inst = template.clone(true);
-      inst.scale.setScalar(propScale);
-      inst.rotation.y = Math.random() * Math.PI * 2;
-      const groundedY = spot.y - box.min.y * propScale;
-      inst.position.set(spot.x, groundedY, spot.z);
-      if (opts.tapForQuote) {
-        // "tap any tree/bush -> a random line", same idea as the one
-        // dedicated wisdom tree, applied to the ordinary scattered decoration.
-        // An invisible hitbox at roughly the model's mid-height, not the
-        // gappy visible leaves themselves — see addInvisibleHitbox's comment.
-        addInvisibleHitbox(room, spot.x, groundedY + (size.y * propScale) * 0.4, spot.z, Math.max(size.x, size.z) * propScale * 0.55, 'quote-prop');
-      }
-      room.group.add(inst);
-      placed.push(inst);
-    }
-    return placed;
-  }
+  /* scatterClone() lived here: it normalised a kit prop to a target size
+     and sprinkled N copies over validated ground. Both callers (the forest
+     kit and the bush kit on the hub) are gone, so it went with them. */
 
   /* ============================================================
      ASSET LOADING — every GLB used to load one at a time (an `await`
@@ -386,12 +376,10 @@ export async function bootFocciWorld(root, opts) {
   const ARC_ENV_FILES = ['island.glb', 'camp.glb', 'waterfall.glb', 'secretcamp.glb'];
   const arcCount = Math.min(ARC_TITLES.length, 4);
   const [
-    hub, forestKit, bushKit, mushGlb, chestGlb, birdGlb, treeGlb, doeGlb, diamondGlb,
+    hub, mushGlb, chestGlb, birdGlb, treeGlb, doeGlb, diamondGlb,
     ...arcGltfs
   ] = await Promise.all([
     loadGLB(ASSET('hub-island.glb')),
-    loadGLB(ASSET('forest-kit.glb')),
-    loadGLB(ASSET('bush-kit.glb')),
     loadGLB(ASSET('mushrooms.glb')),
     loadGLB(ASSET('chest.glb')),
     loadGLB(ASSET('birds.glb')),
@@ -414,22 +402,30 @@ export async function bootFocciWorld(root, opts) {
   const diamondSize = diamondBox.getSize(new THREE.Vector3());
   const diamondScale = DIAMOND_TARGET / Math.max(diamondSize.x, diamondSize.y, diamondSize.z, 0.0001);
   const DIAMOND_GLOW_COLOR = 0x7CFFC4;
-  function spawnDiamond(room, x, y, z, interactType, targetArc) {
+  /* One hue per destination so the four of them are telling apart at a
+     glance instead of being four identical glows. Index order matches
+     ARC_TITLES; the way-home diamond in each arc keeps the default. */
+  const ARC_GLOW_COLORS = [0x6FE3FF, 0xFFC44D, 0x9B8CFF, 0x6BF2A8];
+  function spawnDiamond(room, x, y, z, interactType, targetArc, glowColor) {
     const d = diamondGlb.scene.clone(true);
     const mixer = new THREE.AnimationMixer(d);
     if (diamondGlb.animations[0]) mixer.clipAction(diamondGlb.animations[0]).play();
     d.scale.setScalar(diamondScale);
-    const groundedY = y - diamondBox.min.y * diamondScale;
+    // Lifted a little: sitting exactly on the surface, the diamond's lower
+    // point kept disappearing into any bump it happened to land on and the
+    // silhouette came out clipped.
+    const groundedY = (y - diamondBox.min.y * diamondScale) + 0.3;
     d.position.set(x, groundedY, z);
     d.userData.interactType = interactType;
     if (targetArc !== undefined) d.userData.targetArc = targetArc;
     room.group.add(d);
     room.interactive.push(d);
     const glowY = groundedY + diamondSize.y * diamondScale * 0.5;
-    const light = new THREE.PointLight(DIAMOND_GLOW_COLOR, 1.1, 6, 2);
+    const col = glowColor !== undefined ? glowColor : DIAMOND_GLOW_COLOR;
+    const light = new THREE.PointLight(col, 1.3, 7, 2);
     light.position.set(x, glowY, z);
     room.group.add(light);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: DIAMOND_GLOW_COLOR, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: col, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
     sprite.scale.setScalar(2.2);
     sprite.position.set(x, glowY, z);
     room.group.add(sprite);
@@ -475,15 +471,18 @@ export async function bootFocciWorld(root, opts) {
     // up blown up to tree-sized and scattered with no purpose. Dropped
     // entirely rather than given their own separate smaller scatter pass —
     // asked to just remove them, not re-tune them.
-    const forestProps = extractPropGroups(forestKit.scene).filter((p) => !/flower/i.test(p.name));
-    // Random "tap this tree/bush for a quote" was asked to be removed —
-    // that reaction belongs ONLY to the one dedicated wisdom tree now, not
-    // every scattered prop, so tapForQuote (and its invisible hitbox) is
-    // gone from both kits below.
-    forestProps.forEach((p) => scatterClone(station, p, 3, 4, 12, 5));
-
-    const bushProps = extractPropGroups(bushKit.scene);
-    bushProps.forEach((p) => scatterClone(station, p, 3, 4, 12, 1.6));
+    // NO scattered vegetation any more. Both kits used to be fanned out over
+    // the island by scatterClone: the forest kit (17 groups — whole trees,
+    // but also loose branches, leaf sprigs and flowers) and the bush kit.
+    // Every one of those groups was normalized to a single targetSize, so a
+    // branch or a leaf came out the size of a sapling, and they read as
+    // shrunken trees and twigs stabbed into the ground at random angles.
+    // The hub model already carries its own baked-in scenery, so the whole
+    // decorative scatter is gone rather than re-tuned — what stays on the
+    // island is only what the player can actually do something with: the
+    // wisdom tree, mushrooms, word-hunt letters, chests and teleports.
+    // forest-kit.glb and bush-kit.glb are no longer fetched at all —
+    // nothing else used them, so that is two fewer GLBs on first load.
 
     // mushrooms — 15 individual finds, tucked near bushes/rocks. Same two
     // fixes as scatterClone: measured + normalized scale instead of a flat
@@ -514,11 +513,14 @@ export async function bootFocciWorld(root, opts) {
     // — the raw chest is 1.65 units tall with its origin near the middle, so
     // `position.set(x, spot.y, z)` alone buried almost half of it in the
     // terrain ("cắm vào bên trong đảo").
-    const CHEST_TARGET = 0.75;
+    // 0.75 units on a ~39-unit island is the size of a mushroom — the
+    // chests were technically there and correctly grounded, just far too
+    // small to ever notice ("chả thấy đâu"). Sized to read as a landmark.
+    const CHEST_TARGET = 1.7;
     const chestBox = new THREE.Box3().setFromObject(chestGlb.scene);
     const chestScale = CHEST_TARGET / Math.max(chestBox.getSize(new THREE.Vector3()).x, chestBox.getSize(new THREE.Vector3()).y, chestBox.getSize(new THREE.Vector3()).z, 0.0001);
     for (let i = 0; i < 3; i++) {
-      const spot = findGroundSpot(station, 4, 11);
+      const spot = findFlatGroundSpot(station, 4, 11, CHEST_TARGET * 0.6, 10);
       const inst = chestGlb.scene.clone(true);
       const mixer = new THREE.AnimationMixer(inst);
       inst.scale.setScalar(chestScale);
@@ -546,8 +548,24 @@ export async function bootFocciWorld(root, opts) {
     const treeBox = new THREE.Box3().setFromObject(treeGlb.scene);
     const treeScale = 6 / Math.max(treeBox.getSize(new THREE.Vector3()).x, treeBox.getSize(new THREE.Vector3()).z);
     treeGlb.scene.scale.setScalar(treeScale);
-    const treeSpot = findGroundSpot(station, 3, 10);
-    const treeGroundedY = treeSpot.y - treeBox.min.y * treeScale;
+    // Anchor to the lowest ground under the canopy's footprint, not the
+    // centre sample: on even slightly uneven ground that is the difference
+    // between roots resting on the surface and roots hanging in the air.
+    // Two different radii, on purpose. The SELECTION looks at a 2.2-unit
+    // ring (roughly the canopy) so the tree doesn't end up straddling a
+    // ledge, but the ANCHOR height is taken from a 0.7-unit ring — the
+    // trunk's actual footprint. Anchoring to the canopy ring buried the
+    // trunk 1.07 units into a rise at the centre; anchoring to the centre
+    // alone left roots hanging over the low side. The trunk has to meet the
+    // ground where the trunk is.
+    const treeSpot = findFlatGroundSpot(station, 2.5, 9, 2.2, 90);
+    let treeBaseY = treeSpot.y;
+    for (let a = 0; a < 8; a++) {
+      const ang = (Math.PI / 4) * a;
+      const su = surfaceYIn(station, treeSpot.x + Math.cos(ang) * 0.7, treeSpot.z + Math.sin(ang) * 0.7);
+      if (su.hit && !su.water) treeBaseY = Math.min(treeBaseY, su.y);
+    }
+    const treeGroundedY = treeBaseY - treeBox.min.y * treeScale;
     treeGlb.scene.position.set(treeSpot.x, treeGroundedY, treeSpot.z);
     station.group.add(treeGlb.scene);
     // Same gappy-vine-leaf tap problem as the scattered trees — an invisible
@@ -561,7 +579,7 @@ export async function bootFocciWorld(root, opts) {
     // rather than just another tree
     const treeGlowColor = 0xffd98a;
     const treeLight = new THREE.PointLight(treeGlowColor, 1.4, 14, 2);
-    treeLight.position.set(treeSpot.x, (treeSpot.y - treeBox.min.y * treeScale) + treeBox.getSize(new THREE.Vector3()).y * treeScale * 0.6, treeSpot.z);
+    treeLight.position.set(treeSpot.x, treeGroundedY + treeBox.getSize(new THREE.Vector3()).y * treeScale * 0.6, treeSpot.z);
     station.group.add(treeLight);
     const glowTex = makeGlowTexture();
     const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: treeGlowColor, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -574,14 +592,28 @@ export async function bootFocciWorld(root, opts) {
     const doeMixer = new THREE.AnimationMixer(doeGlb.scene);
     const clipByName = {};
     doeGlb.animations.forEach((c) => { clipByName[c.name.split('|').pop()] = c; });
-    doeGlb.scene.scale.setScalar(1.1);
+    const DOE_SCALE = 1.1;
+    doeGlb.scene.scale.setScalar(DOE_SCALE);
+    // No bounding-box anchor here, deliberately. doe.glb is a single
+    // SkinnedMesh whose rest geometry is FLAT — measured on the live scene,
+    // its geometry bounding box is y 0 -> 0.017, so Box3.setFromObject
+    // returns a 0.02-unit-tall box and any box.min.y offset taken from it is
+    // meaningless. The shape comes from the 44 bones, and the lowest of them
+    // (root_02) sits exactly at the object origin, i.e. the model is already
+    // authored with its feet at y=0.
+    // The real reason it was "chạy ở ngay không trung": tickDoe only ever
+    // moved x and z. It was correctly grounded where it spawned and then
+    // kept that one height for the rest of the session, so the moment it
+    // wandered onto different terrain it was flying. Fixed by re-sampling
+    // the surface every frame it moves — see groundDoe() in tickDoe.
+    const doeFootOffset = 0;
     const doeSurf = surfaceYIn(station, treeSpot.x + 2.5, treeSpot.z + 1.5);
-    const doeSpot = doeSurf.hit ? { x: treeSpot.x + 2.5, z: treeSpot.z + 1.5, y: doeSurf.y } : treeSpot;
-    doeGlb.scene.position.set(doeSpot.x, doeSpot.y, doeSpot.z);
+    const doeSpot = doeSurf.hit ? { x: treeSpot.x + 2.5, z: treeSpot.z + 1.5, y: doeSurf.y } : { x: treeSpot.x, z: treeSpot.z, y: treeBaseY };
+    doeGlb.scene.position.set(doeSpot.x, doeSpot.y - doeFootOffset, doeSpot.z);
     station.group.add(doeGlb.scene);
     station.doe = {
       obj: doeGlb.scene, mixer: doeMixer, clips: clipByName,
-      homeX: doeSpot.x, homeZ: doeSpot.z,
+      homeX: doeSpot.x, homeZ: doeSpot.z, footOffset: doeFootOffset,
       state: 'idle', cooldown: 6 + Math.random() * 6, current: null,
       wanderTarget: null, calledHome: false
     };
@@ -593,12 +625,27 @@ export async function bootFocciWorld(root, opts) {
     // the compass to sample within rather than the full circle, so they
     // don't cluster on the same side by chance.
     ARC_TITLES.slice(0, 4).forEach((title, i) => {
-      const sliceStart = (Math.PI / 2) * i, spot = findGroundSpotInSlice(station, 4, 10, sliceStart, sliceStart + Math.PI / 2);
+      // Pushed further out (6-12 instead of 4-10) and picked for flatness,
+      // so they stand in open ground instead of wedged against the hub's own
+      // rocks and trees where their corners were being cut off.
+      const sliceStart = (Math.PI / 2) * i;
+      let spot = findGroundSpotInSlice(station, 6, 12, sliceStart, sliceStart + Math.PI / 2);
+      for (let k = 0; k < 8; k++) {
+        const cand = findGroundSpotInSlice(station, 6, 12, sliceStart, sliceStart + Math.PI / 2);
+        let lo = cand.y, hi = cand.y, ok = true;
+        for (let a = 0; a < 6; a++) {
+          const ang = (Math.PI / 3) * a;
+          const su = surfaceYIn(station, cand.x + Math.cos(ang) * 1.1, cand.z + Math.sin(ang) * 1.1);
+          if (!su.hit || su.water) { ok = false; break; }
+          lo = Math.min(lo, su.y); hi = Math.max(hi, su.y);
+        }
+        if (ok && hi - lo < 0.3) { spot = cand; break; }
+      }
       // Every land is explorable regardless of story progress now — Focci
       // can walk into any of the 4 arcs any time; only the auto-opened
       // story text (gated separately, in the app's own onOpenArc handler)
       // still depends on what's actually been unlocked there.
-      const spawned = spawnDiamond(station, spot.x, spot.y, spot.z, 'teleport', i);
+      const spawned = spawnDiamond(station, spot.x, spot.y, spot.z, 'teleport', i, ARC_GLOW_COLORS[i % ARC_GLOW_COLORS.length]);
       station.teleports.push({ obj: spawned.obj, mixer: spawned.mixer, x: spot.x, z: spot.z, arcIndex: i, title, locked: false });
     });
   }
@@ -711,6 +758,38 @@ export async function bootFocciWorld(root, opts) {
     // refresh every arc room's treasure to point at the same hunt
     Object.values(rooms).forEach((r) => { if (r.wordTreasure) r.wordTreasure.found = false, (r.wordTreasure.obj.visible = true); });
     onLetterProgress(word, progressMask());
+  }
+  /* Picking things up by walking into them. Tapping a 0.45-unit mushroom on
+     a phone, while the camera is orbiting and Focci is moving, was a fiddly
+     shot to line up; now contact is enough and the tap handlers just call
+     the same two functions. Both still fire spawnPickupBurst, so there is
+     always a visible burst saying what was collected. */
+  const PICKUP_REACH = 1.15;
+  function collectMushroom(room, m) {
+    if (!m || m.found) return;
+    m.found = true;
+    if (m.hitbox) m.hitbox.visible = false;
+    m.obj.visible = false;
+    spawnPickupBurst(room, m.x, m.obj.position.y, m.z, 0xFF8A5C);
+    onWordFound({ type: 'mushroom-exp' });
+    maybeScheduleRespawn(room.mushrooms);
+  }
+  function checkWalkOverPickups(room) {
+    const cx = charState.x, cz = charState.z;
+    let got = false;
+    if (room.mushrooms) {
+      for (const m of room.mushrooms) {
+        if (m.found) continue;
+        if (Math.hypot(m.x - cx, m.z - cz) < PICKUP_REACH) { collectMushroom(room, m); got = true; }
+      }
+    }
+    if (room === station) {
+      for (const l of wordHunt.letters) {
+        if (l.found) continue;
+        if (Math.hypot(l.obj.position.x - cx, l.obj.position.z - cz) < PICKUP_REACH + 0.2) { collectLetter(l); got = true; }
+      }
+    }
+    if (got) focciReact();
   }
   function collectLetter(l) {
     if (l.found) return;
@@ -989,17 +1068,9 @@ export async function bootFocciWorld(root, opts) {
       }
     } else if (type === 'mushroom') {
       // obj here is the invisible hitbox (see addInvisibleHitbox), not the
-      // visible mushroom itself — matched by .hitbox now, and both the
-      // hitbox (stops future raycasts hitting it) and the real visual mesh
-      // need hiding.
+      // visible mushroom itself.
       const m = room.mushrooms.find((m) => m.hitbox === obj);
-      if (m && !m.found) {
-        m.found = true; obj.visible = false; m.obj.visible = false;
-        spawnPickupBurst(room, m.x, m.obj.position.y, m.z, 0xFF8A5C);
-        onWordFound({ type: 'mushroom-exp' });
-        maybeScheduleRespawn(room.mushrooms);
-        focciReact();
-      }
+      if (m) { collectMushroom(room, m); focciReact(); }
     } else if (type === 'letter') {
       const l = wordHunt.letters.find((l) => l.obj === obj);
       if (l) { collectLetter(l); focciReact(); }
@@ -1048,9 +1119,14 @@ export async function bootFocciWorld(root, opts) {
      ============================================================ */
   const clock = new THREE.Clock();
   const SPEED = 5.4;
-  function tickDoe(doe, dt, t) {
+  function tickDoe(room, doe, dt, t) {
     if (!doe) return;
     doe.mixer.update(dt);
+    // Re-seat on the terrain every frame — see the placement comment above.
+    const groundDoe = () => {
+      const surf = surfaceYIn(room, doe.obj.position.x, doe.obj.position.z);
+      if (surf.hit) doe.obj.position.y = surf.y - (doe.footOffset || 0);
+    };
     if (doe.calledHome) {
       const dx = doe.homeX - doe.obj.position.x, dz = doe.homeZ - doe.obj.position.z;
       const d = Math.hypot(dx, dz);
@@ -1058,6 +1134,7 @@ export async function bootFocciWorld(root, opts) {
         doe.obj.position.x += (dx / d) * 2.4 * dt;
         doe.obj.position.z += (dz / d) * 2.4 * dt;
         doe.obj.rotation.y = Math.atan2(dx, dz);
+        groundDoe();
         if (doe.state !== 'Dear_walk') playDoeClip(doe, 'Dear_walk', true);
       } else {
         doe.calledHome = false;
@@ -1073,6 +1150,7 @@ export async function bootFocciWorld(root, opts) {
         doe.obj.position.x += (dx / d) * 2.2 * dt;
         doe.obj.position.z += (dz / d) * 2.2 * dt;
         doe.obj.rotation.y = Math.atan2(dx, dz);
+        groundDoe();
         if (doe.state !== 'Dear_walk') playDoeClip(doe, 'Dear_walk', true);
       } else {
         doe.wanderTarget = null;
@@ -1140,7 +1218,8 @@ export async function bootFocciWorld(root, opts) {
     const bob = surf.water ? Math.sin(t * 3) * 0.05 - 0.32 : (walking ? Math.abs(Math.sin(charState.walkT)) * 0.07 : Math.sin(t * 1.6) * 0.02);
     character.position.set(charState.x, surf.y + bob, charState.z);
 
-    if (room.doe) tickDoe(room.doe, dt, t);
+    checkWalkOverPickups(room);
+    if (room.doe) tickDoe(room, room.doe, dt, t);
     room.chests.forEach((c) => c.mixer.update(dt));
     room.teleports.forEach((tp) => tp.mixer.update(dt));
     if (room._homeTeleport) room._homeTeleport.mixer.update(dt);

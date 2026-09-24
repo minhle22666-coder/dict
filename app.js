@@ -3831,17 +3831,29 @@ async function renderSaySaved(box, head, stale){
   else if(savedSort==='za') list.sort((a,b)=>String(b.you).localeCompare(String(a.you)));
   else list.sort((a,b)=>b.ts-a.ts);
 
-  let h='';
+  /* What A/B/C/D actually mean, spelled out once at the top — the letters
+     are only useful for sifting low scores out if their boundaries are
+     visible. Collapsed by default so it costs one line when ignored. */
+  let h='<details class="sy-legend"><summary>What do A, B, C, D mean?</summary><ul>';
+  SPEAKUP_BANDS.forEach(b=>{
+    const hi = b.g==='A' ? 100 : (b.g==='B' ? 90 : (b.g==='C' ? 70 : 40));
+    h+='<li><span class="sy-grade sy-grade-'+b.g.toLowerCase()+'">'+b.g+'</span>'
+      +'<b>'+b.min+'\u2013'+hi+'</b> '+esc(b.note)+'</li>';
+  });
+  h+='</ul><p>\u0110i\u1ec3m ch\u1ea5m \u0111\u1ed9 T\u1ef0 NHI\u00caN khi nghe, kh\u00f4ng ph\u1ea3i ch\u1ea5m ng\u1eef ph\u00e1p.</p></details>';
   for(const a of list){
     const v=SAY_VERDICT[a.verdict]?a.verdict:'';
     const vm=v?SAY_VERDICT[v]:null;
     const topic=WRITE_TOPICS[a.topic]||{label:'Practice',icon:'\u2728',color:'blue'};
     const id=esc(a.id);
     h+='<div class="sy-row'+(v?' sy-v-'+v:'')+'">';
+    const band=speakUpBand(a.score);
     h+='<div class="sy-head" onclick="this.parentNode.classList.toggle(\'open\')">'
-      +'<span class="sy-dot">'+(vm?vm.ico:'\u{1F4AC}')+'</span>'
+      +'<span class="sy-grade sy-grade-'+band.g.toLowerCase()+'">'+band.g+'</span>'
       +'<div class="sy-mid"><div class="sy-you-t">'+esc(a.you)+'</div>'
-      +'<div class="sy-meta"><span>'+topic.icon+' '+esc(topic.label)+'</span><span>'+sayWhen(a.ts)+'</span></div></div>'
+      +'<div class="sy-meta"><span>'+topic.icon+' '+esc(topic.label)+'</span>'
+      +'<span>'+normSpeakUpScore(a.score, a.verdict)+'/100</span>'
+      +'<span>'+sayWhen(a.ts)+'</span></div></div>'
       +'<span class="wf-x">\u25be</span></div>';
     h+='<div class="sy-detail">';
     if(a.ctx) h+='<div class="sy-blk"><div class="sy-blk-l">Situation</div><div class="sy-blk-t">'+esc(a.ctx)+'</div></div>';
@@ -4902,6 +4914,7 @@ function renderWrite(){
     h+='<div class="su-coach"><img class="su-coach-fox" src="./mascot-compass.webp" alt="" onerror="this.style.display=\'none\'"/>'
       +'<b>Coach’s Feedback:</b> '+esc(writeResult.feedback_vi||'')+'</div>';
     h+='<div class="su-feedback">';
+    h+=speakUpScoreHtml(writeResult.score);
     h+=speakUpSegmentsHtml(writeResult.segments);
     h+=speakUpMistakesHtml(writeResult.mistakes);
     h+='<button class="su-ans-lbl" onclick="pickSpeakUpAnswer(\'fixed\')">'
@@ -4955,7 +4968,15 @@ function gradeSpeakUpPrompt(promptObj, userAnswer){
   +'  level 2 = grammatically correct but a native speaker would not phrase it this way — stiff/translated-sounding, still understandable.\n'
   +'  level 3 = grammatically wrong, or confusing/unclear to a native listener. MUST include "fix".\n'
   +'Keep segments as short natural phrase chunks, not single letters, and not the whole sentence as one blob unless it truly has zero issues.\n\n'
+  +'ALSO score the attempt out of 100 on how NATURAL it sounds to a native ear. This is NOT a grammar test \u2014 '
+  +'a grammatically flawless sentence that no native would ever say scores lower than a slightly rough one that '
+  +'lands perfectly. Use these bands exactly:\n'
+  +'  0-40  (D): nobody would understand what they meant \u2014 the grammar has collapsed, or the meaning has drifted away from the Vietnamese.\n'
+  +'  40-70 (C): the message does get across, but several parts are unnatural, or the grammar is noticeably off.\n'
+  +'  70-90 (B): well expressed and a native understands it completely; just slightly unnatural in places.\n'
+  +'  90-100 (A): well expressed, natural, no grammar errors, a native understands it completely. It does NOT have to match "natural_sample" \u2014 a different but equally natural phrasing still scores in this band.\n\n'
   +'Return ONLY this JSON:\n{\n'
+  +'  "score": 0-100 integer, following the bands above,\n'
   +'  "verdict": "good" | "close" | "off",\n'
   +'  "feedback_vi": "Nếu câu ĐÃ ĐÚNG VÀ TỰ NHIÊN HOÀN TOÀN: khen 1 câu ngắn gọn. Nếu KHÔNG: 1 câu tiếng Việt NGẮN GọN nêu ĐÚNG vấn đề CHÍNH của cả câu (không liệt kê từng lỗi ở đây, chỉ tóm tắt vấn đề lớn nhất, ví dụ tư duy dịch word-by-word, sai giới từ, sai thời...).",\n'
   +'  "segments": [ {"text":"...", "level":1|2|3, "fix":"chỉ có nếu level 3"} ],\n'
@@ -4985,8 +5006,37 @@ async function askGradeSpeakUp(promptObj, userAnswer){
   if(!Array.isArray(data.mistakes)) data.mistakes=[];
   if(!data.fixed_sentence) data.fixed_sentence=userAnswer;
   if(!data.natural_sample) data.natural_sample=userAnswer;
+  data.score=normSpeakUpScore(data.score, data.verdict);
   return data;
 }
+/* Naturalness out of 100, bucketed A/B/C/D. Defined once so the play
+   screen, the saved list and its legend can never drift apart. If the model
+   omits the score (an older cached response, or it just ignored the field)
+   fall back to the middle of the band its verdict implies rather than
+   showing a confident-looking 0. */
+const SPEAKUP_BANDS=[
+  {g:'A', min:90, label:'Natural',     note:'Di\u1ec5n \u0111\u1ea1t t\u1ed1t, t\u1ef1 nhi\u00ean, kh\u00f4ng sai ng\u1eef ph\u00e1p \u2014 ng\u01b0\u1eddi b\u1ea3n x\u1ee9 hi\u1ec3u tr\u1ecdn v\u1eb9n.'},
+  {g:'B', min:70, label:'Good',        note:'Di\u1ec5n \u0111\u1ea1t t\u1ed1t, ng\u01b0\u1eddi b\u1ea3n x\u1ee9 hi\u1ec3u h\u1ebft, ch\u1ec9 h\u01a1i thi\u1ebfu t\u1ef1 nhi\u00ean v\u00e0i ch\u1ed7.'},
+  {g:'C', min:40, label:'Gets across', note:'Truy\u1ec1n \u0111\u1ea1t \u0111\u01b0\u1ee3c \u00fd nh\u01b0ng nhi\u1ec1u ch\u1ed7 ch\u01b0a t\u1ef1 nhi\u00ean ho\u1eb7c h\u01a1i sai ng\u1eef ph\u00e1p.'},
+  {g:'D', min:0,  label:'Unclear',     note:'Kh\u00f3 hi\u1ec3u \u2014 sai ng\u1eef ph\u00e1p qu\u00e1 nhi\u1ec1u ho\u1eb7c l\u1ec7ch h\u1eb3n so v\u1edbi c\u00e2u g\u1ed1c.'}
+];
+function normSpeakUpScore(raw, verdict){
+  let n=Number(raw);
+  if(!isFinite(n)) n = verdict==='good' ? 92 : (verdict==='off' ? 30 : 60);
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+function speakUpBand(score){
+  const n=normSpeakUpScore(score);
+  return SPEAKUP_BANDS.find(b=>n>=b.min) || SPEAKUP_BANDS[SPEAKUP_BANDS.length-1];
+}
+function speakUpScoreHtml(score){
+  const n=normSpeakUpScore(score), b=speakUpBand(n);
+  return '<div class="su-score su-score-'+b.g.toLowerCase()+'">'
+    +'<span class="su-score-g">'+b.g+'</span>'
+    +'<span class="su-score-n">'+n+'<i>/100</i></span>'
+    +'<span class="su-score-l">'+b.label+'</span></div>';
+}
+window.speakUpBand=speakUpBand;
 /* ------------------------------------------------------------------
    LỊCH SỬ SAY IT — mỗi câu chơi xong TỰ ĐỘNG được lưu, nhưng KHÔNG nằm trong
    từ điển (IndexedDB "entries") nữa. Trước đây mỗi lượt là một bản ghi từ
@@ -5016,6 +5066,8 @@ function saveWriteAttempt(promptObj, userAnswer, result){
     pid: promptObj.id, topic: promptObj.topic, ctx: promptObj.context, vi: promptObj.vi,
     you: userAnswer, originalAnswer: userAnswer, liked: null,
     verdict: (result.verdict==='good'||result.verdict==='off') ? result.verdict : 'close',
+    score: normSpeakUpScore(result.score, result.verdict),
+    grade: speakUpBand(normSpeakUpScore(result.score, result.verdict)).g,
     fb: String(result.feedback_vi||''),
     mistakes,
     fixed: String(result.fixed_sentence||userAnswer),
