@@ -1929,40 +1929,17 @@ window.renderGameHub = function(){
 
   h+=map.hero;
 
-  /* Games panel — the actual games belong right under the hero, not
-     buried below the full land map. The Map (12-land strip) moved down
-     to a secondary section since it's reference material you check
-     occasionally, not the thing you came here to tap. */
-  h+='<div class="gm-zone"><span class="gm-zone-t">Mini games</span>'
-    +'<span class="gm-zone-rule"></span>'
-    +'<span class="gm-zone-chip" id="gm-ready">…</span></div>';
-  /* Ba game là ba thẻ CÙNG KÍCH THƯỚC — trước đây Say it là một thanh dài
-     chiếm cả hàng dưới hai ô kia nên trông lệch. Mỗi lần vào sảnh, mỗi thẻ
-     bốc một phong cảnh khác nhau (không trùng nhau) và một dáng Focci hợp với
-     game đó, nên sảnh không bao giờ giống hệt lần trước. */
-  const FS=window.FocciScenes;
-  const bgs=FS.pickBgs(3);
-  const card=(cls,mode,bg,pose,title,sub)=>
-    '<button class="gm-card '+cls+'" style="'+FS.bgStyle(bg)+'" onclick="setPracticeMode(\''+mode+'\')">'
-    +'<img class="gm-card-char" src="./'+pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
-    +'<span class="gm-card-txt"><span class="gm-card-t">'+title+'</span>'
-    +'<span class="gm-card-s">'+sub+'</span></span></button>';
-  /* Ba dáng Focci luôn KHÁC nhau: bốc lần lượt, mỗi lần tránh các dáng đã bốc. */
-  const pT=FS.pickPose('type');
-  const pM=FS.pickPose('match',[pT]);
-  const pS=FS.pickPose('say',[pT,pM]);
-  h+='<div class="gm-trio">';
-  h+=card('is-type','type',bgs[0],pT,'Type it','Spell it out');
-  h+=card('is-match','match',bgs[1],pM,'Match it','Pick the word');
-  h+=card('is-write','write',bgs[2],pS,'Speak Up','Say it out loud');
-  h+='</div>';
+  /* The mini-game tiles used to live here. The home page is the mini-game
+     menu now — same three games, better art, and it is the first thing the
+     app shows — so this hub keeps only what is actually its own: the story
+     hero and the land map. Leaving a second, worse copy of the menu here
+     just meant it flashed up for a moment on the way into every game. */
 
   h+=map.more;
   h+=map.mapSection;
 
   h+='</div>';
   area.innerHTML=h;
-  fillGameCounts();
 };
 
 /* Chip "bao nhiêu từ sẵn để luyện" phải đọc IndexedDB, nên điền SAU khi

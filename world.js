@@ -1202,9 +1202,15 @@ export async function bootFocciWorld(root, opts) {
   // and overviewCamera() (an explicit "see the whole island" jump) has
   // real room to zoom out to.
   const MAX_ZOOM = 60;
-  const ORBIT_DRAG_FROM = 30;   // past this, a one-finger drag turns the island
+  /* Turning the island with one finger used to switch on automatically
+     past 30 units of zoom. That silently took walking away: pull the camera
+     back to look around and Focci simply stopped responding, with nothing
+     on screen to say why. It is an explicit mode now — the overview button
+     turns it on, and the first tap anywhere turns it off again. */
+  let inspectMode = false;   // past this, a one-finger drag turns the island
   function overviewCamera() {
     setCamMode('orbit');
+    inspectMode = true;
     // phi is measured from straight up, so a SMALLER value lifts the camera.
     // 0.72 puts it ~48 degrees above the island: high enough to take the
     // whole thing in, shallow enough that the relief still reads.
@@ -1316,6 +1322,7 @@ export async function bootFocciWorld(root, opts) {
   let camMode = 'orbit';
   function setCamMode(m) {
     camMode = m;
+    inspectMode = false;        // either view is for walking, not inspecting
     character.visible = (m !== 'fpv');
     if (m === 'fpv') { cam.tPhi = 1.45; cam.tRadius = 7; }
     else { cam.tPhi = 1.05; cam.tRadius = 14; }
@@ -1347,11 +1354,16 @@ export async function bootFocciWorld(root, opts) {
       // Sat at Focci's eye line, looking the way he walks. "Forward" is
       // -sin/-cos of cam.theta, the same vector the movement code uses, so
       // the view and the controls can never disagree.
-      const eyeY = character.position.y + 1.18;
-      camera.position.set(charState.x, eyeY, charState.z);
+      /* Nudged forward along the view direction and given a walk bob.
+         Sitting exactly on charState put the camera inside Focci's own
+         collision volume at the near plane, so the screen filled with a
+         flat colour and it looked as though nothing moved at all. */
+      const eyeY = character.position.y + 1.18 + (Math.sin(charState.walkT * 2) * 0.035);
+      const fx = -Math.sin(cam.theta), fz = -Math.cos(cam.theta);
+      camera.position.set(charState.x + fx * 0.32, eyeY, charState.z + fz * 0.32);
       // Barely tilted down (~3 degrees over 8 units). At -0.9 the gaze ran
       // into the ground on any slope and the screen filled with dirt.
-      camera.lookAt(charState.x - Math.sin(cam.theta) * 8, eyeY - 0.4, charState.z - Math.cos(cam.theta) * 8);
+      camera.lookAt(charState.x + fx * 8, eyeY - 0.4, charState.z + fz * 8);
       return;
     }
     const sinPhi = Math.sin(cam.phi);
@@ -1402,11 +1414,7 @@ export async function bootFocciWorld(root, opts) {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1 && singleId === e.pointerId && moveOrigin) {
-      // Pulled far enough back that Focci is a speck, a drag is obviously
-      // meant to turn the island, not to walk him — so one finger orbits
-      // out here and goes back to steering as soon as you zoom in. No mode
-      // to remember, and the overview button lands you straight in it.
-      if (cam.radius > ORBIT_DRAG_FROM) {
+      if (inspectMode) {
         moveVec.x = 0; moveVec.y = 0;
         const last = pointers.get(e.pointerId) || moveOrigin;
         cam.tTheta -= (e.clientX - moveOrigin.x) * 0.0006;
@@ -1436,7 +1444,7 @@ export async function bootFocciWorld(root, opts) {
       // A fast upward flick jumps. Held apart from the walk joystick by
       // speed, not direction: dragging up to walk forward is a sustained
       // press, this is a flick that is over in a quarter of a second.
-      else if (held < 260 && dyUp > 55 && dxAbs < 70 && cam.radius <= ORBIT_DRAG_FROM) startJump(activeRoom());
+      else if (held < 260 && dyUp > 55 && dxAbs < 70 && !inspectMode) startJump(activeRoom());
     }
     pointers.delete(e.pointerId);
     if (e.pointerId === singleId) { singleId = null; moveOrigin = null; moveVec = { x: 0, y: 0 }; }
@@ -1450,6 +1458,8 @@ export async function bootFocciWorld(root, opts) {
   const ndcVec = new THREE.Vector2();
   let lastEmptyTap = 0;
   function handleTap(clientX, clientY) {
+    // Touching anything returns you to steering Focci.
+    if (inspectMode) { inspectMode = false; root.dispatchEvent(new CustomEvent('focci-inspect', { detail: { on: false } })); }
     const rect = canvas.getBoundingClientRect();
     ndcVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     ndcVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
