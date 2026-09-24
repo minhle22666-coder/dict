@@ -830,7 +830,23 @@ export async function bootFocciWorld(root, opts) {
   let moveOrigin = null, moveVec = { x: 0, y: 0 }, singleId = null;
   let lastOrbitMid = null, lastPinch = null, downTime = 0, downPos = null;
   function pinchDist() { const p = Array.from(pointers.values()); return p.length < 2 ? null : Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); }
+  /* A full-screen panel (Games, Saved, Settings...) sits on top of the
+     canvas, but a pointer that lands on the canvas captures itself and
+     keeps steering Focci from underneath. Gate every gesture on the
+     overlay being closed, and drop any gesture still in flight when one
+     opens. */
+  function overlayOpen() {
+    if (document.hidden) return true;                       // tab in the background
+    var ov = document.getElementById('fw-overlay');
+    if (ov && ov.style.display === 'none') return true;     // world not on screen at all
+    return !!document.querySelector('.view.fw-panel.active'); // Games/Saved/Progress/Settings
+  }
+  function releaseGesture() {
+    pointers.clear(); singleId = null; moveOrigin = null;
+    moveVec.x = 0; moveVec.y = 0; lastPinch = null; lastOrbitMid = null;
+  }
   canvas.addEventListener('pointerdown', (e) => {
+    if (overlayOpen()) return;
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) { singleId = e.pointerId; moveOrigin = { x: e.clientX, y: e.clientY }; moveVec = { x: 0, y: 0 }; downTime = Date.now(); downPos = { x: e.clientX, y: e.clientY }; }
@@ -842,6 +858,7 @@ export async function bootFocciWorld(root, opts) {
     }
   });
   canvas.addEventListener('pointermove', (e) => {
+    if (overlayOpen()) { releaseGesture(); return; }
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1 && singleId === e.pointerId && moveOrigin) {
@@ -1087,6 +1104,13 @@ export async function bootFocciWorld(root, opts) {
 
   function animate() {
     requestAnimationFrame(animate);
+    /* Nothing of this scene is visible while a full-screen panel covers
+       it, so simulating and re-rendering it is pure battery burn — and
+       on a phone it also steals frames from the panel's own scrolling.
+       Park the loop instead: keep the rAF alive so it picks straight
+       back up, but skip the work and reset the clock's delta so Focci
+       doesn't lurch forward by the whole paused duration on resume. */
+    if (overlayOpen()) { releaseGesture(); clock.getDelta(); return; }
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
     const room = activeRoom();

@@ -984,11 +984,15 @@
      reward — measured 154px tall with 26px padding and a 24px radius.
      Both text blocks are justified in the mockup (the giveaway is the
      stretched word-spacing on "You see a foreigner standing near the"). */
-  .su-scene{position:relative;overflow:hidden;border-radius:24px;padding:25px 24px 14px;margin:0 0 20px;
+  .su-scene{position:relative;overflow:hidden;border-radius:24px;padding:20px 24px 13px;margin:0 0 20px;
     background:rgba(3,58,54,.66);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
-  .su-context{font-size:15.5px;line-height:1.5;font-weight:500;color:#fff;text-align:justify;margin:0}
-  .su-vi{position:relative;margin-top:20px;padding-left:26px;font-size:15.5px;line-height:1.55;
-    font-weight:500;color:#fff;text-align:justify}
+  /* Measured off the mockup: line pitch 17px on ~14px text, i.e.
+     line-height ~1.18, and REGULAR weight — the app's body 500 was
+     reading as bold here. Vietnamese gets a hair more leading than the
+     English so the dấu don't touch the line above. */
+  .su-context{font-size:15px;line-height:1.28;font-weight:400;color:#fff;text-align:justify;margin:0}
+  .su-vi{position:relative;margin-top:17px;padding-left:26px;font-size:15px;line-height:1.38;
+    font-weight:400;color:#fff;text-align:justify}
   .su-vi-q{position:absolute;left:-2px;top:2px;font-family:Georgia,serif;font-size:34px;line-height:.8;
     color:rgba(255,255,255,.62)}
   .su-xp{display:block;position:relative;z-index:1;margin-top:8px;text-align:right;
@@ -1016,7 +1020,7 @@
   /* Measured #07CEC4, 45px tall, radius 16. The fox sits ON the bar's
      left end and overhangs it, so the text is padded 34px clear. */
   .su-coach{position:relative;margin:0 0 12px;padding:11px 15px 11px 34px;border-radius:16px;
-    background:#07CEC4;color:#0B3F3A;font-size:13.5px;line-height:1.42;font-style:italic;font-weight:600}
+    background:#07CEC4;color:#0B3F3A;font-size:13px;line-height:1.34;font-style:italic;font-weight:600}
   .su-coach b{font-weight:800;font-style:italic}
   .su-coach-fox{position:absolute;left:-14px;bottom:-2px;width:50px;height:auto;
     filter:drop-shadow(0 3px 5px rgba(0,0,0,.3))}
@@ -1032,14 +1036,14 @@
        level 3  red,    regular,  strikethrough  — wrong
        .su-fix  green,  BOLD,     no decoration  — the replacement
      Only the fix is bold; only level 3 is struck. */
-  .su-diff{font-size:15px;line-height:1.85;text-align:justify;margin:0 0 15px;color:#E9EFC8}
+  .su-diff{font-size:14.5px;line-height:1.38;text-align:justify;margin:0 0 15px;color:#E9EFC8}
   .su-seg-1{color:#E9EFC8;font-weight:500;text-decoration:none}
   .su-seg-2{color:#F0A874;font-weight:500;text-decoration:none}
   .su-seg-3{color:#F0776A;font-weight:500;text-decoration:line-through;text-decoration-thickness:1.5px}
   .su-fix{color:#7BE052;font-weight:800;text-decoration:none}
 
-  .su-mistakes{list-style:disc;margin:0;padding:0 0 0 19px;display:flex;flex-direction:column;gap:8px}
-  .su-mistakes li{font-size:13.5px;line-height:1.5;color:#fff}
+  .su-mistakes{list-style:disc;margin:0;padding:0 0 0 19px;display:flex;flex-direction:column;gap:9px}
+  .su-mistakes li{font-size:13px;line-height:1.34;color:#fff}
   .su-mistakes b.wrong{font-weight:500;color:#fff}      /* the quoted error is NOT bold */
   .su-mistakes b.ok{font-weight:800;color:#fff}         /* only the correction is */
   .su-mistakes span{color:rgba(186,232,225,.9)}
@@ -1055,7 +1059,7 @@
     box-shadow:0 0 0 0 rgba(255,213,74,0);transition:box-shadow .2s}
   .su-ans-box.picked{box-shadow:0 0 0 2.5px #FFD54A}
   /* White, bold, italic, justified — measured off the mockup. */
-  .su-ans-text{font-size:15px;line-height:1.55;font-style:italic;font-weight:700;color:#fff;text-align:justify}
+  .su-ans-text{font-size:14.5px;line-height:1.36;font-style:italic;font-weight:700;color:#fff;text-align:justify}
   /* The phrases the correction introduced are underlined, not recoloured. */
   .su-ans-text u.su-u{text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2.5px}
   .su-ans-text .wtap{border-radius:4px;transition:background .15s}

@@ -4648,26 +4648,57 @@ function pickSpeakUpTopic(avoid){
   const keys=Object.keys(WRITE_TOPICS).filter(k=>k!==avoid);
   return pick(keys.length?keys:Object.keys(WRITE_TOPICS));
 }
-function genSpeakUpPrompt(topicKey){
+/* The reference sentence the user gave is 39 Vietnamese words over two
+   sentences; the model kept returning things like "Mưa hoài kiểu này
+   chắc tôi ở nhà luôn quá, ra đường ướt hết đồ." — 15 words, one
+   sentence, nothing hard to translate. Three changes fixed that: the
+   word "short" is gone from the brief, there is a hard word floor stated
+   as a number, and the speech has to carry a concrete thing/mechanism so
+   the learner has something real to render into English rather than a
+   mood. speakUpScenarioOk() below enforces the floor client-side. */
+function genSpeakUpPrompt(topicKey, stricter){
   const topic=WRITE_TOPICS[topicKey]||WRITE_TOPICS.casual;
-  return 'You write ONE short roleplay scenario for a Vietnamese learner practicing SPOKEN English.\n\n'
+  return 'You write ONE roleplay scenario for a Vietnamese learner practising SPOKEN English.\n\n'
   +'TOPIC: '+topic.label+'\n\n'
-  +'"vi" must be a real little SPEECH, not a single short clause — always TWO sentences:\n'
-  +'  Sentence 1: the actual thing said out loud to the other person (can itself have 2 clauses — an ask/warning plus a softener like "cho ... hơn", "được không", "nhé").\n'
-  +'  Sentence 2: a SEPARATE short sentence giving the reason/explanation why, usually starting with "Vì..." — this is what makes it a real spoken moment, not a textbook line.\n'
-  +'Match this length and shape exactly (topic/content must be DIFFERENT from this example, only the shape/length matters):\n'
-  +'  vi: "Chào anh, tôi không muốn anh vô tình bị cửa đập vào người, anh có thể đứng lên bậc này cho an toàn hơn. Vì xe bus này là xe cũ nên cơ chế đóng cửa không an toàn."\n'
-  +'  context: "You see a foreigner standing near the bus door and remind him."\n\n'
-  +'"context" is ONE short English sentence (10-14 words) describing WHO is speaking to WHOM and WHY, in neutral terms only — '
-  +'CRITICAL: it must NEVER contain, or closely paraphrase, any of the specific words/idioms an ideal English translation of "vi" '
-  +'would use. A learner reading ONLY "context" should not be able to guess the target phrasing at all — it sets up the scene, nothing more.\n\n'
+  +'"vi" is the Vietnamese speech the learner must render into English. HARD REQUIREMENTS:\n'
+  +'  - EXACTLY two sentences, separated by a full stop.\n'
+  +'  - Between 32 and 60 Vietnamese words IN TOTAL. Count them. Fewer than 32 is a FAILURE.\n'
+  +'  - Sentence 1 = what is actually said out loud, and it must itself have at least two\n'
+  +'    clauses: the ask/warning/offer PLUS a softener ("cho ... hơn", "được không", "nhé",\n'
+  +'    "nếu được", "cho tiện").\n'
+  +'  - Sentence 2 = a separate sentence giving the REASON, usually opening with "Vì...",\n'
+  +'    "Tại vì...", "Do..." — this is what turns a textbook line into a real spoken moment.\n'
+  +'  - The speech must involve a CONCRETE object, mechanism, place or arrangement (a door\n'
+  +'    latch, a deposit, a delivery slot, a warranty, a seat row...) that is genuinely\n'
+  +'    awkward to translate word-for-word. A sentence that only reports a feeling or the\n'
+  +'    weather is too easy — do not write one.\n\n'
+  +'Two examples, for LENGTH AND SHAPE ONLY — your topic and content must be completely\n'
+  +'different from both:\n'
+  +'  vi: "Chào anh, tôi không muốn anh vô tình bị cửa đập vào người, anh có thể đứng lên bậc này cho an toàn hơn. Vì xe bus này là xe cũ nên cơ chế đóng cửa không an toàn." (39 words)\n'
+  +'  context: "You see a foreigner standing near the bus door and remind him."\n'
+  +'  vi: "Chị ơi, em gửi lại chị cái máy này, chị xem giúp em đổi sang màu khác được không ạ. Vì em mới mở hộp ra thì thấy vỏ bị xước một đường dài ở mặt sau." (37 words)\n'
+  +'  context: "You are at a shop counter speaking to the staff about something you bought."\n\n'
+  +'"context" is ONE English sentence of 10-14 words saying WHO is speaking to WHOM and WHY, '
+  +'in neutral terms only — CRITICAL: it must NEVER contain, or closely paraphrase, any word or '
+  +'idiom that a good English translation of "vi" would use. A learner who reads ONLY "context" '
+  +'must not be able to guess the target phrasing. It sets the scene, nothing more.\n\n'
+  +(stricter?'YOUR PREVIOUS ATTEMPT WAS TOO SHORT. Write a visibly longer "vi" this time: two full sentences, at least 35 words.\n\n':'')
   +'Return ONLY this JSON: {"context":"...", "vi":"..."}';
 }
-async function askGenSpeakUpScenario(topicKey){
+/* Cheap client-side gate so a lazy generation never reaches the player:
+   two sentences and a real word count, matching the prompt's own floor. */
+function speakUpScenarioOk(vi){
+  const t=String(vi||'').trim();
+  if(!t) return false;
+  const words=t.split(/\s+/).filter(Boolean).length;
+  const sentences=t.split(/[.!?]+/).map(x=>x.trim()).filter(x=>x.length>3).length;
+  return words>=30 && sentences>=2;
+}
+async function askGenSpeakUpScenario(topicKey, stricter){
   if(!getKey() || !navigator.onLine) return pickWritePrompt();
   try{
     const model=getModel();
-    const prompt=genSpeakUpPrompt(topicKey);
+    const prompt=genSpeakUpPrompt(topicKey, !!stricter);
     const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(getKey())}`;
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
@@ -4680,6 +4711,9 @@ async function askGenSpeakUpScenario(topicKey){
     if(s<0||e<0) throw new Error('BAD_JSON');
     const data=JSON.parse(txt.slice(s,e+1));
     if(!data.vi || !data.context) throw new Error('EMPTY');
+    /* One retry with a sharper nudge if the model ignored the word floor;
+       after that take what we got rather than stalling the round. */
+    if(!speakUpScenarioOk(data.vi) && !stricter) return askGenSpeakUpScenario(topicKey, true);
     return { id:'ai_'+now().toString(36)+Math.random().toString(36).slice(2,5), topic:topicKey,
       context:String(data.context), vi:String(data.vi), ai:true };
   }catch(e){
