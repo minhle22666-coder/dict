@@ -3413,15 +3413,21 @@
      ordinary pickup asides (.reaction) are untouched and stay small. */
   .fw-wisdom-veil{position:fixed;inset:0;z-index:44;pointer-events:none;opacity:0;
     transition:opacity .7s ease;
-    background:radial-gradient(ellipse 78% 58% at 50% 46%,rgba(4,16,26,0) 0%,rgba(4,16,26,.42) 62%,rgba(3,10,18,.8) 100%)}
+    background:radial-gradient(ellipse 74% 46% at 50% 34%,rgba(4,16,26,0) 0%,rgba(4,16,26,.4) 62%,rgba(3,10,18,.82) 100%)}
   html.wisdom-on .fw-wisdom-veil{opacity:1}
-  .fw-quote.wisdom{z-index:45;left:22px;right:22px;bottom:auto;top:50%;
-    transform:translateY(calc(-50% + 14px)) scale(.96);
+  /* Sat LOW, not centred. The camera swings round to show Focci's face
+     while the tree speaks, and a card in the middle of the screen was
+     landing straight over it — you could see his feet under the box and
+     nothing else. The message belongs in the bottom third, with him
+     framed above it. */
+  .fw-quote.wisdom{z-index:45;left:22px;right:22px;top:auto;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 104px);
+    transform:translateY(14px) scale(.96);
     flex-direction:column;align-items:center;text-align:center;gap:10px;
     padding:24px 22px 22px;border-radius:26px;
     background:linear-gradient(180deg,rgba(18,52,58,.9),rgba(8,30,36,.94));
     box-shadow:0 0 0 1px rgba(255,226,168,.3),0 0 46px rgba(255,214,140,.28),0 24px 54px rgba(0,0,0,.5)}
-  .fw-quote.wisdom.show{transform:translateY(-50%) scale(1)}
+  .fw-quote.wisdom.show{transform:translateY(0) scale(1)}
   .fw-quote.wisdom img{width:62px;height:62px}
   .fw-quote.wisdom p{font-size:16.5px;line-height:1.62;font-weight:500;
     color:#FFF3DA;text-shadow:0 2px 10px rgba(0,0,0,.5)}

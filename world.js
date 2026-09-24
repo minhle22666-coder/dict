@@ -975,31 +975,99 @@ export async function bootFocciWorld(root, opts) {
     cam.tPhi = 0.72; cam.tRadius = MAX_ZOOM;
   }
 
+  /* ============================================================
+     FOCCI
+
+     The original boxy Focci, with the corners taken off and arms added —
+     nothing else. A previous pass rebuilt him out of spheres and capsules
+     with cheeks, ear linings, eye glints and a three-part tail; it lost
+     the character completely (a round ball head with beady eyes reads as
+     a generic teddy, not a fox) while being fussier at the same time. So
+     this is the shape that worked, unchanged in every proportion, just
+     softened.
+
+     roundedBox() is the whole trick: a BoxGeometry subdivided a few times,
+     with every vertex pushed onto the surface of a rounded-rectangle
+     solid. At r = 0.05 on a 0.5-unit body that is a gentle bevel, not a
+     blob, and it stays low-poly.
+
+     The arms are what he was actually missing. Each limb hangs inside a
+     Group pivoted at the joint so it swings from the shoulder or hip
+     rather than spinning about its own middle. The four names the walk
+     cycle animates are kept, remapped from four stubby legs to a biped:
+       legFL = left arm    legFR = right arm
+       legBL = left leg    legBR = right leg
+     The existing line swings legFL with legBR and legFR with legBL, which
+     on a biped is exactly the right opposite-arm-to-leg gait.
+     ============================================================ */
+  function roundedBox(w, h, d, r, seg) {
+    const g = new THREE.BoxGeometry(w, h, d, seg || 3, seg || 3, seg || 3);
+    const p = g.attributes.position;
+    const hw = Math.max(0, w / 2 - r), hh = Math.max(0, h / 2 - r), hd = Math.max(0, d / 2 - r);
+    const v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i);
+      const cx = Math.max(-hw, Math.min(hw, v.x));
+      const cy = Math.max(-hh, Math.min(hh, v.y));
+      const cz = Math.max(-hd, Math.min(hd, v.z));
+      const dx = v.x - cx, dy = v.y - cy, dz = v.z - cz;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      p.setXYZ(i, cx + (dx / len) * r, cy + (dy / len) * r, cz + (dz / len) * r);
+    }
+    g.computeVertexNormals();
+    return g;
+  }
+
   const character = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.5, 0.42), orangeMat); body.position.y = 0.5; character.add(body);
-  const vest = new THREE.Mesh(new THREE.BoxGeometry(0.67, 0.36, 0.46), vestMat); vest.position.y = 0.56; character.add(vest);
-  const pocketL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.05), pocketMat); pocketL.position.set(-0.17, 0.48, 0.25); character.add(pocketL);
-  const pocketR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.05), pocketMat); pocketR.position.set(0.17, 0.48, 0.25); character.add(pocketR);
-  const belly = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.06), creamMat); belly.position.set(0, 0.33, 0.22); character.add(belly);
-  const scarf = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.1, 0.48), redMat); scarf.position.y = 0.8; character.add(scarf);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.4, 0.42), orangeMat); head.position.y = 1.08; character.add(head);
-  const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.22), creamMat); muzzle.position.set(0, 1.0, 0.3); character.add(muzzle);
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.06), darkMat); nose.position.set(0, 1.02, 0.42); character.add(nose);
+  const rbox = (w, h, d, mat, r) => new THREE.Mesh(roundedBox(w, h, d, r === undefined ? 0.05 : r), mat);
+
+  const body = rbox(0.62, 0.5, 0.42, orangeMat); body.position.y = 0.5; character.add(body);
+  const vest = rbox(0.67, 0.36, 0.46, vestMat); vest.position.y = 0.56; character.add(vest);
+  const pocketL = rbox(0.14, 0.12, 0.05, pocketMat, 0.02); pocketL.position.set(-0.17, 0.48, 0.25); character.add(pocketL);
+  const pocketR = rbox(0.14, 0.12, 0.05, pocketMat, 0.02); pocketR.position.set(0.17, 0.48, 0.25); character.add(pocketR);
+  const belly = rbox(0.3, 0.14, 0.06, creamMat, 0.03); belly.position.set(0, 0.33, 0.22); character.add(belly);
+  const scarf = rbox(0.68, 0.1, 0.48, redMat, 0.04); scarf.position.y = 0.8; character.add(scarf);
+  const head = rbox(0.46, 0.4, 0.42, orangeMat, 0.07); head.position.y = 1.08; character.add(head);
+  const muzzle = rbox(0.24, 0.2, 0.22, creamMat, 0.05); muzzle.position.set(0, 1.0, 0.3); character.add(muzzle);
+  const nose = rbox(0.08, 0.08, 0.06, darkMat, 0.03); nose.position.set(0, 1.02, 0.42); character.add(nose);
   [-0.13, 0.13].forEach((dxv) => {
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.04), darkMat); eye.position.set(dxv, 1.14, 0.32); character.add(eye);
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.26, 4), orangeMat); ear.position.set(dxv * 1.55, 1.42, -0.02); ear.rotation.y = Math.PI / 4; character.add(ear);
+    const eye = rbox(0.06, 0.06, 0.04, darkMat, 0.025); eye.position.set(dxv, 1.14, 0.32); character.add(eye);
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.26, 4), orangeMat);
+    ear.position.set(dxv * 1.55, 1.42, -0.02); ear.rotation.y = Math.PI / 4; character.add(ear);
   });
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.5), orangeMat); tail.position.set(0, 0.55, -0.38); tail.rotation.x = 0.4; character.add(tail);
-  const tailTip = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.16), creamMat); tailTip.position.set(0, 0.68, -0.6); character.add(tailTip);
-  const legGeo = new THREE.BoxGeometry(0.16, 0.26, 0.16);
-  const legFL = new THREE.Mesh(legGeo, darkMat); legFL.position.set(-0.18, 0.13, 0.14); character.add(legFL);
-  const legFR = new THREE.Mesh(legGeo, darkMat); legFR.position.set(0.18, 0.13, 0.14); character.add(legFR);
-  const legBL = new THREE.Mesh(legGeo, darkMat); legBL.position.set(-0.18, 0.13, -0.14); character.add(legBL);
-  const legBR = new THREE.Mesh(legGeo, darkMat); legBR.position.set(0.18, 0.13, -0.14); character.add(legBR);
+  const tail = rbox(0.2, 0.2, 0.5, orangeMat, 0.07); tail.position.set(0, 0.55, -0.38); tail.rotation.x = 0.4; character.add(tail);
+  const tailTip = rbox(0.22, 0.22, 0.16, creamMat, 0.07); tailTip.position.set(0, 0.68, -0.6); character.add(tailTip);
+
+  // Limbs on joint pivots, so a rotation swings rather than spins.
+  const limb = (x, y, z, w, h, d, mat) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, z);
+    const m = rbox(w, h, d, mat, Math.min(w, d) * 0.4);
+    m.position.y = -h / 2;
+    pivot.add(m);
+    character.add(pivot);
+    return pivot;
+  };
+  const legFL = limb(-0.37, 0.68, 0.02, 0.13, 0.27, 0.14, orangeMat);   // left arm
+  const legFR = limb(0.37, 0.68, 0.02, 0.13, 0.27, 0.14, orangeMat);    // right arm
+  [legFL, legFR].forEach((a, i) => {
+    const paw = rbox(0.14, 0.1, 0.15, creamMat, 0.045);
+    paw.position.y = -0.31; a.add(paw);
+    a.rotation.z = (i === 0 ? 1 : -1) * 0.1;
+  });
+  const legBL = limb(-0.17, 0.27, 0, 0.16, 0.26, 0.16, darkMat);        // left leg
+  const legBR = limb(0.17, 0.27, 0, 0.16, 0.26, 0.16, darkMat);         // right leg
+
   scene.add(character);
   character.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
-  const charState = { x: 0, z: 0, angle: 0, walkT: 0, inWater: false };
+  const charState = { x: 0, z: 0, angle: 0, walkT: 0, inWater: false, jumpY: 0, vy: 0 };
+  const JUMP_V = 5.0, GRAVITY = 14;
+  function startJump(room) {
+    if (charState.jumpY > 0.001 || charState.inWater) return;
+    charState.vy = JUMP_V;
+    spawnPickupBurst(room, charState.x, character.position.y + 0.05, charState.z, 0xFFE9A8);
+  }
   function activeRoom() { return rooms[currentRoomKey]; }
   function enterRoom(key, spawnOverride) {
     Object.values(rooms).forEach((r) => { r.group.visible = false; });
@@ -1146,7 +1214,13 @@ export async function bootFocciWorld(root, opts) {
   function endPointer(e) {
     if (e.pointerId === singleId && downPos) {
       const upDist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
-      if (upDist < 10 && (Date.now() - downTime) < 320) handleTap(e.clientX, e.clientY);
+      const dyUp = downPos.y - e.clientY, dxAbs = Math.abs(e.clientX - downPos.x);
+      const held = Date.now() - downTime;
+      if (upDist < 10 && held < 320) handleTap(e.clientX, e.clientY);
+      // A fast upward flick jumps. Held apart from the walk joystick by
+      // speed, not direction: dragging up to walk forward is a sustained
+      // press, this is a flick that is over in a quarter of a second.
+      else if (held < 260 && dyUp > 55 && dxAbs < 70 && cam.radius <= ORBIT_DRAG_FROM) startJump(activeRoom());
     }
     pointers.delete(e.pointerId);
     if (e.pointerId === singleId) { singleId = null; moveOrigin = null; moveVec = { x: 0, y: 0 }; }
@@ -1401,7 +1475,24 @@ export async function bootFocciWorld(root, opts) {
     const swing = (walking && !surf.water) ? Math.sin(charState.walkT) * 0.55 : 0;
     legFL.rotation.x = swing; legBR.rotation.x = swing; legFR.rotation.x = -swing; legBL.rotation.x = -swing;
     const bob = surf.water ? Math.sin(t * 3) * 0.05 - 0.32 : (walking ? Math.abs(Math.sin(charState.walkT)) * 0.07 : Math.sin(t * 1.6) * 0.02);
-    character.position.set(charState.x, surf.y + bob, charState.z);
+    // Jump arc rides on top of whatever the terrain is doing underneath, so
+    // he can leap off a slope and still land on it.
+    if (charState.vy !== 0 || charState.jumpY > 0) {
+      charState.vy -= GRAVITY * dt;
+      charState.jumpY += charState.vy * dt;
+      if (charState.jumpY <= 0) {
+        charState.jumpY = 0; charState.vy = 0;
+        spawnPickupBurst(room, charState.x, surf.y + 0.05, charState.z, 0xFFE9A8);
+      }
+    }
+    // Tuck the legs and throw the arms up while airborne — without it the
+    // jump reads as the whole model being slid upward.
+    if (charState.jumpY > 0.02) {
+      const k = Math.min(1, charState.jumpY / 1.2);
+      legBL.rotation.x = legBR.rotation.x = -0.9 * k;
+      legFL.rotation.x = legFR.rotation.x = -1.5 * k;
+    }
+    character.position.set(charState.x, surf.y + bob + charState.jumpY, charState.z);
 
     checkWalkOverPickups(room);
     if (room.doe) tickDoe(room, room.doe, dt, t);
@@ -1442,6 +1533,7 @@ export async function bootFocciWorld(root, opts) {
 
   resize();
   animate();
+
 
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, get currentRoom() { return currentRoomKey; } };
   } catch (err) {
