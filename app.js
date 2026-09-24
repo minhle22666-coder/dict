@@ -6428,7 +6428,14 @@ function wireMaintenance(){
 function showView(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  $('#v-'+v).classList.add('active');
+  const target=$('#v-'+v);
+  target.classList.add('active');
+  /* Anything that reaches a full-screen panel through showView (rather than
+     openFwPanel) used to arrive without #fw-panel-close being revealed, so
+     the panel came up with no exit — that is how opening a chest could
+     strand you in Speak Up. Reveal it here too, and nothing can trap. */
+  const closeBtn=document.getElementById('fw-panel-close');
+  if(closeBtn) closeBtn.style.display = target.classList.contains('fw-panel') ? 'flex' : 'none';
   document.querySelector('.tab[data-view="'+v+'"]').classList.add('active');
   window.scrollTo(0,0);
   if(v==='home'){

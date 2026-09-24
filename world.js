@@ -654,25 +654,6 @@ export async function bootFocciWorld(root, opts) {
     addInvisibleHitbox(station, treeSpot.x, treeGroundedY + treeSize.y * treeScale * 0.45, treeSpot.z, Math.max(treeSize.x, treeSize.z) * treeScale * 0.6, 'vine-tree');
     treeGlb.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     station.vineTree = { obj: treeGlb.scene, x: treeSpot.x, z: treeSpot.z };
-    /* A soft ring on the ground saying "stand here". Built from points
-       sampled against the real terrain so it follows the slope instead of
-       hovering as a flat disc, and drawn as an additive line so it glows
-       faintly rather than looking like a decal. */
-    (function () {
-      const RING_R = 2.6, SEG = 64, pts = [];
-      for (let i = 0; i <= SEG; i++) {
-        const a = (i / SEG) * Math.PI * 2;
-        const px = treeSpot.x + Math.cos(a) * RING_R, pz = treeSpot.z + Math.sin(a) * RING_R;
-        const su = surfaceYIn(station, px, pz);
-        pts.push(new THREE.Vector3(px, (su.hit ? su.y : treeBaseY) + 0.06, pz));
-      }
-      const ring = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(pts),
-        new THREE.LineBasicMaterial({ color: 0xffe6a8, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending })
-      );
-      station.group.add(ring);
-      station.vineTree.ring = ring;
-    })();
 
     // "wisdom tree" glow — a warm point light plus a soft additive sprite
     // glowing at the canopy, so it reads as the map's one magical landmark
@@ -729,9 +710,18 @@ export async function bootFocciWorld(root, opts) {
       // so they stand in open ground instead of wedged against the hub's own
       // rocks and trees where their corners were being cut off.
       const sliceStart = (Math.PI / 2) * i;
+      // Clear of the wisdom tree: one of these kept landing under its
+      // canopy, where the diamond and the trunk fought for the same space.
+      const TREE_CLEAR = 7;
+      const farFromTree = (p) => !station.vineTree ||
+        Math.hypot(p.x - station.vineTree.x, p.z - station.vineTree.z) > TREE_CLEAR;
       let spot = findGroundSpotInSlice(station, 6, 12, sliceStart, sliceStart + Math.PI / 2);
-      for (let k = 0; k < 8; k++) {
+      for (let k = 0; k < 24 && !farFromTree(spot); k++) {
+        spot = findGroundSpotInSlice(station, 6, 12, sliceStart, sliceStart + Math.PI / 2);
+      }
+      for (let k = 0; k < 10; k++) {
         const cand = findGroundSpotInSlice(station, 6, 12, sliceStart, sliceStart + Math.PI / 2);
+        if (!farFromTree(cand)) continue;
         let lo = cand.y, hi = cand.y, ok = true;
         for (let a = 0; a < 6; a++) {
           const ang = (Math.PI / 3) * a;
@@ -976,7 +966,9 @@ export async function bootFocciWorld(root, opts) {
   // and overviewCamera() (an explicit "see the whole island" jump) has
   // real room to zoom out to.
   const MAX_ZOOM = 60;
+  const ORBIT_DRAG_FROM = 30;   // past this, a one-finger drag turns the island
   function overviewCamera() {
+    setCamMode('orbit');
     // phi is measured from straight up, so a SMALLER value lifts the camera.
     // 0.72 puts it ~48 degrees above the island: high enough to take the
     // whole thing in, shallow enough that the relief still reads.
@@ -1034,6 +1026,22 @@ export async function bootFocciWorld(root, opts) {
      previous "effect" was a half-second glow bump with the camera left
      wherever it was, which is why the moment didn't land. */
   let camCinematic = null;
+  /* Two ways to look at the world, toggled by a double-tap on empty ground
+     (see handleTap): the usual third-person orbit, and Focci's own eyes.
+     First person hides the character model — otherwise you are staring at
+     the inside of his head — and reuses cam.theta as the look direction so
+     dragging to walk still sends him where the view is pointing. */
+  let camMode = 'orbit';
+  function setCamMode(m) {
+    camMode = m;
+    character.visible = (m !== 'fpv');
+    if (m === 'fpv') { cam.tPhi = 1.45; cam.tRadius = 7; }
+    else { cam.tPhi = 1.05; cam.tRadius = 14; }
+  }
+  function toggleCamMode() {
+    setCamMode(camMode === 'fpv' ? 'orbit' : 'fpv');
+    return camMode;
+  }
   function focusOnFocci(ms) {
     if (camCinematic) clearTimeout(camCinematic.timer);
     const saved = camCinematic ? camCinematic.saved
@@ -1053,6 +1061,15 @@ export async function bootFocciWorld(root, opts) {
     cam.theta += (cam.tTheta - cam.theta) * 0.15;
     cam.phi += (cam.tPhi - cam.phi) * 0.15;
     cam.radius += (cam.tRadius - cam.radius) * 0.15;
+    if (camMode === 'fpv') {
+      // Sat at Focci's eye line, looking the way he walks. "Forward" is
+      // -sin/-cos of cam.theta, the same vector the movement code uses, so
+      // the view and the controls can never disagree.
+      const eyeY = character.position.y + 1.18;
+      camera.position.set(charState.x, eyeY, charState.z);
+      camera.lookAt(charState.x - Math.sin(cam.theta) * 8, eyeY - 0.9, charState.z - Math.cos(cam.theta) * 8);
+      return;
+    }
     const sinPhi = Math.sin(cam.phi);
     const cx = charState.x + cam.radius * sinPhi * Math.sin(cam.theta);
     const cz = charState.z + cam.radius * sinPhi * Math.cos(cam.theta);
@@ -1101,6 +1118,17 @@ export async function bootFocciWorld(root, opts) {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1 && singleId === e.pointerId && moveOrigin) {
+      // Pulled far enough back that Focci is a speck, a drag is obviously
+      // meant to turn the island, not to walk him — so one finger orbits
+      // out here and goes back to steering as soon as you zoom in. No mode
+      // to remember, and the overview button lands you straight in it.
+      if (cam.radius > ORBIT_DRAG_FROM) {
+        moveVec.x = 0; moveVec.y = 0;
+        const last = pointers.get(e.pointerId) || moveOrigin;
+        cam.tTheta -= (e.clientX - moveOrigin.x) * 0.0006;
+        cam.tPhi = Math.min(1.45, Math.max(0.25, cam.tPhi - (e.clientY - moveOrigin.y) * 0.0004));
+        return;
+      }
       const dx = e.clientX - moveOrigin.x, dy = e.clientY - moveOrigin.y;
       const dist = Math.hypot(dx, dy), MAXD = 58;
       if (dist > 5) { const m = Math.min(1, dist / MAXD); moveVec.x = (dx / dist) * m; moveVec.y = (dy / dist) * m; }
@@ -1130,6 +1158,7 @@ export async function bootFocciWorld(root, opts) {
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.tRadius = Math.min(MAX_ZOOM, Math.max(6, cam.tRadius + e.deltaY * 0.02)); }, { passive: false });
 
   const ndcVec = new THREE.Vector2();
+  let lastEmptyTap = 0;
   function handleTap(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
     ndcVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
@@ -1140,7 +1169,19 @@ export async function bootFocciWorld(root, opts) {
     if (!hits.length) return;
     let root3d = hits[0].object;
     while (root3d && !root3d.userData.interactType && root3d.parent) root3d = root3d.parent;
-    if (!root3d || !root3d.userData.interactType) return;
+    if (!root3d || !root3d.userData.interactType) {
+      // Nothing interactive under the finger: a second tap here within
+      // 320ms swaps the camera between the orbit view and Focci's own eyes.
+      // Gating it on empty ground keeps taps on objects instant — no
+      // double-tap delay to sit through before a chest or a letter reacts.
+      const now = Date.now();
+      if (now - lastEmptyTap < 320) {
+        lastEmptyTap = 0;
+        const m = toggleCamMode();
+        root.dispatchEvent(new CustomEvent('focci-cammode', { detail: { mode: m } }));
+      } else lastEmptyTap = now;
+      return;
+    }
     onInteract(root3d);
   }
 
@@ -1375,12 +1416,6 @@ export async function bootFocciWorld(root, opts) {
     if (room.wordTreasure && !room.wordTreasure.found) {
       room.wordTreasure.obj.rotation.y = t * 0.8;
       room.wordTreasure.obj.position.y = room.wordTreasure.y + 0.6 + Math.sin(t * 1.6) * 0.1;
-    }
-    if (room.vineTree && room.vineTree.ring) {
-      const near = Math.hypot(room.vineTree.x - charState.x, room.vineTree.z - charState.z) < 3.4;
-      const want = near ? 0.9 : 0.42;
-      const m = room.vineTree.ring.material;
-      m.opacity += (want + Math.sin(t * 1.6) * 0.07 - m.opacity) * 0.08;
     }
     if (room.vineTree && room.vineTree.glowSprite) {
       const pulse = 0.82 + Math.sin(t * 1.1) * 0.18;
