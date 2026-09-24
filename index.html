@@ -1011,7 +1011,11 @@
     box-shadow:inset 0 0 0 1px rgba(190,250,244,.5),0 6px 20px rgba(4,51,58,.22);
     backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);
     text-shadow:0 1px 6px rgba(0,40,44,.45)}
-  .fw-word-progress.done:active{transform:scale(.96)}
+  /* translateX(-50%) has to be repeated: the base rule in
+     theme-overrides.css centres the pill with it, and a bare scale()
+     here replaced the whole transform — so every tap flung the pill
+     half its own width to the right. */
+  .fw-word-progress.done:active{transform:translateX(-50%) scale(.96)}
 
   /* ============================================================
      SPEAK UP — every number below was measured off the mockup with

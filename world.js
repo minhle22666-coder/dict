@@ -183,7 +183,7 @@ export async function bootFocciWorld(root, opts) {
     const group = new THREE.Group();
     group.visible = false;
     scene.add(group);
-    const room = { key, name, group, spawn: { x: 0, z: 0 }, collidables: [], interactive: [], doe: null, mushrooms: [], chests: [], teleports: [] };
+    const room = { key, name, group, spawn: { x: 0, z: 0 }, collidables: [], interactive: [], doe: null, mushrooms: [], teleports: [] };
     rooms[key] = room;
     return room;
   }
@@ -217,8 +217,23 @@ export async function bootFocciWorld(root, opts) {
       // confirmed visually (chest/diamond/letters/character all ended up
       // floating in open dark-blue void, detached from the visible mountain).
       // The TOPMOST hit is the real, visible, walkable surface — keep that.
-      let ground = null;
-      for (const h of hits) { if (h.point.y <= lim) { ground = h; break; } }
+      /* Buildings only count as floor if you could plausibly step up onto
+         them. Taking the topmost hit meant a hut ROOF was the ground at
+         every column it covered, so Focci could land on the roof and never
+         get inside — the doorway was sealed by three metres of thatch as
+         far as the raycast was concerned. A roof is metres above the
+         terrain; a porch or a doorstep is not, so anything more than
+         STEP_UP above the next real surface underneath is ignored and he
+         walks in under it. */
+      const STEP_UP = 1.1;
+      let ground = null, firstBuilding = null;
+      for (const h of hits) {
+        if (h.point.y > lim) continue;
+        const isB = !!(h.object.userData && h.object.userData.isBuilding);
+        if (isB && firstBuilding === null) { firstBuilding = h; continue; }
+        ground = h; break;
+      }
+      if (firstBuilding && (!ground || firstBuilding.point.y - ground.point.y <= STEP_UP)) ground = firstBuilding;
       if (ground) {
         return {
           y: ground.point.y,
@@ -257,7 +272,9 @@ export async function bootFocciWorld(root, opts) {
      sudden cliff (a big single-step height jump), is a cheap stand-in for
      "is this reachable" without needing real pathfinding or a navmesh. */
   function isReachableFromSpawn(room, x, z, y) {
-    const STEPS = 10, MAX_JUMP = 2.2, MAX_TOTAL_DROP = 5;
+    // 8, not 5: Fox Island's walkable surface spans y 6.1 to 29.7, so a
+    // 5-unit cap from spawn rules out most of it before anything else runs.
+    const STEPS = 10, MAX_JUMP = 2.2, MAX_TOTAL_DROP = 8;
     const sx = room.spawn.x, sz = room.spawn.z;
     const startY = surfaceYIn(room, sx, sz, GROUND_CEIL).y;
     // Per-step continuity alone isn't enough: a long, gradual, perfectly
@@ -348,6 +365,60 @@ export async function bootFocciWorld(root, opts) {
     return best || findGroundSpot(room, rMin, rMax);
   }
 
+  /* Mushrooms, for any island. Was inline in the station setup and so only
+     ever ran there, which is why the arc lands had none. */
+  const MUSH_TARGET = 0.45;
+  function scatterMushrooms(room, rMin, rMax, count) {
+    const props = extractPropGroups(mushGlb.scene);
+    for (let i = 0; i < count; i++) {
+      const p = props[i % props.length];
+      const spot = findGroundSpot(room, rMin, rMax);
+      const inst = p.clone(true);
+      const mBox = new THREE.Box3().setFromObject(inst);
+      const mSize = mBox.getSize(new THREE.Vector3());
+      const mScale = MUSH_TARGET / Math.max(mSize.x, mSize.y, mSize.z, 0.0001);
+      inst.scale.setScalar(mScale);
+      const groundedY = spot.y - mBox.min.y * mScale;
+      inst.position.set(spot.x, groundedY, spot.z);
+      inst.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      room.group.add(inst);
+      // An invisible hitbox roughly mushroom-sized is the real raycast
+      // target, not the small (and rotating) visible cap.
+      const hitbox = addInvisibleHitbox(room, spot.x, groundedY + MUSH_TARGET * 0.5, spot.z, MUSH_TARGET * 0.9, 'mushroom');
+      room.mushrooms.push({ obj: inst, hitbox, x: spot.x, z: spot.z, found: false });
+    }
+  }
+
+  /* A spot on a given BEARING, for things that must sit at fixed compass
+     points. Searching a random quadrant does not work on Fox Island: the
+     6-12 ring runs straight through the village (measured: roofs are the
+     top surface at 41% of it), so two of the four quadrants yielded nothing
+     at all and the diamonds that could not find a spot fell back to the
+     island centre, stacking on top of each other.
+
+     This walks outward along the bearing with a little angular jitter and
+     takes the first spot that passes, then relaxes the requirements one at
+     a time rather than giving up — a diamond slightly off the ideal shelf
+     is far better than four in a heap. */
+  function findSpotOnBearing(room, bearing, rMin, rMax) {
+    const tries = [
+      (su, x, z) => su.hit && !su.water && !su.building && isStableGround(room, x, z, su.y) && isReachableFromSpawn(room, x, z, su.y),
+      (su, x, z) => su.hit && !su.water && !su.building && isStableGround(room, x, z, su.y),
+      (su, x, z) => su.hit && !su.water && !su.building,
+      (su) => su.hit && !su.water
+    ];
+    for (const ok of tries) {
+      for (let step = 0; step < 40; step++) {
+        const r = rMin + ((rMax - rMin) * (step % 10)) / 9;
+        const a = bearing + (Math.floor(step / 10) - 1.5) * 0.18;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        const su = surfaceYIn(room, x, z, GROUND_CEIL);
+        if (ok(su, x, z)) return { x, z, y: su.y };
+      }
+    }
+    return findGroundSpot(room, rMin, rMax);
+  }
+
   function addInvisibleHitbox(room, x, y, z, radius, interactType) {
     const hit = new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
     hit.position.set(x, y, z);
@@ -422,7 +493,12 @@ export async function bootFocciWorld(root, opts) {
      every animal that follows) treated a rooftop as ordinary ground and
      wandered up onto it. Tagged by material name here; surfaceYIn reports
      the flag and everything that chooses a spot refuses one. */
-  const BUILDING_MAT = /roof|home_body|window|totem|wood|door|chimney|fence|plank/i;
+  /* Roofs and walls only. The first version also matched wood/plank/fence/
+     totem, and on Fox Island the decking and railings ARE "wood" — that one
+     word marked 214 of 400 sampled ground points as off-limits, more than
+     half the island, and is why the four teleport diamonds could not find a
+     single valid spot and all fell back to the centre on top of each other. */
+  const BUILDING_MAT = /roof|tejado|home_body|casa1|window|chimney/i;
   /* Static scenery, merged one mesh per material.
 
      Measured before this: 789 draw calls per frame. Fox Island alone ships
@@ -552,13 +628,12 @@ export async function bootFocciWorld(root, opts) {
   const ARC_ENV_FILES = ['island.glb', 'camp.glb', 'waterfall.glb', 'secretcamp.glb'];
   const arcCount = Math.min(ARC_TITLES.length, 4);
   const [
-    hub, mushGlb, chestGlb, birdGlb, skyGlb, pondGlb, doeGlb, diamondGlb,
+    hub, mushGlb, birdGlb, skyGlb, pondGlb, doeGlb, diamondGlb,
     ...arcGltfs
   ] = await Promise.all([
     loadGLB(ASSET('fox-island.glb')),
     loadGLB(ASSET('mushrooms.glb')),
-    loadGLB(ASSET('chest.glb')),
-    loadGLB(ASSET('birds.glb')),
+        loadGLB(ASSET('birds.glb')),
     loadGLB(ASSET('sky-island.glb')),
     loadGLB(ASSET('pond.glb')),
     loadGLB(ASSET('doe.glb')),
@@ -642,7 +717,29 @@ export async function bootFocciWorld(root, opts) {
     tagBuildings(hub.scene);
     station.group.add(hub.scene);
     station.collidables.push(hub.scene);
-    station.spawn = { x: 0, z: box.getCenter(new THREE.Vector3()).z * scale * 0.15 };
+    /* Spawn on the island's MAIN SHELF, not its geometric centre — on Fox
+       Island that centre is the top of the central mound at y 24.3, and
+       since isReachableFromSpawn measures every candidate against the spawn
+       height, starting up there disqualified the whole lower island.
+       Sampling for the median walkable height and settling on a stable
+       point near it puts Focci where most of the island actually is. */
+    {
+      const samples = [];
+      for (let i = 0; i < 240; i++) {
+        const a = Math.random() * Math.PI * 2, r = Math.random() * 16;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        const su = surfaceYIn(station, x, z, GROUND_CEIL);
+        if (su.hit && !su.water && !su.building) samples.push({ x, z, y: su.y });
+      }
+      if (samples.length) {
+        const median = samples.slice().sort((p, q) => p.y - q.y)[Math.floor(samples.length / 2)].y;
+        samples.sort((p, q) => Math.abs(p.y - median) - Math.abs(q.y - median));
+        const pick = samples.find((c) => isStableGround(station, c.x, c.z, c.y)) || samples[0];
+        station.spawn = { x: pick.x, z: pick.z };
+      } else {
+        station.spawn = { x: 0, z: box.getCenter(new THREE.Vector3()).z * scale * 0.15 };
+      }
+    }
 
     // decorate with the two vegetation kits you sent — target sizes (largest
     // dimension, in world units) rather than a flat multiplier on whatever
@@ -664,7 +761,7 @@ export async function bootFocciWorld(root, opts) {
     // The hub model already carries its own baked-in scenery, so the whole
     // decorative scatter is gone rather than re-tuned — what stays on the
     // island is only what the player can actually do something with: the
-    // wisdom tree, mushrooms, word-hunt letters, chests and teleports.
+    // wisdom tree, mushrooms, word-hunt letters and teleports.
     // forest-kit.glb and bush-kit.glb are no longer fetched at all —
     // nothing else used them, so that is two fewer GLBs on first load.
 
@@ -672,55 +769,9 @@ export async function bootFocciWorld(root, opts) {
     // fixes as scatterClone: measured + normalized scale instead of a flat
     // guess, and findGroundSpot instead of a water-only retry (a miss
     // entirely — off the island's edge — used to fall back to y:0, floating).
-    const mushProps = extractPropGroups(mushGlb.scene);
-    const MUSH_TARGET = 0.45;
-    mushProps.forEach((p) => {
-      const spot = findGroundSpot(station, 3, 11);
-      const inst = p.clone(true);
-      const mBox = new THREE.Box3().setFromObject(inst);
-      const mSize = mBox.getSize(new THREE.Vector3());
-      const mScale = MUSH_TARGET / Math.max(mSize.x, mSize.y, mSize.z, 0.0001);
-      inst.scale.setScalar(mScale);
-      const groundedY = spot.y - mBox.min.y * mScale;
-      inst.position.set(spot.x, groundedY, spot.z);
-      station.group.add(inst);
-      // Same gappy-low-poly tap problem as the scattered trees/bushes —
-      // an invisible hitbox roughly mushroom-sized is the real raycast
-      // target, not the small (and animated/rotating) visible cap.
-      const hitbox = addInvisibleHitbox(station, spot.x, groundedY + MUSH_TARGET * 0.5, spot.z, MUSH_TARGET * 0.9, 'mushroom');
-      station.mushrooms.push({ obj: inst, hitbox, x: spot.x, z: spot.z, found: false });
-    });
+    scatterMushrooms(station, 3, 13, 15);
 
-    // 3 chests — same findGroundSpot fix (was a fixed-radius guess that
-    // could land off-island depending on the hub's actual, irregular shape).
-    // Also measured now instead of a flat scale with no ground-anchor offset
-    // — the raw chest is 1.65 units tall with its origin near the middle, so
-    // `position.set(x, spot.y, z)` alone buried almost half of it in the
-    // terrain ("cắm vào bên trong đảo").
-    // 0.75 units on a ~39-unit island is the size of a mushroom — the
-    // chests were technically there and correctly grounded, just far too
-    // small to ever notice ("chả thấy đâu"). Sized to read as a landmark.
-    const CHEST_TARGET = 1.7;
-    const chestBox = new THREE.Box3().setFromObject(chestGlb.scene);
-    const chestScale = CHEST_TARGET / Math.max(chestBox.getSize(new THREE.Vector3()).x, chestBox.getSize(new THREE.Vector3()).y, chestBox.getSize(new THREE.Vector3()).z, 0.0001);
-    for (let i = 0; i < 3; i++) {
-      const spot = findFlatGroundSpot(station, 4, 11, CHEST_TARGET * 0.6, 10);
-      const inst = chestGlb.scene.clone(true);
-      const mixer = new THREE.AnimationMixer(inst);
-      inst.scale.setScalar(chestScale);
-      inst.position.set(spot.x, spot.y - chestBox.min.y * chestScale, spot.z);
-      inst.rotation.y = Math.random() * Math.PI * 2;
-      inst.userData.interactType = 'chest';
-      station.group.add(inst);
-      station.interactive.push(inst);
-      inst.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-      // A warm glow so a 1.7-unit box is findable across a 39-unit island.
-      const cGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFFC85C, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending }));
-      cGlow.scale.setScalar(2.6);
-      cGlow.position.set(spot.x, spot.y + 0.9, spot.z);
-      station.group.add(cGlow);
-      station.chests.push({ obj: inst, mixer, clips: chestGlb.animations, opened: false, x: spot.x, z: spot.z, glow: cGlow });
-    }
+    // Chests removed on request — they are no longer part of the island.
 
     // birds — a small flying loop, purely decorative
     const birdMixer = new THREE.AnimationMixer(birdGlb.scene);
@@ -906,32 +957,14 @@ export async function bootFocciWorld(root, opts) {
       // Pushed further out (6-12 instead of 4-10) and picked for flatness,
       // so they stand in open ground instead of wedged against the hub's own
       // rocks and trees where their corners were being cut off.
-      const sliceStart = (Math.PI / 2) * i;
-      // Clear of the wisdom tree: one of these kept landing under its
-      // canopy, where the diamond and the trunk fought for the same space.
-      const TREE_CLEAR = 7;
-      const farFromTree = (p) => !station.vineTree ||
-        Math.hypot(p.x - station.vineTree.x, p.z - station.vineTree.z) > TREE_CLEAR;
-      let spot = findGroundSpotInSlice(station, 6, 12, sliceStart, sliceStart + Math.PI / 2);
-      for (let k = 0; k < 24 && !farFromTree(spot); k++) {
-        spot = findGroundSpotInSlice(station, 6, 12, sliceStart, sliceStart + Math.PI / 2);
+      // One per compass corner — NE, SE, SW, NW — so all four are actually
+      // findable and each leads to its own land.
+      const bearing = (Math.PI / 4) + (Math.PI / 2) * i;
+      let spot = findSpotOnBearing(station, bearing, 8, 15);
+      // and clear of the launch pad, which is picked before these
+      if (station.skyPad && Math.hypot(spot.x - station.skyPad.x, spot.z - station.skyPad.z) < 3) {
+        spot = findSpotOnBearing(station, bearing + 0.5, 9, 16);
       }
-      for (let k = 0; k < 10; k++) {
-        const cand = findGroundSpotInSlice(station, 6, 12, sliceStart, sliceStart + Math.PI / 2);
-        if (!farFromTree(cand)) continue;
-        let lo = cand.y, hi = cand.y, ok = true;
-        for (let a = 0; a < 6; a++) {
-          const ang = (Math.PI / 3) * a;
-          const su = surfaceYIn(station, cand.x + Math.cos(ang) * 1.1, cand.z + Math.sin(ang) * 1.1, GROUND_CEIL);
-          if (!su.hit || su.water) { ok = false; break; }
-          lo = Math.min(lo, su.y); hi = Math.max(hi, su.y);
-        }
-        if (ok && hi - lo < 0.3) { spot = cand; break; }
-      }
-      // Every land is explorable regardless of story progress now — Focci
-      // can walk into any of the 4 arcs any time; only the auto-opened
-      // story text (gated separately, in the app's own onOpenArc handler)
-      // still depends on what's actually been unlocked there.
       const spawned = spawnDiamond(station, spot.x, spot.y, spot.z, 'teleport', i, ARC_GLOW_COLORS[i % ARC_GLOW_COLORS.length]);
       station.teleports.push({ obj: spawned.obj, mixer: spawned.mixer, x: spot.x, z: spot.z, arcIndex: i, title, locked: false });
     });
@@ -967,6 +1000,8 @@ export async function bootFocciWorld(root, opts) {
     // findGroundSpot near the room's own center instead of a blind (0,0,0)
     // — same off-ground risk as everything else if that exact point isn't
     // actually solid on a given arc environment.
+    scatterMushrooms(room, 3, 11, 8);
+
     const homeSpot = findGroundSpot(room, 0, 6);
     const homeSpawned = spawnDiamond(room, homeSpot.x, homeSpot.y, homeSpot.z, 'teleport-home');
     room._homeTeleport = { obj: homeSpawned.obj, mixer: homeSpawned.mixer };
@@ -1016,7 +1051,7 @@ export async function bootFocciWorld(root, opts) {
 
   const wordHunt = { word: '', letters: [], respawnPending: false };
   function clearWordHunt() {
-    wordHunt.letters.forEach((l) => station.group.remove(l.obj));
+    wordHunt.letters.forEach((l) => (l.room || station).group.remove(l.obj));
     wordHunt.letters = [];
   }
   function progressMask() {
@@ -1027,21 +1062,31 @@ export async function bootFocciWorld(root, opts) {
     clearWordHunt();
     wordHunt.word = word;
     wordHunt.respawnPending = false;
+    /* Letters are spread over ALL the islands, not just the station — the
+       arc lands had none at all, so there was nothing to find once you
+       teleported. Every island is guaranteed at least one when the word is
+       long enough to go round, and the rest fall where they fall. */
+    const hostKeys = Object.keys(rooms);
+    const hosts = [];
     for (let i = 0; i < word.length; i++) {
-      // Used to pick a raw random point up to 29 units out with only a bare
-      // surfaceYIn check (no stability/reachability validation) — the
-      // island's real walkable radius is much smaller than that, so a good
-      // few letters every hunt landed past the edge, over open air/water.
-      // Same validated search every other prop on this island uses.
-      const spot = findGroundSpot(station, 3, 14);
+      hosts.push(i < hostKeys.length ? rooms[hostKeys[i]] : rooms[hostKeys[Math.floor(Math.random() * hostKeys.length)]]);
+    }
+    // shuffle, so the first letters are not always on the same island
+    for (let i = hosts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = hosts[i]; hosts[i] = hosts[j]; hosts[j] = tmp; }
+    for (let i = 0; i < word.length; i++) {
+      const host = hosts[i];
+      // Validated placement, like every other prop: a raw random point used
+      // to drop letters past the island's edge, over open air.
+      const spot = findGroundSpot(host, 3, 13);
       const tex = makeLetterTexture(word[i], LETTER_BG[i % LETTER_BG.length]);
       const cube = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ map: tex, flatShading: true }));
       cube.position.set(spot.x, spot.y + 0.75, spot.z);
       cube.rotation.set(0.3, Math.random() * Math.PI, 0.1);
+      cube.castShadow = true;
       cube.userData.interactType = 'letter';
-      station.group.add(cube);
-      station.interactive.push(cube);
-      wordHunt.letters.push({ obj: cube, letter: word[i], found: false, phase: Math.random() * Math.PI * 2 });
+      host.group.add(cube);
+      host.interactive.push(cube);
+      wordHunt.letters.push({ obj: cube, letter: word[i], found: false, phase: Math.random() * Math.PI * 2, room: host });
     }
     // refresh every arc room's treasure to point at the same hunt
     Object.values(rooms).forEach((r) => { if (r.wordTreasure) r.wordTreasure.found = false, (r.wordTreasure.obj.visible = true); });
@@ -1053,31 +1098,8 @@ export async function bootFocciWorld(root, opts) {
      the same two functions. Both still fire spawnPickupBurst, so there is
      always a visible burst saying what was collected. */
   const PICKUP_REACH = 1.15;
-  /* Chests open on contact too, and say so. Before this they were tap-only
-     with no feedback of their own beyond the mini-game opening, so walking
-     into one did nothing and it was easy to conclude they were missing. */
-  function openChest(room, c) {
-    if (!c || c.opened) return;
-    c.opened = true;
-    const openClip = c.clips.find((cl) => /open/i.test(cl.name));
-    if (openClip) { const a = c.mixer.clipAction(openClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.reset().play(); }
-    spawnPickupBurst(room, c.x, c.obj.position.y + 0.8, c.z, 0xFFC85C);
-    if (c.glow) c.glow.visible = false;
-    onOpenSayIt();
-    // A repeatable bonus, not a one-off: after a breather, close again
-    // (reversing the open clip when there is no separate close one so it
-    // doesn't just snap shut) and become available again.
-    setTimeout(() => {
-      c.opened = false;
-      if (c.glow) c.glow.visible = true;
-      const closeClip = c.clips.find((cl) => /close/i.test(cl.name));
-      if (closeClip) {
-        const a = c.mixer.clipAction(closeClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.reset().play();
-      } else if (openClip) {
-        const a = c.mixer.clipAction(openClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.paused = false; a.timeScale = -1; a.time = a.getClip().duration; a.play();
-      }
-    }, CHEST_RESPAWN_MS);
-  }
+  /* Collecting a mushroom, shared by the walk-over check and the tap
+     handler so both paths give the same burst and the same XP. */
   function collectMushroom(room, m) {
     if (!m || m.found) return;
     m.found = true;
@@ -1096,16 +1118,10 @@ export async function bootFocciWorld(root, opts) {
         if (Math.hypot(m.x - cx, m.z - cz) < PICKUP_REACH) { collectMushroom(room, m); got = true; }
       }
     }
-    if (room === station) {
+    {
       for (const l of wordHunt.letters) {
-        if (l.found) continue;
+        if (l.found || l.room !== room) continue;
         if (Math.hypot(l.obj.position.x - cx, l.obj.position.z - cz) < PICKUP_REACH + 0.2) { collectLetter(l); got = true; }
-      }
-    }
-    if (room.chests) {
-      for (const c of room.chests) {
-        if (c.opened) continue;
-        if (Math.hypot(c.x - cx, c.z - cz) < PICKUP_REACH + 0.75) { openChest(room, c); got = true; }
       }
     }
     if (got) focciReact();
@@ -1113,7 +1129,7 @@ export async function bootFocciWorld(root, opts) {
   function collectLetter(l) {
     if (l.found) return;
     l.found = true; l.obj.visible = false;
-    spawnPickupBurst(station, l.obj.position.x, l.obj.position.y, l.obj.position.z, 0xFFD54A);
+    spawnPickupBurst(l.room || station, l.obj.position.x, l.obj.position.y, l.obj.position.z, 0xFFD54A);
     onLetterProgress(wordHunt.word, progressMask());
     if (wordHunt.letters.every((x) => x.found)) completeWordHunt();
   }
@@ -1451,7 +1467,6 @@ export async function bootFocciWorld(root, opts) {
     }, RESPAWN_DELAY_MS);
   }
 
-  const CHEST_RESPAWN_MS = 45000; // shorter than the word-hunt respawn — chests are a bonus, not the main loop
   function randomQuote() {
     return ANGEL_MESSAGES.length ? ANGEL_MESSAGES[Math.floor(Math.random() * ANGEL_MESSAGES.length)] : null;
   }
@@ -1508,8 +1523,6 @@ export async function bootFocciWorld(root, opts) {
         const p = room.skyPad;
         flyTo(room, { x: p.x, y: p.y + 0.1, z: p.z + 1.2 }, null);
       }
-    } else if (type === 'chest') {
-      openChest(room, room.chests.find((c) => c.obj === obj));
     } else if (type === 'mushroom') {
       // obj here is the invisible hitbox (see addInvisibleHitbox), not the
       // visible mushroom itself.
@@ -1733,10 +1746,6 @@ export async function bootFocciWorld(root, opts) {
     checkWalkOverPickups(room);
     if (room.doe) tickDoe(room, room.doe, dt, t);
     if (room.pondMixer) room.pondMixer.update(dt);
-    room.chests.forEach((c) => {
-      c.mixer.update(dt);
-      if (c.glow && c.glow.visible) c.glow.material.opacity = 0.32 + Math.sin(t * 1.9 + c.x) * 0.12;
-    });
     room.teleports.forEach((tp) => tp.mixer.update(dt));
     if (room._homeTeleport) room._homeTeleport.mixer.update(dt);
     room.mushrooms.forEach((m) => { if (!m.found) m.obj.rotation.y = t * 0.6; });
@@ -1777,6 +1786,7 @@ export async function bootFocciWorld(root, opts) {
 
   resize();
   animate();
+
 
 
 
