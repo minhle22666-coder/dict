@@ -1120,37 +1120,85 @@ export async function bootFocciWorld(root, opts) {
               else clusters.push({ x, z, sx: x, sz: z, n: 1, y: hits[0].point.y });
             }
           }
-          clusters.filter((c) => c.n >= 3).slice(0, 6).forEach((c) => {
-            /* The doorstep: the nearest walkable ground anywhere around the
-               hut, swept on sixteen bearings.
-
-               The old version only looked in ONE direction — straight out
-               from the island's spawn point — and when that ray found
-               nothing it silently kept the cluster centre, whose surface
-               is the ROOF. Measured: three of the six markers had landed
-               on rooftops at y 14 to 17.7, and one of those "huts" is
-               actually the lantern tower. A hut with no ground around it
-               now gets no doorway at all rather than one on its own roof. */
-            let mx = null, mz = null, my = null, bestD = Infinity;
+          /* How far the building actually reaches, measured on sixteen
+             bearings out from its centre. Everything below used one fixed
+             set of distances, which is fine for a four-metre hut and
+             hopeless for the big house: its walls are wider than the
+             eight units the doorstep search ever looked, so every column
+             it tested was still building and it was given no door at all. */
+          const footprint = (c) => {
+            let sum = 0, max = 0;
             for (let a = 0; a < 16; a++) {
               const th = (a / 16) * Math.PI * 2;
-              for (let d = 2; d <= 8; d += 0.4) {
+              let last = 0;
+              for (let d = 0.5; d <= 20; d += 0.5) {
+                raycaster.set(new THREE.Vector3(c.x + Math.cos(th) * d, 200, c.z + Math.sin(th) * d), DOWN);
+                if (!raycaster.intersectObject(wallMesh, true).length) break;
+                last = d;
+              }
+              sum += last; if (last > max) max = last;
+            }
+            return { avg: sum / 16, max: max };
+          };
+          /* THE FLOOR OF A BUILDING.
+
+             The old comment here said these huts were empty shells with no
+             interior floor. That was simply wrong, and everything built on
+             top of it was wrong with it. Probing a column through one of
+             them returns, top to bottom: roof1 at 19, home_body at 14,
+             FLOOR at 10.3, wood at 10.1, floor at 8.8. They are furnished
+             rooms, some of them two storeys, and the material is called
+             "floor".
+
+             So the floor is found rather than invented: the highest
+             floor-like surface below the building's own wall top. The
+             marker outside then has to be at THAT level, not at whatever
+             ground happens to be nearest — the big house stands on a mound
+             and its floor is at 10.3, four units above the grass the
+             previous version called its doorstep, which is how Focci ended
+             up clamped to a height inside the hillside with the camera in
+             solid rock. */
+          const FLOORISH = /floor|wood|madera|plank|suelo/i;
+          const WALLISH = /home_body|casa1/i;
+          const interiorFloor = (x, z) => {
+            raycaster.set(new THREE.Vector3(x, 200, z), DOWN);
+            const hits = raycaster.intersectObject(station.collidables[0], true);
+            let wallTop = null;
+            for (const h of hits) {
+              const nm = (h.object.material && h.object.material.name) || '';
+              if (wallTop === null && WALLISH.test(nm)) { wallTop = h.point.y; continue; }
+              if (wallTop !== null && h.point.y < wallTop - 0.3 && FLOORISH.test(nm)) return h.point.y;
+            }
+            return null;
+          };
+          clusters.filter((c) => c.n >= 3).slice(0, 6).forEach((c) => {
+            const floorY = interiorFloor(c.x, c.z);
+            if (floorY === null) return;
+            const fp = footprint(c);
+            /* The wall mesh is one merged mesh for the WHOLE island, so a
+               ray walking outward from one hut runs straight into the next
+               one and reports a footprint of 14 or 18 units. Capped to
+               something a room can plausibly be. */
+            const inner = Math.max(2.4, Math.min(4.5, fp.avg * 0.85));
+
+            /* The doorstep: the nearest surface, on any bearing, that is at
+               the building's own floor level. Its own porch counts —
+               several of these open onto decking rather than grass. */
+            let step = null;
+            for (let a = 0; a < 16; a++) {
+              const th = (a / 16) * Math.PI * 2;
+              for (let d = 2; d <= 16; d += 0.5) {
                 const px = c.x + Math.cos(th) * d, pz = c.z + Math.sin(th) * d;
                 const su = surfaceYIn(station, px, pz, GROUND_CEIL);
-                if (!su.hit || su.water || su.building) continue;
-                /* A doorstep is BELOW the roof it belongs to. Two of the
-                   clusters sit buried in the central mountain, and the
-                   sweep was happily calling the terrace above them — 18.2,
-                   four units higher than their own roofs — their front
-                   door. Those two get no doorway now, which is correct:
-                   there is nothing there to walk into. */
-                if (su.y > c.y - 1.2) continue;
-                if (!isStableGround(station, px, pz, su.y)) continue;
-                if (d < bestD) { bestD = d; mx = px; mz = pz; my = su.y; }
+                if (!su.hit || su.water) continue;
+                if (Math.abs(su.y - floorY) > 1.6) continue;
+                const score = d + (su.building ? 2.5 : 0);
+                if (!step || score < step.score) step = { x: px, z: pz, y: su.y, score: score };
                 break;
               }
             }
-            if (mx === null) return;
+            if (!step) return;
+            const mx = step.x, mz = step.z, my = step.y;
             const ring = new THREE.Mesh(
               new THREE.CylinderGeometry(0.85, 0.85, 0.06, 18),
               new THREE.MeshStandardMaterial({ color: 0xFFE3AE, emissive: 0xFFC96B, emissiveIntensity: 1.1, transparent: true, opacity: 0.8 })
@@ -1165,7 +1213,21 @@ export async function bootFocciWorld(root, opts) {
             const lamp = new THREE.PointLight(0xFFCE87, 0, 7, 2);
             lamp.position.set(c.x, c.y + 1.4, c.z);
             station.group.add(lamp);
-            station.houses.push({ x: mx, z: mz, y: my, cx: c.x, cz: c.z, ring, spark, lamp, inside: false });
+            /* The room has to reach at least as far as its own front door.
+               The big house's doorstep lands further out than its inner
+               radius, so stepping in flipped him to "inside" and then
+               straight back out again one step later — and once out, the
+               door was behind him and he could never get back in. The
+               room is whichever is larger: its inside, its footprint, or
+               the distance to the doorstep. */
+            /* `y` is the floor you stand on once you are in; `doorY` is
+               where the marker outside sits. They are within 1.6 of each
+               other by construction, but on the big house they are not the
+               same number. */
+            station.houses.push({
+              x: mx, z: mz, y: floorY, doorY: my, cx: c.x, cz: c.z,
+              ring, spark, lamp, inside: false, inner: inner, roomR: Math.max(inner, 4.6)
+            });
             /* The doorway ring answers a tap as well as a step, so you can
                go in from across the room instead of steering into a
                1.3-unit circle. */
@@ -1548,10 +1610,50 @@ export async function bootFocciWorld(root, opts) {
     return tex;
   }
 
+
+  /* ============================================================
+     CLONING AN ANIMAL
+
+     Every one of these models is a skinned mesh, and THREE's own
+     .clone() does not rebind the skeleton: the copy keeps pointing at
+     the ORIGINAL's bones, so every vertex is posed by the wrong matrices
+     and the whole animal collapses into a speck. That is why a rescued
+     resident showed nothing but its energy bar floating over empty
+     grass — the body was there, folded into a point too small to see.
+
+     This is the rebind that three/examples/jsm/utils/SkeletonUtils.js
+     does, written out here because only three.module.js and GLTFLoader
+     are vendored in this project.
+     ============================================================ */
+  function parallelTraverse(a, b, cb) {
+    cb(a, b);
+    for (let i = 0; i < a.children.length; i++) parallelTraverse(a.children[i], b.children[i], cb);
+  }
+  function cloneSkinned(source) {
+    const sourceLookup = new Map(), cloneLookup = new Map();
+    const clone = source.clone(true);
+    parallelTraverse(source, clone, (sourceNode, clonedNode) => {
+      sourceLookup.set(clonedNode, sourceNode);
+      cloneLookup.set(sourceNode, clonedNode);
+    });
+    clone.traverse((node) => {
+      if (!node.isSkinnedMesh) return;
+      const sourceMesh = sourceLookup.get(node);
+      if (!sourceMesh || !sourceMesh.skeleton) return;
+      const sourceBones = sourceMesh.skeleton.bones;
+      node.skeleton = sourceMesh.skeleton.clone();
+      node.bindMatrix.copy(sourceMesh.bindMatrix);
+      node.skeleton.bones = sourceBones.map((b) => cloneLookup.get(b) || b);
+      node.bind(node.skeleton, node.bindMatrix);
+    });
+    return clone;
+  }
+
   async function buildResident(room, rec) {
     const gltf = await animalModel(rec.species);
     if (!gltf) return null;
-    const obj = gltf.scene.clone(true);
+    const obj = cloneSkinned(gltf.scene);
+    obj.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(obj);
     const size = box.getSize(new THREE.Vector3());
     // normalise to a 1-unit creature, then apply the species' own adult
@@ -1571,15 +1673,21 @@ export async function bootFocciWorld(root, opts) {
     const lvl = window.resLevel ? window.resLevel(rec) : 3;
     const bar = new THREE.Sprite(new THREE.SpriteMaterial({ map: energyBarTexture(lvl), transparent: true, depthWrite: false, depthTest: false }));
     const headY = (box.max.y - box.min.y) * scale;
-    bar.scale.set(1.15, 0.36, 1);
-    bar.position.set(spot.x, spot.y + headY + 0.5, spot.z);
+    /* Sized to the animal it belongs to. A fixed 1.15-wide bar floating
+       half a unit over a lamb's head was more than twice as wide as the
+       lamb and higher above it than the lamb is tall — which is how the
+       bar ended up being the only thing anyone could see. */
+    const barW = Math.max(0.5, Math.min(1.15, headY * 1.5));
+    const barLift = headY * 0.34 + 0.16;
+    bar.scale.set(barW, barW * 0.313, 1);
+    bar.position.set(spot.x, spot.y + headY + barLift, spot.z);
     room.group.add(bar);
 
     const hit = addInvisibleHitbox(room, spot.x, spot.y + headY * 0.5, spot.z, Math.max(0.6, headY * 0.6), 'resident');
     hit.userData.residentId = rec.id;
 
     const body = {
-      id: rec.id, obj, bar, hit, mixer, footOffset, headY,
+      id: rec.id, obj, bar, hit, mixer, footOffset, headY, barLift,
       homeX: spot.x, homeZ: spot.z, level: lvl,
       target: null, cooldown: 2 + Math.random() * 6
     };
@@ -1622,10 +1730,12 @@ export async function bootFocciWorld(root, opts) {
     const HUT_WOOD = M.wood, HUT_CLOTH = M.cloth, HUT_RUG = M.rug, HUT_QUILT = M.quilt, HUT_LAMP = M.lamp;
     const g = new THREE.Group();
     g.position.set(h.cx, h.y, h.cz);
-    /* Written at full size the bed ran out through the wall — these huts
-       are about four units across inside. Everything below is laid out in
-       comfortable units and then shrunk to fit the room it is in. */
-    g.scale.setScalar(0.72);
+    /* Written at full size the bed ran out through the wall of a small
+       hut, and looked like doll's furniture in the big house. Everything
+       below is laid out for a room about 2.6 units in radius and then
+       scaled to whatever this building actually measures. */
+    const K = Math.max(0.6, Math.min(2.2, (h.inner || 2.6) / 2.6));
+    g.scale.setScalar(K);
     g.visible = false;
     const put = (mesh, x, y, z, ry) => { mesh.position.set(x, y, z); if (ry) mesh.rotation.y = ry; g.add(mesh); return mesh; };
 
@@ -1657,9 +1767,8 @@ export async function bootFocciWorld(root, opts) {
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
     room.group.add(g);
 
-    const K = 0.72;   // the same shrink the group gets
-    const bedHit = addInvisibleHitbox(room, h.cx - 1.5 * K, h.y + 0.5 * K, h.cz + 0.4 * K, 0.85, 'hut-bed');
-    const lampHit = addInvisibleHitbox(room, h.cx + 1.4 * K, h.y + 0.9 * K, h.cz - 0.5 * K, 0.45, 'hut-lamp');
+    const bedHit = addInvisibleHitbox(room, h.cx - 1.5 * K, h.y + 0.5 * K, h.cz + 0.4 * K, 1.2 * K, 'hut-bed');
+    const lampHit = addInvisibleHitbox(room, h.cx + 1.4 * K, h.y + 0.9 * K, h.cz - 0.5 * K, 0.6 * K, 'hut-lamp');
     bedHit.visible = false; lampHit.visible = false;
     h.kit = g; h.kitLight = lampLight; h.kitHits = [bedHit, lampHit];
   }
@@ -1710,16 +1819,12 @@ export async function bootFocciWorld(root, opts) {
         portraitR.setSize(512, 512);
         portraitR.outputEncoding = THREE.sRGBEncoding;
       }
-      /* The GLTF's OWN scene, not a clone.
-
-         Every one of these animals is a skinned mesh, and .clone(true)
-         does not rebind the skeleton — the copy renders as collapsed
-         geometry, which is why the first attempt produced pale blobs
-         about thirty pixels across. Nothing else ever adds gltf.scene to
-         the world (buildResident clones it too), so borrowing the
-         original for one frame and putting its transform back is safe. */
-      const obj = gltf.scene;
-      const keep = { p: obj.position.clone(), q: obj.quaternion.clone(), s: obj.scale.clone(), parent: obj.parent };
+      /* A properly rebound clone. A plain .clone(true) leaves the copy
+         pointing at the original's bones and the animal renders as a
+         collapsed speck — that is what produced pale blobs thirty pixels
+         across here, and an invisible resident with a floating energy
+         bar out on the island. */
+      const obj = cloneSkinned(gltf.scene);
       obj.position.set(0, 0, 0); obj.quaternion.identity(); obj.scale.setScalar(1);
       obj.updateMatrixWorld(true);
 
@@ -1782,9 +1887,6 @@ export async function bootFocciWorld(root, opts) {
       const url = out.toDataURL('image/png');
 
       sc.remove(obj);
-      obj.position.copy(keep.p); obj.quaternion.copy(keep.q); obj.scale.copy(keep.s);
-      if (keep.parent) keep.parent.add(obj);
-      obj.updateMatrixWorld(true);
 
       clearTimeout(portraitIdle);
       portraitIdle = setTimeout(() => { if (portraitR) { portraitR.dispose(); portraitR = null; } }, 8000);
@@ -1794,14 +1896,24 @@ export async function bootFocciWorld(root, opts) {
     return job;
   };
 
+  /* Two of these can be in flight at once — one from boot, one from the
+     boat coming home — and buildResident awaits a model download in the
+     middle. A snapshot of "who already exists" taken before that await is
+     out of date by the time it resolves, so both calls built the same
+     animal and the island ended up with three copies of the same rabbit
+     sharing one id. The check is live now, and an id is claimed BEFORE
+     the await rather than after it. */
+  const residentsBuilding = new Set();
   async function syncResidents(room) {
     if (!window.resLoad) return;
     const recs = window.resTick ? window.resTick() : window.resLoad();
     room.residents = room.residents || [];
-    const known = new Set(room.residents.map((b) => b.id));
     for (const rec of recs) {
-      if (known.has(rec.id)) continue;
-      await buildResident(room, rec);
+      if (residentsBuilding.has(rec.id)) continue;
+      if (room.residents.some((b) => b.id === rec.id)) continue;
+      residentsBuilding.add(rec.id);
+      try { await buildResident(room, rec); }
+      finally { residentsBuilding.delete(rec.id); }
     }
   }
 
@@ -1951,7 +2063,7 @@ export async function bootFocciWorld(root, opts) {
       }
       // a small idle bob only while it has the energy for it
       const bob = lively ? Math.abs(Math.sin(t * 2 + b.homeX)) * 0.04 : 0;
-      b.bar.position.set(b.obj.position.x, b.obj.position.y + b.headY + 0.5 + bob, b.obj.position.z);
+      b.bar.position.set(b.obj.position.x, b.obj.position.y + b.headY + (b.barLift || 0.5) + bob, b.obj.position.z);
       if (b.hit) b.hit.position.set(b.obj.position.x, b.obj.position.y + b.headY * 0.5, b.obj.position.z);
     }
   }
@@ -1989,14 +2101,33 @@ export async function bootFocciWorld(root, opts) {
     if (room.houses && room.houses.length) {
       let anyInside = false, insideHut = null;
       for (const h of room.houses) {
-        /* You get in THROUGH THE DOOR, and only from the ground. Without
-           the height test, standing on the roof counted as being inside —
-           the hut is directly underneath you in x/z — and the floor clamp
-           below would have yanked him down through it. */
-        const atFloor = Math.abs(character.position.y - h.y) < 2.4;
-        const atDoor = atFloor && Math.hypot(h.x - cx, h.z - cz) < 1.25;
-        const inRoom = atFloor && Math.hypot(h.cx - cx, h.cz - cz) < 2.9;
-        const near = h.inside ? (inRoom || atDoor) : atDoor;
+        /* The doorway is a door, both ways.
+
+           Walking it as a distance test could not work: the big house's
+           doorstep is eight units from the middle of the room, so he
+           crossed into "inside" and straight back out one step later, and
+           once out the door was behind him and there was no way back in.
+           Step on the marker and he goes in; walk out of the room and he
+           is put back on the marker. No gap either way.
+
+           The height test matters as much as ever — the hut is directly
+           below you when you are standing on its roof, and without it the
+           floor clamp would drag him down through the thatch. */
+        const atFloor = Math.abs(character.position.y - h.y) < 2.6;
+        const onStep = Math.abs(character.position.y - h.doorY) < 2.0
+          && Math.hypot(h.x - cx, h.z - cz) < 1.3;
+        const inRoom = atFloor && Math.hypot(h.cx - cx, h.cz - cz) < h.roomR;
+        let near = h.inside;
+        if (!h.inside && onStep) {
+          near = true;
+          // one step over the threshold, so he is standing in the room
+          const bx = h.cx - h.x, bz = h.cz - h.z, bl = Math.hypot(bx, bz) || 1;
+          charState.x = h.cx - (bx / bl) * Math.min(1.4, bl * 0.4);
+          charState.z = h.cz - (bz / bl) * Math.min(1.4, bl * 0.4);
+        } else if (h.inside && !inRoom) {
+          near = false;
+          charState.x = h.x; charState.z = h.z;   // back out onto the marker
+        }
         if (near) { anyInside = true; insideHut = h; }
         if (near !== h.inside) {
           h.inside = near;
@@ -2024,7 +2155,15 @@ export async function bootFocciWorld(root, opts) {
              filled with brown. From above, with the roof faded out, the
              room actually reads. */
           camBeforeHut = { phi: cam.tPhi, radius: cam.tRadius };
-          cam.tRadius = 8.2; cam.tPhi = 0.66;
+          /* The camera has to stay INSIDE the room, above him and looking
+             down. Anywhere further out than the walls and it is in the
+             hillside the big house is built against, with the screen full
+             of brown rock; anywhere near level and it is in the wall
+             itself. So: high enough to see over the furniture, and never
+             further out horizontally than the room is wide. */
+          const rr = insideHut.inner || 2.9;
+          cam.tRadius = Math.max(4, Math.min(7.5, rr * 0.95));
+          cam.tPhi = 0.5;
         } else if (camBeforeHut) {
           cam.tRadius = camBeforeHut.radius; cam.tPhi = camBeforeHut.phi;
           camBeforeHut = null;
@@ -2036,7 +2175,12 @@ export async function bootFocciWorld(root, opts) {
         room.collidables[0].traverse((o) => {
           if (!o.isMesh || !o.userData.isBuilding) return;
           o.material.transparent = true;
-          o.userData._targetOpacity = anyInside ? 0.13 : 1;   // barely there, so you can see in
+          /* Ghosted almost to nothing, and taken out of the depth buffer
+             while it is. At 0.13 with depth writing on you were looking
+             through four or five stacked translucent surfaces at once and
+             the whole room came out a flat washed-out pink. */
+          o.material.depthWrite = !anyInside;
+          o.userData._targetOpacity = anyInside ? 0.07 : 1;
         });
       }
       room.collidables[0].traverse((o) => {
@@ -2372,6 +2516,30 @@ export async function bootFocciWorld(root, opts) {
     const cz = charState.z + cam.radius * sinPhi * Math.cos(cam.theta);
     const cy = character.position.y + cam.radius * Math.cos(cam.phi);
     camera.position.set(cx, cy + 1.1, cz);
+    /* Indoors, don't let anything solid get between the camera and him.
+
+       Fading the walls is not enough in the big house: its upper floor and
+       decking are WOOD, not wall material, so they never faded, and the
+       camera five units up was simply inside them — a screen full of flat
+       yellow with Focci somewhere underneath it. Sight-line test from his
+       head outwards, ignoring anything already see-through, and pull the
+       camera in to just short of whatever it finds. Only while he is
+       indoors: outdoors this would have the camera flinching at trees. */
+    const inHut = rooms[currentRoomKey]._insideHut;
+    if (inHut) {
+      const look = new THREE.Vector3(charState.x, character.position.y + 1.0, charState.z);
+      const away = camera.position.clone().sub(look);
+      const far = away.length();
+      away.normalize();
+      raycaster.set(look, away);
+      raycaster.far = far;
+      const blocked = raycaster.intersectObject(rooms[currentRoomKey].collidables[0], true)
+        .find((h) => !(h.object.material && h.object.material.transparent && h.object.material.opacity < 0.5));
+      raycaster.far = Infinity;
+      if (blocked && blocked.distance < far - 0.2) {
+        camera.position.copy(look).addScaledVector(away, Math.max(1.5, blocked.distance - 0.4));
+      }
+    }
     camera.lookAt(charState.x, character.position.y + 1.0, charState.z);
   }
 
@@ -2386,7 +2554,11 @@ export async function bootFocciWorld(root, opts) {
      overlay being closed, and drop any gesture still in flight when one
      opens. */
   function overlayOpen() {
-    if (document.hidden) return true;                       // tab in the background
+    // __fwAwake keeps the loop running with the tab in the background. It
+    // is off by default and only ever set by hand while diagnosing: a
+    // parked loop means nothing moves between two tool calls, and every
+    // state read comes back as whatever it was before the last frame.
+    if (document.hidden && !window.__fwAwake) return true;  // tab in the background
     var ov = document.getElementById('fw-overlay');
     if (ov && ov.style.display === 'none') return true;     // world not on screen at all
     if (document.documentElement.classList.contains('dict-open')) return true; // word entry
