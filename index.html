@@ -917,129 +917,160 @@
   .sy-body .write-alt-n{width:24px;height:24px;font-size:12px;color:var(--on-hero);background-image:var(--gloss),var(--grad-hero)}
 
   /* ============================================================
-     SPEAK UP — full redesign. Own dark "night village" mood (background
-     photo the user supplied, bg-speakup-village.webp) instead of the
-     random arc-land scenes the rest of Say it's siblings use, since this
-     screen now has its own real round/session structure worth a distinct
-     identity. Solid dark-teal page background means the photo (bounded to
-     the .su-scene box up top) never needs to awkwardly stretch to cover
-     whatever the total scroll height ends up being.
+     SPEAK UP — every number below was measured off the mockup with
+     a pixel sampler, not estimated by eye. The mockup renders a
+     387px-wide phone, i.e. ~1:1 with CSS px on a 390px viewport, so
+     the measurements transfer directly.
+
+     Measured: content column 344px wide, inset 23px each side (the
+     panel itself already contributes 14px, hence the 9px here);
+     scene panel fill #105552 r24; coach bar #07CEC4 r16 h45;
+     feedback panel #06504B r22; answer boxes #43985C r20.
      ============================================================ */
-  .su-page{background:#0d2622;border-radius:var(--r);padding:14px 14px 4px;margin:0 -2px;color:#F3F7F5}
-  /* Speak Up is its own mint/emerald identity, deliberately different from
-     the violet accent the other 3 dashboard panels got — a prior pass
-     wrongly let the dashboard-wide violet override (body .view.fw-panel)
-     bleed into here too, since .su-page lives inside that same panel.
-     Re-declaring the tokens every button/slider on this screen actually
-     reads (--grad-hero) at equal-or-higher specificity, placed after that
-     rule in the file, wins it back to mint for Speak Up only. */
+  .su-page{position:relative;color:#fff;padding:0 9px 28px}
+
+  /* The panel's own violet glass is switched off and replaced by the
+     village scene. .su-active is toggled by suPanelOn() in app.js.
+     `body ` is needed because theme-overrides.css ties specificity
+     with a bare .view.fw-panel and loads later.
+
+     The overlay is deliberately light (.30 → .52): the supplied
+     artwork averages luma 157 — it is a BRIGHT pastel scene, and the
+     heavy .46→.78 scrim of the previous attempt is what turned it
+     into grey mud. */
+  body .view.fw-panel.su-active{
+    background:
+      linear-gradient(180deg,rgba(4,44,44,.30) 0%,rgba(3,38,38,.40) 58%,rgba(2,30,30,.54) 100%),
+      url('./bg-speakup-village.webp') center top/cover no-repeat,
+      #0d4c48;
+    backdrop-filter:none;-webkit-backdrop-filter:none}
+
+  /* The games panel forces Exo 2 on every descendant; Speak Up keeps
+     the app's Raleway, so it has to be handed back explicitly. */
+  body .view.fw-panel .su-page,
+  body .view.fw-panel .su-page *{
+    font-family:'Raleway Local','Raleway',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}
+
+  /* Supplied artwork, used as-is: title, blurb and fox are baked in.
+     Measured 344x124 in the mockup = the file's own 584x210 aspect. */
+  .su-hero-img{display:block;width:100%;height:auto;margin:0 0 10px}
+  /* Tucked into the header card's rounded top-left corner, above the
+     title, so it adds no row to the measured layout. */
+  .su-back{position:absolute;left:1px;top:1px;z-index:2;width:30px;height:30px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;color:#fff;
+    background:rgba(4,44,42,.42);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  .su-back:active{opacity:.7}
+
+  /* Measured: label 14px, value in a 27x18 translucent pill, then an
+     8px track. Identical geometry before the round (live slider) and
+     during it (progress), so nothing shifts. */
+  .su-qrow{display:flex;align-items:center;gap:11px;margin:0 0 15px;padding:0 1px}
+  .su-qrow-l{font-size:14px;font-weight:500;color:#fff;white-space:nowrap;letter-spacing:.005em}
+  .su-qrow-n{flex:none;min-width:30px;padding:2px 11px;border-radius:999px;text-align:center;
+    font-size:14px;font-weight:700;color:#fff;background:rgba(255,255,255,.20);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+  .su-slider{-webkit-appearance:none;appearance:none;flex:1;height:8px;border-radius:999px;
+    background:rgba(255,255,255,.46);outline:none;margin:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+  .su-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+    background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);cursor:pointer}
+  .su-slider::-moz-range-thumb{width:20px;height:20px;border:0;border-radius:50%;background:#fff;
+    box-shadow:0 2px 6px rgba(0,0,0,.35);cursor:pointer}
+  .su-track{flex:1;height:8px;border-radius:999px;background:rgba(255,255,255,.46);position:relative;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+  .su-track i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:#fff;transition:width .35s}
+
+  /* ONE panel holds the whole prompt — English setup, Vietnamese line,
+     reward — measured 154px tall with 26px padding and a 24px radius.
+     Both text blocks are justified in the mockup (the giveaway is the
+     stretched word-spacing on "You see a foreigner standing near the"). */
+  .su-scene{position:relative;overflow:hidden;border-radius:24px;padding:25px 24px 14px;margin:0 0 20px;
+    background:rgba(3,58,54,.66);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+  .su-context{font-size:15.5px;line-height:1.5;font-weight:500;color:#fff;text-align:justify;margin:0}
+  .su-vi{position:relative;margin-top:20px;padding-left:26px;font-size:15.5px;line-height:1.55;
+    font-weight:500;color:#fff;text-align:justify}
+  .su-vi-q{position:absolute;left:-2px;top:2px;font-family:Georgia,serif;font-size:34px;line-height:.8;
+    color:rgba(255,255,255,.62)}
+  .su-xp{display:block;position:relative;z-index:1;margin-top:8px;text-align:right;
+    font-size:15px;font-style:italic;font-weight:600;color:#fff}
+  .su-xp.got{color:#9CF5BE}
+  /* The crescent in the mockup's bottom-right corner: a ring with the
+     inner disc punched out by a second, offset shadow-coloured circle. */
+  .su-moon{position:absolute;right:-16px;bottom:-14px;width:74px;height:74px;border-radius:50%;
+    border:7px solid rgba(190,245,236,.34);pointer-events:none}
+  .su-moon::after{content:'';position:absolute;left:-19px;top:-13px;width:76px;height:76px;
+    border-radius:50%;background:rgba(3,58,54,.66)}
+
+  .su-loading{text-align:center;padding:40px 16px}
+  .su-loading img{width:84px;margin:0 auto 12px;animation:cheer 2.4s ease-in-out infinite}
+  .su-loading p{font-size:13.5px;color:rgba(255,255,255,.85)}
+
+  .su-body{padding:0}
+  .su-body .write-input{background:rgba(3,58,54,.66);border:1.5px solid rgba(255,255,255,.28);color:#fff;
+    border-radius:20px;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+  .su-body .write-input::placeholder{color:rgba(255,255,255,.5)}
+  .su-body .sy-count{color:rgba(255,255,255,.65)}
+  .su-body .sy-saved-link{color:rgba(255,255,255,.7)}
+  .su-body .sy-saved-link b{color:#7BE052}
+
+  /* Measured #07CEC4, 45px tall, radius 16. The fox sits ON the bar's
+     left end and overhangs it, so the text is padded 34px clear. */
+  .su-coach{position:relative;margin:0 0 12px;padding:11px 15px 11px 34px;border-radius:16px;
+    background:#07CEC4;color:#0B3F3A;font-size:13.5px;line-height:1.42;font-style:italic;font-weight:600}
+  .su-coach b{font-weight:800;font-style:italic}
+  .su-coach-fox{position:absolute;left:-14px;bottom:-2px;width:50px;height:auto;
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.3))}
+
+  .su-feedback{border-radius:22px;padding:20px;margin:0 0 4px;background:rgba(1,46,42,.66);
+    backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+
+  /* The learner's own sentence, marked up inline. The weight and
+     decoration carry meaning and must not drift:
+       level 1  cream,  regular,  no decoration  — fine as written
+       level 2  orange, regular,  NO strikethrough — grammatical but
+                a native would not phrase it that way
+       level 3  red,    regular,  strikethrough  — wrong
+       .su-fix  green,  BOLD,     no decoration  — the replacement
+     Only the fix is bold; only level 3 is struck. */
+  .su-diff{font-size:15px;line-height:1.85;text-align:justify;margin:0 0 15px;color:#E9EFC8}
+  .su-seg-1{color:#E9EFC8;font-weight:500;text-decoration:none}
+  .su-seg-2{color:#F0A874;font-weight:500;text-decoration:none}
+  .su-seg-3{color:#F0776A;font-weight:500;text-decoration:line-through;text-decoration-thickness:1.5px}
+  .su-fix{color:#7BE052;font-weight:800;text-decoration:none}
+
+  .su-mistakes{list-style:disc;margin:0;padding:0 0 0 19px;display:flex;flex-direction:column;gap:8px}
+  .su-mistakes li{font-size:13.5px;line-height:1.5;color:#fff}
+  .su-mistakes b.wrong{font-weight:500;color:#fff}      /* the quoted error is NOT bold */
+  .su-mistakes b.ok{font-weight:800;color:#fff}         /* only the correction is */
+  .su-mistakes span{color:rgba(186,232,225,.9)}
+
+  /* Measured: bright green bold italic, ~12.5px, indented 17px inside
+     the box column. The label row is the pick target so the sentence
+     below stays free for hold-to-select lookup. */
+  .su-ans-lbl{display:flex;align-items:center;gap:8px;width:100%;margin:18px 0 8px;padding:0 0 0 17px;
+    text-align:left;background:none;font-size:12.5px;font-style:italic;font-weight:700;color:#7BD44E}
+  .su-ans-lbl:active{opacity:.7}
+  .su-ans-lbl .ic{flex:none;font-size:16px;font-style:normal;line-height:1}
+  .su-ans-box{border-radius:20px;padding:16px 18px;background:#43985C;
+    box-shadow:0 0 0 0 rgba(255,213,74,0);transition:box-shadow .2s}
+  .su-ans-box.picked{box-shadow:0 0 0 2.5px #FFD54A}
+  /* White, bold, italic, justified — measured off the mockup. */
+  .su-ans-text{font-size:15px;line-height:1.55;font-style:italic;font-weight:700;color:#fff;text-align:justify}
+  /* The phrases the correction introduced are underlined, not recoloured. */
+  .su-ans-text u.su-u{text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2.5px}
+  .su-ans-text .wtap{border-radius:4px;transition:background .15s}
+  .su-ans-text .wtap:active,.su-ans-text .wsel{background:rgba(255,255,255,.32)}
+
+  /* Speak Up keeps its own mint identity — the dashboard-wide violet
+     override lives on .view.fw-panel, which this screen sits inside,
+     so both the token and the hardcoded glass-CTA gradient have to be
+     won back here at higher specificity. */
   body .view.fw-panel .su-page{
     --p1:#22D3A8; --p2:#0DA678; --primary:#6EEFC0;
     --grad-hero:linear-gradient(135deg,#22D3A8,#0DA678)}
   body .view.fw-panel .su-page .btn:not(.ghost){
-    background:linear-gradient(135deg, rgba(34,211,168,.62), rgba(13,166,120,.62))}
-  .su-hero{position:relative;overflow:visible;display:flex;align-items:flex-start;gap:10px;padding:18px 100px 18px 20px;
-    margin-bottom:20px;border-radius:24px;min-height:110px;
-    background:linear-gradient(155deg,rgba(20,46,42,.92),rgba(10,26,24,.94));
-    border:1px solid rgba(255,255,255,.14);box-shadow:0 14px 30px rgba(0,0,0,.35)}
-  .su-hero-spark{position:absolute;font-size:15px;color:#8CF0D8;opacity:.8;pointer-events:none}
-  .su-hero-spark.a{top:-8px;left:26px;transform:rotate(-12deg)}
-  .su-hero-spark.b{top:-4px;right:96px;color:#9AB4FF;transform:rotate(10deg)}
-  .su-hero-txt{position:relative;z-index:1}
-  .su-hero-t{font-size:23px;font-weight:800;color:#fff;letter-spacing:-.01em}
-  .su-hero-txt p{margin:6px 0 0;font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.82);max-width:420px}
-  .su-hero-focci{position:absolute;right:0;bottom:0;height:128%;max-height:150px;width:auto;z-index:1;
-    filter:drop-shadow(0 8px 12px rgba(0,0,0,.4));animation:sway 5s ease-in-out infinite}
-  .su-hero-compact{min-height:0;padding:12px 16px;flex-direction:row;align-items:center;justify-content:space-between;
-    overflow:hidden}
-  .su-hero-compact .su-hero-t{font-size:16px}
-  .su-progress{font-size:12px;font-weight:700;color:rgba(255,255,255,.75)}
-  .su-progress b{color:#fff;font-size:14px;margin:0 2px}
-
-  .su-slider-row{display:flex;align-items:center;justify-content:space-between;padding:0 4px;margin-bottom:8px;
-    font-size:13px;font-weight:700;color:rgba(255,255,255,.85)}
-  .su-slider-row b{font-size:16px;color:#fff}
-  .su-slider{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:99px;margin-bottom:20px;
-    background:rgba(255,255,255,.2);outline:none}
-  .su-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
-    background:var(--grad-hero);box-shadow:0 0 0 4px rgba(255,255,255,.12),0 4px 10px rgba(0,0,0,.4);cursor:pointer}
-  .su-slider::-moz-range-thumb{width:18px;height:18px;border:0;border-radius:50%;background:var(--grad-hero);
-    box-shadow:0 0 0 4px rgba(255,255,255,.12),0 4px 10px rgba(0,0,0,.4);cursor:pointer}
-
-  .su-scene{position:relative;overflow:hidden;min-height:230px;padding:18px 16px 76px;margin-bottom:14px;
-    border-radius:22px;background-image:url('./bg-speakup-village.webp'),linear-gradient(160deg,#1c463f,#0a2320);
-    background-size:cover;background-position:top center;background-repeat:no-repeat;
-    border:1px solid rgba(255,255,255,.14);box-shadow:0 14px 30px rgba(0,0,0,.35)}
-  .su-scene::before{content:'';position:absolute;inset:0;z-index:0;
-    background:linear-gradient(180deg,rgba(6,20,18,.1) 0%,rgba(6,20,18,.5) 55%,rgba(6,20,18,.85) 100%)}
-  .su-context{position:relative;z-index:1;font-size:13px;line-height:1.5;color:rgba(255,255,255,.85);
-    margin:0 0 14px;max-width:80%}
-  .su-mission{position:relative;z-index:1;display:flex;align-items:flex-start;gap:10px;
-    font-size:14.5px;font-weight:700;line-height:1.55;color:#fff;
-    padding:14px 16px;border-radius:16px;max-width:90%;
-    background:rgba(10,28,25,.6);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(6px)}
-  .su-quote-mark{flex:none;font-size:26px;font-weight:800;color:#6EEFC0;
-    font-family:Georgia,serif;line-height:1;margin-top:-2px}
-  .su-mission-body{flex:1;min-width:0}
-  .su-mission-foot{display:flex;align-items:center;gap:6px;margin-top:10px;justify-content:flex-end}
-  .su-reward{font-size:12px;font-weight:800;color:#FFE9A8;text-shadow:0 1px 4px rgba(0,0,0,.5);
-    transition:transform .2s}
-  .su-reward.got{color:#8CF0B0;animation:sy-got .5s ease}
-  .su-mission-moon{font-size:13px;opacity:.85}
-  .su-focci{position:absolute;right:8px;bottom:0;z-index:1;height:150px;width:auto;
-    filter:drop-shadow(0 10px 14px rgba(0,0,0,.45));animation:sway 5s ease-in-out infinite}
-  .su-focci.hop{animation:sy-hop .6s ease}
-  @media (prefers-reduced-motion:reduce){.su-focci{animation:none}}
-
-  .su-loading{text-align:center;padding:40px 16px}
-  .su-loading img{width:84px;margin:0 auto 12px;animation:cheer 2.4s ease-in-out infinite}
-  .su-loading p{font-size:13px;color:rgba(255,255,255,.7)}
-
-  .su-body{padding:2px 2px 14px}
-  .su-body .write-input{background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.18);color:#fff}
-  .su-body .write-input::placeholder{color:rgba(255,255,255,.4)}
-  .su-body .sy-count{color:rgba(255,255,255,.55)}
-  .su-body .sy-saved-link{color:rgba(255,255,255,.6)}
-  .su-body .sy-saved-link b{color:#8CF0B0}
-
-  .su-coach{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;padding:12px 14px;border-radius:16px;
-    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}
-  .su-coach img{flex:none;width:32px;height:32px;object-fit:contain}
-  .su-coach div{font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.9)}
-  .su-coach b{color:#fff}
-
-  .su-feedback{padding:16px;border-radius:20px;margin-bottom:12px;
-    background:linear-gradient(165deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
-    border:1px solid rgba(255,255,255,.14)}
-  /* the 3-level highlight on the learner's OWN sentence: yellow = correct
-     and natural, orange = grammatical but a native wouldn't say it that
-     way, red+strikethrough = wrong — immediately followed by the fix in
-     green+bold, an inline track-changes read rather than a separate list. */
-  .su-diff{font-size:14.5px;line-height:2.1;margin-bottom:12px}
-  .su-seg{padding:1px 4px;border-radius:5px}
-  .su-seg-1{color:rgba(255,255,255,.92)}
-  .su-seg-2{background:rgba(255,159,67,.24);color:#FFC98A;font-weight:600}
-  .su-seg-3{background:rgba(255,82,82,.16);color:#FF8A8A;text-decoration:line-through;text-decoration-color:#FF5252}
-  .su-fix{color:#5EE896;font-weight:800}
-  .su-mistakes{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:8px}
-  .su-mistakes li{font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.85);padding:9px 12px;border-radius:12px;
-    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
-  .su-mistakes b.wrong{color:#FF8A8A;text-decoration:line-through;text-decoration-color:#FF5252}
-  .su-mistakes b.ok{color:#5EE896}
-  .su-mistakes li span{color:rgba(255,255,255,.6)}
-
-  .su-ans-box{border-radius:16px;margin-bottom:10px;overflow:hidden;border:1.5px solid rgba(255,255,255,.14);
-    background:rgba(255,255,255,.04);transition:border-color .2s,box-shadow .2s}
-  .su-ans-box.picked{border-color:#FFD54A;box-shadow:0 0 0 2px rgba(255,213,74,.35),0 8px 18px rgba(0,0,0,.3)}
-  .su-ans-pick{display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;text-align:left;
-    background:rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.1)}
-  .su-ans-pick:active{opacity:.85}
-  .su-ans-ico{flex:none;font-size:15px}
-  .su-ans-lbl{font-size:11.5px;font-weight:700;color:rgba(255,255,255,.8);line-height:1.3}
-  .su-ans-box.picked .su-ans-lbl{color:#FFD54A}
-  .su-ans-text{padding:12px 14px;font-size:14px;line-height:1.6;color:#fff}
-  .su-ans-text .wtap{border-radius:4px;transition:background .15s}
-  .su-ans-text .wtap:active, .su-ans-text .wsel{background:rgba(255,213,74,.3)}
+    background:linear-gradient(135deg,#3FA866,#27804D);
+    border-color:rgba(255,255,255,.22);box-shadow:0 8px 20px rgba(0,0,0,.32)}
 
   .fb-icon{display:inline-flex;width:21px;height:21px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;margin-right:5px;background:currentColor;color:var(--surface)}
   .rev-fb .ex{color:var(--muted);font-weight:500}
@@ -3628,7 +3659,7 @@
     <div class="sv-tabs">
       <button class="sv-tab on" data-tab="vault" onclick="setSavedTab('vault')">The Cache</button>
       <button class="sv-tab" data-tab="why" onclick="setSavedTab('why')">The Casebook</button>
-      <button class="sv-tab" data-tab="say" onclick="setSavedTab('say')">Say it</button>
+      <button class="sv-tab" data-tab="say" onclick="setSavedTab('say')">Speak Up</button>
     </div>
     <div class="saved-head">
       <div class="saved-count" id="saved-count">0 words saved</div>

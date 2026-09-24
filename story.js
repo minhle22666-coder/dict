@@ -1919,6 +1919,7 @@ window.renderGameHub = function(){
   _reviewArcId=null; _reviewPos=null; _reviewHistory=[];
   if(_waitTimer){ clearInterval(_waitTimer); _waitTimer=null; }
   window.__sayItActive=false;   // leaving Speak Up's play screen — stop auto-saving word lookups
+  if(typeof suPanelOn==='function') suPanelOn(false);
   const area=$('#review-area'); if(!area) return;
   const map=renderWorldMap(); // { hero, more, mapSection } — banner is itself the Play/Continue button
   let h='<div class="game-hub">';
@@ -1950,7 +1951,7 @@ window.renderGameHub = function(){
   h+='<div class="gm-trio">';
   h+=card('is-type','type',bgs[0],pT,'Type it','Spell it out');
   h+=card('is-match','match',bgs[1],pM,'Match it','Pick the word');
-  h+=card('is-write','write',bgs[2],pS,'Say it','Write a line');
+  h+=card('is-write','write',bgs[2],pS,'Speak Up','Say it out loud');
   h+='</div>';
 
   h+=map.more;

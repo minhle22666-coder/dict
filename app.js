@@ -3822,8 +3822,8 @@ async function renderSaySaved(box, head, stale){
   if(!list.length){
     box.innerHTML='<div class="empty"><img class="ill" src="./mascot-wonder.webp" alt=""/>'
       +'<h3>No sentences yet</h3>'
-      +'<p>Play <b>Say it</b> and every sentence you write lands here \u2014 with Focci\u2019s feedback and other natural ways to say it.</p></div>'
-      +'<button class="btn" onclick="showView(\'review\');setPracticeMode(\'write\')">Play Say it</button>';
+      +'<p>Play <b>Speak Up</b> and every sentence you write lands here \u2014 with Focci\u2019s feedback and other natural ways to say it.</p></div>'
+      +'<button class="btn" onclick="showView(\'review\');setPracticeMode(\'write\')">Play Speak Up</button>';
     return;
   }
   if(savedSort==='oldest') list.sort((a,b)=>a.ts-b.ts);
@@ -4022,6 +4022,7 @@ function setPracticeMode(m){
   practiceMode=m; practiceStage='setup';
   if(m==='write'){ window.__sayItActive=true; renderSpeakUpIntro(); return; }
   window.__sayItActive=false;
+  suPanelOn(false);
   renderPracticeSetup();
 }
 window.setPracticeMode=setPracticeMode;
@@ -4045,7 +4046,7 @@ function gameSwitch(){
   return back+'<div class="game-switch">'
     +g('type',img('decor-note-and-pen'),'Type it','spell from memory')
     +g('match',img('decor-magnifying-glass'),'Match it','pick the word')
-    +g('write',SAY_ICO,'Say it','write a sentence')
+    +g('write',SAY_ICO,'Speak Up','say it out loud')
     +'</div>';
 }
 function chipRow(label, note, opts){
@@ -4559,18 +4560,52 @@ window.setSpeakUpTotal=function(n){
   try{ localStorage.setItem(SPEAKUP_TOTAL_LS, String(speakUpTotal)); }catch(e){}
   const lab=$('#su-total-label'); if(lab) lab.textContent=speakUpTotal;
 };
+/* The header card is the artwork the user supplied (fox, title and
+   blurb all baked in) — used as an image rather than rebuilt in CSS,
+   which is what finally made it match the mockup exactly. */
+const SU_HERO='<img class="su-hero-img" src="./speakup-header.png" alt="Speak Up" onerror="this.style.display=\'none\'"/>';
+/* The three mini-game pills are gone from this screen (they are not in
+   the design and were competing with the header card), but they also
+   carried the only way back to the hub — so the back arrow survives on
+   its own as a small round button tucked into the header's top-left
+   corner, where it costs the layout nothing. */
+function suBack(){
+  return (typeof renderGameHub==='function')
+    ? '<button class="su-back" onclick="renderGameHub()" aria-label="Back to Games">←</button>' : '';
+}
+/* Speak Up swaps the whole panel's backdrop for its own village scene
+   (see .su-active in index.html) — the games hub and the other two
+   mini-games share this panel, so the class has to come back off when
+   any of them takes over. */
+window.suPanelOn=function(on){
+  const p=document.getElementById('v-review');
+  if(p) p.classList.toggle('su-active', !!on);
+};
+/* Same row shape in both states so the layout never jumps: a live
+   slider before the round starts, a progress track during it. */
+function speakUpQRow(interactive){
+  if(interactive){
+    return '<div class="su-qrow"><span class="su-qrow-l">Number of questions</span>'
+      +'<b class="su-qrow-n" id="su-total-label">'+speakUpTotal+'</b>'
+      +'<input class="su-slider" type="range" min="5" max="30" step="1" value="'+speakUpTotal
+      +'" oninput="setSpeakUpTotal(this.value)"/></div>';
+  }
+  const pct=speakUpTotal?Math.round(speakUpIndex/speakUpTotal*100):0;
+  return '<div class="su-qrow"><span class="su-qrow-l">Question</span>'
+    +'<b class="su-qrow-n">'+speakUpIndex+' / '+speakUpTotal+'</b>'
+    +'<span class="su-track"><i style="width:'+pct+'%"></i></span></div>';
+}
 function renderSpeakUpIntro(){
   const area=$('#review-area'); if(!area) return;
+  suPanelOn(true);
   speakUpStage='intro';
   speakUpTotal=loadSpeakUpTotal();
-  let h=gameSwitch();
-  h+='<div class="su-page su-intro">';
-  h+='<div class="su-hero"><span class="su-hero-spark a">✦</span><span class="su-hero-spark b">✧</span>'
-    +'<div class="su-hero-txt"><div class="su-hero-t">Speak Up</div>'
-    +'<p>Welcome to Speak Up! Just read the scenario, type your best English translation and our AI will give you instant feedback with native tips.</p></div>'
-    +'<img class="su-hero-focci" src="./mascot-badass.webp" alt="" onerror="this.style.visibility=\'hidden\'"/></div>';
-  h+='<div class="su-slider-row"><span>Number of questions</span><b id="su-total-label">'+speakUpTotal+'</b></div>';
-  h+='<input class="su-slider" type="range" min="5" max="30" step="1" value="'+speakUpTotal+'" oninput="setSpeakUpTotal(this.value)"/>';
+  /* No gameSwitch() here: the mockup has nothing above the header card,
+     and the three mini-game pills were fighting it for attention. */
+  let h='<div class="su-page su-intro">';
+  h+=suBack();
+  h+=SU_HERO;
+  h+=speakUpQRow(true);
   h+='<button class="btn" onclick="startSpeakUpRound()">Start</button>';
   h+='</div>';
   area.innerHTML=h;
@@ -4715,6 +4750,50 @@ function speakUpMistakesHtml(mistakes){
   h+='</ul>';
   return h;
 }
+/* In the mockup the phrases the correction introduced are underlined
+   inside both answers ("get hit", "for your safety", "poorly
+   maintained"). Those phrases are exactly the corrections the AI
+   already returns, so nothing extra has to be asked of it: collect
+   them from mistakes[].right and segments[].fix and underline every
+   occurrence. Longest-first so "for your safety" wins over "safety",
+   and matching is done on a lowercased copy so the original casing
+   survives into the output. */
+function speakUpAnswerHtml(sentence){
+  const text=String(sentence||'');
+  if(!text) return '';
+  const marks=[];
+  const add=(s)=>{ s=String(s||'').trim(); if(s.length>2 && !marks.includes(s)) marks.push(s); };
+  if(writeResult){
+    (writeResult.mistakes||[]).forEach(m=>add(m&&m.right));
+    (writeResult.segments||[]).forEach(s=>add(s&&s.fix));
+  }
+  if(!marks.length) return tokenizeForTap(text);
+  marks.sort((a,b)=>b.length-a.length);
+  const hay=text.toLowerCase();
+  const taken=new Array(text.length).fill(false);
+  const hits=[];
+  marks.forEach(m=>{
+    const needle=m.toLowerCase();
+    let from=0, at;
+    while((at=hay.indexOf(needle,from))!==-1){
+      const end=at+needle.length;
+      let free=true;
+      for(let i=at;i<end;i++) if(taken[i]){ free=false; break; }
+      if(free){ for(let i=at;i<end;i++) taken[i]=true; hits.push([at,end]); }
+      from=at+1;
+    }
+  });
+  if(!hits.length) return tokenizeForTap(text);
+  hits.sort((a,b)=>a[0]-b[0]);
+  let out='', cur=0;
+  hits.forEach(([a,b])=>{
+    if(a>cur) out+=tokenizeForTap(text.slice(cur,a));
+    out+='<u class="su-u">'+tokenizeForTap(text.slice(a,b))+'</u>';
+    cur=b;
+  });
+  if(cur<text.length) out+=tokenizeForTap(text.slice(cur));
+  return out;
+}
 window.pickSpeakUpAnswer=function(kind){
   if(!writeResult) return;
   writeLiked=kind;
@@ -4729,28 +4808,29 @@ window.pickSpeakUpAnswer=function(kind){
 
 function renderWrite(){
   const area=$('#review-area'); if(!area) return;
+  suPanelOn(true);
   if(speakUpStage==='intro'){ renderSpeakUpIntro(); return; }
   if(speakUpStage==='done'){
-    area.innerHTML=gameSwitch()+'<div class="su-page">'+speakUpRoundDoneHtml()+'</div>';
+    area.innerHTML='<div class="su-page">'+suBack()+speakUpRoundDoneHtml()+'</div>';
     return;
   }
-  if(!writeScene) writeScene=newWriteScene();
-  let h=gameSwitch();
-  h+='<div class="su-page">';
-  h+='<div class="su-hero su-hero-compact"><div class="su-hero-t">Speak Up</div>'
-    +'<div class="su-progress"><span>Question</span> <b>'+speakUpIndex+'</b> <span>/ '+speakUpTotal+'</span></div></div>';
+  let h='<div class="su-page">';
+  h+=suBack();
+  h+=SU_HERO;
+  h+=speakUpQRow(false);
   if(!writeCur){
     h+='<div class="su-loading"><img src="./mascot-wonder.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
       +'<p>Focci is thinking up a scenario…</p></div></div>';
     area.innerHTML=h;
     return;
   }
+  /* One panel: the English setup, the Vietnamese line under it, the
+     reward bottom-right — exactly the arrangement in the mockup. */
   h+='<div class="su-scene">';
   h+='<div class="su-context">'+esc(writeCur.context)+'</div>';
-  h+='<div class="su-mission"><span class="su-quote-mark">“</span><div class="su-mission-body">'+esc(writeCur.vi)
-    +'<div class="su-mission-foot"><span class="su-reward'+(writeResult?' got':'')+'">'+(writeResult?'✓ ':'⚡ ')+'+5 XP</span>'
-    +'<span class="su-mission-moon">\u{1F319}</span></div></div></div>';
-  h+='<img class="su-focci'+(writeResult?' hop':'')+'" src="./'+writeScene.pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>';
+  h+='<div class="su-vi"><span class="su-vi-q">“</span>'+esc(writeCur.vi)+'</div>';
+  h+='<span class="su-xp'+(writeResult?' got':'')+'">+5XP</span>';
+  h+='<span class="su-moon"></span>';
   h+='</div>';
   h+='<div class="su-body">';
   if(!writeResult){
@@ -4759,23 +4839,23 @@ function renderWrite(){
       +'<span class="sy-count" id="sy-count">0 words</span></div>';
     h+='<button class="btn" id="write-check" disabled onclick="submitWrite()">Check it</button>';
   }else{
-    h+='<div class="su-coach"><img src="./mascot-investigate.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
-      +'<div><b>Coach’s Feedback:</b> '+esc(writeResult.feedback_vi||'')+'</div></div>';
+    h+='<div class="su-coach"><img class="su-coach-fox" src="./mascot-take_note.webp" alt="" onerror="this.style.display=\'none\'"/>'
+      +'<b>Coach’s Feedback:</b> '+esc(writeResult.feedback_vi||'')+'</div>';
     h+='<div class="su-feedback">';
     h+=speakUpSegmentsHtml(writeResult.segments);
     h+=speakUpMistakesHtml(writeResult.mistakes);
-    h+='<div class="su-ans-box su-ans-fixed'+(writeLiked==='fixed'?' picked':'')+'">'
-      +'<button class="su-ans-pick" onclick="pickSpeakUpAnswer(\'fixed\')"><span class="su-ans-ico">⭐</span>'
-      +'<span class="su-ans-lbl">Nếu theo câu của bạn thì bạn nên nói:</span></button>'
-      +'<div class="su-tappable su-ans-text">'+tokenizeForTap(writeResult.fixed_sentence||'')+'</div></div>';
-    h+='<div class="su-ans-box su-ans-natural'+(writeLiked==='natural'?' picked':'')+'">'
-      +'<button class="su-ans-pick" onclick="pickSpeakUpAnswer(\'natural\')"><span class="su-ans-ico">\u{1F319}</span>'
-      +'<span class="su-ans-lbl">Còn đây là cách của Focci nếu bạn thích tự nhiên hơn:</span></button>'
-      +'<div class="su-tappable su-ans-text">'+tokenizeForTap(writeResult.natural_sample||'')+'</div></div>';
+    h+='<button class="su-ans-lbl" onclick="pickSpeakUpAnswer(\'fixed\')">'
+      +'<span class="ic">⭐</span>Nếu theo câu của bạn thì sẽ nên là:</button>'
+      +'<div class="su-ans-box'+(writeLiked==='fixed'?' picked':'')+'">'
+      +'<div class="su-tappable su-ans-text">'+speakUpAnswerHtml(writeResult.fixed_sentence)+'</div></div>';
+    h+='<button class="su-ans-lbl moon" onclick="pickSpeakUpAnswer(\'natural\')">'
+      +'<span class="ic">\u{1F319}</span>Còn đây là cách của Focci nếu bạn thích tự nhiên hơn:</button>'
+      +'<div class="su-ans-box'+(writeLiked==='natural'?' picked':'')+'">'
+      +'<div class="su-tappable su-ans-text">'+speakUpAnswerHtml(writeResult.natural_sample)+'</div></div>';
     h+='</div>';
     const isLast=speakUpIndex>=speakUpTotal;
     h+='<button class="btn" onclick="'+(isLast?'finishSpeakUpRound()':'startWrite()')+'">'+(isLast?'Finish round':'Next question')+'</button>';
-    h+='<button class="sy-saved-link" onclick="openSaySaved()">Saved under <b>Say it</b> in Saved ↗</button>';
+    h+='<button class="sy-saved-link" onclick="openSaySaved()">Saved under <b>Speak Up</b> in Saved ↗</button>';
   }
   h+='</div></div>';
   area.innerHTML=h;
@@ -4786,7 +4866,7 @@ function renderWrite(){
     }); }
   }else{
     if(writeResult.verdict==='good'){
-      const card=area.querySelector('.su-mission');
+      const card=area.querySelector('.su-scene');
       if(card) confettiBurst(card, 28);
     }
     const fb=area.querySelector('.su-feedback');
