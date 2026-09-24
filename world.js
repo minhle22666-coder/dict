@@ -483,6 +483,138 @@ export async function bootFocciWorld(root, opts) {
     });
   }
 
+
+  /* ============================================================
+     WATER AND LEAP EFFECTS
+
+     Rings on the surface, droplets, petals thrown up by a jump. All of it
+     runs through activeEffects, the same one-callback-per-effect list the
+     pickup burst uses, so nothing here costs anything while idle.
+     ============================================================ */
+  const RIPPLE_GEO = new THREE.RingGeometry(0.2, 0.32, 22);
+  RIPPLE_GEO.rotateX(-Math.PI / 2);
+  function spawnRipple(room, x, y, z, scale, color, dur) {
+    const mat = new THREE.MeshBasicMaterial({ color: color === undefined ? 0xDFF6FF : color, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
+    const m = new THREE.Mesh(RIPPLE_GEO, mat);
+    m.position.set(x, y + 0.04, z);
+    room.group.add(m);
+    let age = 0; const DUR = dur || 0.95, S = scale || 1;
+    activeEffects.push((dt) => {
+      age += dt; const k = Math.min(1, age / DUR);
+      m.scale.set(S * (0.5 + k * 3.4), 1, S * (0.5 + k * 3.4));
+      mat.opacity = 0.6 * (1 - k) * (1 - k);
+      if (age < DUR) return true;
+      room.group.remove(m); mat.dispose(); return false;
+    });
+  }
+  function spawnSplash(room, x, y, z, n, speed) {
+    const N = n || 6, V = speed || 1;
+    for (let i = 0; i < N; i++) {
+      const mat = new THREE.SpriteMaterial({ map: GLOW_TEX, color: 0xCFEEFF, transparent: true, opacity: 0.95, depthWrite: false });
+      const sp = new THREE.Sprite(mat);
+      const ang = Math.random() * Math.PI * 2;
+      const out = (0.9 + Math.random() * 1.1) * V;
+      sp.userData.vx = Math.cos(ang) * out;
+      sp.userData.vz = Math.sin(ang) * out;
+      sp.userData.vy = (2 + Math.random() * 1.6) * V;
+      sp.scale.setScalar(0.14 + Math.random() * 0.1);
+      sp.position.set(x, y, z);
+      room.group.add(sp);
+      let age = 0; const DUR = 0.55 + Math.random() * 0.2;
+      activeEffects.push((dt) => {
+        age += dt;
+        sp.position.x += sp.userData.vx * dt;
+        sp.position.z += sp.userData.vz * dt;
+        sp.userData.vy -= 9 * dt;
+        sp.position.y += sp.userData.vy * dt;
+        mat.opacity = 0.95 * (1 - age / DUR);
+        if (age < DUR) return true;
+        room.group.remove(sp); mat.dispose(); return false;
+      });
+    }
+  }
+
+  /* A petal, drawn once. The jump used to throw out the same glowing dots
+     as every pickup in the game; this is what makes a leap read as a leap
+     and not as another collection noise. */
+  let PETAL_TEX = null;
+  function petalTexture() {
+    if (PETAL_TEX) return PETAL_TEX;
+    const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    const g = c.getContext('2d');
+    const grd = g.createLinearGradient(32, 6, 32, 58);
+    grd.addColorStop(0, '#FFF3F8'); grd.addColorStop(0.55, '#FFC2DC'); grd.addColorStop(1, '#F98FC0');
+    g.fillStyle = grd;
+    g.beginPath();
+    g.moveTo(32, 6);
+    g.bezierCurveTo(56, 18, 54, 48, 32, 58);
+    g.bezierCurveTo(10, 48, 8, 18, 32, 6);
+    g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1.5; g.stroke();
+    PETAL_TEX = new THREE.CanvasTexture(c);
+    return PETAL_TEX;
+  }
+  const PETAL_GEO = new THREE.PlaneGeometry(0.3, 0.34);
+  /* The take-off: a shockwave ring off the ground and a spray of petals
+     tumbling outward. */
+  function spawnLeapBurst(room, x, y, z) {
+    spawnRipple(room, x, y, z, 1.1, 0xFFE9C8, 0.55);
+    spawnRipple(room, x, y, z, 1.6, 0xFFC7E4, 0.8);
+    const tex = petalTexture();
+    for (let i = 0; i < 9; i++) {
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 1, depthWrite: false, side: THREE.DoubleSide });
+      const m = new THREE.Mesh(PETAL_GEO, mat);
+      const ang = (i / 9) * Math.PI * 2 + Math.random() * 0.5;
+      const out = 1.5 + Math.random() * 1.4;
+      m.userData.vx = Math.cos(ang) * out;
+      m.userData.vz = Math.sin(ang) * out;
+      m.userData.vy = 2.6 + Math.random() * 2.2;
+      m.userData.spin = (Math.random() - 0.5) * 9;
+      m.position.set(x, y + 0.1, z);
+      m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+      room.group.add(m);
+      let age = 0; const DUR = 1.15;
+      activeEffects.push((dt) => {
+        age += dt; const k = age / DUR;
+        m.position.x += m.userData.vx * dt;
+        m.position.z += m.userData.vz * dt;
+        m.userData.vy -= 5.5 * dt;
+        m.position.y += m.userData.vy * dt;
+        m.rotation.x += m.userData.spin * dt;
+        m.rotation.z += m.userData.spin * 0.6 * dt;
+        m.userData.vx *= 0.97; m.userData.vz *= 0.97;
+        mat.opacity = Math.max(0, 1 - k * k);
+        if (age < DUR) return true;
+        room.group.remove(m); mat.dispose(); return false;
+      });
+    }
+  }
+  /* The landing: dust, low and quick so it never competes with the
+     take-off. In the sea it is a splash instead — see the jump code. */
+  function spawnLandingPuff(room, x, y, z) {
+    spawnRipple(room, x, y, z, 1.3, 0xF3E2C2, 0.5);
+    for (let i = 0; i < 6; i++) {
+      const mat = new THREE.SpriteMaterial({ map: GLOW_TEX, color: 0xE8D6B4, transparent: true, opacity: 0.55, depthWrite: false });
+      const sp = new THREE.Sprite(mat);
+      const ang = (i / 6) * Math.PI * 2;
+      sp.userData.vx = Math.cos(ang) * 1.5;
+      sp.userData.vz = Math.sin(ang) * 1.5;
+      sp.scale.setScalar(0.3);
+      sp.position.set(x, y + 0.08, z);
+      room.group.add(sp);
+      let age = 0; const DUR = 0.42;
+      activeEffects.push((dt) => {
+        age += dt; const k = age / DUR;
+        sp.position.x += sp.userData.vx * dt;
+        sp.position.z += sp.userData.vz * dt;
+        sp.scale.setScalar(0.3 + k * 0.5);
+        mat.opacity = 0.55 * (1 - k);
+        if (age < DUR) return true;
+        room.group.remove(sp); mat.dispose(); return false;
+      });
+    }
+  }
+
   /* Fox Island ships with huts, fences and a totem, and a downward raycast
      returns the ROOF as the topmost hit at those columns — so the doe (and
      every animal that follows) treated a rooftop as ordinary ground and
@@ -989,17 +1121,36 @@ export async function bootFocciWorld(root, opts) {
             }
           }
           clusters.filter((c) => c.n >= 3).slice(0, 6).forEach((c) => {
-            /* The doorway marker goes on open ground just outside the hut,
-               found by stepping outward from its centre until the column
-               stops being building. */
-            let mx = c.x, mz = c.z, my = c.y;
-            const dirx = c.x - station.spawn.x, dirz = c.z - station.spawn.z;
-            const len = Math.hypot(dirx, dirz) || 1;
-            for (let d = 2; d <= 7; d += 0.5) {
-              const px = c.x - (dirx / len) * d, pz = c.z - (dirz / len) * d;
-              const su = surfaceYIn(station, px, pz, GROUND_CEIL);
-              if (su.hit && !su.water && !su.building) { mx = px; mz = pz; my = su.y; break; }
+            /* The doorstep: the nearest walkable ground anywhere around the
+               hut, swept on sixteen bearings.
+
+               The old version only looked in ONE direction — straight out
+               from the island's spawn point — and when that ray found
+               nothing it silently kept the cluster centre, whose surface
+               is the ROOF. Measured: three of the six markers had landed
+               on rooftops at y 14 to 17.7, and one of those "huts" is
+               actually the lantern tower. A hut with no ground around it
+               now gets no doorway at all rather than one on its own roof. */
+            let mx = null, mz = null, my = null, bestD = Infinity;
+            for (let a = 0; a < 16; a++) {
+              const th = (a / 16) * Math.PI * 2;
+              for (let d = 2; d <= 8; d += 0.4) {
+                const px = c.x + Math.cos(th) * d, pz = c.z + Math.sin(th) * d;
+                const su = surfaceYIn(station, px, pz, GROUND_CEIL);
+                if (!su.hit || su.water || su.building) continue;
+                /* A doorstep is BELOW the roof it belongs to. Two of the
+                   clusters sit buried in the central mountain, and the
+                   sweep was happily calling the terrace above them — 18.2,
+                   four units higher than their own roofs — their front
+                   door. Those two get no doorway now, which is correct:
+                   there is nothing there to walk into. */
+                if (su.y > c.y - 1.2) continue;
+                if (!isStableGround(station, px, pz, su.y)) continue;
+                if (d < bestD) { bestD = d; mx = px; mz = pz; my = su.y; }
+                break;
+              }
             }
+            if (mx === null) return;
             const ring = new THREE.Mesh(
               new THREE.CylinderGeometry(0.85, 0.85, 0.06, 18),
               new THREE.MeshStandardMaterial({ color: 0xFFE3AE, emissive: 0xFFC96B, emissiveIntensity: 1.1, transparent: true, opacity: 0.8 })
@@ -1015,10 +1166,74 @@ export async function bootFocciWorld(root, opts) {
             lamp.position.set(c.x, c.y + 1.4, c.z);
             station.group.add(lamp);
             station.houses.push({ x: mx, z: mz, y: my, cx: c.x, cz: c.z, ring, spark, lamp, inside: false });
+            /* The doorway ring answers a tap as well as a step, so you can
+               go in from across the room instead of steering into a
+               1.3-unit circle. */
+            const doorHit = addInvisibleHitbox(station, mx, my + 0.8, mz, 1.1, 'hut-door');
+            doorHit.userData.houseIndex = station.houses.length - 1;
           });
         }
       }
+      station.houses.forEach((h) => buildHutInterior(station, h));
 
+
+
+    /* ============================================================
+       THE SEA
+
+       Fox Island shipped with no water anywhere on it — measured, not
+       assumed: not one mesh in the model tags as water, and every ground
+       probe past radius 23 comes back empty. That is why the boat was
+       sitting in the sand. There was no sea for it to sit on.
+
+       So there is one now, a disc just below the lowest shore (measured at
+       6.1), wide enough to run past anywhere you can see from. The waves
+       are displaced in the vertex shader, not on the CPU — two thousand
+       vertices re-written every frame in JavaScript is exactly the kind of
+       thing that makes this stutter on a phone.
+       ============================================================ */
+    const SEA_Y = 5.9;
+    {
+      const SEA_R = 96;
+      const geo = new THREE.RingGeometry(0.5, SEA_R, 80, 22);
+      geo.rotateX(-Math.PI / 2);
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x0E8CA8, transparent: true, opacity: 0.88,
+        roughness: 0.22, metalness: 0.2, side: THREE.DoubleSide
+      });
+      const uTime = { value: 0 };
+      mat.onBeforeCompile = (sh) => {
+        sh.uniforms.uTime = uTime;
+        /* Moving the vertices is only half of it. The first version did
+           exactly that and the sea still looked like a flat sheet, because
+           the normals went on pointing straight up and the light never
+           changed across a swell. The slope of the same three waves is
+           differentiated by hand here and fed into the normal, which is
+           what actually makes them read as water. */
+        sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader
+          .replace('#include <beginnormal_vertex>',
+            '#include <beginnormal_vertex>\n'
+            + 'float wd = max(length(position.xz), 0.001);\n'
+            + 'float wr = cos(wd * 0.28 - uTime * 1.45) * 0.28 * 0.34;\n'
+            + 'float wnx = wr * (position.x / wd) + cos(position.x * 0.15 + uTime * 0.85) * 0.15 * 0.24;\n'
+            + 'float wnz = wr * (position.z / wd) - sin(position.z * 0.19 + uTime * 0.65) * 0.19 * 0.18;\n'
+            + 'objectNormal = normalize(vec3(-wnx, 1.0, -wnz));')
+          .replace('#include <begin_vertex>',
+            '#include <begin_vertex>\n'
+            + 'float sd = length(transformed.xz);\n'
+            + 'transformed.y += sin(sd * 0.28 - uTime * 1.45) * 0.34\n'
+            + '  + sin(transformed.x * 0.15 + uTime * 0.85) * 0.24\n'
+            + '  + cos(transformed.z * 0.19 + uTime * 0.65) * 0.18;');
+      };
+      const sea = new THREE.Mesh(geo, mat);
+      sea.position.y = SEA_Y;
+      sea.userData.isWater = true;
+      station.group.add(sea);
+      station.collidables.push(sea);
+      station.sea = { mesh: sea, y: SEA_Y, uTime };
+      // the night glow every other water surface gets
+      waterMats.push(mat);
+    }
 
     /* ============================================================
        THE RESCUE BOAT
@@ -1032,8 +1247,9 @@ export async function bootFocciWorld(root, opts) {
        its beach shelf; the boat sits just beyond it, on the water.
        ============================================================ */
     {
+      // the gentlest shore on the island: the lowest walkable ground there is
       let dock = null, lowest = Infinity;
-      for (let i = 0; i < 400; i++) {
+      for (let i = 0; i < 500; i++) {
         const a = Math.random() * Math.PI * 2, r = 14 + Math.random() * 9;
         const x = Math.cos(a) * r, z = Math.sin(a) * r;
         const su = surfaceYIn(station, x, z, GROUND_CEIL);
@@ -1041,26 +1257,62 @@ export async function bootFocciWorld(root, opts) {
         if (su.y < lowest && isStableGround(station, x, z, su.y)) { lowest = su.y; dock = { x, z, y: su.y }; }
       }
       if (dock) {
+        /* Out past the shoreline, floating. Walk outward from the dock until
+           the ground gives way to open water, then a little further still,
+           so the boat is unmistakably at sea and Focci has to wade to it. */
         const out = Math.hypot(dock.x, dock.z) || 1;
-        const bx = dock.x + (dock.x / out) * 2.6, bz = dock.z + (dock.z / out) * 2.6;
+        const ux = dock.x / out, uz = dock.z / out;
+        let bx = dock.x + ux * 6, bz = dock.z + uz * 6;
+        for (let d = 1; d <= 22; d += 0.5) {
+          const px = dock.x + ux * d, pz = dock.z + uz * d;
+          const su = surfaceYIn(station, px, pz, GROUND_CEIL);
+          if (su.water) { bx = px + ux * 2.8; bz = pz + uz * 2.8; break; }
+        }
         const bBox = new THREE.Box3().setFromObject(boatGlb.scene);
         const bSize = bBox.getSize(new THREE.Vector3());
-        const bScale = 3.4 / Math.max(bSize.x, bSize.z, 0.0001);
+        // half again as big as it was, as asked
+        const bScale = 5.1 / Math.max(bSize.x, bSize.z, 0.0001);
         boatGlb.scene.scale.setScalar(bScale);
-        boatGlb.scene.position.set(bx, dock.y - bBox.min.y * bScale - 0.25, bz);
-        boatGlb.scene.rotation.y = Math.atan2(-dock.x, -dock.z);
+        /* Only the keel goes under. Sunk by 0.55 the sea plane cut straight
+           across the inside of the hull and the boat looked swamped. */
+        const restY = SEA_Y - bBox.min.y * bScale - 0.12;
+        boatGlb.scene.position.set(bx, restY, bz);
+        boatGlb.scene.rotation.y = Math.atan2(-ux, -uz);
         boatGlb.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
         station.group.add(boatGlb.scene);
 
+        /* The marker follows the boat rather than staying on the beach —
+           the thing being offered is out there, not here. */
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0x8FD8FF, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
-        glow.scale.setScalar(3.2);
-        glow.position.set(dock.x, dock.y + 1, dock.z);
+        glow.scale.setScalar(4.6);
+        glow.position.set(bx, restY + bSize.y * bScale * 0.9, bz);
         station.group.add(glow);
 
+        /* Where on the boat he actually stands. Put at the boat's own
+           origin he ended up inside the wheelhouse, invisible. Probe the
+           top surface along the hull's long axis and take the LOWEST point
+           in the middle of it: that is the open deck, with the cabin
+           (measured a whole unit higher) ruled out by the same test. */
+        boatGlb.scene.updateMatrixWorld(true);
+        const longAxis = new THREE.Vector3(bSize.x > bSize.z ? 1 : 0, 0, bSize.x > bSize.z ? 0 : 1)
+          .applyQuaternion(boatGlb.scene.quaternion);
+        const halfLen = Math.max(bSize.x, bSize.z) * bScale * 0.5;
+        let deck = null;
+        for (let d = -halfLen * 0.75; d <= halfLen * 0.75; d += 0.2) {
+          const px = bx + longAxis.x * d, pz = bz + longAxis.z * d;
+          raycaster.set(new THREE.Vector3(px, 40, pz), DOWN);
+          const h = raycaster.intersectObject(boatGlb.scene, true);
+          if (!h.length) continue;
+          if (!deck || h[0].point.y < deck.y) deck = { y: h[0].point.y, dx: longAxis.x * d, dz: longAxis.z * d };
+        }
         station.boat = {
           obj: boatGlb.scene, glow,
           dockX: dock.x, dockZ: dock.z, dockY: dock.y,
-          x: bx, z: bz, y: boatGlb.scene.position.y,
+          x: bx, z: bz, y: restY,
+          deckDX: deck ? deck.dx : 0, deckDZ: deck ? deck.dz : 0,
+          deckLift: deck ? (deck.y - restY) : bSize.y * bScale * 0.34,
+          deckY: deck ? deck.y : SEA_Y + bSize.y * bScale * 0.34,
+          glowLift: bSize.y * bScale * 0.9,
           homeX: bx, homeZ: bz, sailing: 0
         };
       }
@@ -1335,6 +1587,213 @@ export async function bootFocciWorld(root, opts) {
     return body;
   }
 
+
+  /* ============================================================
+     WHAT IS INSIDE A HUT
+
+     Fox Island's huts are shells: no floor, no furniture, nothing. Going
+     in used to mean standing in the doorway while the walls went
+     see-through, which is not going in. This builds a small room's worth
+     of furniture for each one out of plain geometry — a bed, a rug, a
+     table with a lamp on it, a shelf — hidden until Focci is actually
+     inside, and the bed and the lamp answer when you tap them.
+
+     The floor is the doorway's own ground height. That is also what the
+     movement code clamps him to while he is inside, which is what stops
+     him from popping out onto the roof the moment he steps in.
+     ============================================================ */
+  /* `var`, and built on first use. As consts declared here these sat in
+     the temporal dead zone: the station's build runs further up the file
+     and calls buildHutInterior before this line is ever reached, so the
+     whole world failed to boot with "Cannot access 'HUT_RUG'". */
+  var HUT_MATS = null;
+  function hutMats() {
+    if (!HUT_MATS) HUT_MATS = {
+      wood: new THREE.MeshStandardMaterial({ color: 0x8A5A38, flatShading: true, roughness: 0.85 }),
+      cloth: new THREE.MeshStandardMaterial({ color: 0xE9DCC2, flatShading: true, roughness: 0.95 }),
+      rug: new THREE.MeshStandardMaterial({ color: 0xB2513F, flatShading: true, roughness: 0.95 }),
+      quilt: new THREE.MeshStandardMaterial({ color: 0x3E8E86, flatShading: true, roughness: 0.9 }),
+      lamp: new THREE.MeshStandardMaterial({ color: 0xFFE7B0, emissive: 0xFFC46B, emissiveIntensity: 1.2, flatShading: true })
+    };
+    return HUT_MATS;
+  }
+  function buildHutInterior(room, h) {
+    const M = hutMats();
+    const HUT_WOOD = M.wood, HUT_CLOTH = M.cloth, HUT_RUG = M.rug, HUT_QUILT = M.quilt, HUT_LAMP = M.lamp;
+    const g = new THREE.Group();
+    g.position.set(h.cx, h.y, h.cz);
+    /* Written at full size the bed ran out through the wall — these huts
+       are about four units across inside. Everything below is laid out in
+       comfortable units and then shrunk to fit the room it is in. */
+    g.scale.setScalar(0.72);
+    g.visible = false;
+    const put = (mesh, x, y, z, ry) => { mesh.position.set(x, y, z); if (ry) mesh.rotation.y = ry; g.add(mesh); return mesh; };
+
+    put(new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.05, 20), HUT_RUG), 0, 0.03, 0);
+    // the bed, against one side
+    const bed = new THREE.Group();
+    bed.add(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.3, 1.0), HUT_WOOD));
+    const mattress = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.22, 0.92), HUT_CLOTH); mattress.position.y = 0.25; bed.add(mattress);
+    const quilt = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.16, 0.95), HUT_QUILT); quilt.position.set(0.32, 0.34, 0); bed.add(quilt);
+    const pillow = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.6), HUT_CLOTH); pillow.position.set(-0.68, 0.36, 0); bed.add(pillow);
+    bed.position.set(-1.5, 0.15, 0.4); bed.rotation.y = 0.35; g.add(bed);
+    // a table with a lamp on it
+    put(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.55, 8), HUT_WOOD), 1.4, 0.3, -0.5);
+    put(new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.08, 14), HUT_WOOD), 1.4, 0.6, -0.5);
+    const lamp = put(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.32, 0.24), HUT_LAMP), 1.4, 0.8, -0.5);
+    const lampLight = new THREE.PointLight(0xFFCE87, 0, 6, 2);
+    lampLight.position.set(1.4, 1.0, -0.5); g.add(lampLight);
+    // a stool and a shelf of books
+    put(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.42, 10), HUT_WOOD), 0.5, 0.21, 0.9);
+    put(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 0.34), HUT_WOOD), 0.2, 1.25, -1.6);
+    [-0.4, -0.15, 0.1, 0.32].forEach((bx, i) => {
+      const bk = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.36, 0.26),
+        new THREE.MeshStandardMaterial({ color: [0xC4553F, 0x3F7CC4, 0xD8A23C, 0x55A05B][i], flatShading: true, roughness: 0.9 }));
+      put(bk, 0.2 + bx, 1.47, -1.6);
+    });
+    // a basket by the door, because a home has clutter
+    put(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.36, 10), HUT_WOOD), -0.9, 0.18, -1.3);
+
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+    room.group.add(g);
+
+    const K = 0.72;   // the same shrink the group gets
+    const bedHit = addInvisibleHitbox(room, h.cx - 1.5 * K, h.y + 0.5 * K, h.cz + 0.4 * K, 0.85, 'hut-bed');
+    const lampHit = addInvisibleHitbox(room, h.cx + 1.4 * K, h.y + 0.9 * K, h.cz - 0.5 * K, 0.45, 'hut-lamp');
+    bedHit.visible = false; lampHit.visible = false;
+    h.kit = g; h.kitLight = lampLight; h.kitHits = [bedHit, lampHit];
+  }
+
+
+  /* ============================================================
+     PORTRAITS
+
+     The rescue board shows each animal rather than naming it, and there
+     is not one 2D picture of a rabbit, duck, cat, sheep or wolf anywhere
+     in this project — only the GLBs. So the picture is rendered off the
+     model itself, once per species, into a data URL the board uses as an
+     ordinary <img>. Its own tiny renderer, torn down when the board is
+     done with it, so the game's own context is never touched.
+     ============================================================ */
+  /* Turned by hand, once, after looking at what each model renders as.
+     Nothing in a GLTF says which way an animal faces. */
+  const PORTRAIT_YAW = { rabbit: 0, duck: 0, sheep: 0, cat: Math.PI, wolf: 0 };
+  /* Where the render is actually opaque, in pixels. */
+  function alphaBox(src) {
+    const S = src.width;
+    const work = document.createElement('canvas'); work.width = work.height = S;
+    const wg = work.getContext('2d');
+    wg.drawImage(src, 0, 0);
+    let minX = S, minY = S, maxX = -1, maxY = -1, d;
+    try { d = wg.getImageData(0, 0, S, S).data; } catch (e) { return null; }
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        if (d[(y * S + x) * 4 + 3] > 24) {
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return null;
+    return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY };
+  }
+  let portraitR = null, portraitIdle = null;
+  const portraitCache = new Map();
+  window.fwPortrait = function (species) {
+    if (portraitCache.has(species)) return portraitCache.get(species);
+    const job = (async () => {
+      const gltf = await animalModel(species);
+      if (!gltf) return null;
+      if (!portraitR) {
+        portraitR = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+        portraitR.setPixelRatio(1);
+        portraitR.setSize(512, 512);
+        portraitR.outputEncoding = THREE.sRGBEncoding;
+      }
+      /* The GLTF's OWN scene, not a clone.
+
+         Every one of these animals is a skinned mesh, and .clone(true)
+         does not rebind the skeleton — the copy renders as collapsed
+         geometry, which is why the first attempt produced pale blobs
+         about thirty pixels across. Nothing else ever adds gltf.scene to
+         the world (buildResident clones it too), so borrowing the
+         original for one frame and putting its transform back is safe. */
+      const obj = gltf.scene;
+      const keep = { p: obj.position.clone(), q: obj.quaternion.clone(), s: obj.scale.clone(), parent: obj.parent };
+      obj.position.set(0, 0, 0); obj.quaternion.identity(); obj.scale.setScalar(1);
+      obj.updateMatrixWorld(true);
+
+      const sc = new THREE.Scene();
+      sc.add(obj);
+      sc.add(new THREE.HemisphereLight(0xFFFFFF, 0x6A5A46, 1.45));
+      const key = new THREE.DirectionalLight(0xFFF3DE, 1.7); key.position.set(2.4, 3, 2.6); sc.add(key);
+      const rim = new THREE.DirectionalLight(0x9FE6FF, 0.9); rim.position.set(-2.8, 1.4, -2.2); sc.add(rim);
+
+      /* Fit the frame to the animal.
+
+         The bounding box gets it roughly right and no better: these are
+         skinned meshes, so Box3 reports the BIND pose, which for the
+         rabbit is a good deal bigger than the animal actually standing
+         there — framed off the box alone it came out a third the size of
+         the others. So: frame from the box, render, measure where the
+         image is really opaque, correct the distance and the aim, render
+         again. Two corrections is enough for all five.
+
+         PORTRAIT_YAW turns the camera round to the animal's front. The
+         models do not agree on which way forward is — straight off a
+         fixed three-quarter angle the cat presented its backside. */
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const target = box.getCenter(new THREE.Vector3());
+      const radius = Math.max(size.length() * 0.5, 0.001);
+      const FOV = 34, SIZE = 512, WANT = SIZE * 0.86;
+      const cam2 = new THREE.PerspectiveCamera(FOV, 1, radius * 0.02, radius * 60);
+      // look along the animal's flank, swung a little towards its front
+      const alongX = size.x > size.z;
+      const dir = (alongX ? new THREE.Vector3(0.5, 0.42, 1) : new THREE.Vector3(1, 0.42, 0.5)).normalize();
+      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), PORTRAIT_YAW[species] || 0);
+      // start deliberately WIDE: a first frame that is clipped gives the
+      // correction below nothing to measure, since the opaque area then
+      // runs to the edges whatever the real size is.
+      let dist = (radius / Math.sin((FOV / 2) * Math.PI / 180)) * 1.35;
+      const place = () => {
+        cam2.position.copy(dir).multiplyScalar(dist).add(target);
+        cam2.lookAt(target);
+        cam2.updateMatrixWorld(true);
+        portraitR.render(sc, cam2);
+      };
+      place();
+      for (let pass = 0; pass < 4; pass++) {
+        const bb = alphaBox(portraitR.domElement);
+        if (!bb) break;
+        const got = Math.max(bb.w, bb.h);
+        if (got < 3) break;
+        const worldPerPx = (2 * dist * Math.tan((FOV * Math.PI / 180) / 2)) / SIZE;
+        const right = new THREE.Vector3().setFromMatrixColumn(cam2.matrixWorld, 0);
+        const up = new THREE.Vector3().setFromMatrixColumn(cam2.matrixWorld, 1);
+        target.addScaledVector(right, (bb.x - SIZE / 2) * worldPerPx);
+        target.addScaledVector(up, -(bb.y - SIZE / 2) * worldPerPx);
+        dist *= got / WANT;
+        place();
+      }
+
+      const out = document.createElement('canvas'); out.width = out.height = 320;
+      out.getContext('2d').drawImage(portraitR.domElement, 0, 0, 512, 512, 0, 0, 320, 320);
+      const url = out.toDataURL('image/png');
+
+      sc.remove(obj);
+      obj.position.copy(keep.p); obj.quaternion.copy(keep.q); obj.scale.copy(keep.s);
+      if (keep.parent) keep.parent.add(obj);
+      obj.updateMatrixWorld(true);
+
+      clearTimeout(portraitIdle);
+      portraitIdle = setTimeout(() => { if (portraitR) { portraitR.dispose(); portraitR = null; } }, 8000);
+      return url;
+    })();
+    portraitCache.set(species, job);
+    return job;
+  };
+
   async function syncResidents(room) {
     if (!window.resLoad) return;
     const recs = window.resTick ? window.resTick() : window.resLoad();
@@ -1352,48 +1811,98 @@ export async function bootFocciWorld(root, opts) {
      without one, the return leg is the same. */
   function startVoyage(room) {
     const b = room.boat; if (!b || b.sailing) return;
-    b.sailing = 1;
-    character.visible = false;
-    charState.x = b.x; charState.z = b.z;
-    b.t = 0;
-    root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'out' } }));
+    b.sailing = 0.5;                     // climbing in
+    /* Swing round to the boat's beam so you actually watch him get in,
+       instead of the whole thing happening behind his own back. */
+    cam.tTheta = Math.atan2(b.x - b.dockX, b.z - b.dockZ) + Math.PI / 2;
+    cam.tPhi = 1.16; cam.tRadius = 12;
+    const sy = room.sea ? room.sea.y : character.position.y;
+    spawnSplash(room, charState.x, sy, charState.z, 10, 1.1);
+    spawnRipple(room, charState.x, sy, charState.z, 1.6);
+    flyTo(room, { x: b.x + b.deckDX, y: b.deckY, z: b.z + b.deckDZ }, () => {
+      b.sailing = 1; b.t = 0;
+      character.visible = (camMode !== 'fpv');
+      root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'out' } }));
+    }, { dur: 1.0, lift: 2.4, spin: 0, trail: 'splash' });
   }
   window.__fwVoyageReturn = function (species) {
     const b = station.boat; if (!b) return;
     b.sailing = 2; b.t = 0; b.bringing = species || null;
   };
+  /* Riding out and back. Focci stands on the deck the whole way — this
+     used to hide him the instant you said yes, so the voyage was a boat
+     leaving with nobody in it. */
+  const VOYAGE_OUT = 3.0, VOYAGE_DIST = 34;
   function tickBoat(room, dt, t) {
     const b = room.boat; if (!b) return;
-    // idle bob on the water
+    const sy = room.sea ? room.sea.y : b.y;
     if (!b.sailing) {
-      b.obj.position.y = b.y + Math.sin(t * 1.1) * 0.06;
-      b.obj.rotation.z = Math.sin(t * 0.9) * 0.02;
+      b.obj.position.y = b.y + Math.sin(t * 1.1) * 0.1;
+      b.obj.rotation.z = Math.sin(t * 0.9) * 0.035;
+      b.obj.rotation.x = Math.cos(t * 0.7) * 0.02;
       b.glow.material.opacity = 0.34 + Math.sin(t * 1.7) * 0.16;
+      b.glow.position.set(b.obj.position.x, b.obj.position.y + b.glowLift, b.obj.position.z);
       return;
     }
+    if (b.sailing === 0.5) return;        // the hop aboard; flyTo is driving
     b.t += dt;
     const away = new THREE.Vector3(b.homeX, 0, b.homeZ).normalize();
+    /* charState is deliberately NOT moved: the camera orbits it, so
+       following the boat with it kept the boat dead centre and nothing
+       ever looked like it was leaving. Left ashore, the camera stays on
+       the beach and the boat actually shrinks into the distance. */
+    const setDeck = () => {
+      character.position.set(b.obj.position.x + b.deckDX, b.obj.position.y + b.deckLift, b.obj.position.z + b.deckDZ);
+      character.rotation.y = Math.atan2(away.x, away.z);
+    };
+    const wake = () => {
+      b.wakeT = (b.wakeT || 0) - dt;
+      if (b.wakeT <= 0) {
+        b.wakeT = 0.16;
+        spawnRipple(room, b.obj.position.x - away.x * 2.2, sy, b.obj.position.z - away.z * 2.2, 1.7, 0xE6F8FF, 1.2);
+      }
+    };
     if (b.sailing === 1) {
-      // out: 2.2s of drifting, fading as it goes
-      const k = Math.min(1, b.t / 2.2);
-      b.obj.position.set(b.homeX + away.x * k * 16, b.y + Math.sin(t * 1.1) * 0.06, b.homeZ + away.z * k * 16);
-      charState.x = b.obj.position.x; charState.z = b.obj.position.z;
-      b.obj.traverse((o) => { if (o.isMesh && o.material) { o.material.transparent = true; o.material.opacity = 1 - k; } });
-      if (k >= 1) { b.sailing = 1.5; root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'board' } })); }
+      const k = Math.min(1, b.t / VOYAGE_OUT);
+      const e = k * k * (3 - 2 * k);                       // eases away from the shore
+      b.obj.position.set(b.homeX + away.x * e * VOYAGE_DIST, b.y + Math.sin(t * 1.3) * 0.16, b.homeZ + away.z * e * VOYAGE_DIST);
+      b.obj.rotation.z = Math.sin(t * 1.4) * 0.06;
+      b.glow.material.opacity = Math.max(0, 0.4 * (1 - k * 2));
+      b.glow.position.set(b.obj.position.x, b.obj.position.y + b.glowLift, b.obj.position.z);
+      setDeck(); wake();
+      /* The camera hangs back on the shore and watches him go — it stays
+         put, but it turns to keep the boat in frame, or the whole voyage
+         happens off the left edge of the screen. */
+      cam.tRadius = 12 + k * 16;
+      cam.tTheta = Math.atan2(-away.x, -away.z);
+      cam.tPhi = 1.12;
+      const fade = Math.max(0, (k - 0.45) / 0.55);
+      b.obj.traverse((o) => { if (o.isMesh && o.material) { o.material.transparent = true; o.material.opacity = 1 - fade; } });
+      if (fade > 0.7) character.visible = false;
+      if (k > 0.45 && !b._faded) { b._faded = true; root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'fade' } })); }
+      if (k >= 1) { b.sailing = 1.5; b._faded = false; root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'board' } })); }
     } else if (b.sailing === 2) {
-      // back: fades in as it returns to the mooring
-      const k = Math.min(1, b.t / 2.2);
-      b.obj.position.set(b.homeX + away.x * (1 - k) * 16, b.y + Math.sin(t * 1.1) * 0.06, b.homeZ + away.z * (1 - k) * 16);
-      b.obj.traverse((o) => { if (o.isMesh && o.material) o.material.opacity = k; });
-      charState.x = b.obj.position.x; charState.z = b.obj.position.z;
+      const k = Math.min(1, b.t / VOYAGE_OUT);
+      const e = 1 - k * k * (3 - 2 * k);
+      b.obj.position.set(b.homeX + away.x * e * VOYAGE_DIST, b.y + Math.sin(t * 1.3) * 0.16, b.homeZ + away.z * e * VOYAGE_DIST);
+      const fade = Math.min(1, k / 0.45);
+      b.obj.traverse((o) => { if (o.isMesh && o.material) o.material.opacity = fade; });
+      if (fade > 0.35) character.visible = (camMode !== 'fpv');
+      setDeck(); wake();
+      cam.tRadius = 28 - k * 15;
+      cam.tTheta = Math.atan2(-away.x, -away.z);
+      cam.tPhi = 1.12;
       if (k >= 1) {
-        b.sailing = 0;
+        b.sailing = 0; b.wakeT = 0;
         b.obj.traverse((o) => { if (o.isMesh && o.material) { o.material.opacity = 1; o.material.transparent = false; } });
-        // Focci hops out onto the mooring
-        charState.x = b.dockX; charState.z = b.dockZ;
+        b.obj.position.set(b.homeX, b.y, b.homeZ);
+        // he swings himself off the bow and wades back up the beach
         character.visible = (camMode !== 'fpv');
-        startJump(room);
-        spawnPickupBurst(room, b.dockX, b.dockY + 0.4, b.dockZ, 0x8FD8FF);
+        charState.x = b.x; charState.z = b.z;
+        flyTo(room, { x: b.dockX, y: b.dockY, z: b.dockZ }, () => {
+          spawnLandingPuff(room, b.dockX, b.dockY, b.dockZ);
+          cam.tRadius = 14; cam.tPhi = 1.05;
+        }, { dur: 1.0, lift: 2.4, spin: 0, trail: 'splash' });
         if (b.bringing) { b.bringing = null; syncResidents(room); }
         root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'home' } }));
       }
@@ -1478,15 +1987,48 @@ export async function bootFocciWorld(root, opts) {
     /* Doorways. Inside is a state: the hut's own meshes fade so Focci is
        visible through them and its lamp comes up. */
     if (room.houses && room.houses.length) {
-      let anyInside = false;
+      let anyInside = false, insideHut = null;
       for (const h of room.houses) {
-        const near = Math.hypot(h.x - cx, h.z - cz) < 1.3 || Math.hypot(h.cx - cx, h.cz - cz) < 2.6;
-        if (near) anyInside = true;
+        /* You get in THROUGH THE DOOR, and only from the ground. Without
+           the height test, standing on the roof counted as being inside —
+           the hut is directly underneath you in x/z — and the floor clamp
+           below would have yanked him down through it. */
+        const atFloor = Math.abs(character.position.y - h.y) < 2.4;
+        const atDoor = atFloor && Math.hypot(h.x - cx, h.z - cz) < 1.25;
+        const inRoom = atFloor && Math.hypot(h.cx - cx, h.cz - cz) < 2.9;
+        const near = h.inside ? (inRoom || atDoor) : atDoor;
+        if (near) { anyInside = true; insideHut = h; }
         if (near !== h.inside) {
           h.inside = near;
-          if (near) root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'Warm in here. Someone keeps this place tidy.', kind: 'reaction' } }));
+          if (near) {
+            root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'Warm in here. Someone keeps this place tidy.', kind: 'reaction' } }));
+            hintNear('hut', 'Tap the bed or the lamp — this is somewhere to rest');
+          }
+        }
+        if (h.kit) {
+          h.kit.visible = near;
+          if (h.kitHits) h.kitHits.forEach((x) => { x.userData.disabled = !near; });
+          h.kitLight.intensity += ((near ? 2.6 : 0) - h.kitLight.intensity) * 0.12;
         }
         h.lamp.intensity += ((near ? 2.2 : 0) - h.lamp.intensity) * 0.12;
+      }
+      room._insideHut = insideHut;
+      /* Pull the camera in close and drop it to head height, so being
+         inside actually looks like being inside a small room rather than
+         watching a hut from thirty feet up. */
+      if (!!insideHut !== !!room._wasInside) {
+        room._wasInside = !!insideHut;
+        if (insideHut) {
+          /* Looking DOWN into the room. At radius 4.4 and a near-level
+             phi the camera sat inside the hut's own wall and the screen
+             filled with brown. From above, with the roof faded out, the
+             room actually reads. */
+          camBeforeHut = { phi: cam.tPhi, radius: cam.tRadius };
+          cam.tRadius = 8.2; cam.tPhi = 0.66;
+        } else if (camBeforeHut) {
+          cam.tRadius = camBeforeHut.radius; cam.tPhi = camBeforeHut.phi;
+          camBeforeHut = null;
+        }
       }
       if (anyInside !== room._inHouse) {
         room._inHouse = anyInside;
@@ -1494,7 +2036,7 @@ export async function bootFocciWorld(root, opts) {
         room.collidables[0].traverse((o) => {
           if (!o.isMesh || !o.userData.isBuilding) return;
           o.material.transparent = true;
-          o.userData._targetOpacity = anyInside ? 0.22 : 1;
+          o.userData._targetOpacity = anyInside ? 0.13 : 1;   // barely there, so you can see in
         });
       }
       room.collidables[0].traverse((o) => {
@@ -1518,12 +2060,13 @@ export async function bootFocciWorld(root, opts) {
           }, 'sky');
       } else if (Math.hypot(p.x - cx, p.z - cz) > 7) declined.delete('sky');
     }
-    /* The boat. Stepping onto the mooring offers the trip. */
+    /* The boat, moored out on the water. Wade to it and it offers the trip. */
     if (room === station && room.boat && !flight && !pendingTravel && !room.boat.sailing) {
       const b = room.boat;
-      const d = Math.hypot(b.dockX - cx, b.dockZ - cz);
-      if (d > 7) declined.delete('boat');
-      if (d < 1.7) {
+      const d = Math.hypot(b.x - cx, b.z - cz);
+      if (d > 11) declined.delete('boat');
+      if (d < 3.4) {
+        hintNear('boat', 'Wade out to the boat and climb aboard');
         askTravel('boat', 'Set sail',
           'Somewhere out there is someone with no island to go home to. Take the boat and look?',
           'Cast off', () => startVoyage(room), 'boat');
@@ -1667,27 +2210,55 @@ export async function bootFocciWorld(root, opts) {
   character.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
   const charState = { x: 0, z: 0, angle: 0, walkT: 0, inWater: false, jumpY: 0, vy: 0 };
-  const JUMP_V = 5.0, GRAVITY = 14;
+  let waterFxT = 0;
+  /* Twice the height and a faster action, as asked. Height is v squared
+     over 2g, so doubling it while keeping the hang time short means
+     raising BOTH: 5.0/14 peaked at 0.89 units in 0.71s, 9.6/26 peaks at
+     1.77 in 0.74s. Same beat, twice the arc, and it snaps. */
+  const JUMP_V = 9.6, GRAVITY = 26;
   /* Flying to and from the sky island. While a flight is running the normal
      ground-following is skipped entirely and Focci is driven along an arc,
      because there is nothing under him to follow for most of the trip. */
   let flight = null;
-  function flyTo(room, to, onArrive) {
+  function flyTo(room, to, onArrive, opts) {
     if (flight) return;
+    opts = opts || {};
     flight = {
       from: new THREE.Vector3(charState.x, character.position.y, charState.z),
       to: new THREE.Vector3(to.x, to.y, to.z),
-      t: 0, dur: 2.2, onArrive: onArrive || null, sparkle: 0
+      t: 0, dur: opts.dur || 2.2, onArrive: onArrive || null, sparkle: 0,
+      // a hop into a boat is a hop: low arc, no pirouette, no pink sparkles
+      lift: opts.lift === undefined ? 6 : opts.lift,
+      spin: opts.spin === undefined ? 2.4 : opts.spin,
+      trail: opts.trail === undefined ? 'sparkle' : opts.trail
     };
     charState.jumpY = 0; charState.vy = 0;
     moveVec.x = 0; moveVec.y = 0;
     spawnPickupBurst(room, charState.x, character.position.y + 0.4, charState.z, 0xFF9ED2);
   }
   function startJump(room) {
-    if (charState.jumpY > 0.001 || charState.inWater) return;
+    if (charState.jumpY > 0.001) return;
+    // A leap out of the shallows is shorter and throws water, not petals.
+    if (charState.inWater) {
+      charState.vy = JUMP_V * 0.66;
+      spawnSplash(room, charState.x, character.position.y + 0.1, charState.z, 12, 1.25);
+      spawnRipple(room, charState.x, (room.sea ? room.sea.y : character.position.y), charState.z, 1.5);
+      return;
+    }
     charState.vy = JUMP_V;
-    spawnPickupBurst(room, charState.x, character.position.y + 0.05, charState.z, 0xFFE9A8);
+    spawnLeapBurst(room, charState.x, character.position.y + 0.05, charState.z);
   }
+  /* Nothing in this world ever said what any of it was for. One quiet
+     line the first time Focci is close enough to use something, and never
+     again after that — a tutorial you can finish, not a nag. */
+  const hintsShown = new Set();
+  let camBeforeHut = null;
+  function hintNear(key, text) {
+    if (hintsShown.has(key)) return;
+    hintsShown.add(key);
+    root.dispatchEvent(new CustomEvent('focci-hint', { detail: { key, text }, bubbles: true }));
+  }
+
   function activeRoom() { return rooms[currentRoomKey]; }
   function enterRoom(key, spawnOverride) {
     Object.values(rooms).forEach((r) => { r.group.visible = false; });
@@ -1742,12 +2313,18 @@ export async function bootFocciWorld(root, opts) {
      the inside of his head — and reuses cam.theta as the look direction so
      dragging to walk still sends him where the view is pointing. */
   let camMode = 'orbit';
+  let fpvPitch = -0.05;      // where his eyes are aimed in first person
   function setCamMode(m) {
     camMode = m;
     inspectMode = false;        // either view is for walking, not inspecting
     character.visible = (m !== 'fpv');
-    if (m === 'fpv') { cam.tPhi = 1.45; cam.tRadius = 7; }
+    if (m === 'fpv') { cam.tPhi = 1.45; cam.tRadius = 7; fpvPitch = -0.05; }
     else { cam.tPhi = 1.05; cam.tRadius = 14; }
+    /* Everything looked too close in his eyes because the camera kept the
+       third-person 50-degree lens. A head sees much wider than that; 68
+       pulls the walls back off your face without bending the horizon. */
+    camera.fov = (m === 'fpv') ? 68 : 50;
+    camera.updateProjectionMatrix();
   }
   function toggleCamMode() {
     setCamMode(camMode === 'fpv' ? 'orbit' : 'fpv');
@@ -1783,9 +2360,11 @@ export async function bootFocciWorld(root, opts) {
       const eyeY = character.position.y + 1.18 + (Math.sin(charState.walkT * 2) * 0.035);
       const fx = -Math.sin(cam.theta), fz = -Math.cos(cam.theta);
       camera.position.set(charState.x + fx * 0.32, eyeY, charState.z + fz * 0.32);
-      // Barely tilted down (~3 degrees over 8 units). At -0.9 the gaze ran
-      // into the ground on any slope and the screen filled with dirt.
-      camera.lookAt(charState.x + fx * 8, eyeY - 0.4, charState.z + fz * 8);
+      /* fpvPitch is where he is looking up or down, set by dragging. It
+         used to be nailed at -0.4 over 8 units and there was no way to
+         raise his eyes at all — you could walk, and that was the whole
+         range of motion. */
+      camera.lookAt(charState.x + fx * 8, eyeY + fpvPitch * 8, charState.z + fz * 8);
       return;
     }
     const sinPhi = Math.sin(cam.phi);
@@ -1799,7 +2378,7 @@ export async function bootFocciWorld(root, opts) {
   /* ---------- one-finger walk (drag from press point), two-finger look+zoom ---------- */
   const pointers = new Map();
   let moveOrigin = null, moveVec = { x: 0, y: 0 }, singleId = null;
-  let lastOrbitMid = null, lastPinch = null, downTime = 0, downPos = null;
+  let lastOrbitMid = null, lastPinch = null, downTime = 0, downPos = null, fpvLast = null;
   function pinchDist() { const p = Array.from(pointers.values()); return p.length < 2 ? null : Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); }
   /* A full-screen panel (Games, Saved, Settings...) sits on top of the
      canvas, but a pointer that lands on the canvas captures itself and
@@ -1815,7 +2394,7 @@ export async function bootFocciWorld(root, opts) {
   }
   function releaseGesture() {
     pointers.clear(); singleId = null; moveOrigin = null;
-    moveVec.x = 0; moveVec.y = 0; lastPinch = null; lastOrbitMid = null;
+    moveVec.x = 0; moveVec.y = 0; lastPinch = null; lastOrbitMid = null; fpvLast = null;
   }
   canvas.addEventListener('pointerdown', (e) => {
     if (overlayOpen()) return;
@@ -1823,7 +2402,7 @@ export async function bootFocciWorld(root, opts) {
     if (camCinematic) { clearTimeout(camCinematic.timer); camCinematic = null; }
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size === 1) { singleId = e.pointerId; moveOrigin = { x: e.clientX, y: e.clientY }; moveVec = { x: 0, y: 0 }; downTime = Date.now(); downPos = { x: e.clientX, y: e.clientY }; }
+    if (pointers.size === 1) { singleId = e.pointerId; moveOrigin = { x: e.clientX, y: e.clientY }; fpvLast = null; moveVec = { x: 0, y: 0 }; downTime = Date.now(); downPos = { x: e.clientX, y: e.clientY }; }
     else if (pointers.size >= 2) {
       singleId = null; moveOrigin = null; moveVec = { x: 0, y: 0 };
       const p = Array.from(pointers.values());
@@ -1843,6 +2422,19 @@ export async function bootFocciWorld(root, opts) {
         cam.tPhi = Math.min(1.45, Math.max(0.25, cam.tPhi - (e.clientY - moveOrigin.y) * 0.0004));
         return;
       }
+      if (camMode === 'fpv') {
+        /* In his own eyes a sideways drag turns his head and an up/down
+           drag walks. Strafing sideways while unable to look around is the
+           wrong trade for a first-person view: before this you could only
+           ever walk in the one direction you happened to be facing. */
+        const prev = fpvLast || moveOrigin;
+        cam.tTheta -= (e.clientX - prev.x) * 0.006;
+        fpvLast = { x: e.clientX, y: e.clientY };
+        const dyF = e.clientY - moveOrigin.y;
+        moveVec.x = 0;
+        moveVec.y = Math.abs(dyF) > 6 ? Math.max(-1, Math.min(1, dyF / 58)) : 0;
+        return;
+      }
       const dx = e.clientX - moveOrigin.x, dy = e.clientY - moveOrigin.y;
       const dist = Math.hypot(dx, dy), MAXD = 58;
       if (dist > 5) { const m = Math.min(1, dist / MAXD); moveVec.x = (dx / dist) * m; moveVec.y = (dy / dist) * m; }
@@ -1850,7 +2442,11 @@ export async function bootFocciWorld(root, opts) {
     } else if (pointers.size >= 2) {
       const p = Array.from(pointers.values());
       const mid = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
-      if (lastOrbitMid) { cam.tTheta -= (mid.x - lastOrbitMid.x) * 0.006; cam.tPhi = Math.min(1.5, Math.max(0.32, cam.tPhi - (mid.y - lastOrbitMid.y) * 0.005)); }
+      if (lastOrbitMid) {
+        cam.tTheta -= (mid.x - lastOrbitMid.x) * 0.006;
+        if (camMode === 'fpv') fpvPitch = Math.min(0.75, Math.max(-0.75, fpvPitch - (mid.y - lastOrbitMid.y) * 0.004));
+        else cam.tPhi = Math.min(1.5, Math.max(0.32, cam.tPhi - (mid.y - lastOrbitMid.y) * 0.005));
+      }
       lastOrbitMid = mid;
       const d = pinchDist();
       if (lastPinch && d) cam.tRadius = Math.min(MAX_ZOOM, Math.max(6, cam.tRadius - (d - lastPinch) * 0.05));
@@ -1894,6 +2490,8 @@ export async function bootFocciWorld(root, opts) {
     // camera toggle could ever be reached. It never once fired.
     let root3d = hits.length ? hits[0].object : null;
     while (root3d && !root3d.userData.interactType && root3d.parent) root3d = root3d.parent;
+    // furniture inside a hut he is not in should not answer a tap through the wall
+    if (root3d && root3d.userData.disabled) root3d = null;
     if (!root3d || !root3d.userData.interactType) {
       // Nothing interactive under the finger: a second tap here within
       // 320ms swaps the camera between the orbit view and Focci's own eyes.
@@ -1956,6 +2554,15 @@ export async function bootFocciWorld(root, opts) {
   function faceToward(x, z) {
     charState.angle = Math.atan2(x - charState.x, z - charState.z);
   }
+  /* Lines for the bed. The huts are where the residents will sleep off a
+     bad day, so the bed is written as somewhere that belongs to everyone,
+     not as Focci's bedroom. */
+  const HUT_LINES = [
+    'Focci sits on the edge of the bed. The quilt smells of woodsmoke.',
+    'Room enough here for whoever needs it tonight.',
+    'He straightens the pillow. Someone will be glad of that.',
+    'Warm, dry, and nobody is asking anything of him.'
+  ];
   function onInteract(obj) {
     const room = activeRoom();
     const type = obj.userData.interactType;
@@ -1999,6 +2606,21 @@ export async function bootFocciWorld(root, opts) {
       if (l) { collectLetter(l); focciReact(); }
     } else if (type === 'word-treasure') {
       collectTreasure(room);
+    } else if (type === 'hut-door') {
+      // walk him in rather than making him thread a 1.3-unit doorway
+      const h = room.houses && room.houses[obj.userData.houseIndex];
+      if (h) {
+        charState.x = h.cx; charState.z = h.cz;
+        h.inside = true;
+        spawnPickupBurst(room, h.x, h.y + 0.5, h.z, 0xFFD98A);
+      }
+    } else if (type === 'hut-bed') {
+      root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: HUT_LINES[Math.floor(Math.random() * HUT_LINES.length)] } }));
+      spawnPickupBurst(room, obj.position.x, obj.position.y, obj.position.z, 0x8FD8FF);
+    } else if (type === 'hut-lamp') {
+      const h = room.houses && room.houses.find((x) => x.kitHits && x.kitHits.indexOf(obj) >= 0);
+      if (h) { h.kitLight.intensity = h.kitLight.intensity > 1.4 ? 0.6 : 3.4; }
+      root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: 'The wick catches. Shadows go soft.' } }));
     } else if (type === 'vine-tree') {
       // "Focci must focus on the wisdom tree" — turn to actually face it
       // and give its glow a pronounced boost, so this reads as a moment of
@@ -2139,18 +2761,21 @@ export async function bootFocciWorld(root, opts) {
       const px = flight.from.x + (flight.to.x - flight.from.x) * e;
       const pz = flight.from.z + (flight.to.z - flight.from.z) * e;
       const base = flight.from.y + (flight.to.y - flight.from.y) * e;
-      const lift = Math.sin(Math.PI * k) * 6;
+      const lift = Math.sin(Math.PI * k) * flight.lift;
       charState.x = px; charState.z = pz;
       character.position.set(px, base + lift, pz);
-      character.rotation.y += dt * 2.4;                 // a slow spin on the way
+      if (flight.spin) character.rotation.y += dt * flight.spin;
+      else character.rotation.y = Math.atan2(flight.to.x - flight.from.x, flight.to.z - flight.from.z);
       flight.sparkle -= dt;
-      if (flight.sparkle <= 0) {
+      if (flight.trail && flight.sparkle <= 0) {
         flight.sparkle = 0.09;
-        spawnPickupBurst(room, px, base + lift, pz, 0xFFC7E4);
+        if (flight.trail === 'splash') spawnSplash(room, px, base + lift, pz, 2, 0.5);
+        else spawnPickupBurst(room, px, base + lift, pz, 0xFFC7E4);
       }
       if (k >= 1) {
-        const cb = flight.onArrive; flight = null;
-        charState.angle = character.rotation.y = 0;
+        const cb = flight.onArrive;
+        charState.angle = character.rotation.y;
+        flight = null;
         if (cb) cb();
       }
       updateCamera();
@@ -2158,6 +2783,8 @@ export async function bootFocciWorld(root, opts) {
       return;
     }
 
+    // Steering is not his while the boat is carrying him.
+    if (room.boat && room.boat.sailing) { moveVec.x = 0; moveVec.y = 0; }
     const fwdX = -Math.sin(cam.theta), fwdZ = -Math.cos(cam.theta);
     const rightX = Math.cos(cam.theta), rightZ = -Math.sin(cam.theta);
     const fwdAmt = -moveVec.y, rightAmt = moveVec.x;
@@ -2166,7 +2793,7 @@ export async function bootFocciWorld(root, opts) {
     if (mag > 1) { moveX /= mag; moveZ /= mag; }
 
     if (mag > 0.04) {
-      const speedMul = charState.inWater ? 0.55 : 1;
+      const speedMul = charState.inWater ? 0.42 : 1;   // wading, not walking
       charState.x += moveX * SPEED * speedMul * dt;
       charState.z += moveZ * SPEED * speedMul * dt;
       charState.angle = Math.atan2(moveX, moveZ);
@@ -2175,6 +2802,17 @@ export async function bootFocciWorld(root, opts) {
     character.rotation.y = lerpAngle(character.rotation.y, charState.angle, 0.2);
 
     const walking = mag > 0.04;
+    /* Wading. Rings spread from his legs and water goes up — without it,
+       stepping into the sea looked exactly like walking on a blue floor. */
+    if (charState.inWater) {
+      waterFxT -= dt;
+      if (waterFxT <= 0) {
+        waterFxT = walking ? 0.24 : 0.8;
+        const sy = room.sea ? room.sea.y : character.position.y;
+        spawnRipple(room, charState.x, sy, charState.z, walking ? 1 : 0.7);
+        if (walking) spawnSplash(room, charState.x, sy + 0.1, charState.z, 3, 0.55);
+      }
+    }
     /* Ceiling just above his head so he can step onto a hut roof without a
        probe from y 200 grabbing the sky island — but never BELOW
        GROUND_CEIL. A purely relative ceiling is a trap: Fox Island's ground
@@ -2183,7 +2821,12 @@ export async function bootFocciWorld(root, opts) {
        Taking the larger of the two keeps him on Fox Island anywhere on it,
        and once he is up on the sky lawn at y 52 his own height carries the
        ceiling with him. */
-    const surf = surfaceYIn(room, charState.x, charState.z, Math.max(GROUND_CEIL, character.position.y + 2.5));
+    let surf = surfaceYIn(room, charState.x, charState.z, Math.max(GROUND_CEIL, character.position.y + 2.5));
+    /* Inside a hut the topmost surface under him IS the roof — these
+       models have no interior floor at all. While he is in there the
+       doorway's own ground height is the floor, which is the only reason
+       walking in does not fire him up onto the thatch. */
+    if (room._insideHut) surf = { y: room._insideHut.y, water: false, building: false, hit: true };
     charState.inWater = surf.water;
     const swing = (walking && !surf.water) ? Math.sin(charState.walkT) * 0.55 : 0;
     // Biped gait: each arm swings opposite the leg on its own side.
@@ -2197,7 +2840,8 @@ export async function bootFocciWorld(root, opts) {
       charState.jumpY += charState.vy * dt;
       if (charState.jumpY <= 0) {
         charState.jumpY = 0; charState.vy = 0;
-        spawnPickupBurst(room, charState.x, surf.y + 0.05, charState.z, 0xFFE9A8);
+        if (surf.water) { spawnSplash(room, charState.x, surf.y, charState.z, 10, 1.1); spawnRipple(room, charState.x, surf.y, charState.z, 1.7); }
+        else spawnLandingPuff(room, charState.x, surf.y, charState.z);
       }
     }
     // Tuck the legs and throw the arms up while airborne — without it the
@@ -2209,6 +2853,7 @@ export async function bootFocciWorld(root, opts) {
     }
     character.position.set(charState.x, surf.y + bob + charState.jumpY, charState.z);
 
+    if (room.sea) room.sea.uTime.value = t;
     tickBoat(room, dt, t);
     tickResidents(room, dt, t);
     checkWalkOverPickups(room);
@@ -2239,6 +2884,9 @@ export async function bootFocciWorld(root, opts) {
       room.sky.halo.material.opacity = 0.24 + Math.sin(t * 0.8) * 0.08;
     }
     if (room.vineTree && room.vineTree.glowSprite) {
+      if (Math.hypot(room.vineTree.x - charState.x, room.vineTree.z - charState.z) < 7) {
+        hintNear('tree', 'Tap the blossom tree — it has something to tell you');
+      }
       const pulse = 0.82 + Math.sin(t * 1.1) * 0.18;
       // listenBoost: a brief brighter/bigger glow while Focci is "listening"
       // right after tapping the tree (set in onInteract), decaying back to
@@ -2267,6 +2915,17 @@ export async function bootFocciWorld(root, opts) {
 
 
 
+
+  /* A handle on the live world for diagnosis. Everything above is closed
+     over inside this function, so without this there is no way to measure
+     anything — where the water actually is, whether a prop landed on the
+     ground — except by eye, and eyeballing a 3D scene through a screenshot
+     has been wrong every single time it was tried. */
+  window.__fw = { scene, camera, rooms, cam, charState, surfaceYIn, THREE,
+    get room() { return rooms[currentRoomKey]; },
+    get state() { return { pending: !!pendingTravel, flight: !!flight, declined: Array.from(declined), camMode, inspectMode }; },
+    animalModel, toggleCamMode, setCamMode,
+    jump() { startJump(rooms[currentRoomKey]); } };
 
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, get currentRoom() { return currentRoomKey; } };
   } catch (err) {

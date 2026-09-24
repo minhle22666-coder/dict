@@ -1072,6 +1072,27 @@
     50%{opacity:.85}
     100%{transform:translate3d(-14px,-7px,0);opacity:.35}}
   .fh-learn:active{transform:scale(.985)}
+  /* A light running round the edge. The box was the way into the whole
+     3D world and it sat on the page as quietly as a settings row.
+     Built as a spinning conic gradient masked down to the border itself,
+     which works on iOS Safari where @property animation does not. */
+  .fh-edge{position:absolute;inset:0;border-radius:16px;padding:1.7px;overflow:hidden;
+    pointer-events:none;
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    mask-composite:exclude}
+  .fh-edge::before{content:'';position:absolute;top:50%;left:50%;width:190%;aspect-ratio:1;
+    transform:translate(-50%,-50%);
+    background:conic-gradient(from 0deg,
+      transparent 0 62%,
+      rgba(140,240,212,.25) 74%,
+      #BFF8EA 85%,
+      #FFFFFF 89%,
+      #BFF8EA 93%,
+      rgba(140,240,212,.2) 97%,
+      transparent 100%);
+    animation:fh-edge-spin 3.6s linear infinite}
+  @keyframes fh-edge-spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
   .fh-learn-fox{flex:none;width:46px;height:46px;object-fit:contain;
     filter:drop-shadow(0 3px 6px rgba(0,0,0,.4))}
   .fh-learn-txt{flex:1;min-width:0}
@@ -1133,39 +1154,97 @@
   .fh-loading img{width:90px;animation:cheer 2.2s ease-in-out infinite}
 
   /* ============================================================
-     RESCUE BOARD — who is out there, and what the trip costs.
+     THE RESCUE BOARD
+
+     One card per animal, swiped through. Everyone is on it, including
+     the ones Focci cannot afford yet — a board that hid those had
+     nothing to save towards. The pictures are rendered off the actual
+     3D models at runtime (see fwPortrait in world.js); there is no 2D
+     art of these creatures anywhere in the project.
      ============================================================ */
   .rb-scrim{position:fixed;inset:0;z-index:86;display:none;flex-direction:column;
-    padding:calc(env(safe-area-inset-top,0px) + 18px) 18px calc(env(safe-area-inset-bottom,0px) + 18px);
-    background:linear-gradient(180deg,rgba(6,28,40,.96),rgba(4,18,28,.98));
-    font-family:'Raleway Local','Raleway',system-ui,sans-serif;overflow-y:auto}
-  html.rb-on .rb-scrim{display:flex}
-  .rb-head{text-align:center;margin-bottom:4px}
-  .rb-t{font-size:20px;font-weight:800;color:#fff;letter-spacing:-.01em;
-    text-shadow:0 0 20px rgba(140,220,255,.3)}
-  .rb-s{margin-top:5px;font-size:11.5px;line-height:1.45;color:rgba(200,232,246,.76)}
-  .rb-xp{display:inline-flex;align-items:center;gap:6px;margin:12px auto 16px;padding:7px 15px;
-    border-radius:999px;font-size:12px;font-weight:700;color:#CFF3FF;
-    background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(160,220,245,.28)}
-  .rb-list{display:flex;flex-direction:column;gap:12px}
-  .rb-card{display:flex;gap:12px;padding:13px;border-radius:18px;text-align:left;
-    background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(160,220,245,.16)}
-  .rb-card.poor{opacity:.55}
-  .rb-body{flex:1;min-width:0}
-  .rb-name{font-size:14.5px;font-weight:800;color:#fff}
-  .rb-meta{margin-top:2px;font-size:10.5px;font-weight:600;color:rgba(190,230,246,.7)}
-  .rb-story{margin-top:6px;font-size:11.5px;line-height:1.45;color:rgba(255,255,255,.76)}
-  .rb-go{align-self:center;flex:none;min-width:86px;height:38px;border:none;border-radius:999px;cursor:pointer;
-    font-family:inherit;font-size:12px;font-weight:800;color:#06312C;
+    padding:calc(env(safe-area-inset-top,0px) + 16px) 0 calc(env(safe-area-inset-bottom,0px) + 14px);
+    background:
+      radial-gradient(130% 62% at 50% 0%,rgba(30,104,128,.6),transparent 72%),
+      linear-gradient(180deg,#07202E 0%,#04131D 100%);
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif}
+  html.rb-on .rb-scrim{display:flex;animation:rb-in .5s ease}
+  @keyframes rb-in{from{opacity:0;transform:scale(1.03)}to{opacity:1;transform:none}}
+  .rb-head{flex:none;text-align:center;padding:0 22px}
+  .rb-t{font-size:21px;font-weight:800;color:#fff;letter-spacing:-.015em;
+    text-shadow:0 0 26px rgba(140,220,255,.4)}
+  .rb-s{margin:6px auto 0;max-width:290px;font-size:11.5px;line-height:1.5;color:rgba(200,232,246,.72)}
+  .rb-xp{display:inline-flex;align-items:center;gap:6px;margin:11px 0 2px;padding:7px 16px;
+    border-radius:999px;font-size:12px;font-weight:800;color:#CFF3FF;
+    background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(160,220,245,.3)}
+
+  .rb-track{flex:1;min-height:0;display:flex;gap:14px;overflow-x:auto;overflow-y:hidden;
+    scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
+    padding:12px 0 8px;scrollbar-width:none}
+  .rb-track::-webkit-scrollbar{display:none}
+  /* spacers so the first and last card can still sit dead centre */
+  .rb-track::before,.rb-track::after{content:'';flex:none;width:calc((100vw - min(86vw,332px)) / 2 - 7px)}
+  .rb-card{flex:none;width:min(86vw,332px);scroll-snap-align:center;
+    display:flex;flex-direction:column;border-radius:26px;overflow:hidden;text-align:left;
+    background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.04));
+    box-shadow:inset 0 0 0 1px rgba(160,220,245,.22),0 18px 44px rgba(0,0,0,.5)}
+  .rb-card.locked .rb-art img{filter:grayscale(.72) brightness(.62) drop-shadow(0 10px 16px rgba(0,0,0,.45))}
+  .rb-art{position:relative;flex:none;height:158px;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(58% 68% at 50% 56%,rgba(126,231,214,.32),rgba(9,38,50,0) 74%)}
+  .rb-art img{width:140px;height:140px;object-fit:contain;
+    filter:drop-shadow(0 10px 16px rgba(0,0,0,.45))}
+  .rb-ph{width:84px;height:84px;border-radius:50%;background:rgba(255,255,255,.08);
+    animation:rb-pulse 1.4s ease-in-out infinite}
+  @keyframes rb-pulse{0%,100%{opacity:.45}50%{opacity:.85}}
+  .rb-badge{position:absolute;top:12px;left:14px;padding:4px 10px;border-radius:999px;
+    font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+    color:#04222B;background:linear-gradient(180deg,#CFF6E8,#7FDCC8)}
+  .rb-badge.lock{color:#FFE2C4;background:rgba(255,255,255,.14);
+    box-shadow:inset 0 0 0 1px rgba(255,214,160,.4)}
+  .rb-body{flex:1;min-height:0;overflow-y:auto;padding:4px 18px 16px}
+  .rb-name{font-size:19px;font-weight:800;color:#fff;letter-spacing:-.01em}
+  .rb-meta{margin-top:2px;font-size:10.5px;font-weight:700;letter-spacing:.03em;
+    text-transform:uppercase;color:rgba(170,232,246,.72)}
+  .rb-story{margin-top:9px;font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.82)}
+  .rb-facts{margin-top:11px;display:flex;flex-direction:column;gap:7px}
+  .rb-fact{display:flex;gap:9px;padding:8px 11px;border-radius:12px;background:rgba(255,255,255,.06)}
+  .rb-fact i{flex:none;font-style:normal;font-size:12px;opacity:.9}
+  .rb-fact span{font-size:11px;line-height:1.42;color:rgba(255,255,255,.8)}
+  .rb-foot{flex:none;padding:0 18px 16px}
+  .rb-go{width:100%;height:44px;border:none;border-radius:999px;cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:800;color:#06312C;
     background:linear-gradient(180deg,#BFF4E4,#6FD9C4);
-    box-shadow:0 3px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.65);
+    box-shadow:0 5px 16px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.7);
     transition:transform .14s ease}
-  .rb-go:active{transform:scale(.94)}
-  .rb-go[disabled]{background:rgba(255,255,255,.12);color:rgba(255,255,255,.45);box-shadow:none;cursor:default}
-  .rb-sail{margin-top:18px;width:100%;height:44px;border:none;border-radius:999px;cursor:pointer;
-    font-family:inherit;font-size:13px;font-weight:700;color:rgba(255,255,255,.82);
-    background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+  .rb-go:active{transform:scale(.96)}
+  .rb-go[disabled]{background:rgba(255,255,255,.1);color:rgba(255,226,196,.72);
+    box-shadow:inset 0 0 0 1px rgba(255,214,160,.28);cursor:default}
+
+  .rb-dots{flex:none;display:flex;justify-content:center;gap:7px;padding:10px 0 4px}
+  .rb-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.26);
+    transition:background .2s ease,width .2s ease}
+  .rb-dots i.on{width:18px;border-radius:99px;background:#8CF0D4}
+  .rb-sail{flex:none;margin:6px 22px 0;height:44px;border:none;border-radius:999px;cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:700;color:rgba(255,255,255,.8);
+    background:rgba(255,255,255,.09);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
   .rb-sail:active{transform:scale(.97)}
+
+  /* the crossing itself: the screen goes under while the boat is out */
+  .fw-voyage{position:fixed;inset:-40px;z-index:85;pointer-events:none;opacity:0;
+    background:radial-gradient(90% 60% at 50% 55%,rgba(16,76,102,.9),#04131D 85%);
+    transition:opacity .9s ease}
+  html.voy-on .fw-voyage{opacity:1}
+
+  /* one quiet line the first time something is within reach */
+  .fw-hint{position:fixed;left:50%;transform:translate(-50%,-14px);
+    top:calc(env(safe-area-inset-top,0px) + 84px);z-index:47;
+    max-width:80vw;padding:9px 16px;border-radius:999px;
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif;
+    font-size:11.5px;font-weight:600;line-height:1.35;text-align:center;color:#EAFFFA;
+    background:rgba(8,32,38,.76);box-shadow:inset 0 0 0 1px rgba(150,235,220,.32),0 10px 26px rgba(0,0,0,.4);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    opacity:0;pointer-events:none;transition:opacity .3s ease,transform .3s cubic-bezier(.3,1.3,.4,1)}
+  .fw-hint.show{opacity:1;transform:translate(-50%,0)}
 
   /* ============================================================
      RESIDENT CARD — who this animal is, not a control panel.
@@ -1200,6 +1279,11 @@
   .rz-pair{margin-top:11px;padding:8px 12px;border-radius:12px;text-align:center;
     font-size:12px;font-weight:700;color:#FFD3E6;background:rgba(255,120,180,.14);
     box-shadow:inset 0 0 0 1px rgba(255,150,200,.28)}
+  .rz-trait{margin-top:11px;padding:9px 12px;border-radius:12px;font-size:11.5px;line-height:1.45;
+    color:rgba(232,255,250,.88);background:rgba(255,255,255,.06);
+    box-shadow:inset 0 0 0 1px rgba(150,230,220,.14)}
+  .rz-likes{margin-top:7px;font-size:11px;color:rgba(190,240,232,.76);text-align:center}
+  .rz-likes b{color:#9BEFD8;font-weight:700}
   .rz-note{margin-top:13px;font-size:12.5px;font-style:italic;line-height:1.5;
     color:rgba(255,255,255,.82);text-align:center}
   .rz-feed{width:100%;height:42px;margin-top:14px;border:none;border-radius:999px;cursor:pointer;
@@ -3838,25 +3922,68 @@
     transition:opacity .7s ease;
     background:radial-gradient(ellipse 74% 46% at 50% 34%,rgba(4,16,26,0) 0%,rgba(4,16,26,.4) 62%,rgba(3,10,18,.82) 100%)}
   html.wisdom-on .fw-wisdom-veil{opacity:1}
-  /* Sat LOW, not centred. The camera swings round to show Focci's face
-     while the tree speaks, and a card in the middle of the screen was
-     landing straight over it — you could see his feet under the box and
-     nothing else. The message belongs in the bottom third, with him
-     framed above it. */
-  .fw-quote.wisdom{z-index:45;left:22px;right:22px;top:auto;
-    bottom:calc(env(safe-area-inset-bottom,0px) + 104px);
-    transform:translateY(14px) scale(.96);
-    flex-direction:column;align-items:center;text-align:center;gap:10px;
-    padding:24px 22px 22px;border-radius:26px;
-    background:linear-gradient(180deg,rgba(18,52,58,.9),rgba(8,30,36,.94));
-    box-shadow:0 0 0 1px rgba(255,226,168,.3),0 0 46px rgba(255,214,140,.28),0 24px 54px rgba(0,0,0,.5)}
+  /* ============================================================
+     THE WISDOM TREE SPEAKING
+
+     Sat LOW, not centred: the camera swings round to show Focci's face
+     while the tree talks, and a card in the middle of the screen landed
+     straight over him.
+
+     It used to be the same grey bar every pickup line uses, with Focci's
+     own mascot portrait stuck on it — so the tree was never actually in
+     its own message. Now the tree is the picture, drawn as a medallion
+     the card is built around, with its blossom coming loose across the
+     top. Everything is vector, so there is no new asset to ship and it
+     stays sharp at any size.
+     ============================================================ */
+  .fw-quote.wisdom{z-index:45;left:18px;right:18px;top:auto;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 96px);
+    transform:translateY(16px) scale(.95);
+    flex-direction:column;align-items:center;text-align:center;gap:0;
+    padding:0 20px 22px;border-radius:28px;overflow:hidden;
+    background:
+      radial-gradient(120% 60% at 50% 0%,rgba(255,176,214,.26),transparent 68%),
+      linear-gradient(180deg,rgba(30,54,62,.94),rgba(9,26,33,.97));
+    border:1px solid rgba(255,199,228,.34);
+    box-shadow:0 0 44px rgba(255,158,210,.24),0 26px 60px rgba(0,0,0,.55)}
   .fw-quote.wisdom.show{transform:translateY(0) scale(1)}
-  .fw-quote.wisdom img{width:62px;height:62px}
-  .fw-quote.wisdom p{font-size:16.5px;line-height:1.62;font-weight:500;
-    color:#FFF3DA;text-shadow:0 2px 10px rgba(0,0,0,.5)}
-  /* A thin gold rule above the line, the way a plaque would carry it. */
-  .fw-quote.wisdom p::before{content:'';display:block;width:42px;height:2px;margin:0 auto 13px;
-    border-radius:2px;background:linear-gradient(90deg,transparent,#FFD98A,transparent)}
+  .fw-quote.wisdom img{display:none}          /* the mascot has no business here */
+  /* the medallion, lifted so it breaks the top edge of the card */
+  .fw-qtree{display:none;position:relative;width:108px;height:108px;margin:-16px 0 2px;flex:none}
+  .fw-quote.wisdom .fw-qtree{display:block}
+  .fw-qtree svg{width:100%;height:100%;display:block;
+    filter:drop-shadow(0 6px 16px rgba(0,0,0,.45))}
+  .fw-qtree::after{content:'';position:absolute;inset:14px;border-radius:50%;
+    box-shadow:0 0 0 1px rgba(255,199,228,.34),0 0 34px rgba(255,150,205,.34);
+    animation:qt-breathe 4.2s ease-in-out infinite}
+  @keyframes qt-breathe{0%,100%{opacity:.5;transform:scale(.97)}50%{opacity:1;transform:scale(1.04)}}
+  /* blossom coming off it, across the head of the card */
+  .fw-qpetals{display:none;position:absolute;top:0;left:0;right:0;height:120px;
+    pointer-events:none;overflow:hidden}
+  .fw-quote.wisdom .fw-qpetals{display:block}
+  .fw-qpetals i{position:absolute;top:-10px;width:7px;height:8px;border-radius:60% 40% 60% 40%;
+    background:linear-gradient(180deg,#FFE3F0,#FF9FCB);opacity:0;
+    animation:qt-fall 5.2s linear infinite}
+  .fw-qpetals i:nth-child(1){left:12%;animation-delay:0s}
+  .fw-qpetals i:nth-child(2){left:31%;animation-delay:1.3s}
+  .fw-qpetals i:nth-child(3){left:66%;animation-delay:.6s}
+  .fw-qpetals i:nth-child(4){left:84%;animation-delay:2.4s}
+  .fw-qpetals i:nth-child(5){left:49%;animation-delay:3.3s}
+  @keyframes qt-fall{
+    0%{transform:translate(0,0) rotate(0);opacity:0}
+    12%{opacity:.9}
+    100%{transform:translate(-16px,128px) rotate(280deg);opacity:0}}
+  .fw-qlabel{display:none;margin-bottom:9px;font-size:9.5px;font-weight:800;
+    letter-spacing:.22em;text-transform:uppercase;color:#FFC7E4}
+  .fw-quote.wisdom .fw-qlabel{display:block}
+  .fw-quote.wisdom p{position:relative;font-size:15.5px;line-height:1.66;font-weight:500;
+    color:#FFF2F7;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+  /* a thin blossom-coloured rule above the line, the way a plaque carries it */
+  .fw-quote.wisdom p::before{content:'';display:block;width:46px;height:2px;margin:0 auto 13px;
+    border-radius:2px;background:linear-gradient(90deg,transparent,#FFC7E4,transparent)}
+  .fw-quote.wisdom p::after{content:'';display:block;width:26px;height:2px;margin:14px auto 0;
+    border-radius:2px;background:linear-gradient(90deg,transparent,rgba(255,199,228,.55),transparent)}
+
   .fw-quote{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);
     z-index:5;display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:20px;
     background:rgba(20,18,14,.5);backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
@@ -3875,15 +4002,9 @@
   .fw-quote.reaction.show{transform:translate(-50%,0) scale(1)}
   .fw-quote.reaction img{display:none}
   .fw-quote.reaction p{font-size:12.5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* The wisdom tree is the one deliberate, "sit with this" moment — warm
-     gold glass instead of the plain dark bar, a soft ring around Focci's
-     own avatar (he's listening, not just talking), and it stays up longer
-     (see the JS timer) since these lines are long life-advice quotes, not
-     a one-liner. */
-  .fw-quote.wisdom{background:linear-gradient(155deg,rgba(255,217,138,.22),rgba(120,84,20,.42));
-    border-color:rgba(255,224,150,.45);box-shadow:0 16px 36px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.2)}
-  .fw-quote.wisdom img{border-radius:50%;box-shadow:0 0 0 2px rgba(255,224,150,.6),0 0 18px rgba(255,200,100,.5)}
-  .fw-quote.wisdom p{font-size:13.5px;line-height:1.6}
+  /* The gold-glass version of this card used to be re-declared here and,
+     coming later in the file, it quietly won over everything above. The
+     blossom design is the design; there is no second one. */
 
   /* Saved / Game / Progress / Settings now float ABOVE the 3D world as glass
      sheets instead of being flat 2D pages you navigate to — the world stays
@@ -4561,13 +4682,16 @@
 <div class="toast" id="toast"></div>
 
 <button id="dict-back" onclick="closeDictPage()" aria-label="Back to the island">← Back to the island</button>
+<div class="fw-voyage" id="fw-voyage"></div>
+<div class="fw-hint" id="fw-hint"></div>
 <div class="rb-scrim" id="rb-scrim">
   <div class="rb-head">
     <div class="rb-t">Out on the water</div>
-    <div class="rb-s">Focci can sail for one of them. The cost is the crossing — rope, food and a long night at the oars.</div>
+    <div class="rb-s">Focci can bring one of them home. The cost is the crossing — rope, food and a long night at the oars.</div>
     <div class="rb-xp" id="rb-xp"></div>
   </div>
-  <div class="rb-list" id="rb-list"></div>
+  <div class="rb-track" id="rb-track"></div>
+  <div class="rb-dots" id="rb-dots"></div>
   <button class="rb-sail" onclick="rbSailHome()">Sail home alone</button>
 </div>
 <div class="rz-scrim" id="rz-scrim" onclick="if(event.target===this)rzClose()">
@@ -4634,6 +4758,7 @@
   <div class="fh-rule"><span></span><b>✦</b><span></span></div>
 
   <button class="fh-learn" onclick="fhLearned()">
+    <i class="fh-edge" aria-hidden="true"></i>
     <img class="fh-learn-fox" src="./mascot-withflag-3.webp" alt="" onerror="this.style.display='none'"/>
     <div class="fh-learn-txt">
       <div class="fh-learn-t">Enter Focci’s Village</div>
@@ -4682,6 +4807,33 @@
   <div class="fw-wisdom-veil" id="fw-wisdom-veil"></div>
   <div class="fw-toast fw-ui" id="fw-toast"></div>
   <div class="fw-quote fw-ui" id="fw-quote">
+    <div class="fw-qpetals" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="fw-qtree" aria-hidden="true">
+      <svg viewBox="0 0 120 120">
+        <defs>
+          <radialGradient id="wt-glow" cx="50%" cy="46%" r="52%">
+            <stop offset="0%" stop-color="#FFD9EC" stop-opacity=".95"/>
+            <stop offset="58%" stop-color="#FF9FCB" stop-opacity=".34"/>
+            <stop offset="100%" stop-color="#FF9FCB" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="60" cy="58" r="56" fill="url(#wt-glow)"/>
+        <path d="M58 102V74q0-11-7-19M63 102V70q0-13 9-23M60 80q-6-9-15-13M60 73q9-7 18-10"
+              stroke="#6B4630" stroke-width="5.2" stroke-linecap="round" fill="none"/>
+        <circle cx="43" cy="53" r="15" fill="#FFB3D6"/>
+        <circle cx="76" cy="48" r="17" fill="#FFC6E1"/>
+        <circle cx="59" cy="35" r="16" fill="#FFAFD3"/>
+        <circle cx="89" cy="63" r="11" fill="#FFD2E8"/>
+        <circle cx="33" cy="69" r="10" fill="#FFC1DE"/>
+        <circle cx="60" cy="52" r="13" fill="#FFE1F0" opacity=".78"/>
+        <g fill="#FFF6FA" opacity=".92">
+          <circle cx="51" cy="40" r="2.3"/><circle cx="70" cy="33" r="1.9"/>
+          <circle cx="83" cy="53" r="2.1"/><circle cx="40" cy="61" r="2"/>
+          <circle cx="66" cy="58" r="1.7"/>
+        </g>
+      </svg>
+    </div>
+    <div class="fw-qlabel">The Wisdom Tree</div>
     <img id="fw-quote-avatar" src="" alt="" onerror="this.style.visibility='hidden'"/>
     <p id="fw-quote-text"></p>
   </div>
@@ -4869,35 +5021,103 @@
   /* ---- the rescue board ---- */
   document.addEventListener('focci-voyage', (e) => {
     const phase = (e.detail || {}).phase;
-    if (phase === 'board') rbOpen();
-    if (phase === 'home' && window.fwToast) fwToast('Back on the shore');
+    if (phase === 'fade') document.documentElement.classList.add('voy-on');
+    if (phase === 'board') { rbOpen(); setTimeout(() => document.documentElement.classList.remove('voy-on'), 700); }
+    if (phase === 'home') {
+      document.documentElement.classList.remove('voy-on');
+      if (window.fwToast) fwToast('Back on the shore');
+    }
   });
+
+  /* Light guidance, once each. */
+  document.addEventListener('focci-hint', (e) => {
+    const el = document.getElementById('fw-hint');
+    el.textContent = (e.detail || {}).text || '';
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 5200);
+  });
+
+  const RB_STAGE = (age, adult) => age >= adult ? 'grown' : age > adult * 0.78 ? 'nearly grown' : 'young';
   window.rbOpen = function () {
     const roster = window.resRescueRoster ? window.resRescueRoster() : [];
     const xp = (window.getXP && window.getXP()) || 0;
     document.getElementById('rb-xp').textContent = xp.toLocaleString() + ' XP to spend';
-    document.getElementById('rb-list').innerHTML = roster.map((c) => {
-      const poor = xp < c.cost;
-      return '<div class="rb-card' + (poor ? ' poor' : '') + '">'
-        + '<div class="rb-body">'
-        + '<div class="rb-name">A stranded ' + c.born + '</div>'
-        + '<div class="rb-meta">' + c.label + ' \u00b7 about ' + c.ageDays + ' days old</div>'
-        + '<div class="rb-story">' + c.story + '</div>'
+    const track = document.getElementById('rb-track');
+    track.innerHTML = roster.map((c) => {
+      const short = Math.max(0, c.cost - xp);
+      const locked = short > 0;
+      return '<div class="rb-card' + (locked ? ' locked' : '') + '">'
+        + '<div class="rb-art">'
+        +   '<div class="rb-badge' + (locked ? ' lock' : '') + '">' + (locked ? '\u2727 ' + short + ' XP to go' : 'Ready to sail') + '</div>'
+        +   '<div class="rb-ph" data-species="' + c.species + '"></div>'
         + '</div>'
-        + '<button class="rb-go" ' + (poor ? 'disabled' : '') + ' onclick="rbRescue(\'' + c.species + '\')">'
-        + c.cost + ' XP</button></div>';
+        + '<div class="rb-body">'
+        +   '<div class="rb-name">' + c.name + '</div>'
+        +   '<div class="rb-meta">' + c.label + ' \u00b7 ' + RB_STAGE(c.ageDays, c.adultDays) + ' \u00b7 ' + c.ageDays + ' days old</div>'
+        +   '<div class="rb-story">' + c.story + '</div>'
+        +   '<div class="rb-facts">'
+        +     '<div class="rb-fact"><i>\u2693</i><span>Found ' + c.found + '</span></div>'
+        +     '<div class="rb-fact"><i>\u273F</i><span>' + c.trait + '</span></div>'
+        +     '<div class="rb-fact"><i>\u2665</i><span>Loves ' + c.likes + '</span></div>'
+        +   '</div>'
+        + '</div>'
+        + '<div class="rb-foot">'
+        +   '<button class="rb-go" ' + (locked ? 'disabled' : '') + ' onclick="rbRescue(\'' + c.species + '\')">'
+        +     (locked ? 'Not enough for the crossing' : 'Bring ' + c.name + ' home \u00b7 ' + c.cost + ' XP')
+        +   '</button>'
+        + '</div>'
+        + '</div>';
     }).join('');
+    document.getElementById('rb-dots').innerHTML = roster.map((_, i) => '<i class="' + (i ? '' : 'on') + '"></i>').join('');
     document.documentElement.classList.add('rb-on');
+    track.scrollLeft = 0;
+    rbWireDots(track);
+    /* The pictures come off the 3D models, so they arrive a frame or two
+       later than the card does — each slot is a placeholder until then. */
+    roster.forEach((c) => {
+      if (!window.fwPortrait) return;
+      Promise.resolve(window.fwPortrait(c.species)).then((url) => {
+        if (!url) return;
+        const slot = track.querySelector('.rb-ph[data-species="' + c.species + '"]');
+        if (!slot) return;
+        const img = new Image();
+        img.src = url; img.alt = c.name;
+        slot.replaceWith(img);
+      }).catch(() => {});
+    });
   };
+  function rbWireDots(track) {
+    if (track._wired) return;
+    track._wired = true;
+    track.addEventListener('scroll', () => {
+      clearTimeout(track._st);
+      track._st = setTimeout(() => {
+        const cards = track.querySelectorAll('.rb-card');
+        if (!cards.length) return;
+        const mid = track.scrollLeft + track.clientWidth / 2;
+        let best = 0, bestD = Infinity;
+        cards.forEach((el, i) => {
+          const c = el.offsetLeft + el.offsetWidth / 2;
+          if (Math.abs(c - mid) < bestD) { bestD = Math.abs(c - mid); best = i; }
+        });
+        document.querySelectorAll('#rb-dots i').forEach((d, i) => d.classList.toggle('on', i === best));
+      }, 60);
+    }, { passive: true });
+  }
   window.rbRescue = function (species) {
     const res = window.resRescue ? window.resRescue(species) : null;
     if (!res || !res.ok) { if (window.fwToast) fwToast('Not enough XP for the crossing yet'); return; }
     document.documentElement.classList.remove('rb-on');
+    document.documentElement.classList.add('voy-on');
+    setTimeout(() => document.documentElement.classList.remove('voy-on'), 900);
     if (window.fwToast) fwToast(res.resident.name + ' is coming home with Focci');
     if (window.__fwVoyageReturn) window.__fwVoyageReturn(species);
   };
   window.rbSailHome = function () {
     document.documentElement.classList.remove('rb-on');
+    document.documentElement.classList.add('voy-on');
+    setTimeout(() => document.documentElement.classList.remove('voy-on'), 900);
     if (window.__fwVoyageReturn) window.__fwVoyageReturn(null);
   };
 
