@@ -3371,6 +3371,27 @@
      tree/bush) — always paired with his current avatar, per what was asked
      for: "câu nói của Focci phải kèm cái avatar này vào". Sits just above
      the floating menu row so it never collides with it. */
+  /* The wisdom moment. The camera swings in front of Focci for 7s (see
+     focusOnFocci in world.js); this is the other half of it — everything
+     except the message dims away, so there is one thing to read. The
+     ordinary pickup asides (.reaction) are untouched and stay small. */
+  .fw-wisdom-veil{position:fixed;inset:0;z-index:44;pointer-events:none;opacity:0;
+    transition:opacity .7s ease;
+    background:radial-gradient(ellipse 78% 58% at 50% 46%,rgba(4,16,26,0) 0%,rgba(4,16,26,.42) 62%,rgba(3,10,18,.8) 100%)}
+  html.wisdom-on .fw-wisdom-veil{opacity:1}
+  .fw-quote.wisdom{z-index:45;left:22px;right:22px;bottom:auto;top:50%;
+    transform:translateY(calc(-50% + 14px)) scale(.96);
+    flex-direction:column;align-items:center;text-align:center;gap:10px;
+    padding:24px 22px 22px;border-radius:26px;
+    background:linear-gradient(180deg,rgba(18,52,58,.9),rgba(8,30,36,.94));
+    box-shadow:0 0 0 1px rgba(255,226,168,.3),0 0 46px rgba(255,214,140,.28),0 24px 54px rgba(0,0,0,.5)}
+  .fw-quote.wisdom.show{transform:translateY(-50%) scale(1)}
+  .fw-quote.wisdom img{width:62px;height:62px}
+  .fw-quote.wisdom p{font-size:16.5px;line-height:1.62;font-weight:500;
+    color:#FFF3DA;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+  /* A thin gold rule above the line, the way a plaque would carry it. */
+  .fw-quote.wisdom p::before{content:'';display:block;width:42px;height:2px;margin:0 auto 13px;
+    border-radius:2px;background:linear-gradient(90deg,transparent,#FFD98A,transparent)}
   .fw-quote{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);
     z-index:5;display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:20px;
     background:rgba(20,18,14,.5);backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
@@ -4102,6 +4123,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3h-4l-.3 2.9a8 8 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.9 7.9 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a8 8 0 0 0 1.7 1L11 21h4l.3-2.9a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6Z"/></svg>
   </button>
 
+  <div class="fw-wisdom-veil" id="fw-wisdom-veil"></div>
   <div class="fw-toast fw-ui" id="fw-toast"></div>
   <div class="fw-quote fw-ui" id="fw-quote">
     <img id="fw-quote-avatar" src="" alt="" onerror="this.style.visibility='hidden'"/>
@@ -4118,6 +4140,9 @@
       </button>
       <button class="fw-mi" id="fw-sound-btn" aria-label="Sound">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>
+      </button>
+      <button class="fw-mi" aria-label="See the whole island" onclick="fwOverview()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/><circle cx="12" cy="12" r="2.6"/></svg>
       </button>
       <button class="fw-mi" aria-label="Map" onclick="openFwMap()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
@@ -4264,6 +4289,17 @@
      toggle, saved/games/progress/guide to its right) and the panels
      it opens. See the "3D-FIRST SHELL" CSS block for the visuals.
      ============================================================ */
+  /* Pull the camera back to take in the whole island — works in the hub
+     and in every arc room, since it just retargets the shared orbit rig.
+     Pinch/drag still work from there, so it is a jump to an overview, not
+     a locked mode. */
+  window.fwOverview = function () {
+    if (!worldApi || !worldApi.overviewCamera) return;
+    worldApi.overviewCamera();
+    document.getElementById('fw-menu-cluster').classList.remove('open');
+    if (window.fwToast) fwToast('Whole island \u2014 drag to turn, pinch to zoom');
+  };
+
   function fwToast(msg) {
     const t = document.getElementById('fw-toast');
     if (!t) return;
@@ -4291,7 +4327,15 @@
     document.getElementById('fw-quote-text').textContent = q.message;
     bubble.classList.add('show');
     clearTimeout(bubble._hideTimer);
-    bubble._hideTimer = setTimeout(() => bubble.classList.remove('show'), kind === 'reaction' ? 2000 : 6200);
+    // Matched to focusOnFocci(7000) in world.js so the line is still on
+    // screen when the camera pulls back out, rather than vanishing early.
+    bubble._hideTimer = setTimeout(() => bubble.classList.remove('show'), kind === 'reaction' ? 2000 : 6800);
+  });
+
+  // world.js brackets the wisdom close-up with this; the veil is CSS-only
+  // so it costs nothing when idle.
+  document.addEventListener('focci-wisdom-focus', (e) => {
+    document.documentElement.classList.toggle('wisdom-on', !!(e.detail && e.detail.on));
   });
 
   window.toggleFwMenu = function () {

@@ -46,6 +46,11 @@ export async function bootFocciWorld(root, opts) {
   try {
   const canvas = root.querySelector('#fw-canvas');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // Shadows were never switched on, which is why the island read as flat
+  // no matter what the sun did: there was no cast shadow anywhere, so a
+  // ridge and a flat plain caught exactly the same light.
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
   if ('NoToneMapping' in THREE) renderer.toneMapping = THREE.NoToneMapping;
@@ -65,17 +70,48 @@ export async function bootFocciWorld(root, opts) {
      DAY / NIGHT — driven by the visitor's real clock
      ============================================================ */
   const hemi = new THREE.HemisphereLight(0xfff3e6, 0x6a8a63, 0.85);
-  const sun = new THREE.DirectionalLight(0xfff2df, 0.85);
-  sun.position.set(30, 45, 20);
+  // Warm, low and casting — a high overhead sun throws no visible shadow,
+  // which is half of why there was no sense of morning light on the island.
+  const sun = new THREE.DirectionalLight(0xffe7bd, 0.85);
+  sun.position.set(46, 38, 40);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 160;
+  sun.shadow.camera.left = -34; sun.shadow.camera.right = 34;
+  sun.shadow.camera.top = 34;   sun.shadow.camera.bottom = -34;
+  sun.shadow.bias = -0.0012;
+  sun.shadow.normalBias = 0.03;
+  // The moon is its own light, not the sun tinted down: it comes from the
+  // other side, is cool white, and stays weak so the ridges it misses fall
+  // genuinely dark instead of the whole island dimming evenly.
+  const moon = new THREE.DirectionalLight(0xc8d8ff, 0);
+  moon.position.set(-44, 34, -38);
+  moon.castShadow = true;
+  moon.shadow.mapSize.set(1024, 1024);
+  moon.shadow.camera.near = 1;
+  moon.shadow.camera.far = 160;
+  moon.shadow.camera.left = -34; moon.shadow.camera.right = 34;
+  moon.shadow.camera.top = 34;   moon.shadow.camera.bottom = -34;
+  moon.shadow.bias = -0.0012;
+  moon.shadow.normalBias = 0.03;
   const ambient = new THREE.AmbientLight(0xffffff, 0.28);
-  scene.add(hemi, sun, ambient);
+  scene.add(hemi, sun, moon, ambient);
 
   const DAY_SKY = new THREE.Color(0x5fbdea), NIGHT_SKY = new THREE.Color(0x0d1a3a);
   const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(6, 16, 16), new THREE.MeshBasicMaterial({ color: 0xfff3c4, transparent: true }));
   const moonDisc = new THREE.Mesh(new THREE.SphereGeometry(5, 16, 16), new THREE.MeshBasicMaterial({ color: 0xf3f6ff, transparent: true }));
-  sunDisc.position.set(58, 52, -58);
-  moonDisc.position.set(-58, 50, -50);
-  scene.add(sunDisc, moonDisc);
+  // Sat where their own light actually comes from — they used to be parked
+  // on the far side of the island from the sun direction, so you could
+  // never see the disc the light was supposedly coming from.
+  sunDisc.position.copy(sun.position).multiplyScalar(1.9);
+  moonDisc.position.copy(moon.position).multiplyScalar(1.9);
+  // A soft halo each, so they read as a light source rather than a ball.
+  const sunHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xffdf9a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  sunHalo.scale.setScalar(46); sunHalo.position.copy(sunDisc.position);
+  const moonHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xbccdf5, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  moonHalo.scale.setScalar(34); moonHalo.position.copy(moonDisc.position);
+  scene.add(sunDisc, moonDisc, sunHalo, moonHalo);
 
   function dayFactor() {
     // 1 = full day, 0 = full night. Smooth 30-min ramps at 05:00 and 18:00.
@@ -94,11 +130,19 @@ export async function bootFocciWorld(root, opts) {
     scene.background = sky;
     scene.fog = scene.fog || new THREE.Fog(sky.getHex(), 60, 220);
     scene.fog.color.copy(sky);
-    hemi.intensity = 0.5 + d * 0.35;
-    sun.intensity = 0.4 + d * 0.55;
-    ambient.intensity = 0.22 + d * 0.12;
+    // Night is lit almost entirely by the moon, and the fill drops hard so
+    // the faces it doesn't reach actually go dark — that contrast is what
+    // makes the island's raised edges read as three-dimensional after dark.
+    hemi.intensity = 0.22 + d * 0.63;
+    sun.intensity = d * 1.05;
+    moon.intensity = (1 - d) * 0.55;
+    ambient.intensity = 0.1 + d * 0.22;
+    sun.castShadow = d > 0.15;
+    moon.castShadow = d <= 0.15;
     sunDisc.material.opacity = d;
     moonDisc.material.opacity = 1 - d;
+    sunHalo.material.opacity = d * 0.85;
+    moonHalo.material.opacity = (1 - d) * 0.6;
   }
   updateDayNight();
   setInterval(updateDayNight, 30000); // real clock moves slowly; no need to check every frame
@@ -408,6 +452,7 @@ export async function bootFocciWorld(root, opts) {
   const ARC_GLOW_COLORS = [0x6FE3FF, 0xFFC44D, 0x9B8CFF, 0x6BF2A8];
   function spawnDiamond(room, x, y, z, interactType, targetArc, glowColor) {
     const d = diamondGlb.scene.clone(true);
+    d.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     const mixer = new THREE.AnimationMixer(d);
     if (diamondGlb.animations[0]) mixer.clipAction(diamondGlb.animations[0]).play();
     d.scale.setScalar(diamondScale);
@@ -455,6 +500,7 @@ export async function bootFocciWorld(root, opts) {
     // the first real frame rendered (by which point props were already
     // placed and baked into the wrong spot).
     hub.scene.updateMatrixWorld(true);
+    hub.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     tagWater(hub.scene);
     station.group.add(hub.scene);
     station.collidables.push(hub.scene);
@@ -529,7 +575,13 @@ export async function bootFocciWorld(root, opts) {
       inst.userData.interactType = 'chest';
       station.group.add(inst);
       station.interactive.push(inst);
-      station.chests.push({ obj: inst, mixer, clips: chestGlb.animations, opened: false, x: spot.x, z: spot.z });
+      inst.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      // A warm glow so a 1.7-unit box is findable across a 39-unit island.
+      const cGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFFC85C, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending }));
+      cGlow.scale.setScalar(2.6);
+      cGlow.position.set(spot.x, spot.y + 0.9, spot.z);
+      station.group.add(cGlow);
+      station.chests.push({ obj: inst, mixer, clips: chestGlb.animations, opened: false, x: spot.x, z: spot.z, glow: cGlow });
     }
 
     // birds — a small flying loop, purely decorative
@@ -546,8 +598,36 @@ export async function bootFocciWorld(root, opts) {
     // which was tuned for the old, smaller island and not guaranteed to
     // land on solid ground on this one (or the new 1.5x-bigger hub)
     const treeBox = new THREE.Box3().setFromObject(treeGlb.scene);
-    const treeScale = 6 / Math.max(treeBox.getSize(new THREE.Vector3()).x, treeBox.getSize(new THREE.Vector3()).z);
+    const treeRaw = treeBox.getSize(new THREE.Vector3());
+    // Sized by HEIGHT, not footprint: this is the island's one landmark and
+    // it should stand over everything else. 6/width gave a ~7-unit tree;
+    // 9.5/height makes it read as tall from across the island.
+    const treeScale = 9.5 / Math.max(treeRaw.y, 0.0001);
     treeGlb.scene.scale.setScalar(treeScale);
+    /* vine-tree.glb ships with its own little diorama base — one wide, flat
+       slab (1.02 x 0.08 x 0.83) sitting under everything else, which is the
+       "khúc đất xanh" left poking out of the hub's terrain. Rather than
+       deleting it (the roots interleave with it), find it by shape — the
+       lowest mesh that is far wider than it is thick — and bury it: anchor
+       the tree by the slab's TOP instead of the model's bounding-box
+       bottom, so the slab and the root tips below it end up underground. */
+    let slabTop = null;
+    treeGlb.scene.traverse((o) => {
+      if (!o.isMesh || !o.geometry) return;
+      o.geometry.computeBoundingBox();
+      const b = o.geometry.boundingBox, h = b.max.y - b.min.y, w = Math.max(b.max.x - b.min.x, b.max.z - b.min.z);
+      if (h < 0.2 && w > h * 6 && b.min.y < treeBox.min.y + 0.12) {
+        // Hidden outright, not merely sunk. At the scale this tree now runs
+        // at, that 1.02 x 0.83 slab becomes a ~7 x 6 unit lawn — sinking it
+        // by its own 0.08 thickness left most of it still showing through
+        // every rise in the terrain underneath.
+        o.visible = false;
+        slabTop = (slabTop === null) ? b.max.y : Math.max(slabTop, b.max.y);
+      }
+    });
+    // Anchor at the slab's top so the root tips that dipped into it end up
+    // just under the hub's own ground rather than hanging in the open.
+    const treeAnchorY = (slabTop !== null ? slabTop : treeBox.min.y);
     // Anchor to the lowest ground under the canopy's footprint, not the
     // centre sample: on even slightly uneven ground that is the difference
     // between roots resting on the surface and roots hanging in the air.
@@ -565,14 +645,34 @@ export async function bootFocciWorld(root, opts) {
       const su = surfaceYIn(station, treeSpot.x + Math.cos(ang) * 0.7, treeSpot.z + Math.sin(ang) * 0.7);
       if (su.hit && !su.water) treeBaseY = Math.min(treeBaseY, su.y);
     }
-    const treeGroundedY = treeBaseY - treeBox.min.y * treeScale;
+    const treeGroundedY = treeBaseY - treeAnchorY * treeScale;
     treeGlb.scene.position.set(treeSpot.x, treeGroundedY, treeSpot.z);
     station.group.add(treeGlb.scene);
     // Same gappy-vine-leaf tap problem as the scattered trees — an invisible
     // hitbox covering the tree's silhouette instead of its actual leafy mesh.
     const treeSize = treeBox.getSize(new THREE.Vector3());
     addInvisibleHitbox(station, treeSpot.x, treeGroundedY + treeSize.y * treeScale * 0.45, treeSpot.z, Math.max(treeSize.x, treeSize.z) * treeScale * 0.6, 'vine-tree');
+    treeGlb.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     station.vineTree = { obj: treeGlb.scene, x: treeSpot.x, z: treeSpot.z };
+    /* A soft ring on the ground saying "stand here". Built from points
+       sampled against the real terrain so it follows the slope instead of
+       hovering as a flat disc, and drawn as an additive line so it glows
+       faintly rather than looking like a decal. */
+    (function () {
+      const RING_R = 2.6, SEG = 64, pts = [];
+      for (let i = 0; i <= SEG; i++) {
+        const a = (i / SEG) * Math.PI * 2;
+        const px = treeSpot.x + Math.cos(a) * RING_R, pz = treeSpot.z + Math.sin(a) * RING_R;
+        const su = surfaceYIn(station, px, pz);
+        pts.push(new THREE.Vector3(px, (su.hit ? su.y : treeBaseY) + 0.06, pz));
+      }
+      const ring = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: 0xffe6a8, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending })
+      );
+      station.group.add(ring);
+      station.vineTree.ring = ring;
+    })();
 
     // "wisdom tree" glow — a warm point light plus a soft additive sprite
     // glowing at the canopy, so it reads as the map's one magical landmark
@@ -765,6 +865,31 @@ export async function bootFocciWorld(root, opts) {
      the same two functions. Both still fire spawnPickupBurst, so there is
      always a visible burst saying what was collected. */
   const PICKUP_REACH = 1.15;
+  /* Chests open on contact too, and say so. Before this they were tap-only
+     with no feedback of their own beyond the mini-game opening, so walking
+     into one did nothing and it was easy to conclude they were missing. */
+  function openChest(room, c) {
+    if (!c || c.opened) return;
+    c.opened = true;
+    const openClip = c.clips.find((cl) => /open/i.test(cl.name));
+    if (openClip) { const a = c.mixer.clipAction(openClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.reset().play(); }
+    spawnPickupBurst(room, c.x, c.obj.position.y + 0.8, c.z, 0xFFC85C);
+    if (c.glow) c.glow.visible = false;
+    onOpenSayIt();
+    // A repeatable bonus, not a one-off: after a breather, close again
+    // (reversing the open clip when there is no separate close one so it
+    // doesn't just snap shut) and become available again.
+    setTimeout(() => {
+      c.opened = false;
+      if (c.glow) c.glow.visible = true;
+      const closeClip = c.clips.find((cl) => /close/i.test(cl.name));
+      if (closeClip) {
+        const a = c.mixer.clipAction(closeClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.reset().play();
+      } else if (openClip) {
+        const a = c.mixer.clipAction(openClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.paused = false; a.timeScale = -1; a.time = a.getClip().duration; a.play();
+      }
+    }, CHEST_RESPAWN_MS);
+  }
   function collectMushroom(room, m) {
     if (!m || m.found) return;
     m.found = true;
@@ -787,6 +912,12 @@ export async function bootFocciWorld(root, opts) {
       for (const l of wordHunt.letters) {
         if (l.found) continue;
         if (Math.hypot(l.obj.position.x - cx, l.obj.position.z - cz) < PICKUP_REACH + 0.2) { collectLetter(l); got = true; }
+      }
+    }
+    if (room.chests) {
+      for (const c of room.chests) {
+        if (c.opened) continue;
+        if (Math.hypot(c.x - cx, c.z - cz) < PICKUP_REACH + 0.75) { openChest(room, c); got = true; }
       }
     }
     if (got) focciReact();
@@ -846,7 +977,10 @@ export async function bootFocciWorld(root, opts) {
   // real room to zoom out to.
   const MAX_ZOOM = 60;
   function overviewCamera() {
-    cam.tPhi = 0.85; cam.tRadius = MAX_ZOOM;
+    // phi is measured from straight up, so a SMALLER value lifts the camera.
+    // 0.72 puts it ~48 degrees above the island: high enough to take the
+    // whole thing in, shallow enough that the relief still reads.
+    cam.tPhi = 0.72; cam.tRadius = MAX_ZOOM;
   }
 
   const character = new THREE.Group();
@@ -871,6 +1005,7 @@ export async function bootFocciWorld(root, opts) {
   const legBL = new THREE.Mesh(legGeo, darkMat); legBL.position.set(-0.18, 0.13, -0.14); character.add(legBL);
   const legBR = new THREE.Mesh(legGeo, darkMat); legBR.position.set(0.18, 0.13, -0.14); character.add(legBR);
   scene.add(character);
+  character.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
   const charState = { x: 0, z: 0, angle: 0, walkT: 0, inWater: false };
   function activeRoom() { return rooms[currentRoomKey]; }
@@ -892,6 +1027,28 @@ export async function bootFocciWorld(root, opts) {
   }
 
   /* ---------- camera ---------- */
+  /* A held close-up while the tree speaks. The rig always orbits Focci, so
+     putting the camera at his own facing angle (theta = charState.angle)
+     puts it in FRONT of him — we see his face, not the back of his head —
+     and a low phi with a short radius brings it down to eye level. The
+     previous "effect" was a half-second glow bump with the camera left
+     wherever it was, which is why the moment didn't land. */
+  let camCinematic = null;
+  function focusOnFocci(ms) {
+    if (camCinematic) clearTimeout(camCinematic.timer);
+    const saved = camCinematic ? camCinematic.saved
+      : { theta: cam.tTheta, phi: cam.tPhi, radius: cam.tRadius };
+    cam.tTheta = charState.angle;
+    cam.tPhi = 1.36;
+    cam.tRadius = 4.1;
+    camCinematic = {
+      saved,
+      timer: setTimeout(() => {
+        cam.tTheta = saved.theta; cam.tPhi = saved.phi; cam.tRadius = saved.radius;
+        camCinematic = null;
+      }, ms)
+    };
+  }
   function updateCamera() {
     cam.theta += (cam.tTheta - cam.theta) * 0.15;
     cam.phi += (cam.tPhi - cam.phi) * 0.15;
@@ -927,6 +1084,8 @@ export async function bootFocciWorld(root, opts) {
   }
   canvas.addEventListener('pointerdown', (e) => {
     if (overlayOpen()) return;
+    // Touching the world always gives control straight back.
+    if (camCinematic) { clearTimeout(camCinematic.timer); camCinematic = null; }
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) { singleId = e.pointerId; moveOrigin = { x: e.clientX, y: e.clientY }; moveVec = { x: 0, y: 0 }; downTime = Date.now(); downPos = { x: e.clientX, y: e.clientY }; }
@@ -1047,26 +1206,7 @@ export async function bootFocciWorld(root, opts) {
     } else if (type === 'teleport-home') {
       enterRoom('station', station.spawn);
     } else if (type === 'chest') {
-      const c = room.chests.find((c) => c.obj === obj);
-      if (c && !c.opened) {
-        c.opened = true;
-        const openClip = c.clips.find((cl) => /open/i.test(cl.name));
-        if (openClip) { const a = c.mixer.clipAction(openClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.reset().play(); }
-        onOpenSayIt();
-        // Chests used to open exactly once, forever — asked to make them a
-        // repeatable bonus instead: after a shorter breather than the
-        // word-hunt respawn, close (reverse the clip if there is one so it
-        // doesn't just snap shut) and become tappable again.
-        setTimeout(() => {
-          c.opened = false;
-          const closeClip = c.clips.find((cl) => /close/i.test(cl.name));
-          if (closeClip) {
-            const a = c.mixer.clipAction(closeClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.reset().play();
-          } else if (openClip) {
-            const a = c.mixer.clipAction(openClip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.paused = false; a.timeScale = -1; a.time = a.getClip().duration; a.play();
-          }
-        }, CHEST_RESPAWN_MS);
-      }
+      openChest(room, room.chests.find((c) => c.obj === obj));
     } else if (type === 'mushroom') {
       // obj here is the invisible hitbox (see addInvisibleHitbox), not the
       // visible mushroom itself.
@@ -1085,6 +1225,9 @@ export async function bootFocciWorld(root, opts) {
       const doe = room.doe;
       if (doe) { doe.calledHome = true; doe.wanderTarget = null; }
       if (room.vineTree) { faceToward(room.vineTree.x, room.vineTree.z); room.vineTree.listenBoost = 1; }
+      focusOnFocci(7000);
+      root.dispatchEvent(new CustomEvent('focci-wisdom-focus', { detail: { on: true } }));
+      setTimeout(() => root.dispatchEvent(new CustomEvent('focci-wisdom-focus', { detail: { on: false } })), 7000);
       const q = randomQuote();
       root.dispatchEvent(new CustomEvent('focci-quote', { detail: q ? { ...q, kind: 'wisdom' } : null }));
     }
@@ -1221,7 +1364,10 @@ export async function bootFocciWorld(root, opts) {
 
     checkWalkOverPickups(room);
     if (room.doe) tickDoe(room, room.doe, dt, t);
-    room.chests.forEach((c) => c.mixer.update(dt));
+    room.chests.forEach((c) => {
+      c.mixer.update(dt);
+      if (c.glow && c.glow.visible) c.glow.material.opacity = 0.32 + Math.sin(t * 1.9 + c.x) * 0.12;
+    });
     room.teleports.forEach((tp) => tp.mixer.update(dt));
     if (room._homeTeleport) room._homeTeleport.mixer.update(dt);
     room.mushrooms.forEach((m) => { if (!m.found) m.obj.rotation.y = t * 0.6; });
@@ -1229,6 +1375,12 @@ export async function bootFocciWorld(root, opts) {
     if (room.wordTreasure && !room.wordTreasure.found) {
       room.wordTreasure.obj.rotation.y = t * 0.8;
       room.wordTreasure.obj.position.y = room.wordTreasure.y + 0.6 + Math.sin(t * 1.6) * 0.1;
+    }
+    if (room.vineTree && room.vineTree.ring) {
+      const near = Math.hypot(room.vineTree.x - charState.x, room.vineTree.z - charState.z) < 3.4;
+      const want = near ? 0.9 : 0.42;
+      const m = room.vineTree.ring.material;
+      m.opacity += (want + Math.sin(t * 1.6) * 0.07 - m.opacity) * 0.08;
     }
     if (room.vineTree && room.vineTree.glowSprite) {
       const pulse = 0.82 + Math.sin(t * 1.1) * 0.18;
