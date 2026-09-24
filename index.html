@@ -964,6 +964,14 @@
   html.home-on #fw-word-progress{display:none}
 
   /* search row */
+  /* Long-press on iOS was raising the Look Up / Share callout and dragging
+     a selection across the UI. Chrome, cards and the 3D overlay are not
+     text you read, so selection is off there; inputs and anything the word
+     tools need to read stay selectable. */
+  #fw-home, #fw-overlay, #fw-chrome, .fm-panel, .fa-scrim, .fw-menu-cluster{
+    -webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  #fw-home input, #fw-chrome input{-webkit-user-select:text;user-select:text}
+
   .fh-top{display:flex;align-items:center;gap:10px;margin-bottom:15px}
   .fh-search{flex:1;min-width:0;display:flex;align-items:center;gap:9px;
     padding:10px 15px;border-radius:999px;
@@ -996,19 +1004,29 @@
   .fh-hero-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55}
   .fh-hero-bg::after{content:'';position:absolute;inset:0;
     background:linear-gradient(100deg,rgba(5,30,34,.78) 0%,rgba(5,30,34,.5) 46%,rgba(5,30,34,.18) 78%)}
-  .fh-hero-fox{position:absolute;right:2px;bottom:-16px;height:132%;width:auto;z-index:2;
-    filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}
+  /* Half the height it was, kept hard against the right edge, and the feet
+     still land below the card so he reads as stepping out of it. */
+  .fh-hero-fox{position:absolute;right:6px;bottom:-16px;height:66%;width:auto;z-index:3;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}
+  /* a contact shadow, so the feet sit ON something */
+  .fh-hero-shadow{position:absolute;right:16px;bottom:-14px;width:62px;height:13px;z-index:2;
+    border-radius:50%;pointer-events:none;
+    background:radial-gradient(ellipse at center,rgba(0,0,0,.45) 0%,rgba(0,0,0,0) 70%)}
   .fh-hero-in{position:relative;z-index:3;padding:18px 0 0 22px;max-width:60%}
   .fh-hero-t{font-size:17px;font-weight:800;color:#fff;letter-spacing:-.015em;line-height:1.14;
     text-shadow:0 2px 8px rgba(0,0,0,.55),0 0 16px rgba(200,255,246,.28)}
   .fh-hero-s{margin-top:6px;font-size:10px;font-weight:400;line-height:1.4;
     color:rgba(255,255,255,.82);text-shadow:0 1px 5px rgba(0,0,0,.6)}
   /* smaller, brighter, and sat further in from the margin */
+  /* Glass, not a solid mint pill: translucent with a blur behind it and a
+     bright rim, so the field shows faintly through. */
   .fh-cta{display:inline-flex;align-items:center;gap:5px;margin:11px 0 0 18px;height:26px;
-    padding:0 13px;border-radius:999px;border:none;cursor:pointer;
-    font-family:inherit;font-size:11px;font-weight:700;color:#06312C;
-    background:linear-gradient(180deg,#BFF4E4 0%,#6FD9C4 100%);
-    box-shadow:0 3px 10px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.75);
+    padding:0 14px;border-radius:999px;border:none;cursor:pointer;
+    font-family:inherit;font-size:11px;font-weight:700;color:#EFFFFA;
+    background:linear-gradient(180deg,rgba(215,255,246,.34) 0%,rgba(110,214,196,.28) 100%);
+    box-shadow:inset 0 0 0 1px rgba(233,255,250,.62),0 3px 12px rgba(0,0,0,.3);
+    backdrop-filter:blur(12px) saturate(1.5);-webkit-backdrop-filter:blur(12px) saturate(1.5);
+    text-shadow:0 1px 4px rgba(0,0,0,.35);
     transition:transform .14s ease}
   .fh-cta:active{transform:scale(.94)}
   .fh-cta i{font-style:normal;font-size:8px}
@@ -1023,9 +1041,24 @@
   .fh-learn{position:relative;display:flex;align-items:center;gap:11px;width:100%;
     border:none;cursor:pointer;text-align:left;overflow:hidden;
     padding:12px 54px 12px 12px;border-radius:16px;
-    background:linear-gradient(105deg,#1F4A4E 0%,#2A6158 52%,#3C7A57 100%);
-    box-shadow:0 8px 20px rgba(0,0,0,.3),inset 0 0 0 1px rgba(255,255,255,.09);
+    background:linear-gradient(105deg,rgba(9,28,32,.72) 0%,rgba(12,44,44,.66) 52%,rgba(16,56,46,.6) 100%);
+    box-shadow:0 8px 22px rgba(0,0,0,.42),inset 0 0 0 1px rgba(190,250,240,.18);
+    backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
     transition:transform .14s ease}
+  /* star dust drifting across it */
+  .fh-learn::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.7;
+    background-image:
+      radial-gradient(1.4px 1.4px at 14% 30%,rgba(255,255,255,.95),transparent),
+      radial-gradient(1.1px 1.1px at 38% 70%,rgba(198,244,255,.9),transparent),
+      radial-gradient(1.6px 1.6px at 62% 24%,rgba(255,255,255,.85),transparent),
+      radial-gradient(1.1px 1.1px at 78% 62%,rgba(214,255,246,.9),transparent),
+      radial-gradient(1.3px 1.3px at 90% 36%,rgba(255,255,255,.8),transparent),
+      radial-gradient(1px 1px at 26% 84%,rgba(255,255,255,.7),transparent);
+    animation:fh-dust 9s linear infinite}
+  @keyframes fh-dust{
+    0%{transform:translate3d(0,0,0);opacity:.35}
+    50%{opacity:.85}
+    100%{transform:translate3d(-14px,-7px,0);opacity:.35}}
   .fh-learn:active{transform:scale(.985)}
   .fh-learn-fox{flex:none;width:46px;height:46px;object-fit:contain;
     filter:drop-shadow(0 3px 6px rgba(0,0,0,.4))}
@@ -1311,6 +1344,11 @@
 
      The overlay is deliberately light (.30 -> .54): the artwork averages
      luma 157 — a bright pastel scene — and a heavier scrim just greys it. */
+  /* The root itself is dark. position:fixed layers resolve against mobile
+     Safari's small viewport, so whatever they fail to cover when the
+     address bar retracts shows the page underneath — and cream page showing
+     under a night island is the white strip at the foot of the game. */
+  html{background:#0E2A2E}
   html.home-on, html.home-on body{background:#0d4c48}
   html.su-root, html.su-root body{
     background:
@@ -4464,6 +4502,7 @@
 
   <div class="fh-hero">
     <div class="fh-hero-bg"><img src="./bg-arc1.webp" alt="" onerror="this.style.display='none'"/></div>
+    <div class="fh-hero-shadow"></div>
     <img class="fh-hero-fox" src="./fox-hero.png" alt="" onerror="this.style.display='none'"/>
     <div class="fh-hero-in">
       <div class="fh-hero-t" id="fh-hero-title">The Nameless Field</div>
@@ -4549,7 +4588,7 @@
       <button class="fw-mi" aria-label="Saved" onclick="openFwPanel('saved')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v16l-6-4-6 4V4Z"/></svg>
       </button>
-      <button class="fw-mi" aria-label="Mini games" onclick="openFwPanel('review')">
+      <button class="fw-mi" aria-label="Mini games" onclick="fmGo('games')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r="1"/><circle cx="18" cy="14" r="1"/></svg>
       </button>
       <button class="fw-mi" aria-label="Progress" onclick="openFwPanel('stats')">

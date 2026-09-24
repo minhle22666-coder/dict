@@ -936,6 +936,72 @@ export async function bootFocciWorld(root, opts) {
         station.group.add(violet);
         station.skyPad = { glow: halo, beam, light: violet, x: c.x, y: peakY, z: c.z };
       }
+      /* ---------------- DOORWAYS ----------------
+         Each hut gets a lit marker on the ground just outside it. Step into
+         the marker and Focci goes in: the roof and walls of that hut turn
+         transparent so you can see him inside, and a warm lamp switches on.
+
+         Standing "inside" is a state, not a move — there is no interior
+         floor in this model, so the hut is opened up around him rather than
+         him being sent somewhere. Animals will use exactly the same
+         markers, which is why this is keyed off the building meshes
+         themselves rather than hand-placed points. */
+      station.houses = [];
+      {
+        const seen = [];
+        station.collidables[0].traverse((o) => {
+          if (!o.isMesh || !o.userData.isBuilding) return;
+          if (!/home_body|casa1/i.test((o.material && o.material.name) || '')) return;
+          seen.push(o);
+        });
+        /* One merged mesh holds every wall, so the individual huts are
+           recovered from the geometry: walk its bounding box in a grid and
+           cluster the columns that hit a wall. */
+        const wallMesh = seen[0];
+        if (wallMesh) {
+          const wb = new THREE.Box3().setFromObject(wallMesh);
+          const clusters = [];
+          for (let x = wb.min.x; x <= wb.max.x; x += 1.2) {
+            for (let z = wb.min.z; z <= wb.max.z; z += 1.2) {
+              raycaster.set(new THREE.Vector3(x, 200, z), DOWN);
+              const hits = raycaster.intersectObject(wallMesh, true);
+              if (!hits.length) continue;
+              const near = clusters.find((c) => Math.hypot(c.x - x, c.z - z) < 4.5);
+              if (near) { near.n++; near.sx += x; near.sz += z; near.x = near.sx / near.n; near.z = near.sz / near.n; }
+              else clusters.push({ x, z, sx: x, sz: z, n: 1, y: hits[0].point.y });
+            }
+          }
+          clusters.filter((c) => c.n >= 3).slice(0, 6).forEach((c) => {
+            /* The doorway marker goes on open ground just outside the hut,
+               found by stepping outward from its centre until the column
+               stops being building. */
+            let mx = c.x, mz = c.z, my = c.y;
+            const dirx = c.x - station.spawn.x, dirz = c.z - station.spawn.z;
+            const len = Math.hypot(dirx, dirz) || 1;
+            for (let d = 2; d <= 7; d += 0.5) {
+              const px = c.x - (dirx / len) * d, pz = c.z - (dirz / len) * d;
+              const su = surfaceYIn(station, px, pz, GROUND_CEIL);
+              if (su.hit && !su.water && !su.building) { mx = px; mz = pz; my = su.y; break; }
+            }
+            const ring = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.85, 0.85, 0.06, 18),
+              new THREE.MeshStandardMaterial({ color: 0xFFE3AE, emissive: 0xFFC96B, emissiveIntensity: 1.1, transparent: true, opacity: 0.8 })
+            );
+            ring.position.set(mx, my + 0.04, mz);
+            station.group.add(ring);
+            const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFFD98A, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+            spark.scale.setScalar(2.6);
+            spark.position.set(mx, my + 0.9, mz);
+            station.group.add(spark);
+            // the lamp that comes on once he is inside
+            const lamp = new THREE.PointLight(0xFFCE87, 0, 7, 2);
+            lamp.position.set(c.x, c.y + 1.4, c.z);
+            station.group.add(lamp);
+            station.houses.push({ x: mx, z: mz, y: my, cx: c.x, cz: c.z, ring, spark, lamp, inside: false });
+          });
+        }
+      }
+
       // The gate up top is the way back down.
       addInvisibleHitbox(station, gate.x, gate.y + SKY_SPAN * 0.045, gate.z, SKY_SPAN * 0.04, 'sky-gate');
     }
@@ -1149,6 +1215,33 @@ export async function bootFocciWorld(root, opts) {
       }
     }
     if (got) focciReact();
+    /* Doorways. Inside is a state: the hut's own meshes fade so Focci is
+       visible through them and its lamp comes up. */
+    if (room.houses && room.houses.length) {
+      let anyInside = false;
+      for (const h of room.houses) {
+        const near = Math.hypot(h.x - cx, h.z - cz) < 1.3 || Math.hypot(h.cx - cx, h.cz - cz) < 2.6;
+        if (near) anyInside = true;
+        if (near !== h.inside) {
+          h.inside = near;
+          if (near) root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'Warm in here. Someone keeps this place tidy.', kind: 'reaction' } }));
+        }
+        h.lamp.intensity += ((near ? 2.2 : 0) - h.lamp.intensity) * 0.12;
+      }
+      if (anyInside !== room._inHouse) {
+        room._inHouse = anyInside;
+        // fade the walls and roofs as a group — they are merged by material
+        room.collidables[0].traverse((o) => {
+          if (!o.isMesh || !o.userData.isBuilding) return;
+          o.material.transparent = true;
+          o.userData._targetOpacity = anyInside ? 0.22 : 1;
+        });
+      }
+      room.collidables[0].traverse((o) => {
+        if (!o.isMesh || o.userData._targetOpacity === undefined) return;
+        o.material.opacity += (o.userData._targetOpacity - o.material.opacity) * 0.14;
+      });
+    }
     /* Standing on the cap lifts you. Checked here, once a frame, with a
        height test as well as a distance one so walking past the hut at
        ground level does nothing. */
@@ -1831,6 +1924,12 @@ export async function bootFocciWorld(root, opts) {
     if (room.wordTreasure && !room.wordTreasure.found) {
       room.wordTreasure.obj.rotation.y = t * 0.8;
       room.wordTreasure.obj.position.y = room.wordTreasure.y + 0.6 + Math.sin(t * 1.6) * 0.1;
+    }
+    if (room.houses) {
+      for (const h of room.houses) {
+        h.spark.material.opacity = 0.34 + Math.sin(t * 1.8 + h.x) * 0.16;
+        h.ring.material.emissiveIntensity = 0.9 + Math.sin(t * 1.8 + h.x) * 0.3;
+      }
     }
     if (room.skyPad && room.skyPad.glow) {
       room.skyPad.glow.material.opacity = 0.42 + Math.sin(t * 2.1) * 0.18;
