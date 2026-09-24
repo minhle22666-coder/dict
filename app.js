@@ -4410,66 +4410,80 @@ window.startMatch=startMatch; window.pickMatch=pickMatch; window.nextMatch=nextM
    mới (không tính là lặp trong CÙNG một lượt chơi, vì đã đi hết một vòng).
    ============================================================ */
 const WRITE_PROMPTS=[
+  /* Fallback bank, used when there is no API key / no connection. It used
+     to hold one-clause lines like "Hay là mình chia đều hoá đơn ra cho dễ"
+     (19 words) whose English context gave the whole answer away
+     ("suggest splitting the bill evenly instead of figuring out who
+     ordered what"). Every entry below now follows the same contract the
+     AI prompt enforces: TWO sentences, 32-60 Vietnamese words, a concrete
+     object or arrangement to wrestle with, and a context that sets the
+     scene in 10-14 words without naming anything the answer would use. */
   {id:'bus_interpret', topic:'public',
-   context:"You're stepping onto a bus and notice a foreigner who doesn't understand the Vietnamese bus attendant. You want to interpret for him. Say this in English:",
-   vi:"Bạn cần xuất trình giấy tờ cho tiếp viên hoặc dùng thẻ thanh toán digital hoặc thẻ vật lý đều được, tap vào máy để lấy vé."},
+   context:"You are boarding a bus beside a foreigner who cannot follow the attendant.",
+   vi:"Anh đưa giấy tờ cho tiếp viên xem, hoặc anh chạm thẻ vào máy ở cửa cũng được cho nhanh. Vì tuyến này không bán vé giấy nữa nên anh phải quẹt thẻ thì máy mới in biên lai cho mình."},
   {id:'restaurant_allergy', topic:'restaurant',
-   context:"The waiter is about to take your order and you want to warn them about a food allergy first. Say this in English:",
-   vi:"Tôi bị dị ứng đậu phộng, nên nếu món nào có đậu phộng thì làm ơn nói cho tôi biết trước nhé."},
+   context:"The waiter has just arrived at your table with the order pad.",
+   vi:"Chị ơi, chị dặn bếp bỏ hẳn đậu phộng ra khỏi phần của em nhé, kể cả dầu rang cũng đừng dùng. Vì em bị dị ứng khá nặng, chỉ dính một chút là em phải đi cấp cứu ngay."},
   {id:'restaurant_split_bill', topic:'restaurant',
-   context:"Dinner with friends is over and you want to suggest splitting the bill evenly instead of figuring out who ordered what. Say this in English:",
-   vi:"Hay là mình chia đều hoá đơn ra cho dễ, khỏi phải tính ai ăn món gì cho mất công."},
+   context:"The meal has ended and your friends are reaching for their wallets.",
+   vi:"Hay là mình cứ lấy tổng chia đều cho số người rồi ai chuyển khoản lại cho tớ sau cũng được. Vì lúc nãy món nào cũng gọi ra giữa bàn ăn chung nên bây giờ ngồi tách ra từng phần thì rối lắm."},
+  {id:'restaurant_wrong_dish', topic:'restaurant',
+   context:"A plate has just been set down in front of you at a restaurant.",
+   vi:"Em ơi, món này hình như không phải của bàn mình, em kiểm tra lại phiếu gọi giúp chị với nhé. Vì lúc nãy chị có dặn là đổi sang loại không cay mà đĩa này nhìn đỏ quá chị không dám ăn."},
   {id:'work_late', topic:'work',
-   context:"You're going to be late for a morning meeting because of traffic, and you want to give your manager a heads-up. Say this in English:",
-   vi:"Em xin lỗi, đường đang kẹt xe nên chắc em trễ khoảng mười lăm phút, mọi người cứ bắt đầu trước ạ."},
+   context:"You are stuck in traffic on the way to an early meeting.",
+   vi:"Anh ơi, chắc em tới trễ khoảng mười lăm phút, anh với mọi người cứ bắt đầu trước đừng chờ em nhé. Vì đoạn cầu trước mặt đang kẹt cứng mà em thì đã lỡ qua chỗ quay đầu mất rồi."},
   {id:'work_help', topic:'work',
-   context:"You're stuck on a spreadsheet formula and want to ask a coworker sitting near you for a quick hand. Say this in English:",
-   vi:"Bạn rảnh chút xíu không, mình đang bí một công thức trong file Excel, chỉ mình với."},
+   context:"A colleague is packing up and you still have work on your plate.",
+   vi:"Chị ơi, nếu chị chưa về ngay thì chị ngó qua giúp em phần số liệu ở cuối file với ạ. Vì em ghép hai bảng lại thì tổng nó lệch mất mấy triệu mà em dò mãi không ra chỗ sai."},
   {id:'work_deadline', topic:'work',
-   context:"Your manager just gave you a deadline that feels too tight, and you want to politely ask for one more day. Say this in English:",
-   vi:"Anh chị cho em xin thêm một ngày được không ạ, em muốn kiểm tra lại kỹ trước khi gửi."},
+   context:"Your manager has just asked whether a task will be ready today.",
+   vi:"Anh cho em xin thêm tới sáng mai được không ạ, chiều nay em gửi anh bản nháp trước để anh xem hướng. Vì bên khách vừa đổi lại yêu cầu ở phần đầu nên em phải làm lại gần như từ đầu."},
+  {id:'work_handover', topic:'work',
+   context:"You are about to take leave and a teammate will cover for you.",
+   vi:"Em để lại toàn bộ tài khoản với đường dẫn trong file bàn giao, anh cứ mở ra là thấy hết nhé. Vì tuần sau em không mở máy được nên anh có gì cần gấp thì nhắn thẳng cho chị quản lý giúp em."},
+  {id:'work_meeting_move', topic:'work',
+   context:"You need to shift a scheduled call with a client to another slot.",
+   vi:"Chị xem giúp em dời buổi họp sang chiều thứ Năm được không ạ, khung giờ nào cũng được miễn là sau ba giờ. Vì sáng hôm đó phòng họp đã có người đặt trước mà bên mình thì cần chiếu màn hình lên cho khách xem."},
   {id:'work_feedback', topic:'work',
-   context:"A coworker just pitched an idea in a meeting, and you want to add one gentle concern without shutting it down. Say this in English:",
-   vi:"Ý này hay đó, nhưng mình hơi lo về phần ngân sách, không biết mình tính tới chưa nhỉ?"},
-  {id:'work_email_clarify', topic:'work',
-   context:"You received a confusing email from a client and want to politely ask them to clarify what they meant. Say this in English:",
-   vi:"Cho tôi hỏi lại ý bạn ở đoạn này một chút được không, tôi chưa hiểu rõ lắm."},
-  {id:'work_dayoff', topic:'work',
-   context:"You need to ask your manager for a day off next week for a personal matter. Say this in English:",
-   vi:"Anh chị cho em xin nghỉ một ngày vào tuần sau được không ạ, em có việc gia đình cần giải quyết."},
-  {id:'debate_remote_work', topic:'debate',
-   context:"A friend says remote work is always better than working in an office, and you disagree — politely. Say this in English:",
-   vi:"Mình hiểu ý bạn, nhưng mình nghĩ còn tuỳ công việc nữa — việc nào cần trao đổi trực tiếp thì làm ở văn phòng vẫn hiệu quả hơn."},
-  {id:'debate_defend_choice', topic:'debate',
-   context:"Someone questions why you chose a cheaper phone over a flagship one, and you want to explain your reasoning calmly. Say this in English:",
-   vi:"Mình không cần hết mấy tính năng cao cấp đó, với lại mình muốn để dành tiền cho việc khác quan trọng hơn."},
-  {id:'debate_movie', topic:'debate',
-   context:"A friend loved a movie you thought was overrated, and you want to share your honest opinion without sounding harsh. Say this in English:",
-   vi:"Mình thấy phim cũng ổn, nhưng đoạn giữa hơi lê thê, mình suýt nữa thì ngủ quên luôn."},
+   context:"A junior teammate has just sent you their first draft to look over.",
+   vi:"Em làm phần mở đầu tốt rồi, nhưng em gom mấy đoạn ở giữa lại cho gọn hơn được không em. Vì người đọc là bên khách chứ không phải nội bộ mình nên họ sẽ không hiểu mấy từ viết tắt em dùng."},
   {id:'public_directions', topic:'public',
-   context:"A tourist stops you on the street looking lost and asks how to get to the nearest train station. Say this in English:",
-   vi:"Bạn đi thẳng tới ngã tư phía trước, quẹo trái, ga tàu nằm ngay bên tay phải, đi bộ khoảng năm phút thôi."},
-  {id:'public_lost_wallet', topic:'public',
-   context:"You just realized you lost your wallet and need to explain the situation to airport staff. Say this in English:",
-   vi:"Tôi vừa phát hiện mình làm mất ví, chắc là để quên ở khu vực kiểm tra an ninh, anh chị giúp tôi kiểm tra được không ạ?"},
-  {id:'public_pharmacy', topic:'public',
-   context:"You have a mild headache and want to ask the pharmacist for something safe without a prescription. Say this in English:",
-   vi:"Tôi bị nhức đầu nhẹ thôi, anh chị có loại thuốc nào không cần toa mà uống được không ạ?"},
-  {id:'casual_weekend', topic:'casual',
-   context:"You're texting a friend to see if they're free to hang out this weekend. Say this in English:",
-   vi:"Cuối tuần này bạn có rảnh không, đi cà phê rồi xem phim chung nha?"},
+   context:"A tourist has stopped you on the pavement holding up their phone.",
+   vi:"Anh cứ đi thẳng hết con hẻm này rồi rẽ trái ở chỗ có cây xăng là thấy ngay, đi bộ chừng năm phút thôi. Vì đường một chiều nên anh đừng bắt xe ở đây, ra tới ngã tư kia bắt thì tài xế mới đón được."},
+  {id:'public_shop_return', topic:'public',
+   context:"You are standing at a shop counter with something you bought yesterday.",
+   vi:"Chị xem giúp em đổi sang cái khác hoặc hoàn lại tiền cũng được ạ, em vẫn giữ nguyên hộp với hoá đơn đây. Vì em mở ra ở nhà thì thấy mặt sau bị xước một đường dài mà lúc mua em không kiểm tra kỹ."},
+  {id:'public_landlord', topic:'public',
+   context:"You are messaging the owner of the flat you are renting.",
+   vi:"Anh cho thợ qua xem giúp em cái vòi nước trong bếp với ạ, lúc nào anh rảnh em cũng ở nhà được. Vì nó rỉ suốt cả đêm làm ướt hết tủ dưới bồn mà em khoá van rồi vẫn không ăn thua."},
+  {id:'public_delivery', topic:'public',
+   context:"A courier has just called you about a parcel arriving today.",
+   vi:"Anh gửi giúp em ở quầy lễ tân dưới sảnh rồi nhắn em một tiếng là được, em xuống lấy sau nhé. Vì chiều nay em đi vắng mà gói đó có đồ dễ vỡ nên em không muốn để ngoài cửa."},
+  {id:'casual_reschedule', topic:'casual',
+   context:"A friend is waiting to hear whether you can still meet this weekend.",
+   vi:"Hay là mình dời qua cuối tuần sau đi, hôm đó tớ rảnh cả ngày nên đi đâu cũng được. Vì cuối tuần này nhà tớ có việc mà tớ lại là người phải đứng ra lo nên chắc không đi nổi."},
+  {id:'casual_neighbour', topic:'casual',
+   context:"You are knocking on the door of the flat next to yours.",
+   vi:"Anh ơi, tối anh vặn nhỏ loa lại một chút giúp em với nhé, sau mười giờ thôi cũng được. Vì phòng em sát ngay tường đó mà con em còn nhỏ, cứ nghe tiếng bass là cháu giật mình khóc."},
+  {id:'casual_decline', topic:'casual',
+   context:"Someone has just invited you to something you would rather skip.",
+   vi:"Lần này cho tớ xin phép vắng nhé, hôm nào mọi người tụ lại lần sau thì nhớ gọi tớ với. Vì mấy hôm nay tớ làm tới khuya nên giờ chỉ muốn nằm nhà ngủ bù cho lại sức."},
+  {id:'casual_favour', topic:'casual',
+   context:"You are about to leave town and need a hand from a friend.",
+   vi:"Cậu qua nhà tớ tưới cây giúp tớ vài hôm được không, chìa khoá tớ gửi bác bảo vệ dưới nhà nhé. Vì tớ đi công tác gần hai tuần mà mấy chậu ngoài ban công không chịu nổi nắng lâu như vậy."},
   {id:'casual_apology', topic:'casual',
-   context:"You showed up fifteen minutes late to meet a friend and want to apologize casually. Say this in English:",
-   vi:"Xin lỗi nha, mình bị kẹt xe nên tới trễ, đợi lâu chưa?"},
-  {id:'casual_smalltalk', topic:'casual',
-   context:"You're standing in a long line at the store and want to make small talk with the stranger next to you about the wait. Say this in English:",
-   vi:"Trời ơi xếp hàng lâu dữ vậy, chắc tại đông người mua đồ cuối tuần quá."},
-  {id:'casual_weather', topic:'casual',
-   context:"It's been raining nonstop and you want to complain lightly about it to a coworker. Say this in English:",
-   vi:"Mưa hoài kiểu này chắc tôi ở nhà luôn quá, ra đường ướt hết đồ."},
-  {id:'casual_invite', topic:'casual',
-   context:"You just found a great new café and want to invite a friend to check it out with you. Say this in English:",
-   vi:"Mình mới tìm được một quán cà phê ngon lắm, bữa nào rảnh đi thử với mình nha?"}
+   context:"You are texting a friend the morning after you let them down.",
+   vi:"Tớ xin lỗi vụ hôm qua nhé, để hôm nào tớ mời cậu một bữa coi như chuộc lỗi. Vì điện thoại tớ hết pin giữa đường mà tớ lại không nhớ nổi số của cậu để mượn máy người ta gọi."},
+  {id:'debate_remote', topic:'debate',
+   context:"A friend has asked what you actually think about working from home.",
+   vi:"Theo tớ thì cho nhân viên tự chọn chỗ ngồi làm sẽ hợp lý hơn là bắt lên văn phòng đủ năm ngày. Vì việc cần tập trung thì ở nhà làm nhanh hơn hẳn, còn họp hành thì gom vào một hai buổi là đủ."},
+  {id:'debate_phones', topic:'debate',
+   context:"The conversation has turned to children and screens at school.",
+   vi:"Tớ nghĩ cấm hẳn điện thoại trong trường thì hơi quá, nên thu lại lúc vào lớp rồi trả lại giờ ra chơi thôi. Vì bọn trẻ vẫn cần gọi cho bố mẹ lúc tan học, mà cấm tiệt thì kiểu gì chúng nó cũng giấu mang theo."},
+  {id:'debate_city', topic:'debate',
+   context:"Someone has asked whether you would move out of the city.",
+   vi:"Tớ vẫn chọn ở lại thành phố thêm vài năm nữa, về quê thì để tính sau khi nào ổn định hơn. Vì ở đây tớ đi làm chỉ mất hai mươi phút, chứ về dưới đó thì cái gì cũng phải chạy xe cả tiếng."}
 ];
 const WRITE_SEEN_LS='fc_write_seen';
 const WRITE_TOPICS={
@@ -4564,15 +4578,12 @@ window.setSpeakUpTotal=function(n){
    blurb all baked in) — used as an image rather than rebuilt in CSS,
    which is what finally made it match the mockup exactly. */
 const SU_HERO='<img class="su-hero-img" src="./speakup-header.png" alt="Speak Up" onerror="this.style.display=\'none\'"/>';
-/* The three mini-game pills are gone from this screen (they are not in
-   the design and were competing with the header card), but they also
-   carried the only way back to the hub — so the back arrow survives on
-   its own as a small round button tucked into the header's top-left
-   corner, where it costs the layout nothing. */
-function suBack(){
-  return (typeof renderGameHub==='function')
-    ? '<button class="su-back" onclick="renderGameHub()" aria-label="Back to Games">←</button>' : '';
-}
+/* The three mini-game pills are gone from this screen — they are not in
+   the design and were crowding the header card. Nothing replaces them:
+   the panel's own .fw-panel-close button is already fixed at
+   top:safe-area+70px / left:18px over every panel, which is the exact
+   spot a back arrow here would occupy, so adding one only stacked two
+   round buttons on top of each other. */
 /* Speak Up swaps the whole panel's backdrop for its own village scene
    (see .su-active in index.html) — the games hub and the other two
    mini-games share this panel, so the class has to come back off when
@@ -4580,6 +4591,7 @@ function suBack(){
 window.suPanelOn=function(on){
   const p=document.getElementById('v-review');
   if(p) p.classList.toggle('su-active', !!on);
+  document.documentElement.classList.toggle('su-root', !!on);
 };
 /* Same row shape in both states so the layout never jumps: a live
    slider before the round starts, a progress track during it. */
@@ -4603,7 +4615,6 @@ function renderSpeakUpIntro(){
   /* No gameSwitch() here: the mockup has nothing above the header card,
      and the three mini-game pills were fighting it for attention. */
   let h='<div class="su-page su-intro">';
-  h+=suBack();
   h+=SU_HERO;
   h+=speakUpQRow(true);
   h+='<button class="btn" onclick="startSpeakUpRound()">Start</button>';
@@ -4828,6 +4839,16 @@ function speakUpAnswerHtml(sentence){
   if(cur<text.length) out+=tokenizeForTap(text.slice(cur));
   return out;
 }
+/* Picking stays open right up until Next question — tap either answer as
+   many times as you like and the saved headline follows.
+
+   This used to end in renderWrite(), which rebuilds #review-area wholesale
+   and so threw the panel's scroll back to the top. The answers sit near the
+   bottom of a long page, so one tap bounced you away from them and the
+   choice looked locked in. Nothing about the state was actually frozen —
+   only the scroll position made it seem that way. Updating the two boxes in
+   place keeps the page still, and also keeps any text the learner had
+   selected for a word lookup. */
 window.pickSpeakUpAnswer=function(kind){
   if(!writeResult) return;
   writeLiked=kind;
@@ -4837,7 +4858,13 @@ window.pickSpeakUpAnswer=function(kind){
     const rec=list.find(x=>x.id===writeSavedId);
     if(rec){ rec.you=String(headline||rec.you); rec.liked=kind; saySave(list); }
   }
-  renderWrite();
+  const boxes=document.querySelectorAll('.su-ans-box');
+  if(boxes.length===2){
+    boxes[0].classList.toggle('picked', kind==='fixed');
+    boxes[1].classList.toggle('picked', kind==='natural');
+  }else{
+    renderWrite();   // markup not on screen as expected — fall back
+  }
 };
 
 function renderWrite(){
@@ -4845,11 +4872,10 @@ function renderWrite(){
   suPanelOn(true);
   if(speakUpStage==='intro'){ renderSpeakUpIntro(); return; }
   if(speakUpStage==='done'){
-    area.innerHTML='<div class="su-page">'+suBack()+speakUpRoundDoneHtml()+'</div>';
+    area.innerHTML='<div class="su-page">'+speakUpRoundDoneHtml()+'</div>';
     return;
   }
   let h='<div class="su-page">';
-  h+=suBack();
   h+=SU_HERO;
   h+=speakUpQRow(false);
   if(!writeCur){
@@ -4873,7 +4899,7 @@ function renderWrite(){
       +'<span class="sy-count" id="sy-count">0 words</span></div>';
     h+='<button class="btn" id="write-check" disabled onclick="submitWrite()">Check it</button>';
   }else{
-    h+='<div class="su-coach"><img class="su-coach-fox" src="./mascot-take_note.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    h+='<div class="su-coach"><img class="su-coach-fox" src="./mascot-compass.webp" alt="" onerror="this.style.display=\'none\'"/>'
       +'<b>Coach’s Feedback:</b> '+esc(writeResult.feedback_vi||'')+'</div>';
     h+='<div class="su-feedback">';
     h+=speakUpSegmentsHtml(writeResult.segments);
@@ -4883,7 +4909,7 @@ function renderWrite(){
       +'<div class="su-ans-box'+(writeLiked==='fixed'?' picked':'')+'">'
       +'<div class="su-tappable su-ans-text">'+speakUpAnswerHtml(writeResult.fixed_sentence)+'</div></div>';
     h+='<button class="su-ans-lbl moon" onclick="pickSpeakUpAnswer(\'natural\')">'
-      +'<span class="ic">\u{1F319}</span>Còn đây là cách của Focci nếu bạn thích tự nhiên hơn:</button>'
+      +'<span class="ic">\u{1F319}</span>Nếu bạn thích tự nhiên hơn</button>'
       +'<div class="su-ans-box'+(writeLiked==='natural'?' picked':'')+'">'
       +'<div class="su-tappable su-ans-text">'+speakUpAnswerHtml(writeResult.natural_sample)+'</div></div>';
     h+='</div>';

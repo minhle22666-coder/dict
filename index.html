@@ -927,7 +927,15 @@
      scene panel fill #105552 r24; coach bar #07CEC4 r16 h45;
      feedback panel #06504B r22; answer boxes #43985C r20.
      ============================================================ */
-  .su-page{position:relative;color:#fff;padding:0 9px 28px}
+  /* 26px of head room: the mockup starts the header card ~96px down from
+     the phone's top edge and the panel's own padding only gets us to 74,
+     and the shared .fw-panel-close sits at top:70 / left:18 — without this
+     it lands straight on the "Speak Up" title. */
+  .su-page{position:relative;color:#fff;padding:26px 9px 28px}
+  /* Trimmed a little, only while Speak Up is up, so it finishes clear of
+     the card instead of overlapping its corner. */
+  html.su-root .fw-panel-close{width:32px;height:32px;
+    top:calc(env(safe-area-inset-top,0px) + 64px);left:13px}
 
   /* The panel's own violet glass is switched off and replaced by the
      village scene. .su-active is toggled by suPanelOn() in app.js.
@@ -938,6 +946,12 @@
      artwork averages luma 157 — it is a BRIGHT pastel scene, and the
      heavy .46→.78 scrim of the previous attempt is what turned it
      into grey mud. */
+  /* #v-review is inset:0, but in the installed PWA the home-indicator strip
+     below it still shows the page's own cream background — a white band under
+     the Check it button. Paint the root the same teal while Speak Up is up;
+     the class is toggled alongside .su-active in suPanelOn(). */
+  html.su-root, html.su-root body{background:#0d4c48}
+
   body .view.fw-panel.su-active{
     background:
       linear-gradient(180deg,rgba(4,44,44,.30) 0%,rgba(3,38,38,.40) 58%,rgba(2,30,30,.54) 100%),
@@ -954,13 +968,6 @@
   /* Supplied artwork, used as-is: title, blurb and fox are baked in.
      Measured 344x124 in the mockup = the file's own 584x210 aspect. */
   .su-hero-img{display:block;width:100%;height:auto;margin:0 0 10px}
-  /* Tucked into the header card's rounded top-left corner, above the
-     title, so it adds no row to the measured layout. */
-  .su-back{position:absolute;left:1px;top:1px;z-index:2;width:30px;height:30px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;color:#fff;
-    background:rgba(4,44,42,.42);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);
-    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-  .su-back:active{opacity:.7}
 
   /* Measured: label 14px, value in a 27x18 translucent pill, then an
      8px track. Identical geometry before the round (live slider) and
@@ -1019,11 +1026,16 @@
 
   /* Measured #07CEC4, 45px tall, radius 16. The fox sits ON the bar's
      left end and overhangs it, so the text is padded 34px clear. */
-  .su-coach{position:relative;margin:0 0 12px;padding:11px 15px 11px 34px;border-radius:16px;
-    background:#07CEC4;color:#0B3F3A;font-size:13px;line-height:1.34;font-style:italic;font-weight:600}
-  .su-coach b{font-weight:800;font-style:italic}
-  .su-coach-fox{position:absolute;left:-14px;bottom:-2px;width:50px;height:auto;
-    filter:drop-shadow(0 3px 5px rgba(0,0,0,.3))}
+  /* White text was asked for over the mockup's dark-on-mint. White on the
+     measured #07CEC4 is only ~1.9:1, so the bar is deepened along the same
+     hue until white clears 4.5:1 — the mint identity survives, the text is
+     actually readable. */
+  .su-coach{position:relative;margin:0 0 12px;padding:10px 14px 10px 32px;border-radius:16px;
+    background:linear-gradient(135deg,#0D968D 0%,#0A7871 100%);color:#fff;
+    font-size:13px;line-height:1.34;font-style:italic;font-weight:600}
+  .su-coach b{font-weight:800;font-style:italic;color:#fff}
+  .su-coach-fox{position:absolute;left:-2px;bottom:0;width:26px;height:auto;
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))}
 
   .su-feedback{border-radius:22px;padding:20px;margin:0 0 4px;background:rgba(1,46,42,.66);
     backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
@@ -4188,6 +4200,10 @@
   window.closeFwPanel = function () {
     document.querySelectorAll('.view').forEach((x) => x.classList.remove('active'));
     document.getElementById('fw-panel-close').style.display = 'none';
+    // Speak Up darkens the document root so the PWA's home-indicator strip
+    // doesn't show the cream page background; undo it on every exit path,
+    // not just the ones that route back through the games hub.
+    if (window.suPanelOn) window.suPanelOn(false);
   };
 
   // Sound: one tap mutes/unmutes; a second tap within 350ms cycles the track
