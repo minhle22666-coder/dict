@@ -183,7 +183,7 @@ export async function bootFocciWorld(root, opts) {
     const group = new THREE.Group();
     group.visible = false;
     scene.add(group);
-    const room = { key, name, group, spawn: { x: 0, z: 0 }, collidables: [], interactive: [], doe: null, mushrooms: [], teleports: [] };
+    const room = { key, name, group, spawn: { x: 0, z: 0 }, collidables: [], interactive: [], doe: null, mushrooms: [], teleports: [], residents: [] };
     rooms[key] = room;
     return room;
   }
@@ -1187,6 +1187,148 @@ export async function bootFocciWorld(root, opts) {
      shot to line up; now contact is enough and the tap handlers just call
      the same two functions. Both still fire spawnPickupBurst, so there is
      always a visible burst saying what was collected. */
+
+  /* ============================================================
+     RESIDENTS — the animals living on the island.
+
+     Their whole state (energy, happiness, age, names) belongs to
+     residents.js and localStorage; this only builds bodies for whatever is
+     in that list and keeps them moving. Models are fetched the first time
+     a species actually appears, not at boot — five animal GLBs is ~7MB and
+     most players will have none of them for days.
+
+     An animal that has run out of energy is never hurt and never leaves.
+     It simply stops wandering and sits. That is the whole design: the
+     island asks for care, it does not punish neglect.
+     ============================================================ */
+  const animalCache = new Map();
+  async function animalModel(species) {
+    const sp = (window.RES_SPECIES || {})[species];
+    if (!sp) return null;
+    if (animalCache.has(species)) return animalCache.get(species);
+    const p = loadGLB(ASSET(sp.file)).catch(() => null);
+    animalCache.set(species, p);
+    return p;
+  }
+
+  /* The little three-pip bar that floats over each head. Drawn once per
+     level rather than per frame — it only ever has three states. */
+  const barTextures = {};
+  function energyBarTexture(level) {
+    if (barTextures[level]) return barTextures[level];
+    const c = document.createElement('canvas');
+    c.width = 96; c.height = 30;
+    const g = c.getContext('2d');
+    const colours = { 1: '#F0776A', 2: '#F0C35A', 3: '#7BE052' };
+    g.fillStyle = 'rgba(8,26,28,.72)';
+    g.beginPath(); g.roundRect(0, 0, 96, 30, 11); g.fill();
+    for (let i = 0; i < 3; i++) {
+      g.fillStyle = i < level ? colours[level] : 'rgba(255,255,255,.16)';
+      g.beginPath(); g.roundRect(8 + i * 28, 9, 22, 12, 4); g.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    barTextures[level] = tex;
+    return tex;
+  }
+
+  async function buildResident(room, rec) {
+    const gltf = await animalModel(rec.species);
+    if (!gltf) return null;
+    const obj = gltf.scene.clone(true);
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    // normalise to a 1-unit creature, then apply the species' own adult
+    // size and how grown this individual is
+    const base = 1 / Math.max(size.x, size.y, size.z, 0.0001);
+    const scale = base * (window.resScale ? window.resScale(rec) : 0.8);
+    obj.scale.setScalar(scale);
+    const spot = findFlatGroundSpot(room, 4, 12, 0.9, 30);
+    const footOffset = box.min.y * scale;
+    obj.position.set(spot.x, spot.y - footOffset, spot.z);
+    obj.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    room.group.add(obj);
+
+    const mixer = gltf.animations && gltf.animations.length ? new THREE.AnimationMixer(obj) : null;
+    if (mixer) mixer.clipAction(gltf.animations[0]).play();
+
+    const lvl = window.resLevel ? window.resLevel(rec) : 3;
+    const bar = new THREE.Sprite(new THREE.SpriteMaterial({ map: energyBarTexture(lvl), transparent: true, depthWrite: false, depthTest: false }));
+    const headY = (box.max.y - box.min.y) * scale;
+    bar.scale.set(1.15, 0.36, 1);
+    bar.position.set(spot.x, spot.y + headY + 0.5, spot.z);
+    room.group.add(bar);
+
+    const hit = addInvisibleHitbox(room, spot.x, spot.y + headY * 0.5, spot.z, Math.max(0.6, headY * 0.6), 'resident');
+    hit.userData.residentId = rec.id;
+
+    const body = {
+      id: rec.id, obj, bar, hit, mixer, footOffset, headY,
+      homeX: spot.x, homeZ: spot.z, level: lvl,
+      target: null, cooldown: 2 + Math.random() * 6
+    };
+    room.residents.push(body);
+    return body;
+  }
+
+  async function syncResidents(room) {
+    if (!window.resLoad) return;
+    const recs = window.resTick ? window.resTick() : window.resLoad();
+    room.residents = room.residents || [];
+    const known = new Set(room.residents.map((b) => b.id));
+    for (const rec of recs) {
+      if (known.has(rec.id)) continue;
+      await buildResident(room, rec);
+    }
+  }
+
+  function tickResidents(room, dt, t) {
+    if (!room.residents || !room.residents.length) return;
+    const recs = window.resLoad ? window.resLoad() : [];
+    const byId = {};
+    recs.forEach((r) => { byId[r.id] = r; });
+    for (const b of room.residents) {
+      const rec = byId[b.id];
+      if (!rec) continue;
+      if (b.mixer) b.mixer.update(dt);
+
+      const lvl = window.resLevel ? window.resLevel(rec) : 3;
+      if (lvl !== b.level) { b.level = lvl; b.bar.material.map = energyBarTexture(lvl); b.bar.material.needsUpdate = true; }
+
+      /* Out of energy: it stays put. Not asleep, not dying — just quiet,
+         and it picks straight back up the moment it is fed. */
+      const lively = rec.energy >= 34;
+      if (lively) {
+        if (b.target) {
+          const dx = b.target.x - b.obj.position.x, dz = b.target.z - b.obj.position.z;
+          const d = Math.hypot(dx, dz);
+          if (d > 0.25) {
+            const sp = 1.5 + (rec.happiness / 100) * 0.9;
+            b.obj.position.x += (dx / d) * sp * dt;
+            b.obj.position.z += (dz / d) * sp * dt;
+            b.obj.rotation.y = Math.atan2(dx, dz);
+            const surf = surfaceYIn(room, b.obj.position.x, b.obj.position.z, GROUND_CEIL);
+            if (surf.hit && !surf.building) b.obj.position.y = surf.y - b.footOffset;
+          } else { b.target = null; b.cooldown = 3 + Math.random() * 7; }
+        } else {
+          b.cooldown -= dt;
+          if (b.cooldown <= 0) {
+            for (let k = 0; k < 10; k++) {
+              const cx = b.homeX + (Math.random() - 0.5) * 9, cz = b.homeZ + (Math.random() - 0.5) * 9;
+              const su = surfaceYIn(room, cx, cz, GROUND_CEIL);
+              if (su.hit && !su.water && !su.building) { b.target = { x: cx, z: cz }; break; }
+            }
+            b.cooldown = 4 + Math.random() * 6;
+          }
+        }
+      }
+      // a small idle bob only while it has the energy for it
+      const bob = lively ? Math.abs(Math.sin(t * 2 + b.homeX)) * 0.04 : 0;
+      b.bar.position.set(b.obj.position.x, b.obj.position.y + b.headY + 0.5 + bob, b.obj.position.z);
+      if (b.hit) b.hit.position.set(b.obj.position.x, b.obj.position.y + b.headY * 0.5, b.obj.position.z);
+    }
+  }
+
   const PICKUP_REACH = 1.15;
   /* Collecting a mushroom, shared by the walk-over check and the tap
      handler so both paths give the same burst and the same XP. */
@@ -1291,6 +1433,9 @@ export async function bootFocciWorld(root, opts) {
     completeWordHunt();
   }
   await startNewWordHunt();
+  await syncResidents(station);
+  // a new companion can arrive at any moment the streak completes
+  document.addEventListener('focci-resident-new', () => { syncResidents(station); });
 
   function playDoeClip(doe, name, loop) {
     const clip = doe.clips[name];
@@ -1688,6 +1833,18 @@ export async function bootFocciWorld(root, opts) {
         'Yes, take me', () => { enterRoom(arcRoomKeys[idx]); onOpenArc(idx, ARC_TITLES[idx]); });
     } else if (type === 'teleport-home') {
       enterRoom('station', station.spawn);
+    } else if (type === 'resident') {
+      // A tap is a handful of food and a word from them. The card with the
+      // full story of the animal opens from the speech bubble.
+      const id = obj.userData.residentId;
+      const res = window.resFeed ? window.resFeed(id) : null;
+      const rec = (window.resLoad ? window.resLoad() : []).find((r) => r.id === id);
+      if (rec) {
+        spawnPickupBurst(room, obj.position.x, obj.position.y, obj.position.z, res && res.ok ? 0x8CF0B0 : 0xFFC85C);
+        root.dispatchEvent(new CustomEvent('focci-resident-tap', {
+          detail: { id: id, name: rec.name, fed: !!(res && res.ok), reason: res ? res.reason : null }
+        }));
+      }
     } else if (type === 'sky-gate') {
       if (room.skyPad) {
         const p = room.skyPad;
@@ -1914,6 +2071,7 @@ export async function bootFocciWorld(root, opts) {
     }
     character.position.set(charState.x, surf.y + bob + charState.jumpY, charState.z);
 
+    tickResidents(room, dt, t);
     checkWalkOverPickups(room);
     if (room.doe) tickDoe(room, room.doe, dt, t);
     if (room.pondMixer) room.pondMixer.update(dt);

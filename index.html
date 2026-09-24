@@ -1121,6 +1121,63 @@
   .fh-loading img{width:90px;animation:cheer 2.2s ease-in-out infinite}
 
   /* ============================================================
+     RESIDENT CARD — who this animal is, not a control panel.
+     ============================================================ */
+  .rz-scrim{position:fixed;inset:0;z-index:84;display:none;align-items:flex-end;justify-content:center;
+    padding:0 0 calc(env(safe-area-inset-bottom,0px) + 18px);
+    background:rgba(4,20,26,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif}
+  html.rz-on .rz-scrim{display:flex}
+  .rz-card{width:min(340px,92vw);padding:20px 18px 16px;border-radius:24px;
+    background:linear-gradient(180deg,rgba(26,62,66,.96),rgba(12,40,46,.98));
+    box-shadow:0 0 0 1px rgba(150,230,220,.24),0 -10px 44px rgba(0,0,0,.5);
+    animation:rz-in .3s cubic-bezier(.3,1.25,.4,1)}
+  @keyframes rz-in{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+  .rz-head{margin-bottom:12px}
+  .rz-name{font-size:19px;font-weight:800;color:#fff;letter-spacing:-.01em}
+  .rz-species{margin-top:2px;font-size:11.5px;font-weight:500;color:rgba(190,240,232,.8)}
+  .rz-bar{height:9px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.14)}
+  .rz-bar i{display:block;height:100%;border-radius:99px;transition:width .35s ease}
+  .rz-l1 i{background:linear-gradient(90deg,#F0776A,#F09A6A)}
+  .rz-l2 i{background:linear-gradient(90deg,#F0C35A,#EFE07A)}
+  .rz-l3 i{background:linear-gradient(90deg,#7BE052,#BEE55A)}
+  .rz-barlab{display:flex;justify-content:space-between;margin:6px 2px 14px;
+    font-size:11px;font-weight:600;color:rgba(255,255,255,.7)}
+  .rz-barlab b{color:#fff}
+  .rz-stats{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px}
+  .rz-stats > div{display:flex;flex-direction:column;gap:1px;padding:8px 10px;border-radius:12px;
+    background:rgba(255,255,255,.07)}
+  .rz-stats span{font-size:9.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+    color:rgba(190,240,232,.62)}
+  .rz-stats b{font-size:13px;font-weight:700;color:#fff}
+  .rz-pair{margin-top:11px;padding:8px 12px;border-radius:12px;text-align:center;
+    font-size:12px;font-weight:700;color:#FFD3E6;background:rgba(255,120,180,.14);
+    box-shadow:inset 0 0 0 1px rgba(255,150,200,.28)}
+  .rz-note{margin-top:13px;font-size:12.5px;font-style:italic;line-height:1.5;
+    color:rgba(255,255,255,.82);text-align:center}
+  .rz-feed{width:100%;height:42px;margin-top:14px;border:none;border-radius:999px;cursor:pointer;
+    font-family:inherit;font-size:13.5px;font-weight:800;color:#06312C;
+    background:linear-gradient(180deg,#BFF4E4 0%,#6FD9C4 100%);
+    box-shadow:0 4px 14px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.7);
+    transition:transform .14s ease}
+  .rz-feed:active{transform:scale(.96)}
+  /* the speech bubble a tap raises, with a way into the card */
+  .rz-say{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);z-index:60;
+    transform:translateX(-50%) translateY(10px);opacity:0;pointer-events:none;
+    display:flex;align-items:center;gap:10px;max-width:86vw;
+    padding:11px 14px;border-radius:18px;
+    background:rgba(10,38,42,.88);box-shadow:inset 0 0 0 1px rgba(170,240,230,.24),0 10px 26px rgba(0,0,0,.4);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif;
+    transition:opacity .22s ease,transform .22s ease}
+  .rz-say.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+  .rz-say-t{flex:1;min-width:0;font-size:12.5px;line-height:1.42;color:#EAFFFA}
+  .rz-say-t b{display:block;font-size:11px;font-weight:800;color:#8CF0D4;margin-bottom:2px}
+  .rz-say-i{flex:none;width:28px;height:28px;border:none;border-radius:50%;cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:800;color:#06312C;
+    background:linear-gradient(180deg,#BFF4E4,#6FD9C4)}
+
+  /* ============================================================
      TRAVEL PROMPT — nothing teleports on contact; it asks first.
      ============================================================ */
   .fa-scrim{position:fixed;inset:0;z-index:82;display:none;align-items:center;justify-content:center;
@@ -4457,6 +4514,13 @@
 <div class="toast" id="toast"></div>
 
 <button id="dict-back" onclick="closeDictPage()" aria-label="Back to the island">← Back to the island</button>
+<div class="rz-scrim" id="rz-scrim" onclick="if(event.target===this)rzClose()">
+  <div class="rz-card" id="rz-card"></div>
+</div>
+<div class="rz-say" id="rz-say">
+  <div class="rz-say-t"><b id="rz-say-who"></b><span id="rz-say-txt"></span></div>
+  <button class="rz-say-i" id="rz-say-i" aria-label="About this animal">i</button>
+</div>
 <div class="fa-scrim" id="fa-scrim">
   <div class="fa-card">
     <div class="fa-t" id="fa-title"></div>
@@ -4607,6 +4671,7 @@
   <div class="fw-map-pop" id="fw-map-pop" style="display:none"></div>
 </div>
 
+<script src="./residents.js"></script>
 <script src="./app.js"></script>
 <script src="./story-content.js"></script>
 <script src="./story.js"></script>
@@ -4745,6 +4810,44 @@
     if (window.__fwAnswer) window.__fwAnswer(!!yes);
   };
 
+  /* ---- residents ---- */
+  let rzCurrent = null;
+  document.addEventListener('focci-resident-tap', (e) => {
+    const d = e.detail || {};
+    rzCurrent = d.id;
+    const recs = window.resLoad ? window.resLoad() : [];
+    const rec = recs.find((r) => r.id === d.id);
+    if (!rec) return;
+    const say = document.getElementById('rz-say');
+    document.getElementById('rz-say-who').textContent = rec.name;
+    document.getElementById('rz-say-txt').textContent =
+      d.fed ? window.resLine(rec)
+            : d.reason === 'full' ? 'I could not eat another thing. Thank you though.'
+            : d.reason === 'no-xp' ? 'You have nothing spare today. Sit with me instead?'
+            : window.resLine(rec);
+    say.classList.add('show');
+    clearTimeout(say._t);
+    say._t = setTimeout(() => say.classList.remove('show'), 4200);
+  });
+  document.getElementById('rz-say-i').addEventListener('click', () => {
+    if (rzCurrent) rzOpen(rzCurrent);
+  });
+  window.rzOpen = function (id) {
+    const recs = window.resTick ? window.resTick() : (window.resLoad ? window.resLoad() : []);
+    const rec = recs.find((r) => r.id === id);
+    if (!rec) return;
+    rzCurrent = id;
+    document.getElementById('rz-card').innerHTML = window.resInfoHtml(rec);
+    document.documentElement.classList.add('rz-on');
+    document.getElementById('rz-say').classList.remove('show');
+  };
+  window.rzClose = function () { document.documentElement.classList.remove('rz-on'); };
+  window.resFeedFromCard = function (id) {
+    const res = window.resFeed ? window.resFeed(id) : null;
+    if (res && !res.ok && res.reason === 'no-xp' && window.fwToast) fwToast('Not enough XP today');
+    rzOpen(id);
+  };
+
   /* ---- the slide-in menu ---- */
   window.fmOpen = function () { document.documentElement.classList.add('menu-on'); };
   window.fmClose = function () { document.documentElement.classList.remove('menu-on'); };
@@ -4868,6 +4971,10 @@
      and in every arc room, since it just retargets the shared orbit rig.
      Pinch/drag still work from there, so it is a jump to an overview, not
      a locked mode. */
+  // Handy for jumping straight to a land, and for telling where you are.
+  window.fwRoom = function () { return worldApi && worldApi.currentRoom; };
+  window.fwGoRoom = function (k) { if (worldApi) worldApi.enterRoom(k); };
+
   window.fwOverview = function () {
     if (!worldApi || !worldApi.overviewCamera) return;
     worldApi.overviewCamera();

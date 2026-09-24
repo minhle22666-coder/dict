@@ -146,6 +146,10 @@ async function logEvent(type, word){
     // story passage — lands here, so this is the one place the word-bank's
     // "new word" detector needs to watch.
     if(type==='search' && word) histPush(word);
+    // Feeds the per-day word count the residents' adoption streak reads.
+    if(type==='search' && word && typeof window.resDayBump==='function'){
+      try{ window.resDayBump(); }catch(e){}
+    }
     if(type==='search' && word && typeof window.onWordSearched==='function'){
       try{ window.onWordSearched(word); }catch(e){}
     }
@@ -6682,5 +6686,9 @@ function wireOnboarding(){
   });
   syncSeedFiles().catch(()=>{});        // fire-and-forget — re-renders itself if it actually merged anything new
 })();
+/* getXP is a `const` arrow, so unlike a plain top-level `function` it never
+   became a window property — residents.js reads it through window and was
+   silently seeing 0 XP, so every feed was refused as "not enough". */
+window.getXP=getXP; window.getDailyXP=getDailyXP; window.getDailyGoal=getDailyGoal;
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;
 window.startReview=startReview; window.checkReview=checkReview; window.skipReview=skipReview; window.nextReview=nextReview;
