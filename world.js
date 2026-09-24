@@ -93,7 +93,7 @@ export async function bootFocciWorld(root, opts) {
   const sun = new THREE.DirectionalLight(0xffe7bd, 0.85);
   sun.position.set(46, 38, 40);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.mapSize.set(768, 768);
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 160;
   sun.shadow.camera.left = -34; sun.shadow.camera.right = 34;
@@ -106,7 +106,7 @@ export async function bootFocciWorld(root, opts) {
   const moon = new THREE.DirectionalLight(0xc8d8ff, 0);
   moon.position.set(-44, 34, -38);
   moon.castShadow = true;
-  moon.shadow.mapSize.set(1024, 1024);
+  moon.shadow.mapSize.set(768, 768);
   moon.shadow.camera.near = 1;
   moon.shadow.camera.far = 160;
   moon.shadow.camera.left = -34; moon.shadow.camera.right = 34;
@@ -423,6 +423,81 @@ export async function bootFocciWorld(root, opts) {
      wandered up onto it. Tagged by material name here; surfaceYIn reports
      the flag and everything that chooses a spot refuses one. */
   const BUILDING_MAT = /roof|home_body|window|totem|wood|door|chimney|fence|plank/i;
+  /* Static scenery, merged one mesh per material.
+
+     Measured before this: 789 draw calls per frame. Fox Island alone ships
+     532 separate meshes and the sky island another 558, and every one of
+     them is its own draw — on a phone that is the whole performance
+     problem. They never move, so there is no reason for them to stay
+     separate.
+
+     three.module.js here does not bundle BufferGeometryUtils (only the
+     error string telling you to use it), so this is a small hand-rolled
+     concatenation: position/normal/uv only, indices re-based, geometry
+     baked into the root's local space so the root's own transform still
+     applies exactly once.
+
+     Merging happens BEFORE tagWater/tagBuildings on purpose — both tag by
+     material, and after the merge there is exactly one mesh per material,
+     so the tags land on precisely the right geometry. */
+  function mergeStaticByMaterial(root3d) {
+    root3d.updateMatrixWorld(true);
+    const toRoot = root3d.matrixWorld.clone().invert();
+    const byMat = new Map();
+    const originals = [];
+    root3d.traverse((o) => {
+      if (!o.isMesh || o.isSkinnedMesh || !o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+      if (Array.isArray(o.material)) return;           // multi-material: leave alone
+      if (!byMat.has(o.material)) byMat.set(o.material, []);
+      byMat.get(o.material).push(o);
+      originals.push(o);
+    });
+    if (originals.length < 8) return 0;
+
+    let made = 0;
+    for (const [mat, list] of byMat) {
+      let vTotal = 0, iTotal = 0;
+      for (const m of list) {
+        vTotal += m.geometry.attributes.position.count;
+        iTotal += m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count;
+      }
+      const pos = new Float32Array(vTotal * 3);
+      const nor = new Float32Array(vTotal * 3);
+      const uv  = new Float32Array(vTotal * 2);
+      const idx = vTotal > 65535 ? new Uint32Array(iTotal) : new Uint16Array(iTotal);
+      let vOff = 0, iOff = 0;
+      const mtx = new THREE.Matrix4(), nmt = new THREE.Matrix3();
+      const v = new THREE.Vector3();
+      for (const m of list) {
+        mtx.multiplyMatrices(toRoot, m.matrixWorld);
+        nmt.getNormalMatrix(mtx);
+        const g = m.geometry, p = g.attributes.position, n = g.attributes.normal, u = g.attributes.uv;
+        for (let i = 0; i < p.count; i++) {
+          v.fromBufferAttribute(p, i).applyMatrix4(mtx);
+          pos[(vOff + i) * 3] = v.x; pos[(vOff + i) * 3 + 1] = v.y; pos[(vOff + i) * 3 + 2] = v.z;
+          if (n) { v.fromBufferAttribute(n, i).applyMatrix3(nmt).normalize();
+                   nor[(vOff + i) * 3] = v.x; nor[(vOff + i) * 3 + 1] = v.y; nor[(vOff + i) * 3 + 2] = v.z; }
+          if (u) { uv[(vOff + i) * 2] = u.getX(i); uv[(vOff + i) * 2 + 1] = u.getY(i); }
+        }
+        if (g.index) { for (let i = 0; i < g.index.count; i++) idx[iOff + i] = g.index.getX(i) + vOff; iOff += g.index.count; }
+        else { for (let i = 0; i < p.count; i++) idx[iOff + i] = vOff + i; iOff += p.count; }
+        vOff += p.count;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      geo.setIndex(new THREE.BufferAttribute(idx, 1));
+      geo.computeBoundingSphere();
+      const merged = new THREE.Mesh(geo, mat);
+      merged.name = 'merged_' + (mat.name || 'mat');
+      root3d.add(merged);
+      made++;
+    }
+    for (const o of originals) { if (o.parent) o.parent.remove(o); o.geometry.dispose(); }
+    return made;
+  }
+
   function tagBuildings(root3d) {
     root3d.traverse((n) => {
       if (n.isMesh && n.material && BUILDING_MAT.test(n.material.name || '')) n.userData.isBuilding = true;
@@ -558,7 +633,11 @@ export async function bootFocciWorld(root, opts) {
     // the first real frame rendered (by which point props were already
     // placed and baked into the wrong spot).
     hub.scene.updateMatrixWorld(true);
-    hub.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    mergeStaticByMaterial(hub.scene);
+    // receiveShadow only. The island is what shadows land ON; having it cast
+    // as well doubled it up in the shadow pass for no visible gain, since
+    // nothing of it is ever backlit against anything else.
+    hub.scene.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
     tagWater(hub.scene);
     tagBuildings(hub.scene);
     station.group.add(hub.scene);
@@ -674,8 +753,11 @@ export async function bootFocciWorld(root, opts) {
        straight through Fox Island. Span 24 shortens the tail to ~18 and a
        lawn at 52 puts its lowest rock at ~34 — clear of Fox Island's 31.6
        peak, and above GROUND_CEIL so no ground probe can ever find it. */
-    const SKY_SPAN = 24;
-    const SKY_OFFSET = { x: 21, y: 52, z: -17 };   // high, and off to one side
+    const SKY_SPAN = 34;                           // 40% bigger, as asked
+    // Raised to match: the rocky tail is 1063 model-units long, so at span 34
+    // it hangs 25.7 world-units below the lawn. A lawn at 62 puts its lowest
+    // rock at ~36 — still clear of Fox Island's 31.6 peak and of GROUND_CEIL.
+    const SKY_OFFSET = { x: 26, y: 62, z: -21 };   // high, and off to one side
     skyGlb.scene.updateMatrixWorld(true);
     const skyBox = new THREE.Box3().setFromObject(skyGlb.scene);
     const skySize = skyBox.getSize(new THREE.Vector3());
@@ -691,7 +773,8 @@ export async function bootFocciWorld(root, opts) {
       SKY_OFFSET.z - (skyBox.getCenter(new THREE.Vector3()).z) * skyScale
     );
     skyGlb.scene.updateMatrixWorld(true);
-    skyGlb.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    mergeStaticByMaterial(skyGlb.scene);
+    skyGlb.scene.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
     tagWater(skyGlb.scene);
     tagBuildings(skyGlb.scene);
     station.group.add(skyGlb.scene);
@@ -729,11 +812,14 @@ export async function bootFocciWorld(root, opts) {
     {
       const pBox = new THREE.Box3().setFromObject(pondGlb.scene);
       const pSize = pBox.getSize(new THREE.Vector3());
-      const pScale = (SKY_SPAN * 0.115) / Math.max(pSize.x, pSize.z);
+      // Right in the middle of the torii, which stands at model (0, ·, 80).
+      // Sized to sit inside the gate's 141-unit opening rather than swallow
+      // the posts.
+      const pScale = (SKY_SPAN * 0.085) / Math.max(pSize.x, pSize.z);
       pondGlb.scene.scale.setScalar(pScale);
-      const spot = skyPoint(105, LAWN_Y, 130);
+      const spot = skyPoint(0, LAWN_Y, 80);
       pondGlb.scene.position.set(spot.x, spot.y - pBox.min.y * pScale - 0.04, spot.z);
-      pondGlb.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      pondGlb.scene.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
       station.group.add(pondGlb.scene);
       if (pondGlb.animations && pondGlb.animations.length) {
         const pm = new THREE.AnimationMixer(pondGlb.scene);
@@ -863,6 +949,7 @@ export async function bootFocciWorld(root, opts) {
     const room = makeRoom(key, ARC_TITLES[i]);
     const gltf = arcGltfs[i];
     gltf.scene.updateMatrixWorld(true);
+    mergeStaticByMaterial(gltf.scene);
     const box = new THREE.Box3().setFromObject(gltf.scene);
     const size = box.getSize(new THREE.Vector3());
     const scale = 26 / Math.max(size.x, size.z);
@@ -1412,7 +1499,7 @@ export async function bootFocciWorld(root, opts) {
     } else if (type === 'sky-pad') {
       if (room.sky) {
         const g = room.sky.gate;
-        flyTo(room, { x: g.x, y: g.y + 0.2, z: g.z + 1.6 }, () => {
+        flyTo(room, { x: g.x, y: g.y + 0.2, z: g.z + 3.2 }, () => {
           root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'The gate lets Focci through. Everything up here smells of blossom.', kind: 'reaction' } }));
         });
       }

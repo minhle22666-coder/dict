@@ -937,17 +937,24 @@
   html.dict-open #v-home{
     position:fixed;inset:0;z-index:51;overflow-y:auto;-webkit-overflow-scrolling:touch;
     padding-bottom:calc(env(safe-area-inset-bottom,0px) + 76px);
-    /* Opaque and mostly white. The earlier wash let the island read through
-       wherever content ran out, so the page never felt like its own screen. */
-    background:linear-gradient(180deg,#FFFFFF 0%,#FAFEFE 38%,#EAF9F8 100%);
+    /* Frosted, not opaque. Fully white made it a flat slab; the island now
+       shows faintly through a heavy blur, which keeps the page clearly its
+       own screen without hiding the world behind it. */
+    background:linear-gradient(180deg,rgba(255,255,255,.82) 0%,rgba(246,253,253,.8) 38%,rgba(226,246,245,.78) 100%);
+    backdrop-filter:blur(26px) saturate(1.25);-webkit-backdrop-filter:blur(26px) saturate(1.25);
     --tint:#1FAFB4; --pri-l:#178E93; --pri-d:#67DEE1;
     --p1:#2FBFC3; --p2:#67DEE1; --p3:#9BEDEA; --primary:#1FAFB4;
     --a1:#67DEE1; --a2:#2AAFB4; --cta-ink:#04333A; --cta-glow:rgba(103,222,225,.5);
     --grad-hero:linear-gradient(135deg,#2FBFC3,#67DEE1);
     --cta:linear-gradient(180deg,#67DEE1 0%,#2AAFB4 100%);
-    --surface:#FFFFFF;
-    --surface-2:#F1FBFA;
-    --line:rgba(31,175,180,.18)}
+    --surface:rgba(255,255,255,.72);
+    --surface-2:rgba(240,251,250,.66);
+    --line:rgba(31,175,180,.2)}
+  /* The headword came through in the app's warm brown, which on a mint page
+     is the one thing that reads as belonging to a different design. */
+  html.dict-open #v-home .headword{color:#12787D}
+  html.dict-open #v-home .phon{color:#2A9AA0}
+  html.dict-open #v-home .entry{background:transparent}
   /* Two search bars were stacking over this page and the first one was
      eating the top of the entry.
 
@@ -986,10 +993,13 @@
     box-shadow:0 10px 24px rgba(4,51,58,.32)}
   html.dict-open #dict-back{display:flex}
   #dict-back:active{transform:scale(.95)}
-  /* The completed word becomes the way back into its entry. */
-  .fw-word-progress.done{cursor:pointer;color:#0B3F3A;
-    background:linear-gradient(180deg,#9BEDEA,#3FC3C7);
-    box-shadow:0 6px 18px rgba(4,51,58,.3)}
+  /* The completed word — glass rather than a solid slab of blue with black
+     text on it. It is the way back into the entry, so it stays tappable. */
+  .fw-word-progress.done{cursor:pointer;color:#EAFFFC;letter-spacing:.14em;
+    background:linear-gradient(180deg,rgba(120,236,226,.3),rgba(24,150,150,.34));
+    box-shadow:inset 0 0 0 1px rgba(190,250,244,.5),0 6px 20px rgba(4,51,58,.22);
+    backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);
+    text-shadow:0 1px 6px rgba(0,40,44,.45)}
   .fw-word-progress.done:active{transform:scale(.96)}
 
   /* ============================================================
@@ -4294,11 +4304,27 @@
       },
       onLetterProgress: (word, mask) => {
         const el = document.querySelector('#fw-word-progress');
-        if (el) { el.textContent = mask; el.classList.remove('done'); }
+        if (!el) return;
+        // A finished word stays on screen until the next one is actually
+        // under way. startNewWordHunt fires this immediately with a mask of
+        // all underscores, and clearing on that wiped the word the player
+        // had just completed the instant the respawn timer ticked.
+        const started = /[a-z]/i.test(mask);
+        if (el.classList.contains('done') && !started) return;
+        el.textContent = mask;
+        el.classList.remove('done');
       },
       onWordComplete: async (word) => {
         const rec = await idbGet(word);
-        if (rec) { showWordSheet(condensedEntryHTML(rec)); addXP(3); }
+        if (rec) {
+          showWordSheet(condensedEntryHTML(rec));
+          addXP(3);
+          // A word assembled letter by letter is a word the player worked
+          // for — log it like a real lookup so it lands in Recent searches
+          // and counts towards progress, and star it into Saved.
+          try { if (window.logEvent) logEvent('search', word); } catch (e) {}
+          try { if (window.toggleSave && !rec.saved) await toggleSave(word); } catch (e) {}
+        }
         // Keep the finished word tappable: the progress pill turns into a
         // button that reopens the full entry as many times as wanted,
         // rather than the sheet being a one-shot you can't get back.
