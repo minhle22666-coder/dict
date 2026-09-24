@@ -217,23 +217,18 @@ export async function bootFocciWorld(root, opts) {
       // confirmed visually (chest/diamond/letters/character all ended up
       // floating in open dark-blue void, detached from the visible mountain).
       // The TOPMOST hit is the real, visible, walkable surface — keep that.
-      /* Buildings only count as floor if you could plausibly step up onto
-         them. Taking the topmost hit meant a hut ROOF was the ground at
-         every column it covered, so Focci could land on the roof and never
-         get inside — the doorway was sealed by three metres of thatch as
-         far as the raycast was concerned. A roof is metres above the
-         terrain; a porch or a doorstep is not, so anything more than
-         STEP_UP above the next real surface underneath is ignored and he
-         walks in under it. */
-      const STEP_UP = 1.1;
-      let ground = null, firstBuilding = null;
-      for (const h of hits) {
-        if (h.point.y > lim) continue;
-        const isB = !!(h.object.userData && h.object.userData.isBuilding);
-        if (isB && firstBuilding === null) { firstBuilding = h; continue; }
-        ground = h; break;
-      }
-      if (firstBuilding && (!ground || firstBuilding.point.y - ground.point.y <= STEP_UP)) ground = firstBuilding;
+      /* Topmost hit, buildings included. An attempt to let Focci walk in
+         UNDER the roofs skipped the roof and took the next hit down — but
+         Fox Island's huts have no interior floor, so that next hit was the
+         underside of the island's own shell. Focci dropped through the
+         world and could not be seen or steered back out, and every prop
+         placed near a hut ended up hanging beneath the island. Going inside
+         needs interior geometry this model simply does not have.
+         The `building` flag below still keeps animals and props off the
+         roofs; only Focci may climb them, which is now how he reaches the
+         sky island. */
+      let ground = null;
+      for (const h of hits) { if (h.point.y <= lim) { ground = h; break; } }
       if (ground) {
         return {
           y: ground.point.y,
@@ -895,24 +890,39 @@ export async function bootFocciWorld(root, opts) {
     station.vineTree.glowSprite = glowSprite;
     station.vineTree.glowLight = treeLight;
 
-    /* The way up: a glowing pad on Fox Island. Tapping it flies Focci to the
-       gate; tapping the gate up there flies him home. */
+    /* The way up is the tallest roof on the island. Climb a hut, walk to
+       the very top of its cap, and the flight starts on its own — no pad to
+       tap, which is what was asked for.
+
+       The peak is found from the geometry rather than hand-placed: of the
+       meshes tagged as roofs, take the one that reaches highest, then
+       raycast straight down onto it at its own centre to get the exact
+       point of the cap. */
     {
-      const pad = findFlatGroundSpot(station, 4, 9, 1.4, 60);
-      const ring = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.25, 1.25, 0.08, 20),
-        new THREE.MeshStandardMaterial({ color: 0xFFB3DE, emissive: 0xFF7EC4, emissiveIntensity: 1.1, transparent: true, opacity: 0.85 })
-      );
-      ring.position.set(pad.x, pad.y + 0.05, pad.z);
-      ring.userData.interactType = 'sky-pad';
-      station.group.add(ring);
-      station.interactive.push(ring);
-      const padGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFF9ED2, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
-      padGlow.scale.setScalar(4);
-      padGlow.position.set(pad.x, pad.y + 1.2, pad.z);
-      station.group.add(padGlow);
-      station.skyPad = { obj: ring, glow: padGlow, x: pad.x, y: pad.y, z: pad.z };
-      // ...and the gate itself is the way back down.
+      let best = null;
+      station.collidables[0].traverse((o) => {
+        if (!o.isMesh || !o.userData.isBuilding) return;
+        if (!/roof|tejado/i.test((o.material && o.material.name) || '')) return;
+        const b = new THREE.Box3().setFromObject(o);
+        if (!best || b.max.y > best.max.y) best = b;
+      });
+      if (best) {
+        const c = best.getCenter(new THREE.Vector3());
+        const su = surfaceYIn(station, c.x, c.z, GROUND_CEIL);
+        const peakY = su.hit ? su.y : best.max.y;
+        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFF9ED2, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
+        halo.scale.setScalar(3.4);
+        halo.position.set(c.x, peakY + 1.1, c.z);
+        station.group.add(halo);
+        const beam = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.5, 0.9, 3.2, 12, 1, true),
+          new THREE.MeshBasicMaterial({ color: 0xFFB3DE, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })
+        );
+        beam.position.set(c.x, peakY + 1.6, c.z);
+        station.group.add(beam);
+        station.skyPad = { glow: halo, beam, x: c.x, y: peakY, z: c.z };
+      }
+      // The gate up top is the way back down.
       addInvisibleHitbox(station, gate.x, gate.y + SKY_SPAN * 0.045, gate.z, SKY_SPAN * 0.04, 'sky-gate');
     }
 
@@ -1125,6 +1135,18 @@ export async function bootFocciWorld(root, opts) {
       }
     }
     if (got) focciReact();
+    /* Standing on the cap lifts you. Checked here, once a frame, with a
+       height test as well as a distance one so walking past the hut at
+       ground level does nothing. */
+    if (room === station && room.skyPad && room.sky && !flight) {
+      const p = room.skyPad;
+      if (Math.hypot(p.x - cx, p.z - cz) < 1.5 && Math.abs(character.position.y - p.y) < 1.4) {
+        const g = room.sky.gate;
+        flyTo(room, { x: g.x, y: g.y + 0.2, z: g.z + 3.2 }, () => {
+          root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'The gate lets Focci through. Everything up here smells of blossom.', kind: 'reaction' } }));
+        });
+      }
+    }
   }
   function collectLetter(l) {
     if (l.found) return;
@@ -1327,7 +1349,9 @@ export async function bootFocciWorld(root, opts) {
       // the view and the controls can never disagree.
       const eyeY = character.position.y + 1.18;
       camera.position.set(charState.x, eyeY, charState.z);
-      camera.lookAt(charState.x - Math.sin(cam.theta) * 8, eyeY - 0.9, charState.z - Math.cos(cam.theta) * 8);
+      // Barely tilted down (~3 degrees over 8 units). At -0.9 the gaze ran
+      // into the ground on any slope and the screen filled with dirt.
+      camera.lookAt(charState.x - Math.sin(cam.theta) * 8, eyeY - 0.4, charState.z - Math.cos(cam.theta) * 8);
       return;
     }
     const sinPhi = Math.sin(cam.phi);
@@ -1432,8 +1456,11 @@ export async function bootFocciWorld(root, opts) {
     raycaster.setFromCamera(ndcVec, camera);
     const room = activeRoom();
     const hits = raycaster.intersectObjects(room.interactive, true);
-    if (!hits.length) return;
-    let root3d = hits[0].object;
+    // No early return on an empty ray. That `if (!hits.length) return;` sat
+    // ABOVE the double-tap branch below, so tapping open ground or sky —
+    // the only place you would ever double-tap — bailed out before the
+    // camera toggle could ever be reached. It never once fired.
+    let root3d = hits.length ? hits[0].object : null;
     while (root3d && !root3d.userData.interactType && root3d.parent) root3d = root3d.parent;
     if (!root3d || !root3d.userData.interactType) {
       // Nothing interactive under the finger: a second tap here within
@@ -1511,13 +1538,6 @@ export async function bootFocciWorld(root, opts) {
       onOpenArc(idx, ARC_TITLES[idx]);
     } else if (type === 'teleport-home') {
       enterRoom('station', station.spawn);
-    } else if (type === 'sky-pad') {
-      if (room.sky) {
-        const g = room.sky.gate;
-        flyTo(room, { x: g.x, y: g.y + 0.2, z: g.z + 3.2 }, () => {
-          root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'The gate lets Focci through. Everything up here smells of blossom.', kind: 'reaction' } }));
-        });
-      }
     } else if (type === 'sky-gate') {
       if (room.skyPad) {
         const p = room.skyPad;
@@ -1755,8 +1775,11 @@ export async function bootFocciWorld(root, opts) {
       room.wordTreasure.obj.position.y = room.wordTreasure.y + 0.6 + Math.sin(t * 1.6) * 0.1;
     }
     if (room.skyPad && room.skyPad.glow) {
-      room.skyPad.glow.material.opacity = 0.45 + Math.sin(t * 2.1) * 0.18;
-      room.skyPad.obj.material.emissiveIntensity = 0.9 + Math.sin(t * 2.1) * 0.35;
+      room.skyPad.glow.material.opacity = 0.42 + Math.sin(t * 2.1) * 0.18;
+      if (room.skyPad.beam) {
+        room.skyPad.beam.material.opacity = 0.16 + Math.sin(t * 2.1) * 0.08;
+        room.skyPad.beam.rotation.y = t * 0.5;
+      }
     }
     if (room.sky && room.sky.halo) {
       room.sky.halo.material.opacity = 0.24 + Math.sin(t * 0.8) * 0.08;
