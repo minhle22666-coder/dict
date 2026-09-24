@@ -423,7 +423,7 @@ export async function bootFocciWorld(root, opts) {
     hub, mushGlb, chestGlb, birdGlb, treeGlb, doeGlb, diamondGlb,
     ...arcGltfs
   ] = await Promise.all([
-    loadGLB(ASSET('hub-island.glb')),
+    loadGLB(ASSET('fox-island.glb')),
     loadGLB(ASSET('mushrooms.glb')),
     loadGLB(ASSET('chest.glb')),
     loadGLB(ASSET('birds.glb')),
@@ -478,7 +478,7 @@ export async function bootFocciWorld(root, opts) {
   }
 
   /* ============================================================
-     STATION ROOM (hub) — built on the flying island you sent
+     STATION ROOM (hub) — Fox Island
      ============================================================ */
   const station = makeRoom('station', 'Station');
   {
@@ -999,20 +999,22 @@ export async function bootFocciWorld(root, opts) {
   });
   const tail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.5), orangeMat); tail.position.set(0, 0.55, -0.38); tail.rotation.x = 0.4; character.add(tail);
   const tailTip = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.16), creamMat); tailTip.position.set(0, 0.68, -0.6); character.add(tailTip);
+  /* TWO legs, centred — adding arms to the original four left him with six
+     limbs. The front pair is gone and the back pair moved to z 0, so he
+     stands on two feet under the middle of his body. */
   const legGeo = new THREE.BoxGeometry(0.16, 0.26, 0.16);
-  const legFL = new THREE.Mesh(legGeo, darkMat); legFL.position.set(-0.18, 0.13, 0.14); character.add(legFL);
-  const legFR = new THREE.Mesh(legGeo, darkMat); legFR.position.set(0.18, 0.13, 0.14); character.add(legFR);
-  const legBL = new THREE.Mesh(legGeo, darkMat); legBL.position.set(-0.18, 0.13, -0.14); character.add(legBL);
-  const legBR = new THREE.Mesh(legGeo, darkMat); legBR.position.set(0.18, 0.13, -0.14); character.add(legBR);
+  const legL = new THREE.Mesh(legGeo, darkMat); legL.position.set(-0.17, 0.13, 0); character.add(legL);
+  const legR = new THREE.Mesh(legGeo, darkMat); legR.position.set(0.17, 0.13, 0); character.add(legR);
 
-  // the arms — the only addition
-  const armGeo = new THREE.BoxGeometry(0.13, 0.26, 0.14);
+  // Arms, on shoulder pivots so they swing from the shoulder. The hands are
+  // darkMat — the same brown as the feet.
+  const armGeo = new THREE.BoxGeometry(0.13, 0.22, 0.14);
+  const handGeo = new THREE.BoxGeometry(0.15, 0.1, 0.16);
   const makeArm = (x) => {
     const pivot = new THREE.Group();
     pivot.position.set(x, 0.66, 0.02);
-    const m = new THREE.Mesh(armGeo, orangeMat);
-    m.position.y = -0.13;
-    pivot.add(m);
+    const m = new THREE.Mesh(armGeo, orangeMat); m.position.y = -0.11; pivot.add(m);
+    const hand = new THREE.Mesh(handGeo, darkMat); hand.position.y = -0.26; pivot.add(hand);
     character.add(pivot);
     return pivot;
   };
@@ -1434,7 +1436,8 @@ export async function bootFocciWorld(root, opts) {
     const surf = surfaceYIn(room, charState.x, charState.z);
     charState.inWater = surf.water;
     const swing = (walking && !surf.water) ? Math.sin(charState.walkT) * 0.55 : 0;
-    legFL.rotation.x = swing; legBR.rotation.x = swing; legFR.rotation.x = -swing; legBL.rotation.x = -swing;
+    // Biped gait: each arm swings opposite the leg on its own side.
+    legL.rotation.x = swing; legR.rotation.x = -swing;
     armL.rotation.x = -swing; armR.rotation.x = swing;
     const bob = surf.water ? Math.sin(t * 3) * 0.05 - 0.32 : (walking ? Math.abs(Math.sin(charState.walkT)) * 0.07 : Math.sin(t * 1.6) * 0.02);
     // Jump arc rides on top of whatever the terrain is doing underneath, so
@@ -1451,7 +1454,7 @@ export async function bootFocciWorld(root, opts) {
     // jump reads as the whole model being slid upward.
     if (charState.jumpY > 0.02) {
       const k = Math.min(1, charState.jumpY / 1.2);
-      legFL.rotation.x = legFR.rotation.x = legBL.rotation.x = legBR.rotation.x = -0.8 * k;
+      legL.rotation.x = legR.rotation.x = -0.8 * k;
       armL.rotation.x = armR.rotation.x = -1.5 * k;
     }
     character.position.set(charState.x, surf.y + bob + charState.jumpY, charState.z);
