@@ -69,6 +69,24 @@ export async function bootFocciWorld(root, opts) {
   /* ============================================================
      DAY / NIGHT — driven by the visitor's real clock
      ============================================================ */
+  /* Every water material in the scene, so the sea can be lit from inside
+     after dark rather than just going dark with everything else. */
+  /* Props and wander targets stay below the sky island. Measured on the
+     real scene: Fox Island's own walkable surface runs y 6.1 to 29.7 (it has
+     a tall central plateau), and the sky island's rocky underside bottoms
+     out at 33.9 — so 32 sits in the gap. The first guess of 16 was cutting
+     off the entire upper half of Fox Island, which would have stopped
+     anything being placed on the plateau at all.
+     Declared up here with waterMats for the same reason: station setup uses
+     it long before the camera section further down would initialise it. */
+  const GROUND_CEIL = 32;
+  const waterMats = [];
+  const WATER_GLOW = new THREE.Color(0x2FA8FF);
+  // Declared up here, not beside tagWater: updateDayNight() runs during
+  // setup, well before tagWater is ever reached, and a `const` further down
+  // the same scope is in its temporal dead zone at that point — boot died
+  // with "Cannot access 'waterMats' before initialization".
+
   const hemi = new THREE.HemisphereLight(0xfff3e6, 0x6a8a63, 0.85);
   // Warm, low and casting — a high overhead sun throws no visible shadow,
   // which is half of why there was no sense of morning light on the island.
@@ -143,6 +161,14 @@ export async function bootFocciWorld(root, opts) {
     moonDisc.material.opacity = 1 - d;
     sunHalo.material.opacity = d * 0.85;
     moonHalo.material.opacity = (1 - d) * 0.6;
+    // The sea lights up once the sun is gone — a deep blue glow from within
+    // the water itself, brightest at full night.
+    const night = 1 - d;
+    for (const m of waterMats) {
+      m.emissive.copy(WATER_GLOW);
+      m.emissiveIntensity = night * 0.85;
+      m.needsUpdate = false;
+    }
   }
   updateDayNight();
   setInterval(updateDayNight, 30000); // real clock moves slowly; no need to check every frame
@@ -173,7 +199,13 @@ export async function bootFocciWorld(root, opts) {
      footprint — a fixed radius that looked fine on one island shape can
      land in empty space on another. findGroundSpot() below uses this to
      retry instead of guessing. */
-  function surfaceYIn(room, x, z) {
+  /* `ceil` matters now that the sky island hangs over Fox Island. Every
+     probe used to start at y 200 and take the topmost hit, which under the
+     sky island is the sky island — Focci would have been walking around 27
+     units in the air, and every prop would have been placed up there. Pass
+     the height to search from and the first hit at or below it wins. */
+  function surfaceYIn(room, x, z, ceil) {
+    const lim = (ceil === undefined) ? Infinity : ceil;
     for (const obj of room.collidables) {
       raycaster.set(new THREE.Vector3(x, 200, z), DOWN);
       const hits = raycaster.intersectObject(obj, true);
@@ -185,9 +217,15 @@ export async function bootFocciWorld(root, opts) {
       // confirmed visually (chest/diamond/letters/character all ended up
       // floating in open dark-blue void, detached from the visible mountain).
       // The TOPMOST hit is the real, visible, walkable surface — keep that.
-      if (hits.length) {
-        const ground = hits[0];
-        return { y: ground.point.y, water: !!(ground.object.userData && ground.object.userData.isWater), hit: true };
+      let ground = null;
+      for (const h of hits) { if (h.point.y <= lim) { ground = h; break; } }
+      if (ground) {
+        return {
+          y: ground.point.y,
+          water: !!(ground.object.userData && ground.object.userData.isWater),
+          building: !!(ground.object.userData && ground.object.userData.isBuilding),
+          hit: true
+        };
       }
     }
     return { y: heightAtFallback(x, z), water: false, hit: false };
@@ -204,7 +242,7 @@ export async function bootFocciWorld(root, opts) {
   function isStableGround(room, x, z, y) {
     const NEIGHBOR_R = 0.7, MAX_STEP = 1.5;
     for (const [dx, dz] of [[NEIGHBOR_R, 0], [-NEIGHBOR_R, 0], [0, NEIGHBOR_R], [0, -NEIGHBOR_R]]) {
-      const n = surfaceYIn(room, x + dx, z + dz);
+      const n = surfaceYIn(room, x + dx, z + dz, GROUND_CEIL);
       if (!n.hit || n.water || Math.abs(n.y - y) > MAX_STEP) return false;
     }
     return true;
@@ -221,7 +259,7 @@ export async function bootFocciWorld(root, opts) {
   function isReachableFromSpawn(room, x, z, y) {
     const STEPS = 10, MAX_JUMP = 2.2, MAX_TOTAL_DROP = 5;
     const sx = room.spawn.x, sz = room.spawn.z;
-    const startY = surfaceYIn(room, sx, sz).y;
+    const startY = surfaceYIn(room, sx, sz, GROUND_CEIL).y;
     // Per-step continuity alone isn't enough: a long, gradual, perfectly
     // "walkable" slope can still end up 15-20 units below where Focci
     // actually starts (found by comparing a prop's stored placement to its
@@ -237,7 +275,7 @@ export async function bootFocciWorld(root, opts) {
     for (let i = 1; i <= STEPS; i++) {
       const t = i / STEPS;
       const px = sx + (x - sx) * t, pz = sz + (z - sz) * t;
-      const s = surfaceYIn(room, px, pz);
+      const s = surfaceYIn(room, px, pz, GROUND_CEIL);
       if (!s.hit || s.water || Math.abs(s.y - prevY) > MAX_JUMP) return false;
       prevY = s.y;
     }
@@ -251,10 +289,12 @@ export async function bootFocciWorld(root, opts) {
     for (let i = 0; i < tries; i++) {
       const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      const surf = surfaceYIn(room, x, z);
-      if (surf.hit && !surf.water && isStableGround(room, x, z, surf.y) && isReachableFromSpawn(room, x, z, surf.y)) return { x, z, y: surf.y };
+      const surf = surfaceYIn(room, x, z, GROUND_CEIL);
+      if (surf.hit && !surf.water && !surf.building && isStableGround(room, x, z, surf.y) && isReachableFromSpawn(room, x, z, surf.y)) return { x, z, y: surf.y };
     }
-    return { x: room.spawn.x, z: room.spawn.z, y: surfaceYIn(room, room.spawn.x, room.spawn.z).y }; // last resort: spawn itself, definitely valid
+    // Ceiling here too — without it this fallback probed straight up into
+    // the sky island and handed back a spot 24 units in the air.
+    return { x: room.spawn.x, z: room.spawn.z, y: surfaceYIn(room, room.spawn.x, room.spawn.z, GROUND_CEIL).y };
   }
   /* Same as findGroundSpot, but samples only within [angleFrom,angleTo) —
      used to spread the 4 teleport diamonds one per compass quadrant so they
@@ -265,8 +305,8 @@ export async function bootFocciWorld(root, opts) {
     for (let i = 0; i < tries; i++) {
       const a = angleFrom + Math.random() * (angleTo - angleFrom), r = minR + Math.random() * (maxR - minR);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      const surf = surfaceYIn(room, x, z);
-      if (surf.hit && !surf.water && isStableGround(room, x, z, surf.y) && isReachableFromSpawn(room, x, z, surf.y)) return { x, z, y: surf.y };
+      const surf = surfaceYIn(room, x, z, GROUND_CEIL);
+      if (surf.hit && !surf.water && !surf.building && isStableGround(room, x, z, surf.y) && isReachableFromSpawn(room, x, z, surf.y)) return { x, z, y: surf.y };
     }
     return findGroundSpot(room, minR, maxR, tries); // fall back to the full circle
   }
@@ -296,7 +336,7 @@ export async function bootFocciWorld(root, opts) {
       let lo = spot.y, hi = spot.y, ok = true;
       for (let a = 0; a < 8; a++) {
         const ang = (Math.PI / 4) * a;
-        const surf = surfaceYIn(room, spot.x + Math.cos(ang) * footprint, spot.z + Math.sin(ang) * footprint);
+        const surf = surfaceYIn(room, spot.x + Math.cos(ang) * footprint, spot.z + Math.sin(ang) * footprint, GROUND_CEIL);
         if (!surf.hit || surf.water) { ok = false; break; }
         lo = Math.min(lo, surf.y); hi = Math.max(hi, surf.y);
       }
@@ -377,6 +417,18 @@ export async function bootFocciWorld(root, opts) {
     });
   }
 
+  /* Fox Island ships with huts, fences and a totem, and a downward raycast
+     returns the ROOF as the topmost hit at those columns — so the doe (and
+     every animal that follows) treated a rooftop as ordinary ground and
+     wandered up onto it. Tagged by material name here; surfaceYIn reports
+     the flag and everything that chooses a spot refuses one. */
+  const BUILDING_MAT = /roof|home_body|window|totem|wood|door|chimney|fence|plank/i;
+  function tagBuildings(root3d) {
+    root3d.traverse((n) => {
+      if (n.isMesh && n.material && BUILDING_MAT.test(n.material.name || '')) n.userData.isBuilding = true;
+    });
+  }
+
   function tagWater(root3d) {
     root3d.traverse((n) => {
       if (n.isMesh && n.material && n.material.transparent && n.material.color) {
@@ -388,7 +440,12 @@ export async function bootFocciWorld(root, opts) {
         // landing on it as if it were dry ground. Water reads as
         // cyan-ish: red clearly low, green AND blue both clearly above
         // red, not "blue is the single highest channel."
-        if (c.r < 0.25 && c.b > 0.3 && c.g > c.r * 1.8 && c.b > c.r * 1.8) n.userData.isWater = true;
+        if (c.r < 0.25 && c.b > 0.3 && c.g > c.r * 1.8 && c.b > c.r * 1.8) {
+          n.userData.isWater = true;
+          // Collected so updateDayNight can light them from within after
+          // dark — see waterMats below.
+          if (n.material.emissive && waterMats.indexOf(n.material) === -1) waterMats.push(n.material);
+        }
       }
     });
   }
@@ -420,14 +477,15 @@ export async function bootFocciWorld(root, opts) {
   const ARC_ENV_FILES = ['island.glb', 'camp.glb', 'waterfall.glb', 'secretcamp.glb'];
   const arcCount = Math.min(ARC_TITLES.length, 4);
   const [
-    hub, mushGlb, chestGlb, birdGlb, treeGlb, doeGlb, diamondGlb,
+    hub, mushGlb, chestGlb, birdGlb, skyGlb, pondGlb, doeGlb, diamondGlb,
     ...arcGltfs
   ] = await Promise.all([
     loadGLB(ASSET('fox-island.glb')),
     loadGLB(ASSET('mushrooms.glb')),
     loadGLB(ASSET('chest.glb')),
     loadGLB(ASSET('birds.glb')),
-    loadGLB(ASSET('vine-tree.glb')),
+    loadGLB(ASSET('sky-island.glb')),
+    loadGLB(ASSET('pond.glb')),
     loadGLB(ASSET('doe.glb')),
     loadGLB(ASSET('teleport-diamond.glb')),
     ...Array.from({ length: arcCount }, (_, i) => loadGLB(ASSET(ARC_ENV_FILES[i]))),
@@ -502,6 +560,7 @@ export async function bootFocciWorld(root, opts) {
     hub.scene.updateMatrixWorld(true);
     hub.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     tagWater(hub.scene);
+    tagBuildings(hub.scene);
     station.group.add(hub.scene);
     station.collidables.push(hub.scene);
     station.spawn = { x: 0, z: box.getCenter(new THREE.Vector3()).z * scale * 0.15 };
@@ -594,81 +653,131 @@ export async function bootFocciWorld(root, opts) {
     station._birdOrbit = { r: 18, speed: 0.15, y: 20 };
     station._birdRig = birdGlb.scene;
 
-    // vine tree + doe — findGroundSpot instead of a fixed {x:-6,z:5} guess,
-    // which was tuned for the old, smaller island and not guaranteed to
-    // land on solid ground on this one (or the new 1.5x-bigger hub)
-    const treeBox = new THREE.Box3().setFromObject(treeGlb.scene);
-    const treeRaw = treeBox.getSize(new THREE.Vector3());
-    // Sized by HEIGHT, not footprint: this is the island's one landmark and
-    // it should stand over everything else. 6/width gave a ~7-unit tree;
-    // 9.5/height makes it read as tall from across the island.
-    const treeScale = 9.5 / Math.max(treeRaw.y, 0.0001);
-    treeGlb.scene.scale.setScalar(treeScale);
-    /* vine-tree.glb ships with its own little diorama base — one wide, flat
-       slab (1.02 x 0.08 x 0.83) sitting under everything else, which is the
-       "khúc đất xanh" left poking out of the hub's terrain. Rather than
-       deleting it (the roots interleave with it), find it by shape — the
-       lowest mesh that is far wider than it is thick — and bury it: anchor
-       the tree by the slab's TOP instead of the model's bounding-box
-       bottom, so the slab and the root tips below it end up underground. */
-    let slabTop = null;
-    treeGlb.scene.traverse((o) => {
-      if (!o.isMesh || !o.geometry) return;
-      o.geometry.computeBoundingBox();
-      const b = o.geometry.boundingBox, h = b.max.y - b.min.y, w = Math.max(b.max.x - b.min.x, b.max.z - b.min.z);
-      if (h < 0.2 && w > h * 6 && b.min.y < treeBox.min.y + 0.12) {
-        // Hidden outright, not merely sunk. At the scale this tree now runs
-        // at, that 1.02 x 0.83 slab becomes a ~7 x 6 unit lawn — sinking it
-        // by its own 0.08 thickness left most of it still showing through
-        // every rise in the terrain underneath.
-        o.visible = false;
-        slabTop = (slabTop === null) ? b.max.y : Math.max(slabTop, b.max.y);
-      }
-    });
-    // Anchor at the slab's top so the root tips that dipped into it end up
-    // just under the hub's own ground rather than hanging in the open.
-    const treeAnchorY = (slabTop !== null ? slabTop : treeBox.min.y);
-    // Anchor to the lowest ground under the canopy's footprint, not the
-    // centre sample: on even slightly uneven ground that is the difference
-    // between roots resting on the surface and roots hanging in the air.
-    // Two different radii, on purpose. The SELECTION looks at a 2.2-unit
-    // ring (roughly the canopy) so the tree doesn't end up straddling a
-    // ledge, but the ANCHOR height is taken from a 0.7-unit ring — the
-    // trunk's actual footprint. Anchoring to the canopy ring buried the
-    // trunk 1.07 units into a rise at the centre; anchoring to the centre
-    // alone left roots hanging over the low side. The trunk has to meet the
-    // ground where the trunk is.
-    const treeSpot = findFlatGroundSpot(station, 2.5, 9, 2.2, 90);
-    let treeBaseY = treeSpot.y;
-    for (let a = 0; a < 8; a++) {
-      const ang = (Math.PI / 4) * a;
-      const su = surfaceYIn(station, treeSpot.x + Math.cos(ang) * 0.7, treeSpot.z + Math.sin(ang) * 0.7);
-      if (su.hit && !su.water) treeBaseY = Math.min(treeBaseY, su.y);
-    }
-    const treeGroundedY = treeBaseY - treeAnchorY * treeScale;
-    treeGlb.scene.position.set(treeSpot.x, treeGroundedY, treeSpot.z);
-    station.group.add(treeGlb.scene);
-    // Same gappy-vine-leaf tap problem as the scattered trees — an invisible
-    // hitbox covering the tree's silhouette instead of its actual leafy mesh.
-    const treeSize = treeBox.getSize(new THREE.Vector3());
-    addInvisibleHitbox(station, treeSpot.x, treeGroundedY + treeSize.y * treeScale * 0.45, treeSpot.z, Math.max(treeSize.x, treeSize.z) * treeScale * 0.6, 'vine-tree');
-    treeGlb.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    station.vineTree = { obj: treeGlb.scene, x: treeSpot.x, z: treeSpot.z };
+    /* ============================================================
+       THE SKY ISLAND
 
-    // "wisdom tree" glow — a warm point light plus a soft additive sprite
-    // glowing at the canopy, so it reads as the map's one magical landmark
-    // rather than just another tree
-    const treeGlowColor = 0xffd98a;
-    const treeLight = new THREE.PointLight(treeGlowColor, 1.4, 14, 2);
-    treeLight.position.set(treeSpot.x, treeGroundedY + treeBox.getSize(new THREE.Vector3()).y * treeScale * 0.6, treeSpot.z);
+       vine-tree.glb is gone; the wisdom tree is now the cherry blossom on
+       this floating island, which hangs in the air over Fox Island and is
+       reached by flying up to its torii gate.
+
+       Placed deliberately OFF-CENTRE and to one side: directly overhead it
+       would sit on top of the player's own camera for most of the game.
+
+       Everything below is measured out of the model rather than guessed —
+       torii gate at (0, 306, 80), green lawn topping out at y 262, the
+       cherry trunks clustered near (-15, 88). Those are model-space, so
+       they all go through skyPoint() to come back as world coordinates.
+       ============================================================ */
+    /* Sized and lifted from measurements, not taste: the model trails a long
+       rocky underside 1063 model-units below its lawn, so at the first try
+       (span 34, lawn at 27) that tail reached down to y 1.3 and hung
+       straight through Fox Island. Span 24 shortens the tail to ~18 and a
+       lawn at 52 puts its lowest rock at ~34 — clear of Fox Island's 31.6
+       peak, and above GROUND_CEIL so no ground probe can ever find it. */
+    const SKY_SPAN = 24;
+    const SKY_OFFSET = { x: 21, y: 52, z: -17 };   // high, and off to one side
+    skyGlb.scene.updateMatrixWorld(true);
+    const skyBox = new THREE.Box3().setFromObject(skyGlb.scene);
+    const skySize = skyBox.getSize(new THREE.Vector3());
+    const skyScale = SKY_SPAN / Math.max(skySize.x, skySize.z);
+    skyGlb.scene.scale.setScalar(skyScale);
+    // Anchor by the LAWN, not the bounding box: the model hangs a long rocky
+    // underside below the island, and anchoring on that would push the part
+    // you actually stand on far higher than SKY_OFFSET.y asks for.
+    const LAWN_Y = 262;
+    skyGlb.scene.position.set(
+      SKY_OFFSET.x - (skyBox.getCenter(new THREE.Vector3()).x) * skyScale,
+      SKY_OFFSET.y - LAWN_Y * skyScale,
+      SKY_OFFSET.z - (skyBox.getCenter(new THREE.Vector3()).z) * skyScale
+    );
+    skyGlb.scene.updateMatrixWorld(true);
+    skyGlb.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    tagWater(skyGlb.scene);
+    tagBuildings(skyGlb.scene);
+    station.group.add(skyGlb.scene);
+    station.collidables.push(skyGlb.scene);
+
+    // model space -> world space, for the landmarks measured above
+    const skyPoint = (mx, my, mz) => new THREE.Vector3(mx, my, mz)
+      .multiplyScalar(skyScale).add(skyGlb.scene.position);
+
+    const gate = skyPoint(0, 250, 80);          // Torii-Gris, the gate's base plate
+    // Offset well away from the gate: the trunk group's bounding-box centre
+    // sits almost on the torii, and the two hitboxes were overlapping.
+    const sakura = skyPoint(-135, 268, 40);     // the big cherry, at lawn height
+    station.sky = { obj: skyGlb.scene, scale: skyScale, gate, sakura, offset: SKY_OFFSET };
+
+    /* Pink halo, so it reads as the magical place rather than scenery: a
+       broad additive sprite plus a rose light that actually tints the
+       island's own geometry. */
+    const skyGlowTex = makeGlowTexture();
+    const skyHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: skyGlowTex, color: 0xFF9ED2, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }));
+    skyHalo.scale.setScalar(SKY_SPAN * 1.05);
+    skyHalo.position.set(SKY_OFFSET.x, SKY_OFFSET.y + 2, SKY_OFFSET.z);
+    station.group.add(skyHalo);
+    // Kept gentle: at 2.2 the halo plus the light blew the whole island out
+    // to near-white and you could not see the blossom at all.
+    const skyLight = new THREE.PointLight(0xFF8FC8, 0.75, SKY_SPAN * 1.3, 2);
+    skyLight.position.set(SKY_OFFSET.x, SKY_OFFSET.y + 5, SKY_OFFSET.z);
+    station.group.add(skyLight);
+    station.sky.halo = skyHalo;
+    station.sky.light = skyLight;
+
+    /* The pond, with its fish swimming, set on the lawn beside the gate —
+       the spot circled on the reference. Its own animation clip is played
+       on the station's mixer list so the fish keep moving. */
+    {
+      const pBox = new THREE.Box3().setFromObject(pondGlb.scene);
+      const pSize = pBox.getSize(new THREE.Vector3());
+      const pScale = (SKY_SPAN * 0.115) / Math.max(pSize.x, pSize.z);
+      pondGlb.scene.scale.setScalar(pScale);
+      const spot = skyPoint(105, LAWN_Y, 130);
+      pondGlb.scene.position.set(spot.x, spot.y - pBox.min.y * pScale - 0.04, spot.z);
+      pondGlb.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      station.group.add(pondGlb.scene);
+      if (pondGlb.animations && pondGlb.animations.length) {
+        const pm = new THREE.AnimationMixer(pondGlb.scene);
+        pondGlb.animations.forEach((c) => pm.clipAction(c).play());
+        station.pondMixer = pm;
+      }
+      station.sky.pond = pondGlb.scene;
+    }
+
+    /* The cherry blossom is the wisdom tree now — same interactType, so the
+       listening moment, the camera swing and the quote all still work. */
+    addInvisibleHitbox(station, sakura.x, sakura.y + SKY_SPAN * 0.09, sakura.z, SKY_SPAN * 0.055, 'vine-tree');
+    station.vineTree = { obj: skyGlb.scene, x: sakura.x, z: sakura.z };
+    const treeGlowColor = 0xFFC7E4;
+    const treeLight = new THREE.PointLight(treeGlowColor, 0.9, SKY_SPAN * 0.45, 2);
+    treeLight.position.set(sakura.x, sakura.y + SKY_SPAN * 0.13, sakura.z);
     station.group.add(treeLight);
-    const glowTex = makeGlowTexture();
-    const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: treeGlowColor, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
-    glowSprite.scale.setScalar(7);
+    const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: treeGlowColor, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
+    glowSprite.scale.setScalar(SKY_SPAN * 0.2);
     glowSprite.position.copy(treeLight.position);
     station.group.add(glowSprite);
     station.vineTree.glowSprite = glowSprite;
     station.vineTree.glowLight = treeLight;
+
+    /* The way up: a glowing pad on Fox Island. Tapping it flies Focci to the
+       gate; tapping the gate up there flies him home. */
+    {
+      const pad = findFlatGroundSpot(station, 4, 9, 1.4, 60);
+      const ring = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.25, 1.25, 0.08, 20),
+        new THREE.MeshStandardMaterial({ color: 0xFFB3DE, emissive: 0xFF7EC4, emissiveIntensity: 1.1, transparent: true, opacity: 0.85 })
+      );
+      ring.position.set(pad.x, pad.y + 0.05, pad.z);
+      ring.userData.interactType = 'sky-pad';
+      station.group.add(ring);
+      station.interactive.push(ring);
+      const padGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFF9ED2, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
+      padGlow.scale.setScalar(4);
+      padGlow.position.set(pad.x, pad.y + 1.2, pad.z);
+      station.group.add(padGlow);
+      station.skyPad = { obj: ring, glow: padGlow, x: pad.x, y: pad.y, z: pad.z };
+      // ...and the gate itself is the way back down.
+      addInvisibleHitbox(station, gate.x, gate.y + SKY_SPAN * 0.045, gate.z, SKY_SPAN * 0.04, 'sky-gate');
+    }
 
     const doeMixer = new THREE.AnimationMixer(doeGlb.scene);
     const clipByName = {};
@@ -688,8 +797,10 @@ export async function bootFocciWorld(root, opts) {
     // wandered onto different terrain it was flying. Fixed by re-sampling
     // the surface every frame it moves — see groundDoe() in tickDoe.
     const doeFootOffset = 0;
-    const doeSurf = surfaceYIn(station, treeSpot.x + 2.5, treeSpot.z + 1.5);
-    const doeSpot = doeSurf.hit ? { x: treeSpot.x + 2.5, z: treeSpot.z + 1.5, y: doeSurf.y } : { x: treeSpot.x, z: treeSpot.z, y: treeBaseY };
+    // The doe used to live beside the vine tree; with that gone she gets
+    // her own validated patch of Fox Island.
+    const doeHome = findFlatGroundSpot(station, 4, 10, 1.2, 40);
+    const doeSpot = { x: doeHome.x, z: doeHome.z, y: doeHome.y };
     doeGlb.scene.position.set(doeSpot.x, doeSpot.y - doeFootOffset, doeSpot.z);
     station.group.add(doeGlb.scene);
     station.doe = {
@@ -725,7 +836,7 @@ export async function bootFocciWorld(root, opts) {
         let lo = cand.y, hi = cand.y, ok = true;
         for (let a = 0; a < 6; a++) {
           const ang = (Math.PI / 3) * a;
-          const su = surfaceYIn(station, cand.x + Math.cos(ang) * 1.1, cand.z + Math.sin(ang) * 1.1);
+          const su = surfaceYIn(station, cand.x + Math.cos(ang) * 1.1, cand.z + Math.sin(ang) * 1.1, GROUND_CEIL);
           if (!su.hit || su.water) { ok = false; break; }
           lo = Math.min(lo, su.y); hi = Math.max(hi, su.y);
         }
@@ -1026,6 +1137,21 @@ export async function bootFocciWorld(root, opts) {
 
   const charState = { x: 0, z: 0, angle: 0, walkT: 0, inWater: false, jumpY: 0, vy: 0 };
   const JUMP_V = 5.0, GRAVITY = 14;
+  /* Flying to and from the sky island. While a flight is running the normal
+     ground-following is skipped entirely and Focci is driven along an arc,
+     because there is nothing under him to follow for most of the trip. */
+  let flight = null;
+  function flyTo(room, to, onArrive) {
+    if (flight) return;
+    flight = {
+      from: new THREE.Vector3(charState.x, character.position.y, charState.z),
+      to: new THREE.Vector3(to.x, to.y, to.z),
+      t: 0, dur: 2.2, onArrive: onArrive || null, sparkle: 0
+    };
+    charState.jumpY = 0; charState.vy = 0;
+    moveVec.x = 0; moveVec.y = 0;
+    spawnPickupBurst(room, charState.x, character.position.y + 0.4, charState.z, 0xFF9ED2);
+  }
   function startJump(room) {
     if (charState.jumpY > 0.001 || charState.inWater) return;
     charState.vy = JUMP_V;
@@ -1283,6 +1409,18 @@ export async function bootFocciWorld(root, opts) {
       onOpenArc(idx, ARC_TITLES[idx]);
     } else if (type === 'teleport-home') {
       enterRoom('station', station.spawn);
+    } else if (type === 'sky-pad') {
+      if (room.sky) {
+        const g = room.sky.gate;
+        flyTo(room, { x: g.x, y: g.y + 0.2, z: g.z + 1.6 }, () => {
+          root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'The gate lets Focci through. Everything up here smells of blossom.', kind: 'reaction' } }));
+        });
+      }
+    } else if (type === 'sky-gate') {
+      if (room.skyPad) {
+        const p = room.skyPad;
+        flyTo(room, { x: p.x, y: p.y + 0.1, z: p.z + 1.2 }, null);
+      }
     } else if (type === 'chest') {
       openChest(room, room.chests.find((c) => c.obj === obj));
     } else if (type === 'mushroom') {
@@ -1347,7 +1485,9 @@ export async function bootFocciWorld(root, opts) {
     // Re-seat on the terrain every frame — see the placement comment above.
     const groundDoe = () => {
       const surf = surfaceYIn(room, doe.obj.position.x, doe.obj.position.z);
-      if (surf.hit) doe.obj.position.y = surf.y - (doe.footOffset || 0);
+      // Never re-seat onto a building: crossing in front of a hut would
+      // otherwise snap the doe up onto its roof for those few frames.
+      if (surf.hit && !surf.building) doe.obj.position.y = surf.y - (doe.footOffset || 0);
     };
     if (doe.calledHome) {
       const dx = doe.homeX - doe.obj.position.x, dz = doe.homeZ - doe.obj.position.z;
@@ -1392,7 +1532,15 @@ export async function bootFocciWorld(root, opts) {
       // radius, a bit faster) like Focci does, and idle picks avoid
       // repeating whatever clip is already playing.
       if (roll < 0.65) {
-        doe.wanderTarget = { x: doe.homeX + (Math.random() - 0.5) * 9, z: doe.homeZ + (Math.random() - 0.5) * 9 };
+        // Validated, not a blind random offset: an unchecked target could
+        // sit on a roof or out over the water, and the doe would walk there.
+        let wx = doe.homeX, wz = doe.homeZ;
+        for (let k = 0; k < 12; k++) {
+          const cx = doe.homeX + (Math.random() - 0.5) * 9, cz = doe.homeZ + (Math.random() - 0.5) * 9;
+          const su = surfaceYIn(room, cx, cz, GROUND_CEIL);
+          if (su.hit && !su.water && !su.building) { wx = cx; wz = cz; break; }
+        }
+        doe.wanderTarget = { x: wx, z: wz };
         if (Math.random() < 0.2) focciReact(DOE_LINES);
       } else {
         const idleClips = ['Dear_look', 'Dear_eat', 'Dear_idle', 'Dear_shake'].filter((c) => c !== doe.state);
@@ -1416,6 +1564,34 @@ export async function bootFocciWorld(root, opts) {
     const room = activeRoom();
     for (let i = activeEffects.length - 1; i >= 0; i--) { if (!activeEffects[i](dt)) activeEffects.splice(i, 1); }
 
+    if (flight) {
+      flight.t += dt;
+      const k = Math.min(1, flight.t / flight.dur);
+      // ease-in-out, plus an arc that lifts well above both ends so it
+      // reads as flying rather than sliding along a straight line
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      const px = flight.from.x + (flight.to.x - flight.from.x) * e;
+      const pz = flight.from.z + (flight.to.z - flight.from.z) * e;
+      const base = flight.from.y + (flight.to.y - flight.from.y) * e;
+      const lift = Math.sin(Math.PI * k) * 6;
+      charState.x = px; charState.z = pz;
+      character.position.set(px, base + lift, pz);
+      character.rotation.y += dt * 2.4;                 // a slow spin on the way
+      flight.sparkle -= dt;
+      if (flight.sparkle <= 0) {
+        flight.sparkle = 0.09;
+        spawnPickupBurst(room, px, base + lift, pz, 0xFFC7E4);
+      }
+      if (k >= 1) {
+        const cb = flight.onArrive; flight = null;
+        charState.angle = character.rotation.y = 0;
+        if (cb) cb();
+      }
+      updateCamera();
+      renderer.render(scene, camera);
+      return;
+    }
+
     const fwdX = -Math.sin(cam.theta), fwdZ = -Math.cos(cam.theta);
     const rightX = Math.cos(cam.theta), rightZ = -Math.sin(cam.theta);
     const fwdAmt = -moveVec.y, rightAmt = moveVec.x;
@@ -1433,7 +1609,15 @@ export async function bootFocciWorld(root, opts) {
     character.rotation.y = lerpAngle(character.rotation.y, charState.angle, 0.2);
 
     const walking = mag > 0.04;
-    const surf = surfaceYIn(room, charState.x, charState.z);
+    /* Ceiling just above his head so he can step onto a hut roof without a
+       probe from y 200 grabbing the sky island — but never BELOW
+       GROUND_CEIL. A purely relative ceiling is a trap: Fox Island's ground
+       sits as high as 29.7, so at spawn (y 0) a 2.5-unit ceiling found
+       nothing at all and he was pinned under the island with no way back up.
+       Taking the larger of the two keeps him on Fox Island anywhere on it,
+       and once he is up on the sky lawn at y 52 his own height carries the
+       ceiling with him. */
+    const surf = surfaceYIn(room, charState.x, charState.z, Math.max(GROUND_CEIL, character.position.y + 2.5));
     charState.inWater = surf.water;
     const swing = (walking && !surf.water) ? Math.sin(charState.walkT) * 0.55 : 0;
     // Biped gait: each arm swings opposite the leg on its own side.
@@ -1461,6 +1645,7 @@ export async function bootFocciWorld(root, opts) {
 
     checkWalkOverPickups(room);
     if (room.doe) tickDoe(room, room.doe, dt, t);
+    if (room.pondMixer) room.pondMixer.update(dt);
     room.chests.forEach((c) => {
       c.mixer.update(dt);
       if (c.glow && c.glow.visible) c.glow.material.opacity = 0.32 + Math.sin(t * 1.9 + c.x) * 0.12;
@@ -1472,6 +1657,13 @@ export async function bootFocciWorld(root, opts) {
     if (room.wordTreasure && !room.wordTreasure.found) {
       room.wordTreasure.obj.rotation.y = t * 0.8;
       room.wordTreasure.obj.position.y = room.wordTreasure.y + 0.6 + Math.sin(t * 1.6) * 0.1;
+    }
+    if (room.skyPad && room.skyPad.glow) {
+      room.skyPad.glow.material.opacity = 0.45 + Math.sin(t * 2.1) * 0.18;
+      room.skyPad.obj.material.emissiveIntensity = 0.9 + Math.sin(t * 2.1) * 0.35;
+    }
+    if (room.sky && room.sky.halo) {
+      room.sky.halo.material.opacity = 0.24 + Math.sin(t * 0.8) * 0.08;
     }
     if (room.vineTree && room.vineTree.glowSprite) {
       const pulse = 0.82 + Math.sin(t * 1.1) * 0.18;
@@ -1498,6 +1690,7 @@ export async function bootFocciWorld(root, opts) {
 
   resize();
   animate();
+
 
 
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, get currentRoom() { return currentRoomKey; } };
