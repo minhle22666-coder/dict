@@ -566,6 +566,14 @@ export async function bootFocciWorld(root, opts) {
       made++;
     }
     for (const o of originals) { if (o.parent) o.parent.remove(o); o.geometry.dispose(); }
+    /* The merged meshes are brand-new children, so until the graph is walked
+       again their matrixWorld is still identity — and every placement
+       raycast that runs before the first rendered frame would then test
+       geometry that is missing the root's scale and position entirely.
+       That is exactly what put the mushrooms and the diamonds at y 0 while
+       the ground under them measured 7.2: the same stale-matrix trap the
+       hub itself already carries a comment about further down. */
+    root3d.updateMatrixWorld(true);
     return made;
   }
 
@@ -899,10 +907,13 @@ export async function bootFocciWorld(root, opts) {
        raycast straight down onto it at its own centre to get the exact
        point of the cap. */
     {
+      /* The HIGHEST point of the whole island, whatever it is made of —
+         here that is the weather-vane tower at (-1.9, -0.1), y 31.6.
+         Looking only at roof-material meshes picked a hut instead, which
+         is why climbing "the roof" never triggered anything. */
       let best = null;
       station.collidables[0].traverse((o) => {
-        if (!o.isMesh || !o.userData.isBuilding) return;
-        if (!/roof|tejado/i.test((o.material && o.material.name) || '')) return;
+        if (!o.isMesh) return;
         const b = new THREE.Box3().setFromObject(o);
         if (!best || b.max.y > best.max.y) best = b;
       });
@@ -910,17 +921,20 @@ export async function bootFocciWorld(root, opts) {
         const c = best.getCenter(new THREE.Vector3());
         const su = surfaceYIn(station, c.x, c.z, GROUND_CEIL);
         const peakY = su.hit ? su.y : best.max.y;
-        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFF9ED2, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
-        halo.scale.setScalar(3.4);
-        halo.position.set(c.x, peakY + 1.1, c.z);
+        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xB07CFF, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
+        halo.scale.setScalar(4.2);
+        halo.position.set(c.x, peakY + 1.3, c.z);
         station.group.add(halo);
         const beam = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.5, 0.9, 3.2, 12, 1, true),
-          new THREE.MeshBasicMaterial({ color: 0xFFB3DE, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })
+          new THREE.CylinderGeometry(0.55, 1.05, 4.2, 14, 1, true),
+          new THREE.MeshBasicMaterial({ color: 0xC79BFF, transparent: true, opacity: 0.26, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })
         );
-        beam.position.set(c.x, peakY + 1.6, c.z);
+        beam.position.set(c.x, peakY + 2.1, c.z);
         station.group.add(beam);
-        station.skyPad = { glow: halo, beam, x: c.x, y: peakY, z: c.z };
+        const violet = new THREE.PointLight(0xA875FF, 1.5, 12, 2);
+        violet.position.set(c.x, peakY + 1.6, c.z);
+        station.group.add(violet);
+        station.skyPad = { glow: halo, beam, light: violet, x: c.x, y: peakY, z: c.z };
       }
       // The gate up top is the way back down.
       addInvisibleHitbox(station, gate.x, gate.y + SKY_SPAN * 0.045, gate.z, SKY_SPAN * 0.04, 'sky-gate');
@@ -1138,13 +1152,27 @@ export async function bootFocciWorld(root, opts) {
     /* Standing on the cap lifts you. Checked here, once a frame, with a
        height test as well as a distance one so walking past the hut at
        ground level does nothing. */
-    if (room === station && room.skyPad && room.sky && !flight) {
+    if (room === station && room.skyPad && room.sky && !flight && !pendingTravel) {
       const p = room.skyPad;
-      if (Math.hypot(p.x - cx, p.z - cz) < 1.5 && Math.abs(character.position.y - p.y) < 1.4) {
-        const g = room.sky.gate;
-        flyTo(room, { x: g.x, y: g.y + 0.2, z: g.z + 3.2 }, () => {
-          root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'The gate lets Focci through. Everything up here smells of blossom.', kind: 'reaction' } }));
-        });
+      if (Math.hypot(p.x - cx, p.z - cz) < 2 && Math.abs(character.position.y - p.y) < 2) {
+        askTravel('sky', 'Zen Island',
+          'Would you like to visit Zen Island and meet the prophetic spirit of the wisdom trees?',
+          'Take Me There', () => {
+            const g = room.sky.gate;
+            flyTo(room, { x: g.x, y: g.y + 0.2, z: g.z + 3.2 }, () => {
+              root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'The gate lets Focci through. Everything up here smells of blossom.', kind: 'reaction' } }));
+            });
+          });
+      }
+    }
+    /* Same for the four diamonds: step in, get asked, decide. */
+    if (room.teleports && room.teleports.length && !flight && !pendingTravel) {
+      for (const tp of room.teleports) {
+        if (Math.hypot(tp.x - cx, tp.z - cz) > 1.8) continue;
+        askTravel('arc', tp.title || 'Another land',
+          'A gateway hums here. Travel to ' + (tp.title || 'another land') + '?',
+          'Yes, take me', () => { enterRoom(arcRoomKeys[tp.arcIndex]); onOpenArc(tp.arcIndex, ARC_TITLES[tp.arcIndex]); });
+        break;
       }
     }
   }
@@ -1201,7 +1229,9 @@ export async function bootFocciWorld(root, opts) {
   // pinch/wheel zoom-out actually reaches a full-island view on its own,
   // and overviewCamera() (an explicit "see the whole island" jump) has
   // real room to zoom out to.
-  const MAX_ZOOM = 60;
+  /* 60 still framed the island nearly edge to edge with no sky around it
+     and the moon well outside the view. */
+  const MAX_ZOOM = 150;
   /* Turning the island with one finger used to switch on automatically
      past 30 units of zoom. That silently took walking away: pull the camera
      back to look around and Focci simply stopped responding, with nothing
@@ -1214,7 +1244,7 @@ export async function bootFocciWorld(root, opts) {
     // phi is measured from straight up, so a SMALLER value lifts the camera.
     // 0.72 puts it ~48 degrees above the island: high enough to take the
     // whole thing in, shallow enough that the relief still reads.
-    cam.tPhi = 0.72; cam.tRadius = MAX_ZOOM;
+    cam.tPhi = 0.72; cam.tRadius = 96;   // room left to pinch further out by hand
   }
 
   /* Focci, exactly as he was — plain boxes, same sizes, same positions —
@@ -1313,6 +1343,22 @@ export async function bootFocciWorld(root, opts) {
      and a low phi with a short radius brings it down to eye level. The
      previous "effect" was a half-second glow bump with the camera left
      wherever it was, which is why the moment didn't land. */
+  /* Nothing teleports on contact any more. Walking into a portal raises a
+     question and waits for an answer — accidentally brushing past a
+     diamond used to fling you to another land with no warning. */
+  let pendingTravel = null;
+  function askTravel(kind, title, body, confirmLabel, run) {
+    if (pendingTravel || flight) return;
+    pendingTravel = { run };
+    root.dispatchEvent(new CustomEvent('focci-ask', {
+      detail: { kind, title, body, confirm: confirmLabel, cancel: 'Not now' }
+    }));
+  }
+  window.__fwAnswer = function (yes) {
+    const p = pendingTravel; pendingTravel = null;
+    if (yes && p && p.run) p.run();
+  };
+
   let camCinematic = null;
   /* Two ways to look at the world, toggled by a double-tap on empty ground
      (see handleTap): the usual third-person orbit, and Focci's own eyes.
@@ -1544,14 +1590,16 @@ export async function bootFocciWorld(root, opts) {
       // text itself auto-opens still depends on real progress (that check
       // lives in the app's own onOpenArc handler, not here).
       const idx = obj.userData.targetArc;
-      enterRoom(arcRoomKeys[idx]);
-      onOpenArc(idx, ARC_TITLES[idx]);
+      askTravel('arc', ARC_TITLES[idx],
+        'A gateway hums here. Travel to ' + ARC_TITLES[idx] + '?',
+        'Yes, take me', () => { enterRoom(arcRoomKeys[idx]); onOpenArc(idx, ARC_TITLES[idx]); });
     } else if (type === 'teleport-home') {
       enterRoom('station', station.spawn);
     } else if (type === 'sky-gate') {
       if (room.skyPad) {
         const p = room.skyPad;
-        flyTo(room, { x: p.x, y: p.y + 0.1, z: p.z + 1.2 }, null);
+        askTravel('home', 'Fox Island', 'Head back down to Fox Island?', 'Yes, take me home',
+          () => flyTo(room, { x: p.x, y: p.y + 0.1, z: p.z + 1.2 }, null));
       }
     } else if (type === 'mushroom') {
       // obj here is the invisible hitbox (see addInvisibleHitbox), not the
@@ -1819,6 +1867,7 @@ export async function bootFocciWorld(root, opts) {
 
   resize();
   animate();
+
 
 
 
