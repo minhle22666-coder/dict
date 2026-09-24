@@ -941,13 +941,25 @@
     padding:calc(env(safe-area-inset-top,0px) + 14px) 18px calc(env(safe-area-inset-bottom,0px) + 30px);
     font-family:'Raleway Local','Raleway',system-ui,sans-serif;
     background:transparent}
-  #fw-home::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  /* Overshoots the viewport on every side. position:fixed resolves against
+     the SMALL viewport on mobile Safari — the one with the address bar
+     showing — so the moment that bar retracts the page is taller than the
+     backdrop and a strip of bare page shows at the bottom. That is the
+     white band on home and the false-gradient band on Speak Up, and
+     inset:0 can never fix it. Overshooting costs nothing: the element is
+     decorative and pointer-events:none. */
+  #fw-home::before{content:'';position:fixed;left:0;right:0;top:-120px;bottom:-160px;
+    z-index:-1;pointer-events:none;
     background:
       linear-gradient(180deg,rgba(4,44,44,.30) 0%,rgba(3,38,38,.40) 58%,rgba(2,30,30,.54) 100%),
       url('./bg-speakup-village.webp') center center/cover no-repeat,
       #0d4c48}
   html.home-on #fw-home{display:block}
-  html.home-on #fw-chrome,
+  /* Home has its own copy of the search bar, so the world's is hidden
+     there — but ONLY while home is the top layer. Opening Speak Up from
+     home left home-on set, which kept hiding #fw-chrome and is why that
+     screen had a bare gap where the search bar should be. */
+  html.home-on:not(.panel-open) #fw-chrome,
   html.home-on .fw-menu-cluster,
   html.home-on #fw-word-progress{display:none}
 
@@ -971,32 +983,35 @@
   .fh-grid-btn svg{width:19px;height:19px;color:#fff}
   .fh-grid-btn:active{transform:scale(.92)}
 
-  /* hero — 132 tall, not 168 */
-  .fh-hero{position:relative;overflow:hidden;border-radius:18px;height:132px;
-    background:linear-gradient(120deg,#3E7F6B 0%,#5FA87E 40%,#9BD08C 100%);
-    box-shadow:0 10px 24px rgba(0,0,0,.3)}
-  .fh-hero-sky{position:absolute;left:0;right:0;top:0;height:52%;
-    background:linear-gradient(180deg,#9BD7EE 0%,#C7EBF4 100%)}
-  .fh-hero-hill{position:absolute;left:-8%;right:-8%;bottom:0;height:62%;border-radius:50% 50% 0 0/26% 26% 0 0;
-    background:linear-gradient(180deg,#7FC06B 0%,#4E8F5C 100%)}
-  .fh-hero-scrim{position:absolute;inset:0;
-    background:linear-gradient(100deg,rgba(6,34,38,.66) 0%,rgba(6,34,38,.36) 48%,rgba(6,34,38,0) 74%)}
-  .fh-hero-fox{position:absolute;right:6px;bottom:-4px;height:112%;width:auto;
-    filter:drop-shadow(0 6px 12px rgba(0,0,0,.4))}
-  .fh-hero-in{position:relative;z-index:2;padding:17px 0 0 17px;max-width:62%}
-  .fh-hero-t{font-size:19px;font-weight:800;color:#fff;letter-spacing:-.015em;line-height:1.12;
-    text-shadow:0 2px 8px rgba(0,0,0,.5),0 0 18px rgba(200,255,246,.3)}
-  .fh-hero-s{margin-top:6px;font-size:11px;font-weight:400;line-height:1.38;
-    color:rgba(255,255,255,.86);text-shadow:0 1px 5px rgba(0,0,0,.55)}
-  .fh-cta{display:inline-flex;align-items:center;gap:6px;margin-top:11px;height:30px;
-    padding:0 14px;border-radius:999px;border:none;cursor:pointer;
-    font-family:inherit;font-size:12px;font-weight:700;color:#fff;
-    background:rgba(255,255,255,.2);
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.42);
-    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  /* hero — the arc's own artwork, and Focci steps out of the frame.
+
+     The card itself does NOT clip: the background and its scrim live in an
+     inner layer that does, so the fox can hang past the bottom edge and
+     read as standing in front of the card rather than printed on it.
+     Background follows the story's own rule — The Nameless Field is arc 1,
+     so bg-arc1.webp, darkened and dimmed so white text holds up on it. */
+  .fh-hero{position:relative;overflow:visible;height:126px;margin-bottom:20px}
+  .fh-hero-bg{position:absolute;inset:0;overflow:hidden;border-radius:18px;
+    background:#2E5A52;box-shadow:0 10px 24px rgba(0,0,0,.32)}
+  .fh-hero-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55}
+  .fh-hero-bg::after{content:'';position:absolute;inset:0;
+    background:linear-gradient(100deg,rgba(5,30,34,.78) 0%,rgba(5,30,34,.5) 46%,rgba(5,30,34,.18) 78%)}
+  .fh-hero-fox{position:absolute;right:2px;bottom:-16px;height:132%;width:auto;z-index:2;
+    filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}
+  .fh-hero-in{position:relative;z-index:3;padding:18px 0 0 22px;max-width:60%}
+  .fh-hero-t{font-size:17px;font-weight:800;color:#fff;letter-spacing:-.015em;line-height:1.14;
+    text-shadow:0 2px 8px rgba(0,0,0,.55),0 0 16px rgba(200,255,246,.28)}
+  .fh-hero-s{margin-top:6px;font-size:10px;font-weight:400;line-height:1.4;
+    color:rgba(255,255,255,.82);text-shadow:0 1px 5px rgba(0,0,0,.6)}
+  /* smaller, brighter, and sat further in from the margin */
+  .fh-cta{display:inline-flex;align-items:center;gap:5px;margin:11px 0 0 18px;height:26px;
+    padding:0 13px;border-radius:999px;border:none;cursor:pointer;
+    font-family:inherit;font-size:11px;font-weight:700;color:#06312C;
+    background:linear-gradient(180deg,#BFF4E4 0%,#6FD9C4 100%);
+    box-shadow:0 3px 10px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.75);
     transition:transform .14s ease}
   .fh-cta:active{transform:scale(.94)}
-  .fh-cta i{font-style:normal;font-size:9px}
+  .fh-cta i{font-style:normal;font-size:8px}
 
   /* the sparkle rule, drawn rather than an image */
   .fh-rule{display:flex;align-items:center;justify-content:center;gap:7px;margin:13px 0}
@@ -1004,12 +1019,12 @@
   .fh-rule span+span{background:linear-gradient(90deg,rgba(190,250,244,.75),transparent)}
   .fh-rule b{font-size:9px;color:rgba(214,255,250,.95);line-height:1}
 
-  /* learned banner, built here instead of cut from a screenshot */
+  /* the way into the 3D world */
   .fh-learn{position:relative;display:flex;align-items:center;gap:11px;width:100%;
     border:none;cursor:pointer;text-align:left;overflow:hidden;
     padding:12px 54px 12px 12px;border-radius:16px;
-    background:linear-gradient(105deg,#24474A 0%,#2E5A52 52%,#3E7355 100%);
-    box-shadow:0 8px 20px rgba(0,0,0,.3),inset 0 0 0 1px rgba(255,255,255,.08);
+    background:linear-gradient(105deg,#1F4A4E 0%,#2A6158 52%,#3C7A57 100%);
+    box-shadow:0 8px 20px rgba(0,0,0,.3),inset 0 0 0 1px rgba(255,255,255,.09);
     transition:transform .14s ease}
   .fh-learn:active{transform:scale(.985)}
   .fh-learn-fox{flex:none;width:46px;height:46px;object-fit:contain;
@@ -1035,14 +1050,27 @@
   .fh-game.g2{background:linear-gradient(150deg,#4A62E0 0%,#2C36A8 100%)}
   .fh-game.g3{background:linear-gradient(150deg,#A8D64A 0%,#6FA52C 100%)}
   .fh-game.g4{background:linear-gradient(150deg,#C2413F 0%,#7E1F24 100%)}
-  .fh-game img{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
-    height:92%;width:auto;max-width:112%;object-fit:contain;
+  /* Anchored to the BOTTOM-RIGHT, not centred. Centring left an empty
+     band under every fox and cut their feet off mid-card; sitting them on
+     the bottom edge means the crop happens where a crop belongs. Each is
+     sized on its own because the four pieces of art are framed very
+     differently — Letter Trail is a whole body, the other three are
+     close-ups, so at one shared size their heads came out wildly
+     different. */
+  .fh-game img{position:absolute;right:-4%;bottom:0;left:auto;top:auto;transform:none;
+    width:auto;object-fit:contain;
     filter:drop-shadow(0 4px 8px rgba(0,0,0,.35))}
+  .fh-game.g1 img{height:104%;right:-2%}
+  .fh-game.g2 img{height:86%;right:-6%}
+  .fh-game.g3 img{height:88%;right:-4%}
+  .fh-game.g4 img{height:84%;right:-6%}
   .fh-game span{position:absolute;left:11px;bottom:8px;z-index:2;
     font-family:inherit;font-size:15.5px;font-weight:700;color:#fff;letter-spacing:-.01em;
     text-shadow:0 2px 7px rgba(0,0,0,.65)}
+  /* the shade climbs from the bottom so the label always has something
+     dark under it, whatever the art behind is doing */
   .fh-game::after{content:'';position:absolute;inset:0;z-index:1;
-    background:linear-gradient(0deg,rgba(0,0,0,.45) 0%,rgba(0,0,0,0) 42%)}
+    background:linear-gradient(0deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.28) 26%,rgba(0,0,0,0) 56%)}
   /* pressed: the card dips, a light wash flashes, then it springs back */
   .fh-game:active{transform:scale(.94);box-shadow:0 3px 10px rgba(0,0,0,.34)}
   .fh-game::before{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;
@@ -1058,6 +1086,64 @@
     color:#DFF7F4;font-family:'Raleway Local','Raleway',system-ui,sans-serif;font-size:13.5px}
   html.world-loading .fh-loading{display:flex}
   .fh-loading img{width:90px;animation:cheer 2.2s ease-in-out infinite}
+
+  /* ============================================================
+     SLIDE-IN MENU — the grid button's panel, in from the right.
+     Frosted glass over whatever is behind it, five destinations, then a
+     tray of the four utility actions.
+     ============================================================ */
+  .fm-scrim{position:fixed;inset:0;z-index:78;opacity:0;pointer-events:none;
+    background:rgba(4,22,26,.5);transition:opacity .28s ease}
+  html.menu-on .fm-scrim{opacity:1;pointer-events:auto}
+  .fm-panel{position:fixed;top:0;right:0;bottom:0;z-index:79;width:min(272px,78vw);
+    display:flex;flex-direction:column;
+    padding:calc(env(safe-area-inset-top,0px) + 14px) 0 calc(env(safe-area-inset-bottom,0px) + 12px);
+    transform:translateX(100%);transition:transform .32s cubic-bezier(.22,1,.36,1);
+    background:linear-gradient(200deg,rgba(150,214,212,.34) 0%,rgba(72,150,150,.3) 40%,rgba(30,86,90,.36) 100%);
+    backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);
+    box-shadow:-18px 0 44px rgba(0,0,0,.4),inset 1px 0 0 rgba(255,255,255,.22);
+    border-radius:24px 0 0 24px;
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif}
+  html.menu-on .fm-panel{transform:translateX(0)}
+  .fm-head{display:flex;align-items:center;gap:11px;padding:4px 20px 16px}
+  .fm-head svg{width:22px;height:22px;color:#EAFFFB}
+  .fm-head b{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.01em;
+    text-shadow:0 1px 6px rgba(0,0,0,.4)}
+  .fm-nav{display:flex;flex-direction:column;padding:0 14px}
+  .fm-item{display:flex;align-items:center;gap:13px;width:100%;padding:13px 8px;
+    border:none;background:none;cursor:pointer;text-align:left;
+    font-family:inherit;font-size:14.5px;font-weight:700;color:#fff;
+    letter-spacing:-.005em;text-shadow:0 1px 5px rgba(0,0,0,.35);
+    border-bottom:1px solid rgba(255,255,255,.14);transition:opacity .14s ease}
+  .fm-item:last-child{border-bottom:none}
+  .fm-item:active{opacity:.6}
+  .fm-item svg{flex:none;width:19px;height:19px;color:#DFFAF4}
+  /* utility tray */
+  .fm-tray{margin:16px 14px 0;padding:13px 12px;border-radius:18px;
+    background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+  .fm-acts{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .fm-act{flex:1;display:flex;align-items:center;justify-content:center;height:36px;
+    border:none;background:none;cursor:pointer;color:#EAFFFB;border-radius:11px;
+    transition:background .14s ease,transform .14s ease}
+  .fm-act svg{width:21px;height:21px}
+  .fm-act:active{background:rgba(255,255,255,.2);transform:scale(.92)}
+  .fm-act.off{opacity:.42}
+  .fm-vol{display:flex;align-items:center;gap:9px;margin-top:12px}
+  .fm-vol svg{flex:none;width:17px;height:17px;color:#DFFAF4;opacity:.85}
+  .fm-vol input{-webkit-appearance:none;appearance:none;flex:1;height:5px;border-radius:99px;
+    background:rgba(255,255,255,.34);outline:none;margin:0}
+  .fm-vol input::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;
+    border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.4);cursor:pointer}
+  .fm-vol input::-moz-range-thumb{width:15px;height:15px;border:0;border-radius:50%;
+    background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.4);cursor:pointer}
+  .fm-track{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;
+    margin-top:11px;padding:8px 10px;border-radius:11px;border:none;cursor:pointer;
+    background:rgba(255,255,255,.13);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);
+    font-family:inherit;font-size:11px;font-style:italic;font-weight:600;color:#EAFFFB}
+  .fm-track:active{background:rgba(255,255,255,.22)}
+  .fm-track svg{width:14px;height:14px;opacity:.85}
+  .fm-foot{margin-top:auto;padding:14px 20px 0;text-align:center;
+    font-size:9.5px;font-weight:500;color:rgba(255,255,255,.55);letter-spacing:.02em}
 
   /* ============================================================
      DICTIONARY PAGE, ON TOP OF THE 3D WORLD
@@ -1200,6 +1286,7 @@
 
      The overlay is deliberately light (.30 -> .54): the artwork averages
      luma 157 — a bright pastel scene — and a heavier scrim just greys it. */
+  html.home-on, html.home-on body{background:#0d4c48}
   html.su-root, html.su-root body{
     background:
       linear-gradient(180deg,rgba(4,44,44,.30) 0%,rgba(3,38,38,.40) 58%,rgba(2,30,30,.54) 100%),
@@ -1223,7 +1310,8 @@
     background:transparent;
     backdrop-filter:none;-webkit-backdrop-filter:none}
   body .view.fw-panel.su-active::before{
-    content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+    content:'';position:fixed;left:0;right:0;top:-120px;bottom:-160px;
+    z-index:-1;pointer-events:none;
     background:
       linear-gradient(180deg,rgba(4,44,44,.30) 0%,rgba(3,38,38,.40) 58%,rgba(2,30,30,.54) 100%),
       url('./bg-speakup-village.webp') center center/cover no-repeat,
@@ -4306,6 +4394,28 @@
 <div class="toast" id="toast"></div>
 
 <button id="dict-back" onclick="closeDictPage()" aria-label="Back to the island">← Back to the island</button>
+<div class="fm-scrim" onclick="fmClose()"></div>
+<aside class="fm-panel" id="fm-panel">
+  <div class="fm-head"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2.6"/><rect x="13" y="3" width="8" height="8" rx="2.6"/><rect x="3" y="13" width="8" height="8" rx="2.6"/><rect x="13" y="13" width="8" height="8" rx="2.6"/></svg><b>Menu</b></div>
+  <nav class="fm-nav">
+    <button class="fm-item" onclick="fmGo('world')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>Focci Universe</button>
+    <button class="fm-item" onclick="fmGo('saved')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v16l-6-3.4L6 20V4Z"/></svg>Saved Words</button>
+    <button class="fm-item" onclick="fmGo('games')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="16" cy="11.6" r="1"/><circle cx="18" cy="14" r="1"/></svg>Mini Games</button>
+    <button class="fm-item" onclick="fmGo('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 5l9 4.5-9 4.5-9-4.5Z"/><path d="M7 11.6V16c0 1.4 2.2 2.6 5 2.6s5-1.2 5-2.6v-4.4"/></svg>Progress</button>
+    <button class="fm-item" onclick="fmGo('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.7 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9.1A1.7 1.7 0 0 0 10.1 3V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9.1a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1.37Z"/></svg>Settings</button>
+  </nav>
+  <div class="fm-tray">
+    <div class="fm-acts">
+      <button class="fm-act" aria-label="Before you begin" onclick="fmGuide()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.3-3.5-2-6-2v13c2.5 0 4.5.7 6 2 1.5-1.3 3.5-2 6-2V4c-2.5 0-4.5.7-6 2Z"/><path d="M12 6v13"/></svg></button>
+      <button class="fm-act" id="fm-sound" aria-label="Sound" onclick="fmSound()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 8a5 5 0 0 1 0 8"/></svg></button>
+      <button class="fm-act" aria-label="Check for updates" onclick="fmRefresh()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
+      <button class="fm-act" aria-label="Save a backup" onclick="fmBackup()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="m7.5 10.5 4.5 4 4.5-4"/><path d="M4 18.5h16"/></svg></button>
+    </div>
+    <div class="fm-vol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h2M7 9v6M11 6v12M15 9v6M19 11v2"/></svg><input id="fm-vol" type="range" min="0" max="100" step="1" value="70" oninput="fmVolume(this.value)"/></div>
+    <button class="fm-track" onclick="fmNextTrack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg><span id="fm-track-name">– Ambient lofi –</span></button>
+  </div>
+  <div class="fm-foot">Focci Learning App · <span id="fm-ver">v1</span></div>
+</aside>
 <div id="fw-home">
   <div class="fh-top">
     <label class="fh-search">
@@ -4318,9 +4428,7 @@
   </div>
 
   <div class="fh-hero">
-    <div class="fh-hero-sky"></div>
-    <div class="fh-hero-hill"></div>
-    <div class="fh-hero-scrim"></div>
+    <div class="fh-hero-bg"><img src="./bg-arc1.webp" alt="" onerror="this.style.display='none'"/></div>
     <img class="fh-hero-fox" src="./fox-hero.png" alt="" onerror="this.style.display='none'"/>
     <div class="fh-hero-in">
       <div class="fh-hero-t" id="fh-hero-title">The Nameless Field</div>
@@ -4334,8 +4442,8 @@
   <button class="fh-learn" onclick="fhLearned()">
     <img class="fh-learn-fox" src="./mascot-withflag-3.webp" alt="" onerror="this.style.display='none'"/>
     <div class="fh-learn-txt">
-      <div class="fh-learn-t">What Focci Has Learned?</div>
-      <div class="fh-learn-s">Summary of every lesson Focci contemplates after all events in his journey</div>
+      <div class="fh-learn-t">Enter Focci’s Village</div>
+      <div class="fh-learn-s">A living island you can walk. Hunt letters, feed the animals and cross to the blossom isle above</div>
     </div>
     <span class="fh-learn-play">▶</span>
   </button>
@@ -4549,6 +4657,55 @@
      asks for the island; if they ask before it has finished loading they
      get the loader and are taken in automatically the moment it is ready,
      rather than a black rectangle. */
+  /* ---- the slide-in menu ---- */
+  window.fmOpen = function () { document.documentElement.classList.add('menu-on'); };
+  window.fmClose = function () { document.documentElement.classList.remove('menu-on'); };
+  window.fmGo = function (where) {
+    fmClose();
+    setTimeout(() => {
+      if (where === 'world') { fhShowWorld(); return; }
+      if (where === 'games') {
+        // Mini Games is a section of home, not a panel of its own.
+        fhShowHome();
+        const g = document.querySelector('.fh-games');
+        if (g) g.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      openFwPanel(where === 'saved' ? 'saved' : where);
+    }, 240);
+  };
+  window.fmGuide = function () { fmClose(); setTimeout(() => showStoryIntro(), 240); };
+  window.fmSound = function () {
+    if (!worldApi) return;
+    const on = worldApi.toggleSound();
+    document.getElementById('fm-sound').classList.toggle('off', !on);
+  };
+  window.fmNextTrack = function () {
+    if (!worldApi) return;
+    const track = worldApi.nextTrack();
+    const el = document.getElementById('fm-track-name');
+    if (el && track) el.textContent = '\u2013 ' + track.replace(/\.mp3$/, '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' \u2013';
+  };
+  window.fmVolume = function (v) {
+    const b = document.getElementById('fw-bgm') || document.querySelector('audio');
+    if (b) b.volume = Math.max(0, Math.min(1, Number(v) / 100));
+  };
+  window.fmRefresh = async function () {
+    if (window.fwToast) fwToast('Fetching the latest version\u2026');
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) await r.unregister();
+      const keys = await caches.keys();
+      for (const k of keys) await caches.delete(k);
+    } catch (e) {}
+    location.reload();
+  };
+  window.fmBackup = function () {
+    fmClose();
+    setTimeout(() => { if (window.dsExport) dsExport(); else openFwPanel('settings'); }, 240);
+  };
+  window.fhOpenSettings = function () { fmOpen(); };
+
   window.fhShowWorld = function () {
     if (!worldReady) {
       window.__wantWorld = true;
@@ -4564,7 +4721,7 @@
   };
   window.fhOpenSettings = function () { openFwPanel('settings'); };
   window.fhContinue = function () { fhShowWorld(); };
-  window.fhLearned = function () { openFwPanel('stats'); };
+  window.fhLearned = function () { fhShowWorld(); };
   window.fhGame = function (btn, mode) {
     // Visible confirmation first — the pop runs whether or not the panel
     // takes a moment to build.
@@ -4680,6 +4837,7 @@
   };
 
   window.openFwPanel = function (view) {
+    document.documentElement.classList.add('panel-open');
     document.getElementById('fw-menu-cluster').classList.remove('open');
     showView(view);
     document.getElementById('fw-panel-close').style.display = 'flex';
@@ -4711,6 +4869,7 @@
   };
 
   window.closeFwPanel = function () {
+    document.documentElement.classList.remove('panel-open');
     document.querySelectorAll('.view').forEach((x) => x.classList.remove('active'));
     document.getElementById('fw-panel-close').style.display = 'none';
     document.documentElement.classList.remove('dict-open');
