@@ -445,11 +445,16 @@ export async function bootFocciWorld(root, opts) {
      and self-removes when its animation finishes.
      ============================================================ */
   const activeEffects = [];
+  /* Every burst used to bring its own PointLight. The flight trail fires a
+     burst every 0.09s, so a two-second flight had twenty-odd dynamic lights
+     in the scene at once -- and a dynamic light is not free, three.js
+     rebuilds and re-uploads shaders when the light count changes. Two at a
+     time reads as the same glow; the rest are sprites, which are free. */
+  let burstLights = 0;
   function spawnPickupBurst(room, x, y, z, color) {
     const N = 7, DURATION = 0.65;
-    const light = new THREE.PointLight(color, 1.6, 4, 2);
-    light.position.set(x, y, z);
-    room.group.add(light);
+    const light = burstLights < 2 ? new THREE.PointLight(color, 1.6, 4, 2) : null;
+    if (light) { burstLights++; light.position.set(x, y, z); room.group.add(light); }
     const sprites = [];
     for (let i = 0; i < N; i++) {
       const mat = new THREE.SpriteMaterial({ map: GLOW_TEX, color, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -475,10 +480,10 @@ export async function bootFocciWorld(root, opts) {
         sp.material.opacity = 1 - k;
         sp.scale.setScalar(0.32 * (1 - k * 0.55));
       });
-      light.intensity = 1.6 * (1 - k);
+      if (light) light.intensity = 1.6 * (1 - k);
       if (age < DURATION) return true;
       sprites.forEach((sp) => { room.group.remove(sp); sp.material.dispose(); });
-      room.group.remove(light);
+      if (light) { room.group.remove(light); burstLights--; }
       return false;
     });
   }
@@ -824,7 +829,9 @@ export async function bootFocciWorld(root, opts) {
         }
       });
     });
-    return { ys: ys, fl: fl, N: N, half: half };
+    /* land/landFl are the island before stampSea paints the sea over it.
+       A room with no sea never stamps, so there they are the same arrays. */
+    return { ys: ys, fl: fl, land: ys, landFl: fl, N: N, half: half };
   }
   /* The grid's answer, in the shape surfaceYIn gives. */
   function groundAt(room, x, z) {
@@ -836,10 +843,77 @@ export async function bootFocciWorld(root, opts) {
     if (y === -Infinity) return { y: 0, water: false, building: false, hit: false };
     return { y: y, water: !!(f.fl[k] & 1), building: !!(f.fl[k] & 2), hit: true };
   }
+  /* The same grid, read smoothly -- and honestly.
+
+     groundAt() snaps to the nearest cell, which is fine for choosing where
+     to put a mushroom and useless for walking on: at 0.6 units a step it
+     would stair-step Focci up every slope. Blending the four cells around
+     the point gives a continuous surface out of the same data.
+
+     This is what everything that MOVES now uses. Measured on this laptop a
+     raycast costs 2.5ms, and Focci fired one every single frame -- a sixth
+     of a 60fps budget before anything else in the world had moved, and
+     every wandering animal fired one of its own. This costs a thousandth
+     of that.
+
+     Two things it must not do, both found by walking a grid over the whole
+     island and comparing every cell against the real raycast:
+
+     Blend across a cliff. Where the four corners disagree by more than
+     CLIFF, they are not describing a slope, they are describing a drop,
+     and averaging a clifftop with the beach below it floats Focci five
+     units out in the air. Those cells get the exact ray. It is about a
+     fifth of the island's area and almost none of where he actually
+     walks, so the cost stays near zero -- and on a ledge, which is the one
+     place being wrong is unforgiving, he gets the true answer.
+
+     Read the stamped sea heights. stampSea raises every cell under the
+     waterline to sea level so nothing gets placed underwater; walking off
+     that array put him on top of the water at the shoreline. f.land holds
+     the island as it was before that.
+
+     After both: half of all cells match the raycast exactly, 95% are
+     within 6cm. */
+  const CLIFF = 0.9;
+  function groundSmooth(room, x, z, exact) {
+    const f = room.field;
+    if (!f || !f.land) return surfaceYIn(room, x, z, GROUND_CEIL);
+    const gx = (x + f.half) / FIELD_STEP, gz = (z + f.half) / FIELD_STEP;
+    const x0 = Math.floor(gx), z0 = Math.floor(gz);
+    if (x0 < 0 || z0 < 0 || x0 + 1 >= f.N || z0 + 1 >= f.N) return groundAt(room, x, z);
+    const k00 = z0 * f.N + x0, k01 = k00 + f.N;
+    const a = f.land[k00], b = f.land[k00 + 1], c = f.land[k01], d = f.land[k01 + 1];
+    // a corner with nothing under it is the edge of the land: that is the sea,
+    // which the stamped array already knows about
+    if (a === -Infinity || b === -Infinity || c === -Infinity || d === -Infinity) return groundAt(room, x, z);
+    const lo = Math.min(a, b, c, d), hi = Math.max(a, b, c, d);
+    if (hi - lo > CLIFF) {
+      // a drop, not a slope. Focci gets the truth; a wandering duck can
+      // have the nearest cell and never notice the difference.
+      if (exact) return surfaceYIn(room, x, z, Math.max(GROUND_CEIL, hi + 2.5));
+      const k = Math.round(gz) * f.N + Math.round(gx);
+      const y = f.land[k];
+      if (y === -Infinity) return groundAt(room, x, z);
+      return { y: y, water: !!(f.landFl[k] & 1), building: !!(f.landFl[k] & 2), hit: true };
+    }
+    const tx = gx - x0, tz = gz - z0;
+    const y = (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
+    const k = Math.round(gz) * f.N + Math.round(gx);
+    return { y: y, water: !!(f.landFl[k] & 1), building: !!(f.landFl[k] & 2), hit: true };
+  }
+
   /* Open water gets stamped in after the sea exists: any cell the island
      never covered is sea, at sea level. */
   function stampSea(room, seaY) {
     const f = room.field; if (!f) return;
+    /* Keep the island as it really is before the sea is painted over it.
+       Stamping is right for PLACING things -- nothing should be put on a
+       patch of ground that sits under the waterline -- but wrong for
+       WALKING on, because it would lift Focci off a beach at y 4.2 and
+       stand him on the water at 5.0, calling it sea. groundSmooth reads
+       these two arrays; everything else reads the stamped ones. */
+    f.land = Float32Array.from(f.ys);
+    f.landFl = Uint8Array.from(f.fl);
     for (let k = 0; k < f.ys.length; k++) {
       if (f.ys[k] === -Infinity || f.ys[k] < seaY) { f.ys[k] = seaY; f.fl[k] = 1; }
     }
@@ -2186,7 +2260,7 @@ export async function bootFocciWorld(root, opts) {
             b.obj.position.x += (dx / d) * sp * dt;
             b.obj.position.z += (dz / d) * sp * dt;
             b.obj.rotation.y = Math.atan2(dx, dz);
-            const surf = surfaceYIn(room, b.obj.position.x, b.obj.position.z, GROUND_CEIL);
+            const surf = groundSmooth(room, b.obj.position.x, b.obj.position.z);
             if (surf.hit && !surf.building) b.obj.position.y = surf.y - b.footOffset;
           } else { b.target = null; b.cooldown = 3 + Math.random() * 7; }
         } else {
@@ -2194,7 +2268,7 @@ export async function bootFocciWorld(root, opts) {
           if (b.cooldown <= 0) {
             for (let k = 0; k < 10; k++) {
               const cx = b.homeX + (Math.random() - 0.5) * 9, cz = b.homeZ + (Math.random() - 0.5) * 9;
-              const su = surfaceYIn(room, cx, cz, GROUND_CEIL);
+              const su = groundAt(room, cx, cz);
               if (su.hit && !su.water && !su.building) { b.target = { x: cx, z: cz }; break; }
             }
             b.cooldown = 4 + Math.random() * 6;
@@ -2946,7 +3020,7 @@ export async function bootFocciWorld(root, opts) {
     doe.mixer.update(dt);
     // Re-seat on the terrain every frame — see the placement comment above.
     const groundDoe = () => {
-      const surf = surfaceYIn(room, doe.obj.position.x, doe.obj.position.z);
+      const surf = groundSmooth(room, doe.obj.position.x, doe.obj.position.z);
       // Never re-seat onto a building: crossing in front of a hut would
       // otherwise snap the doe up onto its roof for those few frames.
       if (surf.hit && !surf.building) doe.obj.position.y = surf.y - (doe.footOffset || 0);
@@ -2999,7 +3073,7 @@ export async function bootFocciWorld(root, opts) {
         let wx = doe.homeX, wz = doe.homeZ;
         for (let k = 0; k < 12; k++) {
           const cx = doe.homeX + (Math.random() - 0.5) * 9, cz = doe.homeZ + (Math.random() - 0.5) * 9;
-          const su = surfaceYIn(room, cx, cz, GROUND_CEIL);
+          const su = groundAt(room, cx, cz);
           if (su.hit && !su.water && !su.building) { wx = cx; wz = cz; break; }
         }
         doe.wanderTarget = { x: wx, z: wz };
@@ -3009,6 +3083,60 @@ export async function bootFocciWorld(root, opts) {
         playDoeClip(doe, idleClips[Math.floor(Math.random() * idleClips.length)], true);
       }
       doe.cooldown = 8 + Math.random() * 8;
+    }
+  }
+
+  /* ============================================================
+     LAMPS YOU CANNOT SEE COST AS MUCH AS LAMPS YOU CAN
+
+     three.js frustum-culls meshes but never lights: every point light in
+     the scene is compiled into every material's fragment shader and
+     evaluated for every lit pixel, whether it is a lantern at your feet
+     or one on the far shore behind your back. The island carries
+     nineteen -- lamp posts, window glows, hearths -- and measured here
+     they were exactly half the cost of a frame: 3.45ms with them in,
+     1.68ms with them out.
+
+     A point light with a falloff distance reaches nothing past that
+     radius, so if the sphere it could possibly light misses the view, it
+     cannot change a single visible pixel and may as well not be there.
+     One sitting at zero intensity -- which is every lamp in daylight --
+     is already contributing nothing.
+
+     Culling on those two rules leaves five lights of the nineteen and
+     takes the frame from 3.20ms to 1.91ms, with the picture identical.
+
+     The pass itself is free -- 0.038ms to find the lights, 0.005ms to
+     test them -- so the only reason not to run it every frame is that
+     changing the light count makes three.js swap shader programs, and a
+     lamp sitting exactly on the edge of the screen would thrash. Every
+     eighth of a second settles that without anyone seeing a lamp's glow
+     arrive late. A light with no falloff distance reaches everywhere and
+     is never culled on position.
+     ============================================================ */
+  const LIGHT_CULL_S = 0.12;
+  let lightCullAt = 0;
+  const cullLights = [];
+  const cullFrustum = new THREE.Frustum();
+  const cullMat = new THREE.Matrix4();
+  const cullSphere = new THREE.Sphere();
+  const cullPos = new THREE.Vector3();
+  function tickLightCull(t) {
+    if (t - lightCullAt < LIGHT_CULL_S) return;
+    lightCullAt = t;
+    cullLights.length = 0;
+    scene.traverse((o) => { if (o.isPointLight) cullLights.push(o); });
+    if (cullLights.length < 5) return;        // too few to be worth the churn
+    camera.updateMatrixWorld();
+    cullMat.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    cullFrustum.setFromProjectionMatrix(cullMat);
+    for (let i = 0; i < cullLights.length; i++) {
+      const l = cullLights[i];
+      if (l.intensity <= 0.005) { l.visible = false; continue; }
+      if (!l.distance) { l.visible = true; continue; }
+      l.getWorldPosition(cullPos);
+      cullSphere.set(cullPos, l.distance);
+      l.visible = cullFrustum.intersectsSphere(cullSphere);
     }
   }
 
@@ -3053,6 +3181,7 @@ export async function bootFocciWorld(root, opts) {
         if (cb) cb();
       }
       updateCamera();
+      tickLightCull(t);
       renderer.render(scene, camera);
       return;
     }
@@ -3095,7 +3224,31 @@ export async function bootFocciWorld(root, opts) {
        Taking the larger of the two keeps him on Fox Island anywhere on it,
        and once he is up on the sky lawn at y 52 his own height carries the
        ceiling with him. */
-    let surf = surfaceYIn(room, charState.x, charState.z, Math.max(GROUND_CEIL, character.position.y + 2.5));
+    /* The height field is built up to GROUND_CEIL and no further, because
+       the sky island deliberately floats above it. So: on the island, on a
+       roof, on Fox Island's 31.6 peak -- read the field. Once he is up on
+       the sky lawn at y 52 there is nothing in the field to stand on, and
+       only the real ray knows where the grass is. That is one raycast per
+       frame in one small place, instead of one everywhere. */
+    let surf = character.position.y > 34
+      ? surfaceYIn(room, charState.x, charState.z, Math.max(GROUND_CEIL, character.position.y + 2.5))
+      : groundSmooth(room, charState.x, charState.z, true);
+    /* The grid steps 0.6 units at a time, so it can walk straight over
+       anything thinner than that -- a plank, a railing, a narrow bridge
+       deck. Checked against the real geometry across the whole island,
+       seven cells out of 7,396 disagree by more than a stride for exactly
+       that reason, and every one of them would drop him through something
+       he should be standing on.
+
+       So: if the ground appears to have moved more than a stride since the
+       last frame, don't take the grid's word for it. Stepping off a real
+       ledge asks the same question and gets the same answer, at the cost
+       of one raycast on the frame he steps off. Everywhere else -- which
+       is almost every frame -- nothing is asked at all. */
+    if (surf.hit && charState.lastGroundY !== undefined
+        && Math.abs(surf.y - charState.lastGroundY) > 1.2) {
+      surf = surfaceYIn(room, charState.x, charState.z, Math.max(GROUND_CEIL, character.position.y + 2.5));
+    }
     /* A roof over your head does not pick you up.
 
        The ground probe takes the topmost surface, so walking towards a
@@ -3119,6 +3272,7 @@ export async function bootFocciWorld(root, opts) {
         break;
       }
     }
+    charState.lastGroundY = surf.y;
     charState.inWater = surf.water;
     const swing = (walking && !surf.water) ? Math.sin(charState.walkT) * 0.55 : 0;
     // Biped gait: each arm swings opposite the leg on its own side.
@@ -3198,6 +3352,7 @@ export async function bootFocciWorld(root, opts) {
     }
 
     updateCamera();
+    tickLightCull(t);
     renderer.render(scene, camera);
   }
 
@@ -3214,7 +3369,7 @@ export async function bootFocciWorld(root, opts) {
      ground — except by eye, and eyeballing a 3D scene through a screenshot
      has been wrong every single time it was tried. */
   BOOT_MARKS.push(['arc-rooms+diamonds', Math.round(performance.now() - _phaseAt)]);
-  window.__fw = { scene, camera, rooms, cam, charState, character, surfaceYIn, THREE,
+  window.__fw = { scene, camera, renderer, rooms, cam, charState, character, surfaceYIn, THREE,
     boot: BOOT_MARKS,
     get room() { return rooms[currentRoomKey]; },
     get state() { return { pending: !!pendingTravel, flight: !!flight, declined: Array.from(declined), camMode, inspectMode }; },
