@@ -252,7 +252,7 @@ export async function bootFocciWorld(root, opts) {
   function isStableGround(room, x, z, y) {
     const NEIGHBOR_R = 0.7, MAX_STEP = 1.5;
     for (const [dx, dz] of [[NEIGHBOR_R, 0], [-NEIGHBOR_R, 0], [0, NEIGHBOR_R], [0, -NEIGHBOR_R]]) {
-      const n = surfaceYIn(room, x + dx, z + dz, GROUND_CEIL);
+      const n = groundAt(room, x + dx, z + dz);
       if (!n.hit || n.water || Math.abs(n.y - y) > MAX_STEP) return false;
     }
     return true;
@@ -271,7 +271,7 @@ export async function bootFocciWorld(root, opts) {
     // 5-unit cap from spawn rules out most of it before anything else runs.
     const STEPS = 10, MAX_JUMP = 2.2, MAX_TOTAL_DROP = 8;
     const sx = room.spawn.x, sz = room.spawn.z;
-    const startY = surfaceYIn(room, sx, sz, GROUND_CEIL).y;
+    const startY = groundAt(room, sx, sz).y;
     // Per-step continuity alone isn't enough: a long, gradual, perfectly
     // "walkable" slope can still end up 15-20 units below where Focci
     // actually starts (found by comparing a prop's stored placement to its
@@ -287,7 +287,7 @@ export async function bootFocciWorld(root, opts) {
     for (let i = 1; i <= STEPS; i++) {
       const t = i / STEPS;
       const px = sx + (x - sx) * t, pz = sz + (z - sz) * t;
-      const s = surfaceYIn(room, px, pz, GROUND_CEIL);
+      const s = groundAt(room, px, pz);
       if (!s.hit || s.water || Math.abs(s.y - prevY) > MAX_JUMP) return false;
       prevY = s.y;
     }
@@ -301,7 +301,7 @@ export async function bootFocciWorld(root, opts) {
     for (let i = 0; i < tries; i++) {
       const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      const surf = surfaceYIn(room, x, z, GROUND_CEIL);
+      const surf = groundAt(room, x, z);
       if (surf.hit && !surf.water && !surf.building && isStableGround(room, x, z, surf.y) && isReachableFromSpawn(room, x, z, surf.y)) return { x, z, y: surf.y };
     }
     // Ceiling here too — without it this fallback probed straight up into
@@ -317,7 +317,7 @@ export async function bootFocciWorld(root, opts) {
     for (let i = 0; i < tries; i++) {
       const a = angleFrom + Math.random() * (angleTo - angleFrom), r = minR + Math.random() * (maxR - minR);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      const surf = surfaceYIn(room, x, z, GROUND_CEIL);
+      const surf = groundAt(room, x, z);
       if (surf.hit && !surf.water && !surf.building && isStableGround(room, x, z, surf.y) && isReachableFromSpawn(room, x, z, surf.y)) return { x, z, y: surf.y };
     }
     return findGroundSpot(room, minR, maxR, tries); // fall back to the full circle
@@ -348,7 +348,7 @@ export async function bootFocciWorld(root, opts) {
       let lo = spot.y, hi = spot.y, ok = true;
       for (let a = 0; a < 8; a++) {
         const ang = (Math.PI / 4) * a;
-        const surf = surfaceYIn(room, spot.x + Math.cos(ang) * footprint, spot.z + Math.sin(ang) * footprint, GROUND_CEIL);
+        const surf = groundAt(room, spot.x + Math.cos(ang) * footprint, spot.z + Math.sin(ang) * footprint);
         if (!surf.hit || surf.water) { ok = false; break; }
         lo = Math.min(lo, surf.y); hi = Math.max(hi, surf.y);
       }
@@ -407,7 +407,7 @@ export async function bootFocciWorld(root, opts) {
         const r = rMin + ((rMax - rMin) * (step % 10)) / 9;
         const a = bearing + (Math.floor(step / 10) - 1.5) * 0.18;
         const x = Math.cos(a) * r, z = Math.sin(a) * r;
-        const su = surfaceYIn(room, x, z, GROUND_CEIL);
+        const su = groundAt(room, x, z);
         if (ok(su, x, z)) return { x, z, y: su.y };
       }
     }
@@ -751,6 +751,122 @@ export async function bootFocciWorld(root, opts) {
      and sprinkled N copies over validated ground. Both callers (the forest
      kit and the bush kit on the hub) are gone, so it went with them. */
 
+
+
+  /* ============================================================
+     THE HEIGHT FIELD
+
+     Measured, on this island: 62,000 triangles across 61 meshes, and no
+     bounding-volume hierarchy in this build of three — so one downward
+     probe costs 2.65ms, about 377 a second.
+
+     Boot fires well over ten thousand of them. findGroundSpot alone can
+     spend 640 probes on a single prop (40 tries, and each try runs
+     isStableGround's four and isReachableFromSpawn's eleven). That is
+     where the thirty-second freeze on the home page came from: measured
+     per phase, 20.6s of it in prop and doorway placement.
+
+     So the island is rasterised into a grid once, straight off the
+     triangles instead of by raycasting: every cell under a triangle
+     keeps the highest y and the flags of whatever is up there. Choosing
+     a spot then costs an array lookup.
+
+     Focci himself still walks on the real surface — surfaceYIn stays
+     exactly as it was. This is for setup only, where "near enough to
+     place a mushroom" is the whole requirement.
+     ============================================================ */
+  const FIELD_STEP = 0.6;
+  function buildHeightField(room, half) {
+    const N = Math.ceil((half * 2) / FIELD_STEP) + 1;
+    const ys = new Float32Array(N * N).fill(-Infinity);
+    const fl = new Uint8Array(N * N);
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    room.collidables.forEach((rootObj) => {
+      rootObj.updateMatrixWorld(true);
+      rootObj.traverse((m) => {
+        if (!m.isMesh || !m.geometry || !m.geometry.attributes.position) return;
+        const bit = (m.userData.isWater ? 1 : 0) | (m.userData.isBuilding ? 2 : 0);
+        const pos = m.geometry.attributes.position, idx = m.geometry.index;
+        const n = idx ? idx.count : pos.count;
+        for (let i = 0; i < n; i += 3) {
+          const i0 = idx ? idx.getX(i) : i, i1 = idx ? idx.getX(i + 1) : i + 1, i2 = idx ? idx.getX(i + 2) : i + 2;
+          a.fromBufferAttribute(pos, i0).applyMatrix4(m.matrixWorld);
+          b.fromBufferAttribute(pos, i1).applyMatrix4(m.matrixWorld);
+          c.fromBufferAttribute(pos, i2).applyMatrix4(m.matrixWorld);
+          // anything above the ceiling is the sky island, and no business of the ground
+          if (a.y > GROUND_CEIL && b.y > GROUND_CEIL && c.y > GROUND_CEIL) continue;
+          const minX = Math.min(a.x, b.x, c.x), maxX = Math.max(a.x, b.x, c.x);
+          const minZ = Math.min(a.z, b.z, c.z), maxZ = Math.max(a.z, b.z, c.z);
+          if (maxX < -half || minX > half || maxZ < -half || minZ > half) continue;
+          const gx0 = Math.max(0, Math.floor((minX + half) / FIELD_STEP));
+          const gx1 = Math.min(N - 1, Math.ceil((maxX + half) / FIELD_STEP));
+          const gz0 = Math.max(0, Math.floor((minZ + half) / FIELD_STEP));
+          const gz1 = Math.min(N - 1, Math.ceil((maxZ + half) / FIELD_STEP));
+          // barycentric denominator, once per triangle
+          const d = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
+          if (Math.abs(d) < 1e-9) continue;
+          for (let gx = gx0; gx <= gx1; gx++) {
+            const px = gx * FIELD_STEP - half;
+            for (let gz = gz0; gz <= gz1; gz++) {
+              const pz = gz * FIELD_STEP - half;
+              const w0 = ((b.z - c.z) * (px - c.x) + (c.x - b.x) * (pz - c.z)) / d;
+              if (w0 < -0.02 || w0 > 1.02) continue;
+              const w1 = ((c.z - a.z) * (px - c.x) + (a.x - c.x) * (pz - c.z)) / d;
+              if (w1 < -0.02 || w1 > 1.02) continue;
+              const w2 = 1 - w0 - w1;
+              if (w2 < -0.02) continue;
+              const y = w0 * a.y + w1 * b.y + w2 * c.y;
+              if (y > GROUND_CEIL) continue;
+              const k = gz * N + gx;
+              if (y > ys[k]) { ys[k] = y; fl[k] = bit; }
+            }
+          }
+        }
+      });
+    });
+    return { ys: ys, fl: fl, N: N, half: half };
+  }
+  /* The grid's answer, in the shape surfaceYIn gives. */
+  function groundAt(room, x, z) {
+    const f = room.field;
+    if (!f) return surfaceYIn(room, x, z, GROUND_CEIL);
+    const gx = Math.round((x + f.half) / FIELD_STEP), gz = Math.round((z + f.half) / FIELD_STEP);
+    if (gx < 0 || gz < 0 || gx >= f.N || gz >= f.N) return { y: 0, water: false, building: false, hit: false };
+    const k = gz * f.N + gx, y = f.ys[k];
+    if (y === -Infinity) return { y: 0, water: false, building: false, hit: false };
+    return { y: y, water: !!(f.fl[k] & 1), building: !!(f.fl[k] & 2), hit: true };
+  }
+  /* Open water gets stamped in after the sea exists: any cell the island
+     never covered is sea, at sea level. */
+  function stampSea(room, seaY) {
+    const f = room.field; if (!f) return;
+    for (let k = 0; k < f.ys.length; k++) {
+      if (f.ys[k] === -Infinity || f.ys[k] < seaY) { f.ys[k] = seaY; f.fl[k] = 1; }
+    }
+  }
+
+  /* ============================================================
+     BOOT PHASES
+
+     Everything after the GLBs land used to run as one unbroken
+     synchronous block: tens of thousands of raycasts for doorways,
+     footprints, the dock and every scattered prop, all on the main
+     thread. The home page sat frozen through it and the Enter button
+     did not answer for seconds — which is exactly what it felt like.
+
+     breathe() closes a phase, records how long it took, and hands the
+     thread back so the browser can paint and take a tap before the next
+     phase starts. The timings are on window.__fw.boot afterwards.
+     ============================================================ */
+  const BOOT_MARKS = [];
+  let _phaseAt = performance.now();
+  function breathe(label) {
+    const t = performance.now();
+    BOOT_MARKS.push([label, Math.round(t - _phaseAt)]);
+    _phaseAt = t;
+    return new Promise((r) => setTimeout(r, 0));
+  }
+
   /* ============================================================
      ASSET LOADING — every GLB used to load one at a time (an `await`
      per file, ~17 of them back to back), which meant the network round
@@ -821,6 +937,7 @@ export async function bootFocciWorld(root, opts) {
     return { obj: d, mixer, glowLight: light, glowSprite: sprite };
   }
 
+  await breathe('assets');
   /* ============================================================
      STATION ROOM (hub) — Fox Island
      ============================================================ */
@@ -853,6 +970,10 @@ export async function bootFocciWorld(root, opts) {
     tagBuildings(hub.scene);
     station.group.add(hub.scene);
     station.collidables.push(hub.scene);
+    /* Rasterise the island now, before anything asks where the ground is.
+       Everything that places something — the spawn point, props, doorways,
+       the dock — reads this instead of firing 2.65ms raycasts. */
+    station.field = buildHeightField(station, 34);
     /* Spawn on the island's MAIN SHELF, not its geometric centre — on Fox
        Island that centre is the top of the central mound at y 24.3, and
        since isReachableFromSpawn measures every candidate against the spawn
@@ -864,7 +985,7 @@ export async function bootFocciWorld(root, opts) {
       for (let i = 0; i < 240; i++) {
         const a = Math.random() * Math.PI * 2, r = Math.random() * 16;
         const x = Math.cos(a) * r, z = Math.sin(a) * r;
-        const su = surfaceYIn(station, x, z, GROUND_CEIL);
+        const su = groundAt(station, x, z);
         if (su.hit && !su.water && !su.building) samples.push({ x, z, y: su.y });
       }
       if (samples.length) {
@@ -919,6 +1040,7 @@ export async function bootFocciWorld(root, opts) {
     station._birdOrbit = { r: 18, speed: 0.15, y: 20 };
     station._birdRig = birdGlb.scene;
 
+    await breathe('hub-merge');
     /* ============================================================
        THE SKY ISLAND
 
@@ -1065,11 +1187,11 @@ export async function bootFocciWorld(root, opts) {
         for (let dx = -2.5; dx <= 2.5; dx += 0.25) {
           for (let dz = -2.5; dz <= 2.5; dz += 0.25) {
             const px = c0.x + dx, pz = c0.z + dz;
-            const su2 = surfaceYIn(station, px, pz, GROUND_CEIL);
+            const su2 = groundAt(station, px, pz);
             if (su2.hit && !su2.water && su2.y > peakY) { peakY = su2.y; c = new THREE.Vector3(px, su2.y, pz); }
           }
         }
-        if (peakY === -Infinity) { const su = surfaceYIn(station, c0.x, c0.z, GROUND_CEIL); peakY = su.hit ? su.y : best.max.y; c = c0; }
+        if (peakY === -Infinity) { const su = groundAt(station, c0.x, c0.z); peakY = su.hit ? su.y : best.max.y; c = c0; }
         const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xB07CFF, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
         halo.scale.setScalar(4.2);
         halo.position.set(c.x, peakY + 1.3, c.z);
@@ -1110,14 +1232,16 @@ export async function bootFocciWorld(root, opts) {
         if (wallMesh) {
           const wb = new THREE.Box3().setFromObject(wallMesh);
           const clusters = [];
+          /* Walk the height field, not the mesh. This grid was ~2,000
+             raycasts at 2.65ms each; the field already knows which cells
+             have a building over them. */
           for (let x = wb.min.x; x <= wb.max.x; x += 1.2) {
             for (let z = wb.min.z; z <= wb.max.z; z += 1.2) {
-              raycaster.set(new THREE.Vector3(x, 200, z), DOWN);
-              const hits = raycaster.intersectObject(wallMesh, true);
-              if (!hits.length) continue;
+              const g = groundAt(station, x, z);
+              if (!g.hit || !g.building) continue;
               const near = clusters.find((c) => Math.hypot(c.x - x, c.z - z) < 4.5);
               if (near) { near.n++; near.sx += x; near.sz += z; near.x = near.sx / near.n; near.z = near.sz / near.n; }
-              else clusters.push({ x, z, sx: x, sz: z, n: 1, y: hits[0].point.y });
+              else clusters.push({ x, z, sx: x, sz: z, n: 1, y: g.y });
             }
           }
           /* How far the building actually reaches, measured on sixteen
@@ -1132,8 +1256,8 @@ export async function bootFocciWorld(root, opts) {
               const th = (a / 16) * Math.PI * 2;
               let last = 0;
               for (let d = 0.5; d <= 20; d += 0.5) {
-                raycaster.set(new THREE.Vector3(c.x + Math.cos(th) * d, 200, c.z + Math.sin(th) * d), DOWN);
-                if (!raycaster.intersectObject(wallMesh, true).length) break;
+                const g = groundAt(station, c.x + Math.cos(th) * d, c.z + Math.sin(th) * d);
+                if (!g.hit || !g.building) break;
                 last = d;
               }
               sum += last; if (last > max) max = last;
@@ -1189,7 +1313,7 @@ export async function bootFocciWorld(root, opts) {
               const th = (a / 16) * Math.PI * 2;
               for (let d = 2; d <= 16; d += 0.5) {
                 const px = c.x + Math.cos(th) * d, pz = c.z + Math.sin(th) * d;
-                const su = surfaceYIn(station, px, pz, GROUND_CEIL);
+                const su = groundAt(station, px, pz);
                 if (!su.hit || su.water) continue;
                 if (Math.abs(su.y - floorY) > 1.6) continue;
                 const score = d + (su.building ? 2.5 : 0);
@@ -1247,6 +1371,7 @@ export async function bootFocciWorld(root, opts) {
 
 
 
+    await breathe('island-props');
     /* ============================================================
        THE SEA
 
@@ -1261,7 +1386,11 @@ export async function bootFocciWorld(root, opts) {
        vertices re-written every frame in JavaScript is exactly the kind of
        thing that makes this stutter on a phone.
        ============================================================ */
-    const SEA_Y = 5.9;
+    /* Measured: the island's lowest walkable shore is 6.1. At 5.9 the sea
+       was two-tenths under it and washed right up over the beach. A metre
+       of dry sand between the grass and the waterline is the difference
+       between an island in the sea and an island being swallowed by it. */
+    const SEA_Y = 5.0;
     {
       const SEA_R = 96;
       const geo = new THREE.RingGeometry(0.5, SEA_R, 80, 22);
@@ -1300,10 +1429,12 @@ export async function bootFocciWorld(root, opts) {
       station.group.add(sea);
       station.collidables.push(sea);
       station.sea = { mesh: sea, y: SEA_Y, uTime };
+      stampSea(station, SEA_Y);        // open water is now part of the grid
       // the night glow every other water surface gets
       waterMats.push(mat);
     }
 
+    await breathe('sea');
     /* ============================================================
        THE RESCUE BOAT
 
@@ -1321,7 +1452,7 @@ export async function bootFocciWorld(root, opts) {
       for (let i = 0; i < 500; i++) {
         const a = Math.random() * Math.PI * 2, r = 14 + Math.random() * 9;
         const x = Math.cos(a) * r, z = Math.sin(a) * r;
-        const su = surfaceYIn(station, x, z, GROUND_CEIL);
+        const su = groundAt(station, x, z);
         if (!su.hit || su.water || su.building) continue;
         if (su.y < lowest && isStableGround(station, x, z, su.y)) { lowest = su.y; dock = { x, z, y: su.y }; }
       }
@@ -1334,7 +1465,7 @@ export async function bootFocciWorld(root, opts) {
         let bx = dock.x + ux * 6, bz = dock.z + uz * 6;
         for (let d = 1; d <= 22; d += 0.5) {
           const px = dock.x + ux * d, pz = dock.z + uz * d;
-          const su = surfaceYIn(station, px, pz, GROUND_CEIL);
+          const su = groundAt(station, px, pz);
           if (su.water) { bx = px + ux * 2.8; bz = pz + uz * 2.8; break; }
         }
         const bBox = new THREE.Box3().setFromObject(boatGlb.scene);
@@ -1445,6 +1576,7 @@ export async function bootFocciWorld(root, opts) {
     });
   }
 
+  await breathe('station-rest');
   /* ============================================================
      4 ARC ROOMS — one existing environment file per arc
      NOTE: none of your 4 environment files is literally a desert — this is
@@ -1467,6 +1599,7 @@ export async function bootFocciWorld(root, opts) {
     tagWater(gltf.scene);
     room.group.add(gltf.scene);
     room.collidables.push(gltf.scene);
+    room.field = buildHeightField(room, 18);
     room.spawn = { x: 0, z: 4 };
 
     // a "return to station" diamond in every arc room (reuses the same
@@ -3080,7 +3213,9 @@ export async function bootFocciWorld(root, opts) {
      anything — where the water actually is, whether a prop landed on the
      ground — except by eye, and eyeballing a 3D scene through a screenshot
      has been wrong every single time it was tried. */
+  BOOT_MARKS.push(['arc-rooms+diamonds', Math.round(performance.now() - _phaseAt)]);
   window.__fw = { scene, camera, rooms, cam, charState, character, surfaceYIn, THREE,
+    boot: BOOT_MARKS,
     get room() { return rooms[currentRoomKey]; },
     get state() { return { pending: !!pendingTravel, flight: !!flight, declined: Array.from(declined), camMode, inspectMode }; },
     animalModel, toggleCamMode, setCamMode,

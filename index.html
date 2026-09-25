@@ -1099,7 +1099,7 @@
   /* the way into the 3D world */
   .fh-learn{position:relative;display:flex;align-items:center;gap:11px;width:100%;
     border:none;cursor:pointer;text-align:left;overflow:hidden;
-    padding:12px 54px 12px 12px;border-radius:16px;
+    min-height:94px;padding:12px 54px 12px 12px;border-radius:16px;   /* a fifth taller */
     background:
       linear-gradient(105deg,rgba(9,28,32,.74) 0%,rgba(12,44,44,.68) 52%,rgba(16,56,46,.62) 100%),
       url('./bg-arc5.webp') center/cover no-repeat;
@@ -1172,11 +1172,16 @@
      page like stickers; at just under half strength with a blur behind
      them the island still shows through and they read as part of the
      same world. */
-  .fh-game{backdrop-filter:blur(12px) saturate(1.5);-webkit-backdrop-filter:blur(12px) saturate(1.5)}
-  .fh-game.g1{background:linear-gradient(150deg,rgba(47,167,155,.52) 0%,rgba(30,124,132,.38) 100%)}
-  .fh-game.g2{background:linear-gradient(150deg,rgba(74,98,224,.52) 0%,rgba(44,54,168,.38) 100%)}
-  .fh-game.g3{background:linear-gradient(150deg,rgba(168,214,74,.52) 0%,rgba(111,165,44,.38) 100%)}
-  .fh-game.g4{background:linear-gradient(150deg,rgba(194,65,63,.52) 0%,rgba(126,31,36,.38) 100%)}
+  /* Barely blurred, on purpose. At blur(12px) the island behind turned to
+     mush, so the tiles read as pale flat colour rather than as glass —
+     "too washed out and you still cannot see through them". At 3px the
+     trees and rooftops stay recognisable underneath, which is what makes
+     the transparency actually register, and the colour can go back up. */
+  .fh-game{backdrop-filter:blur(3px) saturate(1.35);-webkit-backdrop-filter:blur(3px) saturate(1.35)}
+  .fh-game.g1{background:linear-gradient(150deg,rgba(38,178,163,.62) 0%,rgba(20,120,130,.44) 100%)}
+  .fh-game.g2{background:linear-gradient(150deg,rgba(78,102,240,.62) 0%,rgba(40,50,175,.44) 100%)}
+  .fh-game.g3{background:linear-gradient(150deg,rgba(174,226,72,.62) 0%,rgba(108,168,38,.44) 100%)}
+  .fh-game.g4{background:linear-gradient(150deg,rgba(210,64,62,.62) 0%,rgba(132,28,34,.44) 100%)}
   /* Anchored to the BOTTOM-RIGHT, not centred. Centring left an empty
      band under every fox and cut their feet off mid-card; sitting them on
      the bottom edge means the crop happens where a crop belongs. Each is
