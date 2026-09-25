@@ -1326,6 +1326,92 @@
   #v-saved .empty{color:rgba(206,242,236,.75)}
 
   /* ============================================================
+     FOCCI'S JOURNAL
+
+     A week of columns on the home page, and behind the button a day by
+     day record of the words met and the ones a game caught you out on.
+     ============================================================ */
+  .jn-home{margin-top:14px;padding:15px 16px 14px;border-radius:18px;
+    background:linear-gradient(140deg,rgba(255,255,255,.11),rgba(255,255,255,.04));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.18),0 6px 18px rgba(0,0,0,.24);
+    backdrop-filter:blur(12px) saturate(1.3);-webkit-backdrop-filter:blur(12px) saturate(1.3)}
+  .jn-top{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .jn-ttl{flex:1;min-width:0}
+  .jn-ttl b{display:block;font-size:12.5px;font-weight:800;color:#fff}
+  .jn-ttl span{display:block;margin-top:2px;font-size:10px;color:rgba(200,240,236,.62);
+    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif}
+  .jn-arw{flex:none;width:28px;height:28px;border:none;border-radius:50%;cursor:pointer;
+    font-family:inherit;font-size:13px;color:rgba(224,250,255,.88);
+    background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(180,235,250,.2)}
+  .jn-arw:disabled{opacity:.3;cursor:default}
+  .jn-arw:active{transform:scale(.92)}
+
+  .jn-chart{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end}
+  .jn-col{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .jn-bar{width:100%;height:62px;display:flex;align-items:flex-end;border-radius:8px;
+    background:rgba(255,255,255,.07);overflow:hidden}
+  .jn-bar i{display:block;width:100%;border-radius:8px;
+    background:linear-gradient(180deg,#BFF4E4,#5FC9B6);
+    transition:height .5s cubic-bezier(.25,1,.4,1)}
+  .jn-col.now .jn-bar i{background:linear-gradient(180deg,#FFE9A8,#F2B44C)}
+  .jn-n{font-size:10px;font-weight:800;color:rgba(214,244,238,.8);min-height:12px}
+  .jn-d{font-size:9.5px;font-weight:700;color:rgba(190,230,246,.5)}
+
+  /* the way in, with a light going round it */
+  .jn-btn{position:relative;display:flex;align-items:center;justify-content:center;gap:9px;
+    width:100%;height:46px;margin-top:13px;border:none;border-radius:14px;cursor:pointer;
+    overflow:hidden;font-family:inherit;font-size:13.5px;font-weight:800;color:#F2FFFB;
+    background:linear-gradient(120deg,rgba(226,255,250,.22) 0%,rgba(120,215,200,.16) 55%,rgba(70,175,170,.12) 100%);
+    box-shadow:inset 0 0 0 1px rgba(226,255,250,.3),0 4px 16px rgba(0,0,0,.26);
+    backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4)}
+  .jn-btn:active{transform:scale(.98)}
+  .jn-btn .jn-edge{position:absolute;inset:0;border-radius:14px;padding:1.6px;overflow:hidden;
+    pointer-events:none;
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    mask-composite:exclude}
+  .jn-btn .jn-edge::before{content:'';position:absolute;top:50%;left:50%;width:240%;aspect-ratio:1;
+    transform:translate(-50%,-50%);
+    background:conic-gradient(from 0deg,transparent 0 64%,rgba(190,250,236,.3) 76%,
+      #DFFFF6 86%,#FFFFFF 90%,#DFFFF6 94%,transparent 100%);
+    animation:jn-spin 3.2s linear infinite}
+  @keyframes jn-spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+  /* the journal screen */
+  .jn-scrim{position:fixed;inset:0;z-index:91;display:none;flex-direction:column;
+    background:radial-gradient(120% 50% at 50% 0%,rgba(36,104,120,.5),transparent 68%),
+      linear-gradient(180deg,#0A2430 0%,#04131D 100%);
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif}
+  html.jn-on .jn-scrim{display:flex}
+  .jn-head{flex:none;display:flex;align-items:center;gap:10px;
+    padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 12px}
+  .jn-head b{flex:1;min-width:0;font-size:19px;font-weight:800;color:#fff;letter-spacing:-.015em}
+  .jn-x{flex:none;width:34px;height:34px;border:none;border-radius:50%;cursor:pointer;
+    font-family:inherit;font-size:15px;color:rgba(240,255,252,.9);
+    background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(170,232,246,.26)}
+  .jn-body{flex:1;min-height:0;overflow-y:auto;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 24px)}
+  .jn-day{margin-bottom:22px}
+  .jn-date{font-size:13px;font-weight:800;color:#8CF0D4;margin-bottom:9px}
+  .jn-sec{margin:12px 0 7px;font-size:9.5px;font-weight:800;letter-spacing:.14em;
+    text-transform:uppercase;color:rgba(170,232,246,.55)}
+  .jn-sec.warn{color:rgba(255,206,140,.7)}
+  .jn-sec b{margin-left:5px;color:#fff}
+  .jn-list{display:flex;flex-direction:column;gap:7px}
+  .jn-w{position:relative;display:block;width:100%;text-align:left;border:none;cursor:pointer;
+    padding:11px 13px;border-radius:13px;font-family:inherit;
+    background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(180,235,250,.16)}
+  .jn-w:active{transform:scale(.99)}
+  .jn-w b{display:block;font-size:14px;font-weight:700;color:#fff}
+  .jn-w i{display:block;margin-top:2px;font-style:normal;font-size:11.5px;
+    color:rgba(200,240,236,.72)}
+  .jn-w.miss{background:rgba(255,190,110,.1);box-shadow:inset 0 0 0 1px rgba(255,206,140,.26)}
+  .jn-tag{position:absolute;right:11px;top:11px;font-size:9.5px;font-weight:800;
+    letter-spacing:.04em;color:rgba(255,214,160,.8);
+    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif}
+  .jn-empty{padding:48px 18px;text-align:center;font-size:13px;line-height:1.6;
+    color:rgba(200,240,236,.65)}
+
+  /* ============================================================
      LETTER TRAIL AND WORD PAIRS
 
      One shell for both games: the game's own box art at the top, the
@@ -5276,6 +5362,13 @@
 <button id="dict-back" onclick="closeDictPage()" aria-label="Back to the island">← Back to the island</button>
 <div class="fw-voyage" id="fw-voyage"></div>
 <div class="fw-hint" id="fw-hint"></div>
+<div class="jn-scrim" id="jn-scrim">
+  <div class="jn-head">
+    <b>Focci’s Journal</b>
+    <button class="jn-x" onclick="jnClose()" aria-label="Close">✕</button>
+  </div>
+  <div class="jn-body" id="jn-body"></div>
+</div>
 <div class="ht-scrim" id="ht-scrim">
   <div class="ht-shelf" id="ht-shelf">
     <div class="fh-top">
@@ -5443,6 +5536,20 @@
     <span class="fh-learn-play">▶</span>
   </button>
 
+  <div class="jn-home">
+    <div class="jn-top">
+      <button class="jn-arw" onclick="jnStep(1)" aria-label="Earlier">‹</button>
+      <div class="jn-ttl"><b id="jn-range">This week</b><span id="jn-sub"></span></div>
+      <button class="jn-arw" id="jn-next" onclick="jnStep(-1)" aria-label="Later">›</button>
+    </div>
+    <div class="jn-chart" id="jn-chart"></div>
+    <button class="jn-btn" onclick="jnOpen()">
+      <i class="jn-edge" aria-hidden="true"></i>
+      ✧ Focci’s Journal
+    </button>
+  </div>
+
+
   <div class="fh-rule"><span></span><b>✦</b><span></span></div>
 
   <h2 class="fh-h2">Mini Games</h2>
@@ -5558,6 +5665,7 @@
 
 <script src="./residents.js"></script>
 <script src="./hottake.js"></script>
+<script src="./journal.js"></script>
 <script src="./app.js"></script>
 <script src="./story-content.js"></script>
 <script src="./story.js"></script>
@@ -6037,6 +6145,7 @@
   };
   fxRefreshXP();
   setInterval(fxRefreshXP, 4000);
+  if (window.jnRenderChart) jnRenderChart();
 
   /* ---- the search box remembers ----
      Every lookup is already in the history with its meaning in the

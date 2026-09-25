@@ -146,6 +146,8 @@ async function logEvent(type, word){
     // story passage — lands here, so this is the one place the word-bank's
     // "new word" detector needs to watch.
     if(type==='search' && word) histPush(word);
+    // the day's record — see journal.js
+    if(type==='search' && word && typeof window.jnLogWord==='function') window.jnLogWord(word);
     // Feeds the per-day word count the residents' adoption streak reads.
     if(type==='search' && word && typeof window.resDayBump==='function'){
       try{ window.resDayBump(); }catch(e){}
@@ -4426,6 +4428,7 @@ async function pickMatch(i){
   const r=matchRounds[matchIdx], choice=r.opts[i];
   const ok=choice.word===r.answer.word;
   r._ok=ok;
+  if(!ok && typeof window.jnLogMiss==='function') window.jnLogMiss(r.answer.word,'Word Pairs');
   matchPicked={word:choice.word, ok};
   if(ok){ matchHits++; addXP(3); }
   await logEvent(ok?'review_correct':'review_wrong', r.answer.word);
@@ -5310,6 +5313,9 @@ async function checkReview(){
   const correct=exact||close;
   await gradeAndLog(r, correct);
   revResults[revIdx]=correct?'correct':'wrong';
+  // Only the misses are written down. A journal that also logged every
+  // right answer would be a scoreboard, and nobody rereads their own.
+  if(!correct && typeof window.jnLogMiss==='function') window.jnLogMiss(r.word,'Letter Trail');
   if(correct) revCorrectCount++;
   addXP(correct?(close?2:3):0);
   revState={correct, close}; renderReview();

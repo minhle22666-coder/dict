@@ -5,13 +5,14 @@
    every image is cached automatically the first time it's fetched
    successfully, which happens naturally the first time you open the
    app online. */
-const CACHE = 'focci-v145';
+const CACHE = 'focci-v146';
 const SHELL = [
   './',
   './index.html',
   './app.js',
   './residents.js',
   './hottake.js',
+  './journal.js',
   './hottake.json',
   './box-hottake.png',
   './box-wordpairs.png',
