@@ -4019,7 +4019,7 @@ const QCOUNT_LS='fc_qcount', POOL_LS='fc_match_pool', LEVEL_LS='fc_level';
 const QCOUNTS=[5,10,20,30,50];
 function getQCount(){ const n=+localStorage.getItem(QCOUNT_LS); return QCOUNTS.indexOf(n)>=0?n:5; }
 function setQCount(n){ localStorage.setItem(QCOUNT_LS,String(n)); renderPracticeSetup(); }
-const POOLS=[['all','Whole library'],['searched','Words I searched'],['saved','My saved words']];
+const POOLS=[['all','The Whole Dictionary'],['searched','Words I searched'],['saved','My saved words']];
 function getPool(){ const p=localStorage.getItem(POOL_LS); return POOLS.some(x=>x[0]===p)?p:'all'; }
 function setPool(p){ dueReviewMode=false; localStorage.setItem(POOL_LS,p); renderPracticeSetup(); }
 function getLevel(){ const l=localStorage.getItem(LEVEL_LS); return (l&&LEVEL_NAMES[+l])?+l:0; }   // 0 = every level
@@ -4081,48 +4081,84 @@ function dropdownRow(label, note, opts, onChange){
   h+='</select></div>';
   return h;
 }
+/* ============================================================
+   THE SHELL BOTH WORD GAMES SIT IN
+
+   Settings and question on one screen. The old flow was a setup page,
+   a Start button, and then a separate play page — so changing the level
+   meant leaving the round, and you could not see what you were choosing
+   against. Here the three dials stay at the top and the question lives
+   under them; move a dial and the round simply starts again.
+   ============================================================ */
+const PG_META = {
+  type:  { art:'box-lettertrail.png', fox:'fox-letter-trail.png', name:'Letter Trail' },
+  match: { art:'box-wordpairs.png',   fox:'fox-word-pairs.webp',  name:'Word Pairs'  }
+};
+function setQCountIdx(i){ setQCount(QCOUNTS[Math.max(0,Math.min(QCOUNTS.length-1,+i))]); }
+window.setQCountIdx=setQCountIdx;
+
+function pgControls(){
+  const n=getQCount(), lv=getLevel(), pool=getPool();
+  const qi=Math.max(0,QCOUNTS.indexOf(n));
+  const lvLabel = lv===0 ? 'Any' : LEVEL_NAMES[lv];
+  let h='<div class="pg-ctl">';
+  h+='<div class="pg-row"><div class="pg-lab">Number of questions<span class="pg-val num">'+n+'</span></div>'
+    +'<input type="range" min="0" max="'+(QCOUNTS.length-1)+'" step="1" value="'+qi
+    +'" aria-label="Number of questions" onchange="setQCountIdx(this.value)"/></div>';
+  h+='<div class="pg-row"><div class="pg-lab">Choose your level<span class="pg-val num">'+lvLabel+'</span></div>'
+    +'<input type="range" min="0" max="6" step="1" value="'+lv
+    +'" aria-label="Choose your level" onchange="setLevel(+this.value)"/></div>';
+  h+='<div class="pg-row"><div class="pg-lab">In Your Library</div>'
+    +'<select class="pg-sel" aria-label="In Your Library" onchange="setPool(this.value)">'
+    +POOLS.map(p=>'<option value="'+p[0]+'"'+(p[0]===pool?' selected':'')+'>'+esc(p[1])+'</option>').join('')
+    +'</select></div>';
+  return h+'</div>';
+}
+
+function gameShell(body){
+  const m=PG_META[practiceMode]||PG_META.match;
+  const back=(typeof renderGameHub==='function')
+    ? '<button class="hub-back" onclick="renderGameHub()">\u2190 Games</button>' : '';
+  return '<div class="pg">'+back
+    +'<div class="pg-head">'
+    +  '<img class="bg" src="./'+m.art+'" alt="" onerror="this.style.display=\'none\'"/>'
+    +  '<div class="name">'+m.name+'</div>'
+    +  '<img class="fox" src="./'+m.fox+'" alt="" onerror="this.style.display=\'none\'"/>'
+    +'</div>'
+    +pgControls()+body+'</div>';
+}
+
+/* The card the question lives in: mascot breaking the top edge, what the
+   round is worth in the corner. */
+function pgCard(pose, bubble, inner, xp){
+  return '<div class="pg-card">'
+    +'<img class="pg-mascot" src="./mascot-'+pose+'.webp" alt="" onerror="this.style.display=\'none\'"/>'
+    +(xp?'<div class="pg-xp num">+'+xp+'XP</div>':'')
+    +(bubble?'<div class="pg-bub">'+esc(bubble)+'</div>':'')
+    +inner+'</div>';
+}
+
 async function renderPracticeSetup(){
   practiceStage='setup';
   const area=$('#review-area'); if(!area) return;
   await loadLevels();
-  const n=getQCount(), pool=getPool(), lv=getLevel();
-
-  let h=gameSwitch();
-  h+='<div class="setup-card">';
-  h+='<div class="setup-head"><img src="./mascot-'+(practiceMode==='type'?'take_note':'investigate')+'.webp" alt=""/>'
-    +'<div><div class="setup-t">'+(practiceMode==='type'?'Type it':'Match it')+'</div>'
-    +'<div class="setup-s">'+(practiceMode==='type'
-        ? 'Focci shows the Vietnamese meaning — you spell the English word. Uses your saved ⭐ words.'
-        : 'Focci shows the Vietnamese meaning — you pick the right word out of six.')
-    +'</div></div></div>';
-
-  h+=chipRow('How many questions','one round',
-    QCOUNTS.map(c=>({label:String(c), on:c===n, act:'setQCount('+c+')'})));
-
-  const levelOpts=[{label:'Any', on:lv===0, act:'setLevel(0)'}]
-    .concat([1,2,3,4,5,6].map(l=>({label:LEVEL_NAMES[l], on:lv===l, act:'setLevel('+l+')'})));
-  h+=chipRow('Difficulty','by word frequency, not official CEFR', levelOpts);
-
-  if(practiceMode==='match'){
-    h+=dropdownRow('Which words','answers come from here',
-      POOLS.map(p=>({value:p[0], label:p[1], on:p[0]===pool})), 'setPool');
-  }
-
-  // tell them up front how many words actually qualify — no dead-end rounds
   const avail=await availableWords();
-  h+='<div class="setup-avail">'+(avail.length
-      ? '<b>'+avail.length.toLocaleString()+'</b> word'+(avail.length===1?'':'s')+' match these settings'
-        +(avail.length<n?' — this round will be '+avail.length+' question'+(avail.length===1?'':'s')+'.':'.')
-      : 'No words match these settings yet.')+'</div>';
-  h+='<button class="btn'+(avail.length?'':' disabled')+'" onclick="startPractice()">'
-    +(avail.length?'Start round →':'Nothing to practise')+'</button>';
-  h+='</div>';
-
-  if(!avail.length) h+=setupEmptyHelp();
-  area.innerHTML=h;
+  if(!avail.length){
+    area.innerHTML=gameShell(pgCard('wonder','Nothing to practise yet',
+      '<div class="pg-empty">'+setupEmptyWhy()+'</div>'));
+    return;
+  }
+  startPractice();          // the dials stay on screen; the round begins under them
 }
 window.renderPracticeSetup=renderPracticeSetup;
 
+function setupEmptyWhy(){
+  return practiceMode==='type'
+    ? 'Letter Trail quizzes the words you saved with the star. Save a few from any word page, or switch to Word Pairs \u2014 that one works with your whole library.'
+    : (getPool()==='saved' ? 'You have not saved any words yet \u2014 tap the star on a word page.'
+      : getPool()==='searched' ? 'You have not searched any words yet. Look a few up and they will land in this pool.'
+      : 'Try setting the level back to Any \u2014 that level may have no words yet.');
+}
 function setupEmptyHelp(){
   const why = practiceMode==='type'
     ? 'Type it quizzes the words you saved with the ☆. Save a few from any word page, or switch to <b>Match it</b> — that one works with your whole library.'
@@ -4359,16 +4395,14 @@ function renderMatch(){
   }
   const r=matchRounds[matchIdx];
   const states=matchRounds.map((x,i)=> i<matchIdx ? (x._ok?'done':'wrong') : (i===matchIdx?'current':'todo'));
-  let h=roundBar(matchIdx, matchRounds.length, states);
 
   let pose='investigate', bubble="Which word means this?";
   if(matchPicked){
     if(matchPicked.ok){ pose='thumbsup'; bubble=pick(["Spot on!","That's the one!","Sharp eye!"]); }
     else { pose='tired'; bubble="Not quite — here's the right one."; }
   }
-  h+=gameHero(pose,bubble);
 
-  h+='<div class="match-meaning">'+esc(r.meaning)+levelTag(r.answer.word)+'</div>';
+  let h='<div class="pg-q">'+esc(r.meaning)+levelTag(r.answer.word)+'</div>';
   h+='<div class="match-grid">';
   r.opts.forEach((o,i)=>{
     let cls='match-opt';
@@ -4384,7 +4418,8 @@ function renderMatch(){
   });
   h+='</div>';
   if(matchPicked) h+=swipeOn();
-  area.innerHTML=h;
+  area.innerHTML=gameShell(roundBar(matchIdx, matchRounds.length, states)
+    + pgCard(pose, bubble, h, 5));
 }
 async function pickMatch(i){
   if(matchPicked) return;
@@ -5226,20 +5261,15 @@ function renderReview(){
   const prompt=reviewPrompt(d);
   const states=revQueue.map((x,i)=> revResults[i]==='correct' ? 'done'
     : revResults[i]==='wrong' ? 'wrong' : (i===revIdx?'current':'todo'));
-  let h=roundBar(revIdx, revQueue.length, states);
-
   let pose='run_and_think', bubble="Hmm… which word was it?";
   if(revState){
     if(revState.correct && !revState.close){ pose='thumbsup'; bubble=pick(["Nailed it!","That's the one!","Exactly right!"]); }
     else if(revState.correct){ pose='wonder'; bubble="So close — just the spelling!"; }
     else { pose='tired'; bubble=pick(["We'll get it next time.","Tricky one. Keep going!"]); }
   }
-  h+=gameHero(pose,bubble);
 
-  h+='<div class="rev-card">';
-  h+='<div class="prompt">What\'s the English word for…</div>';
-  h+='<div class="q">'+esc(prompt)+levelTag(r.word)+'</div>';
-  if(d.vi_note && !revState) h+='<div class="q-note">'+esc(d.vi_note)+'</div>';
+  let h='<div class="pg-q">'+esc(prompt)+levelTag(r.word)+'</div>';
+  if(d.vi_note && !revState) h+='<div class="pg-note">'+esc(d.vi_note)+'</div>';
 
   if(!revState){
     h+=maskHint(r.word);
@@ -5252,15 +5282,14 @@ function renderReview(){
     const s0=(d.senses||[])[0];
     if(s0&&s0.example) h+='<div class="ex" style="margin-top:10px">“'+esc(s0.example)+'”'+(s0.example_vi?'<span class="evi">→ '+esc(s0.example_vi)+'</span>':'')+'</div>';
   }
-  h+='</div>';
-
   if(!revState){
     h+='<button class="btn" style="margin-top:14px" onclick="checkReview()">Check</button>';
     h+='<button class="link-skip" onclick="skipReview()">I don\'t know — show me</button>';
   } else {
     h+=swipeOn();
   }
-  area.innerHTML=h;
+  area.innerHTML=gameShell(roundBar(revIdx, revQueue.length, states)
+    + pgCard(pose, bubble, h, 3));
   const inp=$('#rev-input'); if(inp){ inp.focus(); inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); checkReview(); } }); }
 }
 async function gradeAndLog(r, correct){
