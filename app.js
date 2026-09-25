@@ -6484,7 +6484,19 @@ function showView(v){
     else { $('#dashboard').style.display='block'; $('#topbar-back').style.display='none'; renderDashboard(); }
   }
   if(v==='saved') renderSaved();
-  if(v==='review'){ if(typeof renderGameHub==='function') renderGameHub(); else startReview(); }
+  if(v==='review'){
+    /* Opening this panel renders the story hub. When the caller is on
+       their way into a mini-game that hub is not what they asked for, and
+       racing it by calling setPracticeMode straight afterwards was
+       exactly that — a race, which the hub sometimes won. The caller
+       states its intention instead. */
+    if(window.__pendingPractice){
+      const m=window.__pendingPractice; window.__pendingPractice=null;
+      setPracticeMode(m);
+    }
+    else if(typeof renderGameHub==='function') renderGameHub();
+    else startReview();
+  }
   if(v==='stats') renderInsights();
   if(v==='settings'){ refreshStats(); if(typeof scanRefreshState==='function'){ scanRefreshState().catch(()=>{}); missRefreshState(); } if(typeof renderTargetLevelUI==='function') renderTargetLevelUI(); }
 }

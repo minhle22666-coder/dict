@@ -72,11 +72,14 @@
   };
 
   /* ---------------- the chart on the home page ---------------- */
+  /* A fortnight at a time. Seven days is too short a run to see whether
+     anything is actually becoming a habit, and the arrows step by a week
+     so consecutive views overlap rather than jumping past a stretch. */
+  var SPAN = 14;
   function weekDays(back) {
-    // seven days ending today, shifted back by `back` weeks
     var out = [];
     var end = new Date(Date.now() - back * 7 * DAY);
-    for (var i = 6; i >= 0; i--) out.push(new Date(end.getTime() - i * DAY));
+    for (var i = SPAN - 1; i >= 0; i--) out.push(new Date(end.getTime() - i * DAY));
     return out;
   }
   var DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -91,11 +94,12 @@
     var total = counts.reduce(function (a, b) { return a + b; }, 0);
 
     var label;
-    if (view === 0) label = 'This week';
-    else if (view === 1) label = 'Last week';
-    else label = view + ' weeks ago';
+    if (view === 0) label = 'The last fortnight';
+    else if (view === 1) label = 'A week earlier';
+    else label = view + ' weeks earlier';
+    var last = days[days.length - 1];
     var range = days[0].getDate() + '/' + (days[0].getMonth() + 1)
-      + ' – ' + days[6].getDate() + '/' + (days[6].getMonth() + 1);
+      + ' – ' + last.getDate() + '/' + (last.getMonth() + 1);
 
     document.getElementById('jn-range').textContent = label;
     document.getElementById('jn-sub').textContent = range + ' · ' + total + ' word' + (total === 1 ? '' : 's');
@@ -153,7 +157,7 @@
         }
         if (d.misses.length) {
           h += '<div class="jn-sec warn">Worth another look <b class="num">' + d.misses.length + '</b></div>';
-          h += '<div class="jn-list">' + d.misses.map(function (w) {
+          h += '<div class="jn-list misses">' + d.misses.map(function (w) {
             return '<button class="jn-w miss" onclick="jnGo(\'' + esc(w.w) + '\')"><b>' + esc(w.w) + '</b>'
               + (w.vi ? '<i>' + esc(w.vi) + '</i>' : '')
               + '<span class="jn-tag">' + esc(w.game || 'game') + (w.n > 1 ? ' ×' + w.n : '') + '</span></button>';

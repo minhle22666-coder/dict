@@ -1076,7 +1076,7 @@
     min-height:94px;padding:12px 54px 12px 12px;border-radius:16px;   /* a fifth taller */
     background:
       linear-gradient(105deg,rgba(9,28,32,.74) 0%,rgba(12,44,44,.68) 52%,rgba(16,56,46,.62) 100%),
-      url('./bg-arc5.webp') center/cover no-repeat;
+      url('./bg-arc4.webp') center/cover no-repeat;
     box-shadow:0 8px 22px rgba(0,0,0,.42),inset 0 0 0 1px rgba(190,250,240,.18);
     backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
     transition:transform .14s ease}
@@ -1326,6 +1326,36 @@
   #v-saved .empty{color:rgba(206,242,236,.75)}
 
   /* ============================================================
+     SETTINGS, in the app's own green
+
+     It was the last screen still wearing the old purple card theme.
+     ============================================================ */
+  #v-settings{font-family:'Raleway Local','Raleway',system-ui,sans-serif}
+  #v-settings .sx-status{background:linear-gradient(140deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.2);border:none;border-radius:18px;
+    backdrop-filter:blur(12px) saturate(1.3);-webkit-backdrop-filter:blur(12px) saturate(1.3)}
+  #v-settings .sx-stat b{color:#fff;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif}
+  #v-settings .sx-stat i{color:rgba(200,240,236,.66)}
+  #v-settings .sx-card,#v-settings details,#v-settings .card{
+    border:none;border-radius:18px;
+    background:linear-gradient(140deg,rgba(255,255,255,.1),rgba(255,255,255,.035));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.16)}
+  #v-settings summary,#v-settings h3,#v-settings label{color:rgba(236,255,250,.9)}
+  #v-settings .sx-hint,#v-settings p{color:rgba(200,240,236,.68)}
+  #v-settings input[type=text],#v-settings input[type=number],
+  #v-settings input[type=password],#v-settings select,#v-settings textarea{
+    border:none;border-radius:12px;color:#F2FFFB;
+    background:rgba(4,20,28,.45);box-shadow:inset 0 0 0 1px rgba(180,235,250,.22)}
+  #v-settings .btn{border:none;color:#06312C;
+    background:linear-gradient(180deg,#CFF6E8,#7FDCC8)}
+  #v-settings .sx-tabs{border:none;
+    background:linear-gradient(140deg,rgba(255,255,255,.1),rgba(255,255,255,.035));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.18)}
+  #v-settings .sx-tab{color:rgba(222,246,252,.7);background:none;border:none}
+  #v-settings .sx-tab.on{color:#06312C;background:linear-gradient(180deg,#CFF6E8,#7FDCC8)}
+  #v-settings .sx-stat{border:none}
+
+  /* ============================================================
      FOCCI'S JOURNAL
 
      A week of columns on the home page, and behind the button a day by
@@ -1346,16 +1376,24 @@
   .jn-arw:disabled{opacity:.3;cursor:default}
   .jn-arw:active{transform:scale(.92)}
 
-  .jn-chart{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end}
-  .jn-col{display:flex;flex-direction:column;align-items:center;gap:4px}
-  .jn-bar{width:100%;height:62px;display:flex;align-items:flex-end;border-radius:8px;
-    background:rgba(255,255,255,.07);overflow:hidden}
-  .jn-bar i{display:block;width:100%;border-radius:8px;
-    background:linear-gradient(180deg,#BFF4E4,#5FC9B6);
-    transition:height .5s cubic-bezier(.25,1,.4,1)}
-  .jn-col.now .jn-bar i{background:linear-gradient(180deg,#FFE9A8,#F2B44C)}
-  .jn-n{font-size:10px;font-weight:800;color:rgba(214,244,238,.8);min-height:12px}
-  .jn-d{font-size:9.5px;font-weight:700;color:rgba(190,230,246,.5)}
+  /* Fourteen days, not seven: one week is too short a run to see a habit
+     in. The columns are a gradient that fades out towards the bottom and
+     carries its own glow, so they read as light rather than as blocks of
+     flat paint. */
+  .jn-chart{display:grid;grid-template-columns:repeat(14,1fr);gap:3px;align-items:end}
+  .jn-col{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
+  .jn-bar{width:100%;height:64px;display:flex;align-items:flex-end;border-radius:5px;
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+    overflow:hidden}
+  .jn-bar i{display:block;width:100%;border-radius:5px 5px 3px 3px;
+    background:linear-gradient(180deg,#E6FFF7 0%,#8CF0D4 38%,rgba(70,190,175,.55) 100%);
+    box-shadow:0 0 12px rgba(140,240,212,.35);
+    transition:height .6s cubic-bezier(.25,1,.4,1)}
+  .jn-col.now .jn-bar i{
+    background:linear-gradient(180deg,#FFF6DC 0%,#FFD98A 38%,rgba(226,150,50,.6) 100%);
+    box-shadow:0 0 14px rgba(255,200,110,.45)}
+  .jn-n{font-size:9px;font-weight:800;color:rgba(214,244,238,.78);min-height:11px}
+  .jn-d{font-size:8.5px;font-weight:700;color:rgba(190,230,246,.42)}
 
   /* the way in, with a light going round it */
   .jn-btn{position:relative;display:flex;align-items:center;justify-content:center;gap:9px;
@@ -1396,18 +1434,24 @@
     text-transform:uppercase;color:rgba(170,232,246,.55)}
   .jn-sec.warn{color:rgba(255,206,140,.7)}
   .jn-sec b{margin-left:5px;color:#fff}
-  .jn-list{display:flex;flex-direction:column;gap:7px}
-  .jn-w{position:relative;display:block;width:100%;text-align:left;border:none;cursor:pointer;
-    padding:11px 13px;border-radius:13px;font-family:inherit;
-    background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(180,235,250,.16)}
-  .jn-w:active{transform:scale(.99)}
-  .jn-w b{display:block;font-size:14px;font-weight:700;color:#fff}
-  .jn-w i{display:block;margin-top:2px;font-style:normal;font-size:11.5px;
-    color:rgba(200,240,236,.72)}
-  .jn-w.miss{background:rgba(255,190,110,.1);box-shadow:inset 0 0 0 1px rgba(255,206,140,.26)}
-  .jn-tag{position:absolute;right:11px;top:11px;font-size:9.5px;font-weight:800;
-    letter-spacing:.04em;color:rgba(255,214,160,.8);
-    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif}
+  /* A list, not a stack of boxes. Every word in its own card gave fifty
+     identical rectangles and no sense of what belonged to what; a single
+     rule down the side does the grouping and lets the words themselves
+     carry the weight. */
+  .jn-list{display:flex;flex-direction:column;
+    border-left:2px solid rgba(140,240,212,.22);padding-left:14px;margin-left:2px}
+  .jn-w{position:relative;display:flex;align-items:baseline;gap:12px;width:100%;
+    text-align:left;border:none;background:none;cursor:pointer;font-family:inherit;
+    padding:9px 0;border-radius:0}
+  .jn-w + .jn-w{box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+  .jn-w:active{opacity:.6}
+  .jn-w b{flex:none;font-size:14.5px;font-weight:700;color:#fff}
+  .jn-w i{flex:1;min-width:0;margin:0;font-style:normal;font-size:12px;text-align:right;
+    color:rgba(200,240,236,.68);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jn-list.misses{border-left-color:rgba(255,206,140,.32)}
+  .jn-w.miss b{color:#FFE9C4}
+  .jn-tag{flex:none;font-size:9px;font-weight:800;letter-spacing:.04em;
+    color:rgba(255,206,140,.7);font-family:Helvetica,'Helvetica Neue',Arial,sans-serif}
   .jn-empty{padding:48px 18px;text-align:center;font-size:13px;line-height:1.6;
     color:rgba(200,240,236,.65)}
 
@@ -2109,8 +2153,17 @@
     --line:rgba(31,175,180,.22)}
   /* The panes themselves get an edge and a soft lift, so they read as
      separate sheets of glass over the haze rather than flat fills. */
-  html.dict-open #v-home .entry > div{
-    box-shadow:0 2px 14px rgba(18,120,125,.07)}
+  /* No rims. Every block on the entry was drawing a pale hairline border
+     from the app's default card theme, so the page read as a grid of
+     boxes laid on the glass rather than as one flat sheet. The soft drop
+     shadow does all the separating that is wanted here. */
+  html.dict-open #v-home .entry > div,
+  html.dict-open #v-home .card,
+  html.dict-open #v-home .sense,
+  html.dict-open #v-home .block{
+    border:none;box-shadow:0 2px 14px rgba(18,120,125,.07)}
+  html.dict-open #v-home .entry > div::before,
+  html.dict-open #v-home .entry > div::after{border-color:transparent}
   /* The world's own fan-out menu sits at z-index 56, above this page, and
      was hanging over the entry. It belongs to the island, not here. */
   html.dict-open .fw-menu-cluster{display:none}
@@ -6109,8 +6162,10 @@
     if (btn) { btn.classList.remove('tapped'); void btn.offsetWidth; btn.classList.add('tapped'); }
     setTimeout(() => {
       if (mode === 'hottake') { if (window.htOpen) htOpen(); return; }
+      // say which game before opening the panel, so the story hub never
+      // renders over the top of it — see showView('review')
+      window.__pendingPractice = mode;
       openFwPanel('review');
-      if (window.setPracticeMode) setPracticeMode(mode);
     }, 150);
   };
 
