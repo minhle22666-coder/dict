@@ -86,6 +86,7 @@
     for (var i = 0; i < 14; i++) { var d = dayBefore(i); if (m[d] !== undefined) keep[d] = m[d]; }
     writeJSON(DAYW_LS, keep);
     resCheckAdoption();
+    resBreedCheck();
   }
 
   /* Three days in a row where each day beat the one before it. Measured on
@@ -119,6 +120,7 @@
 
   function resCreate(species, opts) {
     opts = opts || {};
+    if (opts.bornHere) opts.bornAt = Date.now();
     var list = resLoad();
     var used = list.map(function (r) { return r.name; });
     var name = opts.name || nameFor(species, used);
@@ -134,6 +136,8 @@
       fedTotal: 0,
       parentOf: null,
       mateId: null,
+      bornHere: !!opts.bornHere,
+      parents: null,
       trait: opts.trait || TRAITS[Math.floor(Math.random() * TRAITS.length)],
       likes: opts.likes || LIKES[Math.floor(Math.random() * LIKES.length)],
       found: opts.found || null       // where Focci picked them up, if at sea
@@ -182,9 +186,23 @@
 
   /* ---------------- derived facts ---------------- */
   function resAgeDays(r) { return Math.max(0, Math.floor((Date.now() - (r.bornAt || r.adoptedAt)) / DAY)); }
+  /* Growing up takes food, time and a good life — not just the calendar.
+
+     An animal rescued off the water arrives part-grown, at 55% of adult
+     size. One born here starts at 30%, which is what makes a newborn
+     read as a newborn beside its parents.
+
+     From there the clock only runs at full speed for an animal that is
+     being fed and is happy. A neglected one is never harmed and never
+     punished, it simply takes longer to grow up — which is the same
+     bargain the whole island runs on. */
   function resGrowth(r) {
     var sp = SPECIES[r.species]; if (!sp) return 1;
-    return Math.min(1, 0.55 + 0.45 * (resAgeDays(r) / sp.adultDays));
+    var base = r.bornHere ? 0.30 : 0.55;
+    var ageFrac = resAgeDays(r) / sp.adultDays;
+    var meals = Math.min(1, (r.fedTotal || 0) / (sp.adultDays * 0.25));
+    var care = 0.55 + 0.30 * meals + 0.15 * ((r.happiness || 0) / 100);
+    return Math.min(1, base + (1 - base) * Math.min(1, ageFrac * care));
   }
   function resScale(r) {
     var sp = SPECIES[r.species]; if (!sp) return 1;
@@ -257,6 +275,7 @@
        + '<div><span>Size</span><b>' + Math.round(resGrowth(r) * 100) + '%</b></div>'
        + '</div>';
     if (mate) h += '<div class="rz-pair">♥ Paired with ' + esc(mate.name) + '</div>';
+    if (r.parents) h += '<div class="rz-born">\u2727 Born on the island to ' + esc(r.parents.join(' and ')) + '</div>';
     if (r.trait) h += '<div class="rz-trait">' + esc(r.trait) + '</div>';
     if (r.likes) h += '<div class="rz-likes">Loves <b>' + esc(r.likes) + '</b></div>';
     if (r.found) h += '<div class="rz-likes">Found ' + esc(r.found) + '</div>';
@@ -353,7 +372,9 @@
       var free = bySpecies[sp].filter(function (x) { return !x.mateId; });
       while (free.length >= 2) {
         var a = free.shift(), b = free.shift();
-        a.mateId = b.id; b.mateId = a.id; changed = true;
+        a.mateId = b.id; b.mateId = a.id;
+        a.pairedAt = b.pairedAt = Date.now();   // breeding waits on this
+        changed = true;
       }
     });
     if (changed) resSave(list);
@@ -364,6 +385,70 @@
   window.resRescueCost = resRescueCost;
   window.resRescue = resRescue;
   window.resPairUp = resPairUp;
+
+
+  /* ---------------- young ----------------
+
+     A pair who have been together a while, are both grown, both well fed
+     and both happy, have a baby. Every one of those is a condition about
+     CARE: nothing here breeds on its own while you are away and ignoring
+     them, and nothing breeds fast.
+
+     There are hard caps as well — per species and for the island — so it
+     cannot turn into a farm. When the island is full the pair simply go
+     on living together, which is the point of them.
+  */
+  var BREED_WAIT_DAYS = 4;        // together this long first
+  var BREED_COOLDOWN_DAYS = 14;   // and this long between litters
+  var BREED_MIN_ENERGY = 62;
+  var BREED_MIN_HAPPY = 72;
+  var MAX_PER_SPECIES = 4;
+  var MAX_RESIDENTS = 14;
+
+  function resBreedCheck() {
+    var list = resTick();
+    if (list.length >= MAX_RESIDENTS) return null;
+    var count = {};
+    list.forEach(function (r) { count[r.species] = (count[r.species] || 0) + 1; });
+    var now = Date.now();
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i];
+      if (!a.mateId) continue;
+      var b = list.find(function (x) { return x.id === a.mateId; });
+      if (!b || b.id < a.id) continue;                       // handle each pair once
+      if ((count[a.species] || 0) >= MAX_PER_SPECIES) continue;
+      if (!a.pairedAt || now - a.pairedAt < BREED_WAIT_DAYS * DAY) continue;
+      var last = Math.max(a.lastBirth || 0, b.lastBirth || 0);
+      if (last && now - last < BREED_COOLDOWN_DAYS * DAY) continue;
+      if (!resIsAdult(a) || !resIsAdult(b)) continue;
+      if (a.energy < BREED_MIN_ENERGY || b.energy < BREED_MIN_ENERGY) continue;
+      if (a.happiness < BREED_MIN_HAPPY || b.happiness < BREED_MIN_HAPPY) continue;
+
+      // a smaller copy of its parents, with a little of each of them in it
+      var kid = resCreate(a.species, {
+        bornHere: true,
+        trait: a.trait,
+        likes: b.likes,
+        found: 'born here, to ' + a.name + ' and ' + b.name
+      });
+      kid.parents = [a.name, b.name];
+      var fresh = resLoad();
+      var k = fresh.find(function (x) { return x.id === kid.id; });
+      if (k) { k.parents = kid.parents; k.energy = 85; k.happiness = 88; }
+      var pa = fresh.find(function (x) { return x.id === a.id; });
+      var pb = fresh.find(function (x) { return x.id === b.id; });
+      if (pa) pa.lastBirth = now;
+      if (pb) pb.lastBirth = now;
+      resSave(fresh);
+
+      try {
+        if (window.fwToast) window.fwToast(kid.name + ' was born to ' + a.name + ' and ' + b.name);
+        document.dispatchEvent(new CustomEvent('focci-resident-new', { detail: { id: kid.id, born: true } }));
+      } catch (e) {}
+      return kid;
+    }
+    return null;
+  }
 
   /* ---------------- exports ---------------- */
   window.RES_SPECIES = SPECIES;
@@ -383,5 +468,11 @@
   window.resMood = resMood;
   window.resLine = resLine;
   window.resInfoHtml = resInfoHtml;
+  window.resBreedCheck = resBreedCheck;
+  /* What the island costs a day, honestly: energy drains DRAIN_PER_DAY,
+     one feed gives FEED_ENERGY and costs FEED_XP. */
+  window.resUpkeep = function () {
+    return resLoad().length * Math.ceil((DRAIN_PER_DAY / FEED_ENERGY) * FEED_XP);
+  };
   window.resDayCounts = function () { return readJSON(DAYW_LS, {}); };
 })();
