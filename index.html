@@ -2293,9 +2293,41 @@
     --a1:#67DEE1; --a2:#2AAFB4; --cta-ink:#04333A; --cta-glow:rgba(103,222,225,.5);
     --grad-hero:linear-gradient(135deg,#2FBFC3,#67DEE1);
     --cta:linear-gradient(180deg,#67DEE1 0%,#2AAFB4 100%);
-    --surface:rgba(255,255,255,.88);
-    --surface-2:rgba(255,255,255,.66);
-    --line:rgba(31,175,180,.22)}
+    /* The blocks were white at two thirds opacity sitting on a sheet that
+       is itself white, which is precisely why every one of them showed
+       its own rectangle: the fill was invisible and only the EDGE of it
+       registered. Found by listing every element on the page with a light
+       background rather than by hunting selectors -- the verb forms, the
+       YouGlish panel, the sense numbers and the level tag were all the
+       same two variables.
+
+       A faint mint wash instead. It is a colour rather than an absence of
+       one, so a block reads as a grouped area instead of as a cut-out,
+       and the hairline no longer has to do the work of showing where it
+       is.
+
+       The ink follows: --text and --muted still came from the old brown
+       palette at :root, which is where the brown underline under the
+       YouGlish link and the warm grey labels were coming from on a page
+       that is otherwise green. */
+    --surface:rgba(240,253,250,.9);
+    --surface-2:rgba(168,238,224,.24);
+    --line:rgba(31,175,180,.13);
+    --text:#123C40;
+    --muted:#5E8C8E;
+    /* The last two warm colours on the page. --amber was carrying the
+       preposition keywords and the word-family words, which is where the
+       orange on a mint sheet was coming from; the saved star still wants
+       gold and gets it back below. --coral marked the antonyms, and
+       terracotta against mint reads as a mistake rather than a contrast
+       -- a dusty rose says "the opposite of these" just as clearly and
+       belongs to the same picture. */
+    --amber:#12787D;
+    --coral:#C2657B;
+    --muted-2:#7FA6A7}
+  html.dict-open #v-home .hist-star.on,
+  html.dict-open #v-home .expr-star.on,
+  html.dict-open #v-home .icon-act.star.on{color:#E0A63C}
   /* The panes themselves get an edge and a soft lift, so they read as
      separate sheets of glass over the haze rather than flat fills. */
   /* No rims. Every block on the entry was drawing a pale hairline border
@@ -2309,6 +2341,15 @@
     border:none;box-shadow:0 2px 14px rgba(18,120,125,.07)}
   html.dict-open #v-home .entry > div::before,
   html.dict-open #v-home .entry > div::after{border-color:transparent}
+  /* One strip, not four cards. With the cards tinted rather than white
+     the 8px gaps between them became the thing you noticed -- four slots
+     of bare page showing through a mint bar. Closing the gaps and ruling
+     between the forms says the same thing without cutting the row up. */
+  html.dict-open #v-home .forms{gap:0;border-radius:14px;overflow:hidden;
+    background:rgba(168,238,224,.24)}
+  html.dict-open #v-home .form{background:none;border-radius:0;
+    box-shadow:inset 1px 0 0 rgba(31,175,180,.15)}
+  html.dict-open #v-home .form:first-child{box-shadow:none}
   /* The world's own fan-out menu sits at z-index 56, above this page, and
      was hanging over the entry. It belongs to the island, not here. */
   html.dict-open .fw-menu-cluster{display:none}
@@ -5052,6 +5093,35 @@
   .fw-map-cell.locked .fw-map-cell-n{opacity:.6}
   .fw-map-cell-lock{position:absolute;z-index:1;top:10px;right:10px;font-size:13px;opacity:.85}
   .fw-map-cell.here{border-color:rgba(255,255,255,.7)}
+  /* ============================================================
+     NOTHING TO HOLD DOWN ON
+
+     On an iPhone, resting a finger anywhere in the app raised the
+     selection loupe and the Copy / Look Up / Share bubble over whatever
+     was underneath. This is an app, not a web page: holding a word in a
+     story, a card in a game or a label on the island is not a request to
+     select text, and the magnifier appearing over the thing you were
+     looking at is worse than useless.
+
+     It was already switched off in four or five places, one at a time,
+     as each of them was noticed. Off everywhere instead, and switched
+     back on for the two cases that genuinely want it: anything you type
+     into, and the article column in Hot Take, where selecting a phrase
+     IS the gesture that looks it up.
+
+     -webkit-tap-highlight-color goes too -- the grey flash iOS paints
+     over a tapped element has nothing to do with this app's own press
+     states, and it lands on top of them.
+     ============================================================ */
+  html, body{
+    -webkit-touch-callout:none;
+    -webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;
+    -webkit-tap-highlight-color:transparent}
+  input, textarea, select, [contenteditable="true"], [contenteditable=""],
+  .ht-text, .ht-text *{
+    -webkit-touch-callout:default;
+    -webkit-user-select:text;-moz-user-select:text;-ms-user-select:text;user-select:text}
+
 </style>
 <link rel="stylesheet" href="./theme-overrides.css">
 </head>
@@ -6424,14 +6494,37 @@
       const q = (filter || '').trim().toLowerCase();
 
       if (q) {
-        let hits = [];
-        try {
-          hits = (await idbPrefix(window.norm ? window.norm(q) : q)) || [];
-        } catch (e) {}
+        /* Rank, don't truncate. The word you are most likely to be typing
+           is the short plain one -- "hope", not "hopelessness"; "hold",
+           not "hold your horses" -- and an exact match is not a guess at
+           all. Alphabetical order knows none of that, which is why typing
+           "ho" used to offer hoard, hoax and hobart. */
+        const key = window.norm ? window.norm(q) : q;
+        let words = [];
+        try { words = (await idbPrefixWords(key, 600)) || []; } catch (e) {}
         if (mine !== seq) return;                      // a later keystroke won
-        if (hits.length) {
-          hits = hits.filter(function (r) { return r.data; }).slice(0, 8)
-            .map(function (r) { return { w: r.word, vi: meaningOf(r) }; });
+        if (words.length) {
+          /* Words this reader has looked up before come first. Without
+             frequency data, length is only a guess at which word someone
+             means -- it puts "hoax" and "holy" ahead of "home" -- and
+             their own history is the one piece of real evidence on hand. */
+          const known = new Set((typeof histLoad === 'function' ? histLoad() : [])
+            .map(function (e) { return e && e.w; }).filter(Boolean));
+          const rank = function (w) {
+            if (w === key) return -1000;               // what they actually typed
+            let n = w.length;                          // the plain form is the short one
+            if (known.has(w)) n -= 40;                 // and they have been here before
+            if (w.indexOf(' ') >= 0) n += 60;          // phrases after single words
+            if (w.indexOf("'") >= 0) n += 30;
+            return n;
+          };
+          words.sort(function (a, b) { const d = rank(a) - rank(b); return d || (a < b ? -1 : 1); });
+          const picked = await Promise.all(words.slice(0, 8).map(async function (w) {
+            try { const rec = await idbGet(w); return rec && rec.data ? { w: w, vi: meaningOf(rec) } : null; }
+            catch (_) { return null; }
+          }));
+          if (mine !== seq) return;
+          const hits = picked.filter(Boolean);
           if (hits.length) { drop.innerHTML = rowsFrom(hits, 'In your dictionary'); return; }
         }
         drop.innerHTML = '<div class="sg-empty">No offline word starts with \u201c' + esc(q)

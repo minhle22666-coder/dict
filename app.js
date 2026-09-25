@@ -100,6 +100,26 @@ function idbPrefix(prefix){
     r.onerror=()=>rej(r.error);
   }));
 }
+/* Just the words, and a lot more of them.
+
+   idbPrefix hands back whole entries and stops at forty, and IndexedDB
+   walks a range in key order, so forty means forty ALPHABETICALLY. Type
+   "ho" and you got hoard, hoax, hobart, hobbies, hockey, hodges, hoe,
+   hold -- the list ran out long before "home" or "hope", which are the
+   only two anybody was likely to be typing. Checked: "hope" was not in
+   the result set at all.
+
+   Keys are small, so several hundred of them cost almost nothing and
+   give the caller enough to rank properly, instead of taking whatever
+   the alphabet happened to put first. */
+function idbPrefixWords(prefix, limit){
+  return tx('readonly').then(s=>new Promise((res,rej)=>{
+    const range=IDBKeyRange.bound(prefix, prefix+'\uffff');
+    const r=s.getAllKeys(range, limit||600);
+    r.onsuccess=()=>res(r.result||[]);
+    r.onerror=()=>rej(r.error);
+  }));
+}
 
 /* ---------- behavior log ---------- */
 function logTx(mode){ return db().then(d=>d.transaction(LOG,mode).objectStore(LOG)); }
