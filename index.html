@@ -1284,9 +1284,8 @@
      260px cap, so anything past about six words was cut to a "…" and
      the sentence never arrived.
      ============================================================ */
-  .fw-quote.reaction{max-width:min(86vw,340px)}
-  .fw-quote.reaction p{white-space:normal;overflow:visible;text-overflow:clip;
-    text-align:center;line-height:1.5}
+  /* (the rule that does this lives with the rest of .fw-quote.reaction
+     further down -- putting it here lost to it on source order) */
 
   /* ============================================================
      NOTHING TO SELECT IN A GAME
@@ -4886,11 +4885,21 @@
      moment — small, centered, quick, no avatar (that would make it look as
      weighty as the tree's actual dialogue). */
   .fw-quote.reaction{left:50%;right:auto;transform:translate(-50%,8px) scale(.97);
-    bottom:calc(env(safe-area-inset-bottom,0px) + 100px);padding:9px 16px;max-width:260px;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 100px);padding:9px 16px;max-width:min(86vw,340px);
     background:rgba(20,18,14,.58)}
   .fw-quote.reaction.show{transform:translate(-50%,0) scale(1)}
   .fw-quote.reaction img{display:none}
-  .fw-quote.reaction p{font-size:12.5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Focci gets to finish his sentence. This was nowrap inside a 260px box
+     with an ellipsis, so anything past about six words was cut to a "..."
+     and the line never arrived -- and a line break written into the
+     message had nowhere to go. pre-line keeps the breaks he was given and
+     wraps the rest.
+
+     Set here rather than earlier in the file on purpose: an identical rule
+     further up ties on specificity and loses on order, which is why the
+     first attempt at this appeared to do nothing. */
+  .fw-quote.reaction p{font-size:12.5px;text-align:center;line-height:1.5;
+    white-space:pre-line;overflow:visible;text-overflow:clip}
   /* The gold-glass version of this card used to be re-declared here and,
      coming later in the file, it quietly won over everything above. The
      blossom design is the design; there is no second one. */
