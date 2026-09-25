@@ -1211,6 +1211,67 @@
     font-variant-numeric:lining-nums tabular-nums}
 
   /* ============================================================
+     WHAT YOU LOOKED UP BEFORE
+
+     The search box opened onto nothing. Every word already looked up is
+     sitting in the history with its meaning attached, so the field shows
+     them the moment it is tapped and narrows as you type.
+     ============================================================ */
+  .sg-drop{position:fixed;z-index:96;display:none;max-height:54vh;overflow-y:auto;padding:6px;
+    border-radius:18px;font-family:'Raleway Local','Raleway',system-ui,sans-serif;
+    background:linear-gradient(180deg,rgba(13,48,54,.97),rgba(6,26,34,.98));
+    box-shadow:inset 0 0 0 1px rgba(160,220,245,.22),0 18px 44px rgba(0,0,0,.52);
+    backdrop-filter:blur(18px) saturate(1.3);-webkit-backdrop-filter:blur(18px) saturate(1.3)}
+  .sg-drop.on{display:block}
+  .sg-h{padding:8px 12px 6px;font-size:9.5px;font-weight:800;letter-spacing:.16em;
+    text-transform:uppercase;color:rgba(170,232,246,.55)}
+  .sg-row{display:block;width:100%;border:none;background:none;cursor:pointer;text-align:left;
+    padding:9px 12px;border-radius:12px;font-family:inherit}
+  .sg-row:active{background:rgba(255,255,255,.09)}
+  .sg-row b{display:block;font-size:14.5px;font-weight:700;color:#fff}
+  .sg-row i{display:block;margin-top:2px;font-style:normal;font-size:11.5px;
+    color:rgba(200,240,236,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sg-empty{padding:18px 14px;text-align:center;font-size:12px;line-height:1.5;
+    color:rgba(200,240,236,.6)}
+
+  /* ============================================================
+     SAVED, in the app's own green
+
+     This panel was still wearing the old purple card theme while
+     everything around it had moved to green glass.
+     ============================================================ */
+  #v-saved{font-family:'Raleway Local','Raleway',system-ui,sans-serif}
+  #v-saved .sv-tabs{background:linear-gradient(140deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.2);
+    backdrop-filter:blur(12px) saturate(1.3);-webkit-backdrop-filter:blur(12px) saturate(1.3)}
+  #v-saved .sv-tab{color:rgba(222,246,252,.72);background:none;border:none}
+  #v-saved .sv-tab.on{color:#06312C;background:linear-gradient(180deg,#CFF6E8,#7FDCC8);
+    box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  #v-saved .saved-count{color:rgba(214,244,238,.82)}
+  #v-saved .sort-cycle{color:rgba(214,244,238,.82);border:none;border-radius:999px;padding:7px 13px;
+    background:linear-gradient(140deg,rgba(255,255,255,.13),rgba(255,255,255,.05));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.2)}
+  #v-saved .sv-row{border:none;border-radius:16px;margin-bottom:9px;padding:13px 14px;
+    background:linear-gradient(140deg,rgba(255,255,255,.1),rgba(255,255,255,.04));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.16),0 4px 14px rgba(0,0,0,.2);
+    backdrop-filter:blur(10px) saturate(1.25);-webkit-backdrop-filter:blur(10px) saturate(1.25)}
+  #v-saved .sv-row:active{transform:scale(.985)}
+  #v-saved .sv-w{color:#fff;font-weight:800}
+  #v-saved .sv-e{color:rgba(206,242,236,.78)}
+  #v-saved .sv-when,#v-saved .sv-foot{color:rgba(186,226,240,.62);
+    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif}
+  #v-saved .sv-star{color:#FFD98A;background:none;border:none}
+  #v-saved .sv-sec-h{color:rgba(170,232,246,.6);font-weight:800;letter-spacing:.1em;
+    text-transform:uppercase;font-size:10px}
+  #v-saved .sv-hero{border:none;border-radius:20px;
+    background:linear-gradient(140deg,rgba(150,244,214,.2),rgba(60,150,140,.12));
+    box-shadow:inset 0 0 0 1px rgba(170,255,228,.28)}
+  #v-saved .sv-hero-n{color:#EAFFF9;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif}
+  #v-saved .sv-hero-t{color:rgba(226,250,244,.86)}
+  #v-saved .sv-hero-go{color:#06312C;background:linear-gradient(180deg,#CFF6E8,#7FDCC8);border:none}
+  #v-saved .empty{color:rgba(206,242,236,.75)}
+
+  /* ============================================================
      LETTER TRAIL AND WORD PAIRS
 
      One shell for both games: the game's own box art at the top, the
@@ -5895,6 +5956,67 @@
   document.documentElement.classList.add('home-on');
   document.querySelector('#fw-overlay').style.display = 'none';
   openFocciWorld3D();
+
+  /* ---- the search box remembers ----
+     Every lookup is already in the history with its meaning in the
+     dictionary, so the field opens onto what you have actually read
+     rather than onto nothing. */
+  (function () {
+    const drop = document.createElement('div');
+    drop.className = 'sg-drop';
+    document.body.appendChild(drop);
+    let host = null;
+
+    async function build(filter) {
+      const q = (filter || '').trim().toLowerCase();
+      const hist = (typeof histLoad === 'function' ? histLoad() : []).slice().reverse();
+      const picked = [];
+      for (const e of hist) {
+        if (!e || !e.w) continue;
+        if (q && e.w.indexOf(q) !== 0) continue;
+        if (picked.some((p) => p.w === e.w)) continue;
+        picked.push(e);
+        if (picked.length >= 8) break;
+      }
+      if (!picked.length) {
+        drop.innerHTML = '<div class="sg-empty">' + (q
+          ? 'Nothing looked up starting with that yet \u2014 press Enter and Focci will find it.'
+          : 'Words you look up gather here, with what they mean.') + '</div>';
+        return;
+      }
+      const rows = await Promise.all(picked.map(async (e) => {
+        let mean = '';
+        try {
+          const r = await idbGet(e.w);
+          const d = r && r.data;
+          mean = (d && (d.vi_equivalent || ((d.senses || [])[0] || {}).vi)) || '';
+        } catch (_) {}
+        return '<button class="sg-row" onmousedown="event.preventDefault()" onclick="sgPick(this.dataset.w)"'
+          + ' data-w="' + esc(e.w) + '"><b>' + esc(e.w) + '</b>'
+          + (mean ? '<i>' + esc(mean) + '</i>' : '') + '</button>';
+      }));
+      drop.innerHTML = '<div class="sg-h">Recent</div>' + rows.join('');
+    }
+    function place(input) {
+      const row = input.closest('.fh-top') || input;
+      const r = row.getBoundingClientRect();
+      drop.style.left = r.left + 'px';
+      drop.style.width = r.width + 'px';
+      drop.style.top = (r.bottom + 8) + 'px';
+    }
+    function show(input) { host = input; place(input); drop.classList.add('on'); build(input.value); }
+    function hide() { drop.classList.remove('on'); host = null; }
+    window.sgPick = function (w) { hide(); if (window.openDictPage) openDictPage(w); };
+
+    ['fh-search-input', 'ht-search-input'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('focus', () => show(el));
+      el.addEventListener('input', () => { if (host === el) build(el.value); });
+      el.addEventListener('blur', () => setTimeout(hide, 170));
+    });
+    window.addEventListener('resize', () => { if (host) place(host); });
+  })();
 
   /* Both search boxes — the home page's and the newsstand's — run the
      same lookup. */
