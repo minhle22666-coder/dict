@@ -1232,6 +1232,49 @@
   html.dict-open .fx-xp{display:none}
 
   /* ============================================================
+     THE WORD PAGE: NO HAIRLINES, AND A BETTER GREEN
+
+     Fifteen classes on this page were each drawing their own 0.8px
+     border — chips, forms, examples, the YouGlish panel, the part of
+     speech group — so the entry read as a diagram of rectangles laid
+     over the glass instead of one sheet. Found by walking the rendered
+     page and listing everything with a border or an inset ring, rather
+     than by guessing at selectors.
+
+     The meaning block was a brown-to-teal wash, which is the one colour
+     pair on the page that belongs to the old theme. It is mint now, with
+     a single bright rule down its edge to do the work the box was doing.
+     ============================================================ */
+  html.dict-open #v-home .family-chip,
+  html.dict-open #v-home .yg-wrap,
+  html.dict-open #v-home .yg-link-btn,
+  html.dict-open #v-home .form,
+  html.dict-open #v-home .ex,
+  html.dict-open #v-home .chip,
+  html.dict-open #v-home .syn,
+  html.dict-open #v-home .ant,
+  html.dict-open #v-home .tap,
+  html.dict-open #v-home .lv-tag{border:none}
+  html.dict-open #v-home .pos-group{border-left-color:rgba(47,191,195,.4)}
+
+  html.dict-open #v-home .feel{
+    background:linear-gradient(150deg,rgba(103,222,225,.2),rgba(150,244,214,.12) 60%,rgba(255,255,255,.5));
+    border:none;border-left:3px solid #2FBFC3;border-radius:16px}
+  html.dict-open #v-home .feel .feel-k{color:#12787D;letter-spacing:.14em}
+  html.dict-open #v-home .feel .feel-v{color:#0E6E73}
+
+  /* ============================================================
+     FOCCI SAYS THE WHOLE THING
+
+     The short reaction line was set nowrap with an ellipsis and a
+     260px cap, so anything past about six words was cut to a "…" and
+     the sentence never arrived.
+     ============================================================ */
+  .fw-quote.reaction{max-width:min(86vw,340px)}
+  .fw-quote.reaction p{white-space:normal;overflow:visible;text-overflow:clip;
+    text-align:center;line-height:1.5}
+
+  /* ============================================================
      NOTHING TO SELECT IN A GAME
 
      Holding a word to think about it brought up iOS's Copy / Look Up
@@ -1250,19 +1293,26 @@
   /* In the row, between the search field and the menu. Floating it at a
      fixed top-right put it straight over the banner artwork on every page
      that has one. */
-  .fx-xp{flex:none;display:flex;align-items:center;gap:5px;height:38px;padding:0 12px;
+  /* A bolt on its own mint disc, then the number. The flat one-tone
+     capsule read as a disabled button. */
+  .fx-xp{flex:none;display:flex;align-items:center;gap:7px;height:38px;padding:0 13px 0 5px;
     border:none;border-radius:999px;cursor:pointer;
     font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
-    font-size:12.5px;font-weight:700;color:#EAFFF9;
-    background:linear-gradient(140deg,rgba(150,244,214,.3),rgba(40,120,120,.34));
-    box-shadow:inset 0 0 0 1px rgba(170,255,228,.42),0 4px 14px rgba(0,0,0,.3);
+    font-size:13px;font-weight:700;color:#F2FFFB;
+    background:linear-gradient(140deg,rgba(255,255,255,.16),rgba(255,255,255,.05));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.26),0 4px 14px rgba(0,0,0,.28);
     backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4);
     transition:transform .14s ease}
+  .fx-xp::before{content:'\26A1';display:flex;align-items:center;justify-content:center;
+    width:28px;height:28px;border-radius:50%;font-size:14px;line-height:1;
+    background:linear-gradient(180deg,#CFF6E8,#6FD9C4);
+    box-shadow:0 2px 8px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.7)}
   .fx-xp:active{transform:scale(.93)}
   .fx-xp b{font-weight:800;color:#BFF4E4}
   /* the world's copy floats, because the world has no row to sit in */
-  #fw-chrome .fx-xp{position:absolute;right:62px;pointer-events:auto;
-    top:calc(env(safe-area-inset-top,0px) + 12px)}
+  /* Under the island's search bar, not behind it. */
+  #fw-chrome .fx-xp{position:absolute;right:14px;pointer-events:auto;
+    top:calc(env(safe-area-inset-top,0px) + 68px)}
 
   /* ============================================================
      WHAT YOU LOOKED UP BEFORE
@@ -2057,20 +2107,24 @@
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
     font-family:'Raleway Local','Raleway',system-ui,sans-serif}
   html.ask-on .fa-scrim{display:flex}
+  /* Glass, and green. It was a near-solid slab ringed in violet — the
+     last of the old accent, and the heaviest thing on the screen. */
   .fa-card{width:100%;max-width:320px;padding:22px 20px 18px;border-radius:22px;text-align:center;
-    background:linear-gradient(180deg,rgba(26,62,66,.94),rgba(12,40,46,.96));
-    box-shadow:0 0 0 1px rgba(170,140,255,.32),0 0 46px rgba(150,110,255,.26),0 22px 50px rgba(0,0,0,.5);
+    background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(20,70,76,.5));
+    box-shadow:inset 0 0 0 1px rgba(180,245,232,.34),0 0 42px rgba(120,230,205,.2),0 22px 50px rgba(0,0,0,.45);
+    backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);
     animation:fa-in .26s cubic-bezier(.3,1.3,.4,1)}
   @keyframes fa-in{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
-  .fa-t{font-size:17px;font-weight:800;color:#EBD9FF;letter-spacing:-.01em;
-    text-shadow:0 0 18px rgba(168,117,255,.5)}
+  .fa-t{font-size:17px;font-weight:800;color:#EAFFF9;letter-spacing:-.01em;
+    text-shadow:0 0 18px rgba(130,240,212,.45)}
   .fa-b{margin-top:9px;font-size:13px;font-weight:400;line-height:1.5;color:rgba(255,255,255,.84)}
   .fa-acts{display:flex;gap:9px;margin-top:17px}
   .fa-btn{flex:1;height:40px;border:none;border-radius:999px;cursor:pointer;
     font-family:inherit;font-size:13px;font-weight:700;transition:transform .14s ease}
   .fa-btn:active{transform:scale(.95)}
-  .fa-yes{color:#1B0A33;background:linear-gradient(180deg,#D9BCFF 0%,#A875FF 100%);
-    box-shadow:0 4px 14px rgba(120,70,220,.45),inset 0 1px 0 rgba(255,255,255,.6)}
+  .fa-yes{color:#F2FFFB;
+    background:linear-gradient(140deg,rgba(150,244,214,.4),rgba(70,190,180,.24));
+    box-shadow:inset 0 0 0 1px rgba(180,255,232,.66),0 0 18px rgba(130,240,205,.28)}
   .fa-no{color:rgba(255,255,255,.82);background:rgba(255,255,255,.12);
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
 
@@ -2227,9 +2281,10 @@
   #dict-back{display:none;position:fixed;z-index:52;right:14px;
     bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
     align-items:center;gap:7px;padding:11px 17px;border-radius:999px;
-    font-size:13.5px;font-weight:700;color:#04333A;border:none;
-    background:linear-gradient(180deg,#8CE9EB,#33BCC1);
-    box-shadow:0 10px 24px rgba(4,51,58,.32)}
+    font-size:13.5px;font-weight:700;color:#06474C;border:none;
+    background:linear-gradient(140deg,rgba(255,255,255,.7),rgba(150,232,232,.42));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75),0 8px 22px rgba(4,51,58,.22);
+    backdrop-filter:blur(16px) saturate(1.5);-webkit-backdrop-filter:blur(16px) saturate(1.5)}
   html.dict-open #dict-back{display:flex}
   #dict-back:active{transform:scale(.95)}
   /* The completed word — glass rather than a solid slab of blue with black
@@ -6212,8 +6267,17 @@
     e.preventDefault();
     const raw = searchInput.value.trim();
     if (!raw) return;
-    const word = window.norm(normalizeSpelling(raw));
     searchInput.blur();
+    /* While a word page is open, a second search should replace the entry
+       on it. It used to raise the little word sheet instead, which lands
+       UNDER the open page — so from the reader's side, searching again
+       simply did nothing. */
+    if (document.documentElement.classList.contains('dict-open')) {
+      searchInput.value = '';
+      openDictPage(window.norm(normalizeSpelling(raw)));
+      return;
+    }
+    const word = window.norm(normalizeSpelling(raw));
     const rec = await idbGet(word);
     if (rec) showWordSheet(condensedEntryHTML(rec));
     else wordPopupForceAI(raw);
@@ -6236,48 +6300,75 @@
   setInterval(fxRefreshXP, 4000);
   if (window.jnRenderChart) jnRenderChart();
 
-  /* ---- the search box remembers ----
-     Every lookup is already in the history with its meaning in the
-     dictionary, so the field opens onto what you have actually read
-     rather than onto nothing. */
+  /* ---- the search box suggests, and remembers ----
+
+     Typing "ho" should offer hope, hopeful, hospital — the words already
+     sitting offline in the dictionary. The first version only filtered
+     the history, so it could suggest nothing you had not already looked
+     up, which is the opposite of useful. An empty box still shows what
+     you read recently.
+
+     All three fields share it: the home page's, the newsstand's and the
+     one over the island, which is also the one on the word page. */
   (function () {
     const drop = document.createElement('div');
     drop.className = 'sg-drop';
     document.body.appendChild(drop);
-    let host = null;
+    let host = null, seq = 0;
+
+    function rowsFrom(list, head) {
+      return '<div class="sg-h">' + head + '</div>' + list.map(function (e) {
+        return '<button class="sg-row" onmousedown="event.preventDefault()"'
+          + ' onclick="sgPick(this.dataset.w)" data-w="' + esc(e.w) + '">'
+          + '<b>' + esc(e.w) + '</b>' + (e.vi ? '<i>' + esc(e.vi) + '</i>' : '') + '</button>';
+      }).join('');
+    }
+    function meaningOf(rec) {
+      const d = rec && rec.data;
+      return (d && (d.vi_equivalent || ((d.senses || [])[0] || {}).vi)) || '';
+    }
 
     async function build(filter) {
+      const mine = ++seq;
       const q = (filter || '').trim().toLowerCase();
+
+      if (q) {
+        let hits = [];
+        try {
+          hits = (await idbPrefix(window.norm ? window.norm(q) : q)) || [];
+        } catch (e) {}
+        if (mine !== seq) return;                      // a later keystroke won
+        if (hits.length) {
+          hits = hits.filter(function (r) { return r.data; }).slice(0, 8)
+            .map(function (r) { return { w: r.word, vi: meaningOf(r) }; });
+          if (hits.length) { drop.innerHTML = rowsFrom(hits, 'In your dictionary'); return; }
+        }
+        drop.innerHTML = '<div class="sg-empty">No offline word starts with \u201c' + esc(q)
+          + '\u201d. Press Enter and Focci will look it up.</div>';
+        return;
+      }
+
       const hist = (typeof histLoad === 'function' ? histLoad() : []).slice().reverse();
       const picked = [];
       for (const e of hist) {
-        if (!e || !e.w) continue;
-        if (q && e.w.indexOf(q) !== 0) continue;
-        if (picked.some((p) => p.w === e.w)) continue;
+        if (!e || !e.w || picked.some(function (p) { return p.w === e.w; })) continue;
         picked.push(e);
         if (picked.length >= 8) break;
       }
       if (!picked.length) {
-        drop.innerHTML = '<div class="sg-empty">' + (q
-          ? 'Nothing looked up starting with that yet \u2014 press Enter and Focci will find it.'
-          : 'Words you look up gather here, with what they mean.') + '</div>';
+        drop.innerHTML = '<div class="sg-empty">Words you look up gather here, with what they mean.</div>';
         return;
       }
-      const rows = await Promise.all(picked.map(async (e) => {
-        let mean = '';
-        try {
-          const r = await idbGet(e.w);
-          const d = r && r.data;
-          mean = (d && (d.vi_equivalent || ((d.senses || [])[0] || {}).vi)) || '';
-        } catch (_) {}
-        return '<button class="sg-row" onmousedown="event.preventDefault()" onclick="sgPick(this.dataset.w)"'
-          + ' data-w="' + esc(e.w) + '"><b>' + esc(e.w) + '</b>'
-          + (mean ? '<i>' + esc(mean) + '</i>' : '') + '</button>';
+      const withMeanings = await Promise.all(picked.map(async function (e) {
+        try { return { w: e.w, vi: meaningOf(await idbGet(e.w)) }; }
+        catch (_) { return { w: e.w, vi: '' }; }
       }));
-      drop.innerHTML = '<div class="sg-h">Recent</div>' + rows.join('');
+      if (mine !== seq) return;
+      drop.innerHTML = rowsFrom(withMeanings, 'Recent');
     }
+
     function place(input) {
-      const row = input.closest('.fh-top') || input;
+      const row = input.closest('.fh-top') || input.closest('.fw-searchbar') || input;
       const r = row.getBoundingClientRect();
       drop.style.left = r.left + 'px';
       drop.style.width = r.width + 'px';
@@ -6287,14 +6378,14 @@
     function hide() { drop.classList.remove('on'); host = null; }
     window.sgPick = function (w) { hide(); if (window.openDictPage) openDictPage(w); };
 
-    ['fh-search-input', 'ht-search-input'].forEach((id) => {
+    ['fh-search-input', 'ht-search-input', 'fw-search-input'].forEach(function (id) {
       const el = document.getElementById(id);
       if (!el) return;
-      el.addEventListener('focus', () => show(el));
-      el.addEventListener('input', () => { if (host === el) build(el.value); });
-      el.addEventListener('blur', () => setTimeout(hide, 170));
+      el.addEventListener('focus', function () { show(el); });
+      el.addEventListener('input', function () { if (host === el) { place(el); build(el.value); } });
+      el.addEventListener('blur', function () { setTimeout(hide, 170); });
     });
-    window.addEventListener('resize', () => { if (host) place(host); });
+    window.addEventListener('resize', function () { if (host) place(host); });
   })();
 
   /* Both search boxes — the home page's and the newsstand's — run the
