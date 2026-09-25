@@ -4046,27 +4046,10 @@ function setPracticeMode(m){
 window.setPracticeMode=setPracticeMode;
 
 /* the two games, presented as cards you switch between */
-function gameSwitch(){
-  // Icon của Type it / Match it là asset thật (không dùng emoji vì mỗi máy
-  // vẽ một kiểu); Say it dùng SVG bong bóng thoại vẽ tay — không phụ thuộc
-  // file ngoài nên không bao giờ vỡ ảnh, và không còn trùng icon với Type it.
-  const img=(asset)=>'<img class="gt-ico-img" src="./'+asset+'.webp" alt="" onerror="this.style.display=\'none\'"/>';
-  const SAY_ICO='<svg class="gt-ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
-    +'stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.2 3.6a.6.6 0 0 1-1-.46V15h-.3A2.5 2.5 0 0 1 4 12.5v-7Z"/>'
-    +'<path d="M8.5 8.5h7M8.5 11h4"/></svg>';
-  const g=(id,icon,name,tag)=>'<button class="game-tab'+(practiceMode===id?' on':'')+'" onclick="setPracticeMode(\''+id+'\')">'
-    +icon+'<span class="gt-name">'+name+'</span><span class="gt-tag">'+tag+'</span></button>';
-  // Hub back-link: only shows once the story engine has actually taken over
-  // this tab (renderGameHub defined) — the mini-games still work standalone
-  // if story.js ever fails to load.
-  const back=(typeof renderGameHub==='function')
-    ? '<button class="hub-back" onclick="renderGameHub()">← Games</button>' : '';
-  return back+'<div class="game-switch">'
-    +g('type',img('decor-note-and-pen'),'Type it','spell from memory')
-    +g('match',img('decor-magnifying-glass'),'Match it','pick the word')
-    +g('write',SAY_ICO,'Speak Up','say it out loud')
-    +'</div>';
-}
+/* gameSwitch() lived here: the Type it / Match it / Speak Up tab strip.
+   Nothing has rendered it since the games were rebuilt around their own
+   header boxes, and leaving it in only invited it back. */
+
 function chipRow(label, note, opts){
   let h='<div class="setup-row"><div class="setup-l">'+esc(label)
     +(note?'<span class="setup-note">'+esc(note)+'</span>':'')+'</div><div class="chip-row">';
@@ -4254,9 +4237,17 @@ window.practiceAdvance=practiceAdvance;
 function gameSwipeBack(){
   const area=$('#review-area');
   const inStory = !!(area && area.querySelector('.story-view'));
-  const inSetup = !!(area && area.querySelector('.game-tab'));
-  if(inStory || inSetup){
-    if(typeof renderGameHub==='function'){ renderGameHub(); window.scrollTo(0,0); return; }
+  /* The old test looked for .game-tab, a tab strip the rebuilt games no
+     longer render, so every swipe in Word Pairs or Letter Trail fell
+     straight through to showView('home') — the OLD dashboard. From a
+     game, back is the app's home page; from a story scene, the map. */
+  if(inStory && typeof renderGameHub==='function'){ renderGameHub(); window.scrollTo(0,0); return; }
+  if(window.fhShowHome){
+    document.documentElement.classList.remove('panel-open');
+    const close=document.getElementById('fw-panel-close');
+    if(close) close.style.display='none';
+    fhShowHome();
+    return;
   }
   showView('home');
 }
@@ -6547,7 +6538,14 @@ function wireSwipeBack(){
     const farEnough = dx>=90 || (dx>=64 && vx>0.25);
     if(moves>=3 && farEnough && nowT-st<1200){
       fired=true; reset();
-      backToHome();
+      /* #v-home is also the word page — html.dict-open lifts it over the
+         world. Swiping back there used to call backToHome(), which drops
+         you on the OLD dashboard, which is the "old home page" that kept
+         appearing out of nowhere. On the word page, back means close the
+         word. */
+      if(document.documentElement.classList.contains('dict-open')){
+        if(window.closeDictPage) window.closeDictPage();
+      } else backToHome();
     }
   },{passive:true});
 

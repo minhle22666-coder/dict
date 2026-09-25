@@ -1256,6 +1256,20 @@
   html.dict-open #v-home .tap,
   html.dict-open #v-home .lv-tag{border:none}
   html.dict-open #v-home .pos-group{border-left-color:rgba(47,191,195,.4)}
+  /* The second pass. Walking the page again with the pseudo-elements
+     included turned up the ones that were left: the whole .entry is
+     itself boxed in a 0.8px rectangle, and every .expr and .prep-item
+     draws a hairline under itself. Those are the lines still cutting the
+     word family and the sections apart. Space does the separating now —
+     the rule stays only on .pos-group, where it reads as hierarchy
+     rather than as a box. */
+  html.dict-open #v-home .entry{border:none}
+  html.dict-open #v-home .expr,
+  html.dict-open #v-home .prep-item,
+  html.dict-open #v-home .coll-item,
+  html.dict-open #v-home .idiom{border:none}
+  html.dict-open #v-home .expr + .expr,
+  html.dict-open #v-home .prep-item + .prep-item{margin-top:6px}
 
   html.dict-open #v-home .feel{
     background:linear-gradient(150deg,rgba(103,222,225,.2),rgba(150,244,214,.12) 60%,rgba(255,255,255,.5));
@@ -1310,9 +1324,65 @@
   .fx-xp:active{transform:scale(.93)}
   .fx-xp b{font-weight:800;color:#BFF4E4}
   /* the world's copy floats, because the world has no row to sit in */
-  /* Under the island's search bar, not behind it. */
-  #fw-chrome .fx-xp{position:absolute;right:14px;pointer-events:auto;
-    top:calc(env(safe-area-inset-top,0px) + 68px)}
+  /* ============================================================
+     FOCCI'S XP BAR, on the island
+
+     On the island this is not a chip you tap on a menu row — it is his
+     standing. A level, a number, and a line filling towards the next
+     one, set apart from the search field rather than clamped under it.
+     ============================================================ */
+  .fw-exp{position:absolute;right:14px;pointer-events:auto;z-index:2;
+    top:calc(env(safe-area-inset-top,0px) + 74px);
+    display:grid;grid-template-columns:auto auto;gap:2px 10px;
+    padding:8px 13px 9px;border:none;border-radius:15px;cursor:pointer;text-align:left;
+    background:linear-gradient(140deg,rgba(255,255,255,.17),rgba(10,52,56,.42));
+    box-shadow:inset 0 0 0 1px rgba(180,245,232,.34),0 5px 18px rgba(0,0,0,.3);
+    backdrop-filter:blur(14px) saturate(1.5);-webkit-backdrop-filter:blur(14px) saturate(1.5);
+    transition:transform .14s ease}
+  .fw-exp:active{transform:scale(.95)}
+  .fw-exp-n{font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
+    font-size:13px;font-weight:700;color:rgba(232,255,250,.9);line-height:1}
+  .fw-exp-n b{font-size:15px;font-weight:800;color:#fff}
+  .fw-exp-lv{justify-self:end;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
+    font-size:10.5px;font-weight:800;letter-spacing:.06em;color:#8CF0D4;line-height:1}
+  .fw-exp-lv i{font-style:normal}
+  .fw-exp-track{grid-column:1/-1;height:4px;margin-top:5px;border-radius:99px;overflow:hidden;
+    background:rgba(255,255,255,.16)}
+  .fw-exp-track s{display:block;height:100%;width:0;border-radius:99px;text-decoration:none;
+    background:linear-gradient(90deg,#8CF0D4,#E6FFF7);
+    box-shadow:0 0 10px rgba(140,240,212,.5);transition:width .6s cubic-bezier(.25,1,.4,1)}
+  html.dict-open .fw-exp,html.panel-open .fw-exp{display:none}
+
+  /* ============================================================
+     SAVED IN DAYLIGHT
+
+     The green glass written for this panel assumed a dark page. On the
+     app's light theme it was white-on-cream — invisible rims and grey
+     text. Same shapes, daylight colours.
+     ============================================================ */
+  :root[data-theme="light"] #v-saved .sv-tabs{
+    background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px rgba(30,150,150,.16)}
+  :root[data-theme="light"] #v-saved .sv-tab{color:#2C6F72}
+  :root[data-theme="light"] #v-saved .sv-tab.on{color:#04333A;
+    background:linear-gradient(180deg,#A9EFE2,#5FC9BE)}
+  :root[data-theme="light"] #v-saved .saved-count{color:#2C6F72}
+  :root[data-theme="light"] #v-saved .sort-cycle{color:#2C6F72;
+    background:rgba(255,255,255,.72);box-shadow:inset 0 0 0 1px rgba(30,150,150,.18)}
+  :root[data-theme="light"] #v-saved .sv-row{
+    background:rgba(255,255,255,.78);
+    box-shadow:inset 0 0 0 1px rgba(30,150,150,.14),0 3px 12px rgba(20,90,95,.07)}
+  :root[data-theme="light"] #v-saved .sv-w{color:#123C40}
+  :root[data-theme="light"] #v-saved .sv-e{color:#3E7A7C}
+  :root[data-theme="light"] #v-saved .sv-when,
+  :root[data-theme="light"] #v-saved .sv-foot{color:#6A9A9B}
+  :root[data-theme="light"] #v-saved .sv-star{color:#E0A63C}
+  :root[data-theme="light"] #v-saved .sv-sec-h{color:#4E8B8D}
+  :root[data-theme="light"] #v-saved .sv-hero{
+    background:linear-gradient(140deg,rgba(150,240,220,.55),rgba(255,255,255,.7));
+    box-shadow:inset 0 0 0 1px rgba(40,170,165,.26)}
+  :root[data-theme="light"] #v-saved .sv-hero-n{color:#0B4448}
+  :root[data-theme="light"] #v-saved .sv-hero-t{color:#2C6F72}
+  :root[data-theme="light"] #v-saved .empty{color:#4E8B8D}
 
   /* ============================================================
      WHAT YOU LOOKED UP BEFORE
@@ -2282,9 +2352,11 @@
     bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
     align-items:center;gap:7px;padding:11px 17px;border-radius:999px;
     font-size:13.5px;font-weight:700;color:#06474C;border:none;
-    background:linear-gradient(140deg,rgba(255,255,255,.7),rgba(150,232,232,.42));
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75),0 8px 22px rgba(4,51,58,.22);
-    backdrop-filter:blur(16px) saturate(1.5);-webkit-backdrop-filter:blur(16px) saturate(1.5)}
+    /* Actually see-through: at .7 white over a white page it still read as
+       a solid pill. The page shows through this. */
+    background:linear-gradient(140deg,rgba(255,255,255,.34),rgba(140,230,230,.24));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.6),0 8px 22px rgba(4,51,58,.16);
+    backdrop-filter:blur(18px) saturate(1.7);-webkit-backdrop-filter:blur(18px) saturate(1.7)}
   html.dict-open #dict-back{display:flex}
   #dict-back:active{transform:scale(.95)}
   /* The completed word — glass rather than a solid slab of blue with black
@@ -5516,7 +5588,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
         <input id="ht-search-input" type="search" inputmode="search" placeholder="Translate or compare words (e.g. say, tell)" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
       </label>
-      <button class="fx-xp" onclick="xpOpen()" aria-label="Your XP">⚡ <b>0</b></button>
       <button class="fh-grid-btn" aria-label="Menu" onclick="fmOpen()">
         <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2.6"/><rect x="13" y="3" width="8" height="8" rx="2.6"/><rect x="3" y="13" width="8" height="8" rx="2.6"/><rect x="13" y="13" width="8" height="8" rx="2.6"/></svg>
       </button>
@@ -5643,7 +5714,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
       <input id="fh-search-input" type="search" inputmode="search" placeholder="Translate or compare words (e.g. say, tell)" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
     </label>
-    <button class="fx-xp" onclick="xpOpen()" aria-label="Your XP">⚡ <b>0</b></button>
+    <button class="fx-xp" onclick="xpOpen()" aria-label="Your XP"><b>0</b></button>
       <button class="fh-grid-btn" aria-label="Settings" onclick="fhOpenSettings()">
       <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2.6"/><rect x="13" y="3" width="8" height="8" rx="2.6"/><rect x="3" y="13" width="8" height="8" rx="2.6"/><rect x="13" y="13" width="8" height="8" rx="2.6"/></svg>
     </button>
@@ -5713,7 +5784,11 @@
      empty space still lets drag/pinch through to the canvas below) with
      pointer-events:auto on each actual control. -->
 <div id="fw-chrome">
-  <button class="fx-xp fw-ui" onclick="xpOpen()" aria-label="Your XP">⚡ <b>0</b></button>
+  <button class="fw-exp fw-ui" id="fw-exp" onclick="xpOpen()" aria-label="Focci's XP">
+    <span class="fw-exp-n"><b>0</b> XP</span>
+    <span class="fw-exp-lv">Lv <i>1</i></span>
+    <span class="fw-exp-track"><s></s></span>
+  </button>
   <!-- always-on search bar — no tap-to-reveal icon, this IS the home screen now -->
   <div class="fw-searchbar fw-ui">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -6293,8 +6368,15 @@
   /* ---- the XP pill, kept current ---- */
   window.fxRefreshXP = function () {
     if (!window.getXP) return;
-    const n = getXP().toLocaleString();
+    const xp = getXP();
+    const n = xp.toLocaleString();
     document.querySelectorAll('.fx-xp b').forEach((b) => { b.textContent = n; });
+    const bar = document.getElementById('fw-exp');
+    if (bar) {
+      bar.querySelector('.fw-exp-n b').textContent = n;
+      bar.querySelector('.fw-exp-lv i').textContent = Math.floor(xp / 100) + 1;
+      bar.querySelector('.fw-exp-track s').style.width = (xp % 100) + '%';
+    }
   };
   fxRefreshXP();
   setInterval(fxRefreshXP, 4000);
