@@ -89,7 +89,19 @@
   }
 
   /* ---------------- the shelf ---------------- */
-  var SRC_LABEL = { ted: 'TED', guardian: 'The Guardian', ap: 'AP News' };
+  var SRC_LABEL = { ted: 'TED', guardian: 'The Guardian', abc: 'ABC News' };
+  /* Each masthead on the plate its own artwork needs: the ABC and Guardian
+     marks are black on transparent, TED's is red and white. A logo on the
+     wrong ground is an invisible logo. */
+  var SRC_LOGO = {
+    ted: { img: './logo-ted.png', dark: true },
+    guardian: { img: './logo-guardian.png', dark: false },
+    abc: { img: './logo-abcnews.png', dark: false }
+  };
+  /* Three bands, not six rungs. A learner knows roughly whether they are a
+     beginner, a middle or an advanced reader; asking them to decide
+     between B1 and B2 is asking a question they cannot answer. */
+  function band(lv) { return (lv || 'B1').charAt(0).toLowerCase(); }
 
   function sortedItems(state) {
     var open = {}, done = {};
@@ -117,7 +129,7 @@
 
     var list = sortedItems(state).filter(function (it) {
       if (filterSrc !== 'all' && it.src !== filterSrc) return false;
-      if (filterLevel !== 'all' && it.level !== filterLevel) return false;
+      if (filterLevel !== 'all' && band(it.level) !== filterLevel) return false;
       return true;
     });
 
@@ -126,19 +138,26 @@
 
     document.getElementById('ht-grid').innerHTML = list.map(function (it) {
       var open = !!openSet[it.id], done = !!doneSet[it.id];
-      if (!open) {
-        return '<div class="ht-card locked" aria-label="Locked">'
-          + '<div class="ht-lockface"><span>✕</span><b>Locked</b>'
-          + '<i>Finish one to open two more</i></div></div>';
-      }
-      return '<button class="ht-card' + (done ? ' done' : '') + '" onclick="htRead(\'' + it.id + '\')">'
-        + '<img src="' + esc(it.img) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'"/>'
+      var lg = SRC_LOGO[it.src] || SRC_LOGO.abc;
+      /* A locked card keeps its picture and its headline — dimmed, under a
+         padlock. Blanking them out told you nothing at all about what you
+         were working towards, which is the only reason to show them. */
+      var inner =
+          '<img src="' + esc(it.img) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'"/>'
+        + '<span class="ht-badge b-' + it.src + (lg.dark ? ' d' : '') + '" role="img" aria-label="' + esc(SRC_LABEL[it.src]) + '"></span>'
         + '<span class="ht-lv">' + esc(it.level) + '</span>'
         + (it.src === 'ted' ? '<span class="ht-play">▶</span>' : '')
         + (done ? '<span class="ht-tick">✓</span>' : '')
         + '<span class="ht-cap"><b>' + esc(it.title) + '</b>'
-        + '<i>' + esc(SRC_LABEL[it.src]) + ' · ' + it.mins + ' min</i></span>'
-        + '</button>';
+        + '<i>' + esc(it.topic || SRC_LABEL[it.src]) + ' · ' + it.mins + ' min</i></span>';
+      if (!open) {
+        return '<div class="ht-card locked" aria-label="Locked: ' + esc(it.title) + '">' + inner
+          + '<span class="ht-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+          + ' stroke-width="2" stroke-linecap="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.6"/>'
+          + '<path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7"/></svg></span></div>';
+      }
+      return '<button class="ht-card' + (done ? ' done' : '') + '" onclick="htRead(\'' + it.id + '\')">'
+        + inner + '</button>';
     }).join('') || '<div class="ht-empty">Nothing at that level from that source yet.</div>';
   }
 
@@ -167,10 +186,12 @@
     });
   };
   window.htClose = function () {
+    stopSync();
     document.documentElement.classList.remove('ht-on', 'ht-read');
     window.getSelection && window.getSelection().removeAllRanges();
   };
   window.htBackToShelf = function () {
+    stopSync();
     document.documentElement.classList.remove('ht-read');
     current = null;
     renderShelf();
@@ -188,11 +209,11 @@
      a short editorial summary, not the talk's words, and labelling that
      "Transcript" would be a lie the reader notices in one sentence. */
   function hasTranscript(it) {
-    var text = it.body || it.summary || '';
+    var text = it.transcript || it.body || it.summary || '';
     return text.split(/\n+/).some(function (l) { return TS.test(l); });
   }
   function bodyHtml(it) {
-    var text = it.body || it.summary || '';
+    var text = it.transcript || it.body || it.summary || '';
     var lines = text.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
     if (lines.length < 2) {
       // one block of prose: break it into readable paragraphs on sentence runs
@@ -209,21 +230,40 @@
       var m = l.match(TS);
       if (m) {
         var sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-        return '<p class="ht-line"><button class="ht-ts" onclick="htSeek(' + sec + ')">'
-          + m[1] + ':' + m[2] + '</button>' + esc(l.replace(TS, '')) + '</p>';
+        return '<p class="ht-line" data-at="' + sec + '" onclick="htSeek(' + sec + ')">'
+          + '<button class="ht-ts">' + m[1] + ':' + m[2] + '</button>'
+          + esc(l.replace(TS, '')) + '</p>';
       }
       return '<p class="ht-line">' + esc(l) + '</p>';
     }).join('');
   }
 
+  /* A YouTube link gets the real thing: its IFrame API reports the
+     playhead, so the transcript can follow the talk and a tap on a line
+     can move it. A ted.com embed exposes no such API across origins, so
+     there the best seek available is reloading the frame at a new start
+     time, and the transcript cannot follow along by itself. */
+  function youtubeId(url) {
+    var m = /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/.exec(url || '');
+    return m ? m[1] : null;
+  }
   window.htRead = function (id) {
     var it = byId[id];
     if (!it) return;
     current = it;
+    stopSync();
     var host = document.getElementById('ht-reader');
-    var media = it.src === 'ted'
-      ? '<div class="ht-embed"><iframe id="ht-frame" src="' + esc(it.embed) + '" allow="autoplay; fullscreen; encrypted-media" allowfullscreen referrerpolicy="no-referrer-when-downgrade" title="' + esc(it.title) + '"></iframe></div>'
-      : (it.img ? '<div class="ht-hero"><img src="' + esc(it.img) + '" alt="" onerror="this.parentElement.style.display=\'none\'"/></div>' : '');
+    var yt = youtubeId(it.embed || it.link);
+    var media;
+    if (it.src === 'ted' && yt) {
+      media = '<div class="ht-embed"><iframe id="ht-frame" src="https://www.youtube.com/embed/' + yt
+        + '?enablejsapi=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="'
+        + esc(it.title) + '"></iframe></div>';
+    } else if (it.src === 'ted') {
+      media = '<div class="ht-embed"><iframe id="ht-frame" src="' + esc(it.embed) + '" allow="autoplay; fullscreen; encrypted-media" allowfullscreen referrerpolicy="no-referrer-when-downgrade" title="' + esc(it.title) + '"></iframe></div>';
+    } else {
+      media = it.img ? '<div class="ht-hero"><img src="' + esc(it.img) + '" alt="" onerror="this.parentElement.style.display=\'none\'"/></div>' : '';
+    }
 
     var done = load().done.indexOf(it.id) >= 0;
     host.innerHTML =
@@ -250,12 +290,63 @@
     host.scrollTop = 0;
     document.documentElement.classList.add('ht-read');
     wireSelection();
+    if (yt && hasTranscript(it)) startSync();
   };
+
+  /* ---------------- following the talk ---------------- */
+  var ytPlayer = null, syncTimer = null, lastLine = -1;
+  function stopSync() {
+    if (syncTimer) { clearInterval(syncTimer); syncTimer = null; }
+    ytPlayer = null; lastLine = -1;
+  }
+  function loadYT() {
+    if (window.YT && window.YT.Player) return Promise.resolve();
+    if (!window.__ytLoading) {
+      window.__ytLoading = new Promise(function (res) {
+        window.onYouTubeIframeAPIReady = res;
+        var t = document.createElement('script');
+        t.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(t);
+      });
+    }
+    return window.__ytLoading;
+  }
+  /* Twice a second is plenty to keep a line of speech highlighted, and
+     cheap enough that it costs nothing while a talk plays. */
+  function startSync() {
+    loadYT().then(function () {
+      var frame = document.getElementById('ht-frame');
+      if (!frame) return;
+      ytPlayer = new window.YT.Player(frame);
+      syncTimer = setInterval(function () {
+        if (!ytPlayer || !ytPlayer.getCurrentTime) return;
+        var t = 0;
+        try { t = ytPlayer.getCurrentTime() || 0; } catch (e) { return; }
+        var lines = document.querySelectorAll('.ht-line[data-at]');
+        var idx = -1;
+        for (var i = 0; i < lines.length; i++) {
+          if (+lines[i].dataset.at <= t) idx = i; else break;
+        }
+        if (idx === lastLine) return;
+        lastLine = idx;
+        for (var j = 0; j < lines.length; j++) lines[j].classList.toggle('now', j === idx);
+        if (idx >= 0) {
+          var box = document.getElementById('ht-reader');
+          box.scrollTo({ top: Math.max(0, lines[idx].offsetTop - box.clientHeight * 0.45), behavior: 'smooth' });
+        }
+      }, 500);
+    });
+  }
 
   /* TED's embed takes a start time in the fragment. Reloading the frame
      with a new one is the only seek the embed offers without its own
      player API, and it is enough for "take me to that sentence". */
   window.htSeek = function (sec) {
+    if (ytPlayer && ytPlayer.seekTo) {
+      ytPlayer.seekTo(sec, true);
+      if (ytPlayer.playVideo) ytPlayer.playVideo();
+      return;
+    }
     var f = document.getElementById('ht-frame');
     if (!f || !current || !current.embed) return;
     f.src = current.embed.split('#')[0] + '#t=' + sec;

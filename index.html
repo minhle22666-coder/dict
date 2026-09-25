@@ -1004,53 +1004,27 @@
   .fh-hero-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55}
   .fh-hero-bg::after{content:'';position:absolute;inset:0;
     background:linear-gradient(100deg,rgba(5,30,34,.78) 0%,rgba(5,30,34,.5) 46%,rgba(5,30,34,.18) 78%)}
-  /* Star dust crossing the field, quick. Two layers at different speeds
-     so it has depth instead of one flat sheet sliding by; z-index puts
-     them over the darkening scrim, which is a pseudo-element and would
-     otherwise paint on top of them. */
-  .fh-stars{position:absolute;inset:-14%;z-index:2;pointer-events:none;
-    filter:drop-shadow(0 0 5.1px rgba(190,240,255,.9));
-    background-image:
-      radial-gradient(4.2px 4.2px at 6% 18%,#fff,transparent),
-      radial-gradient(3.2px 3.2px at 14% 62%,rgba(206,248,255,.95),transparent),
-      radial-gradient(4.8px 4.8px at 21% 34%,#fff,transparent),
-      radial-gradient(3.4px 3.4px at 28% 78%,rgba(224,255,248,.9),transparent),
-      radial-gradient(3.9px 3.9px at 35% 12%,#fff,transparent),
-      radial-gradient(2.9px 2.9px at 43% 52%,rgba(206,248,255,.85),transparent),
-      radial-gradient(4.4px 4.4px at 50% 86%,#fff,transparent),
-      radial-gradient(3.4px 3.4px at 57% 28%,rgba(224,255,248,.9),transparent),
-      radial-gradient(3.9px 3.9px at 64% 66%,#fff,transparent),
-      radial-gradient(3.2px 3.2px at 72% 40%,rgba(206,248,255,.9),transparent),
-      radial-gradient(4.9px 4.9px at 79% 8%,#fff,transparent),
-      radial-gradient(3.4px 3.4px at 86% 74%,rgba(224,255,248,.9),transparent),
-      radial-gradient(3.9px 3.9px at 93% 46%,#fff,transparent),
-      radial-gradient(3.2px 3.2px at 98% 22%,rgba(206,248,255,.9),transparent);
-    animation:fh-star-a 2.6s linear infinite}
-  .fh-stars.b{
-    background-image:
-      radial-gradient(2.9px 2.9px at 3% 54%,rgba(255,255,255,.8),transparent),
-      radial-gradient(3.7px 3.7px at 11% 8%,#fff,transparent),
-      radial-gradient(2.7px 2.7px at 18% 88%,rgba(206,248,255,.8),transparent),
-      radial-gradient(3.4px 3.4px at 26% 44%,#fff,transparent),
-      radial-gradient(2.7px 2.7px at 33% 68%,rgba(224,255,248,.8),transparent),
-      radial-gradient(3.9px 3.9px at 41% 24%,#fff,transparent),
-      radial-gradient(2.9px 2.9px at 48% 60%,rgba(206,248,255,.85),transparent),
-      radial-gradient(3.4px 3.4px at 55% 4%,#fff,transparent),
-      radial-gradient(2.7px 2.7px at 63% 82%,rgba(224,255,248,.8),transparent),
-      radial-gradient(3.7px 3.7px at 70% 50%,#fff,transparent),
-      radial-gradient(2.9px 2.9px at 77% 30%,rgba(206,248,255,.85),transparent),
-      radial-gradient(3.4px 3.4px at 84% 92%,#fff,transparent),
-      radial-gradient(2.7px 2.7px at 91% 58%,rgba(224,255,248,.8),transparent),
-      radial-gradient(3.9px 3.9px at 97% 16%,#fff,transparent);
-    animation:fh-star-b 1.7s linear infinite;opacity:.75}
-  @keyframes fh-star-a{
-    0%{transform:translate3d(10%,5%,0);opacity:.45}
-    45%{opacity:1}
-    100%{transform:translate3d(-12%,-8%,0);opacity:.4}}
-  @keyframes fh-star-b{
-    0%{transform:translate3d(-8%,-4%,0);opacity:.35}
-    50%{opacity:.95}
-    100%{transform:translate3d(13%,9%,0);opacity:.3}}
+  /* Embers off a fire, rising. The drifting dust that was here read as a
+     flat sheet of dots sliding sideways — wrong motion and wrong feeling
+     for a field at dusk. These come up from the bottom edge, drift, cool
+     from gold to red and go out, each on its own clock. */
+  .fh-embers{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+  .fh-embers::after{content:'';position:absolute;left:0;right:0;bottom:0;height:42%;
+    background:linear-gradient(0deg,rgba(255,140,40,.2),rgba(255,120,30,.07) 45%,transparent);
+    mix-blend-mode:screen}
+  .fh-embers i{position:absolute;bottom:-8px;width:3px;height:3px;border-radius:50%;
+    background:#FFD08A;box-shadow:0 0 6px 1px rgba(255,160,60,.9);
+    opacity:0;animation:fh-ember linear infinite}
+  @keyframes fh-ember{
+    0%{transform:translate3d(0,0,0) scale(.6);opacity:0;background:#FFE9B0}
+    12%{opacity:1}
+    60%{background:#FF9A3C}
+    100%{transform:translate3d(var(--dx),calc(-1 * var(--rise)),0) scale(.25);
+      opacity:0;background:#E2452A}}
+  /* Restored: the ember patch replaced a CSS range by index and took
+     these with it — the hero's own layout, its fox, its title, its
+     Continue button and the sparkle divider all vanished, which is
+     why the home page came apart. */
   /* Half the height it was, kept hard against the right edge, and the feet
      still land below the card so he reads as stepping out of it. */
   /* Fixed pixels, not a percentage of the card. The card grew by a
@@ -1195,7 +1169,10 @@
   .fh-game.g1 img{height:104%;right:-2%}
   .fh-game.g2 img{height:86%;right:-6%}
   .fh-game.g3 img{height:88%;right:-4%}
-  .fh-game.g4 img{height:84%;right:-6%}
+  /* A fifth bigger, and dropped so the top of his head lines up with Speak
+     Up's next door. Anchored at the bottom, growing him alone would have
+     raised his head above the others — hence the negative offset. */
+  .fh-game.g4 img{height:101%;right:-6%;bottom:-13%}
   .fh-game span{position:absolute;left:11px;bottom:8px;z-index:2;
     font-family:inherit;font-size:15.5px;font-weight:700;color:#fff;letter-spacing:-.01em;
     text-shadow:0 2px 7px rgba(0,0,0,.65)}
@@ -1234,22 +1211,47 @@
   html.ht-on .ht-scrim{display:flex}
   .ht-shelf{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
     padding:calc(env(safe-area-inset-top,0px) + 14px) 14px calc(env(safe-area-inset-bottom,0px) + 22px)}
+  /* The same search field and menu button the home page carries. A page
+     you can only leave by one small cross is a dead end. */
+  .ht-shelf .fh-top{margin-bottom:14px}
   html.ht-read .ht-shelf{display:none}
 
   /* the banner, with the fox stepping out of it */
   .ht-banner{position:relative;margin-bottom:16px}
   .ht-banner img.bg{display:block;width:100%;border-radius:18px;
     box-shadow:0 10px 26px rgba(0,0,0,.4)}
-  .ht-banner img.fox{position:absolute;right:-2px;top:-30px;width:104px;z-index:2;
+  /* Sat down into the box rather than floating above it. At -30px he was
+     hovering clear of the banner with nothing under him. */
+  .ht-banner img.fox{position:absolute;right:2px;bottom:-6px;width:96px;z-index:2;
     filter:drop-shadow(0 6px 12px rgba(0,0,0,.45))}
-  .ht-x{position:absolute;left:10px;top:10px;z-index:3;width:30px;height:30px;
-    border:none;border-radius:50%;cursor:pointer;font-family:inherit;font-size:14px;
-    color:rgba(240,255,252,.9);background:rgba(4,20,28,.5);
-    box-shadow:inset 0 0 0 1px rgba(170,232,246,.3)}
+  /* Out of the banner and into the top row. On the artwork it sat right
+     across the word "Hot", and there was nowhere on that box it did not
+     cover either the title or the fox. */
+  .ht-x{flex:none;width:38px;height:38px;border:none;border-radius:50%;cursor:pointer;
+    font-family:inherit;font-size:16px;line-height:1;
+    color:rgba(240,255,252,.92);background:rgba(255,255,255,.1);
+    box-shadow:inset 0 0 0 1px rgba(170,232,246,.26)}
+  .ht-x:active{transform:scale(.93)}
 
-  .ht-filters{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+  .ht-filters{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
   .ht-row{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .ht-row::-webkit-scrollbar{display:none}
+
+  /* Mastheads, not words. Four tap targets of equal weight: everything,
+     then the three papers as they actually look. */
+  .ht-srcrow{display:grid;grid-template-columns:.72fr 1fr 1fr 1fr;gap:8px}
+  .ht-src{position:relative;height:46px;display:flex;align-items:center;justify-content:center;
+    padding:0 6px;border:none;border-radius:14px;cursor:pointer;overflow:hidden;
+    font-family:inherit;font-size:11.5px;font-weight:800;letter-spacing:.01em;
+    background:#F4F7F5;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
+    opacity:.5;filter:grayscale(.45);transition:opacity .18s ease,filter .18s ease,transform .12s ease}
+  .ht-src.dark{background:#141A1E}
+  .ht-src.all{background:rgba(255,255,255,.09);color:rgba(215,245,252,.9);
+    filter:none;box-shadow:inset 0 0 0 1px rgba(160,220,245,.22)}
+  .ht-src img{max-width:100%;max-height:22px;object-fit:contain;display:block}
+  .ht-src:active{transform:scale(.95)}
+  .ht-src.on{opacity:1;filter:none;box-shadow:0 0 0 2px #8CF0D4,0 4px 14px rgba(0,0,0,.35)}
+  .ht-src.all.on{background:linear-gradient(180deg,#CFF6E8,#7FDCC8);color:#06312C}
   .ht-chip{flex:none;padding:7px 14px;border:none;border-radius:999px;cursor:pointer;
     font-family:inherit;font-size:11.5px;font-weight:700;letter-spacing:.01em;
     color:rgba(210,240,250,.72);background:rgba(255,255,255,.08);
@@ -1260,7 +1262,9 @@
     text-transform:uppercase;color:rgba(170,232,246,.55)}
 
   .ht-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .ht-card{position:relative;display:block;width:100%;aspect-ratio:3/4;padding:0;border:none;
+  /* A fifth shorter than it was: 3/4 gave a tall slab with a lot of dead
+     photograph in the middle. */
+  .ht-card{position:relative;display:block;width:100%;aspect-ratio:3/3.2;padding:0;border:none;
     border-radius:18px;overflow:hidden;cursor:pointer;text-align:left;
     background:#0C2531;box-shadow:0 8px 20px rgba(0,0,0,.4),inset 0 0 0 1px rgba(160,220,245,.16);
     transition:transform .16s cubic-bezier(.3,1.3,.4,1)}
@@ -1277,6 +1281,23 @@
   .ht-lv{position:absolute;left:9px;top:9px;z-index:2;padding:3px 8px;border-radius:999px;
     font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#06312C;
     background:linear-gradient(180deg,#CFF6E8,#7FDCC8)}
+  /* the paper's own mark, so a card is recognisable before it is read */
+  /* flex:none on the image matters: as a shrinkable flex item inside an
+     absolutely positioned box it was being squeezed from 145px wide down
+     to 14, which is a masthead nobody can read. */
+  /* Painted, not laid out. As an <img> in a shrink-to-fit absolute box the
+     plate measured itself before the logo had loaded and stayed 12px wide
+     with the masthead hanging out of it. A background image with a width
+     written down cannot get that wrong. Widths are the real files' aspect
+     ratios at 10px tall: 3.58, 6.59 and 2.85 to one. */
+  .ht-badge{position:absolute;right:8px;top:8px;z-index:2;height:19px;border-radius:6px;
+    background-color:#F4F7F5;background-repeat:no-repeat;background-position:center;
+    background-size:auto 10px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+  .ht-badge.d{background-color:#141A1E}
+  .ht-badge.b-ted{width:48px;background-image:url('./logo-ted.png')}
+  .ht-badge.b-guardian{width:78px;background-image:url('./logo-guardian.png')}
+  .ht-badge.b-abc{width:42px;background-image:url('./logo-abcnews.png')}
+  .ht-card.locked .ht-badge{opacity:.45}
   .ht-play{position:absolute;right:9px;top:9px;z-index:2;width:22px;height:22px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;
     background:rgba(226,60,60,.9);box-shadow:0 2px 8px rgba(0,0,0,.4)}
@@ -1284,14 +1305,20 @@
     display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;
     color:#06312C;background:#8CF0D4}
   .ht-card.done img{filter:saturate(.55) brightness(.75)}
-  /* locked: blacked out on purpose, so you can see there is more */
-  .ht-card.locked{background:#030B10;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
-  .ht-lockface{position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:3px;padding:14px;text-align:center}
-  .ht-lockface span{font-size:17px;color:rgba(255,255,255,.2)}
-  .ht-lockface b{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
-    color:rgba(255,255,255,.28)}
-  .ht-lockface i{font-style:normal;font-size:9.5px;line-height:1.35;color:rgba(255,255,255,.18)}
+  /* Locked keeps its picture and its headline, taken right down and put
+     under a padlock. You can see what is waiting; you just cannot open it
+     yet. Blanked-out boxes told you nothing worth working towards. */
+  .ht-card.locked{cursor:default}
+  .ht-card.locked img{filter:grayscale(.85) brightness(.34)}
+  .ht-card.locked::after{background:linear-gradient(0deg,rgba(2,10,14,.96) 0%,rgba(2,10,14,.8) 40%,rgba(2,10,14,.55) 100%)}
+  .ht-card.locked .ht-cap b{color:rgba(255,255,255,.5)}
+  .ht-card.locked .ht-cap i{color:rgba(190,235,250,.34)}
+  .ht-card.locked .ht-lv{background:rgba(255,255,255,.16);color:rgba(255,255,255,.5)}
+  .ht-lock{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:3;
+    width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    color:rgba(255,255,255,.62);background:rgba(8,22,30,.7);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+  .ht-lock svg{width:19px;height:19px}
   .ht-empty{grid-column:1/-1;padding:40px 10px;text-align:center;font-size:12.5px;
     color:rgba(200,232,246,.6)}
 
@@ -1325,6 +1352,11 @@
   .ht-text{margin-top:18px;-webkit-user-select:text;user-select:text}
   .ht-line{margin:0 0 15px;font-size:15.5px;line-height:1.72;color:rgba(255,255,255,.88)}
   .ht-line::selection,.ht-line *::selection{background:rgba(140,240,212,.32)}
+  .ht-line[data-at]{cursor:pointer;padding:6px 10px;margin-left:-10px;border-radius:12px;
+    transition:background .25s ease,color .25s ease}
+  .ht-line[data-at]:hover{background:rgba(255,255,255,.05)}
+  .ht-line.now{background:rgba(140,240,212,.13);color:#fff;
+    box-shadow:inset 2px 0 0 #8CF0D4}
   .ht-ts{display:inline-block;margin-right:8px;padding:1px 7px;border:none;border-radius:6px;
     vertical-align:1px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:800;
     color:#06312C;background:#7FDCC8}
@@ -4981,24 +5013,32 @@
 <div class="fw-hint" id="fw-hint"></div>
 <div class="ht-scrim" id="ht-scrim">
   <div class="ht-shelf" id="ht-shelf">
+    <div class="fh-top">
+      <button class="ht-x" onclick="htClose()" aria-label="Back">←</button>
+      <label class="fh-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        <input id="ht-search-input" type="search" inputmode="search" placeholder="Translate or compare words (e.g. say, tell)" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
+      </label>
+      <button class="fh-grid-btn" aria-label="Menu" onclick="fmOpen()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2.6"/><rect x="13" y="3" width="8" height="8" rx="2.6"/><rect x="3" y="13" width="8" height="8" rx="2.6"/><rect x="13" y="13" width="8" height="8" rx="2.6"/></svg>
+      </button>
+    </div>
     <div class="ht-banner">
-      <button class="ht-x" onclick="htClose()" aria-label="Close">✕</button>
       <img class="bg" src="./hot-take-banner.png" alt="Hot Take" onerror="this.style.display='none'"/>
       <img class="fox" src="./fox-hot-take.webp" alt="" onerror="this.style.display='none'"/>
     </div>
     <div class="ht-filters">
-      <div class="ht-row" id="ht-src">
-        <button class="ht-chip on" data-v="all" onclick="htSetSrc('all')">Everything</button>
-        <button class="ht-chip" data-v="ted" onclick="htSetSrc('ted')">TED Talks</button>
-        <button class="ht-chip" data-v="guardian" onclick="htSetSrc('guardian')">The Guardian</button>
-        <button class="ht-chip" data-v="ap" onclick="htSetSrc('ap')">AP News</button>
+      <div class="ht-srcrow" id="ht-src">
+        <button class="ht-src all on" data-v="all" onclick="htSetSrc('all')">All</button>
+        <button class="ht-src dark" data-v="ted" onclick="htSetSrc('ted')" aria-label="TED"><img src="./logo-ted.png" alt="TED"/></button>
+        <button class="ht-src" data-v="guardian" onclick="htSetSrc('guardian')" aria-label="The Guardian"><img src="./logo-guardian.png" alt="The Guardian"/></button>
+        <button class="ht-src" data-v="abc" onclick="htSetSrc('abc')" aria-label="ABC News"><img src="./logo-abcnews.png" alt="ABC News"/></button>
       </div>
       <div class="ht-row" id="ht-lvl">
-        <button class="ht-chip on" data-v="all" onclick="htSetLevel('all')">Any level</button>
-        <button class="ht-chip" data-v="A2" onclick="htSetLevel('A2')">A2</button>
-        <button class="ht-chip" data-v="B1" onclick="htSetLevel('B1')">B1</button>
-        <button class="ht-chip" data-v="B2" onclick="htSetLevel('B2')">B2</button>
-        <button class="ht-chip" data-v="C1" onclick="htSetLevel('C1')">C1</button>
+        <button class="ht-chip on" data-v="all" onclick="htSetLevel('all')">All levels</button>
+        <button class="ht-chip" data-v="a" onclick="htSetLevel('a')">A1–A2</button>
+        <button class="ht-chip" data-v="b" onclick="htSetLevel('b')">B1–B2</button>
+        <button class="ht-chip" data-v="c" onclick="htSetLevel('c')">C1–C2</button>
       </div>
     </div>
     <div class="ht-count" id="ht-count"></div>
@@ -5110,8 +5150,7 @@
   <div class="fh-hero">
     <div class="fh-hero-bg">
       <img src="./bg-arc1.webp" alt="" onerror="this.style.display='none'"/>
-      <i class="fh-stars" aria-hidden="true"></i>
-      <i class="fh-stars b" aria-hidden="true"></i>
+      <div class="fh-embers" id="fh-embers" aria-hidden="true"></div>
     </div>
     <div class="fh-hero-shadow"></div>
     <img class="fh-hero-fox" src="./fox-hero.png" alt="" onerror="this.style.display='none'"/>
@@ -5647,7 +5686,34 @@
     document.documentElement.classList.add('home-on');
   };
   window.fhOpenSettings = function () { openFwPanel('settings'); };
-  window.fhContinue = function () { fhShowWorld(); };
+  /* Continue means the story — the reading passage and the choice at the
+     end of it — not the island. Those are two different doors and they
+     were both wired to the island. */
+  /* The embers are generated rather than hand-written: eighteen of them,
+     each with its own lane, height, drift and clock, so the fire never
+     falls into a visible loop. */
+  (function () {
+    var host = document.getElementById('fh-embers');
+    if (!host) return;
+    var html = '';
+    for (var i = 0; i < 18; i++) {
+      var left = 4 + Math.random() * 92;
+      var rise = 70 + Math.random() * 90;          // px travelled before it dies
+      var dx = (Math.random() - 0.5) * 34;         // sideways drift on the way up
+      var dur = 2.6 + Math.random() * 2.8;
+      var size = 2 + Math.random() * 2.4;
+      html += '<i style="left:' + left.toFixed(1) + '%;width:' + size.toFixed(1) + 'px;height:'
+        + size.toFixed(1) + 'px;--rise:' + rise.toFixed(0) + 'px;--dx:' + dx.toFixed(0)
+        + 'px;animation-duration:' + dur.toFixed(2) + 's;animation-delay:'
+        + (-Math.random() * dur).toFixed(2) + 's"></i>';
+    }
+    host.innerHTML = html;
+  })();
+
+  window.fhContinue = function () {
+    if (window.openFwPanel) openFwPanel('review');
+    if (window.openStory) openStory();
+  };
   window.fhLearned = function () { fhShowWorld(); };
   window.fhGame = function (btn, mode) {
     // Visible confirmation first — the pop runs whether or not the panel
@@ -5683,16 +5749,21 @@
   document.querySelector('#fw-overlay').style.display = 'none';
   openFocciWorld3D();
 
-  document.querySelector('#fh-search-input').addEventListener('keydown', async (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    const raw = e.target.value.trim();
-    if (!raw) return;
-    e.target.blur();
-    const word = window.norm(normalizeSpelling(raw));
-    const rec = await idbGet(word);
-    if (rec) showWordSheet(condensedEntryHTML(rec));
-    else wordPopupForceAI(raw);
+  /* Both search boxes — the home page's and the newsstand's — run the
+     same lookup. */
+  ['#fh-search-input', '#ht-search-input'].forEach((sel) => {
+    const el = document.querySelector(sel);
+    if (el) el.addEventListener('keydown', async (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const raw = el.value.trim();
+      if (!raw) return;
+      el.blur();
+      const word = window.norm(normalizeSpelling(raw));
+      const rec = await idbGet(word);
+      if (rec) showWordSheet(condensedEntryHTML(rec));
+      else wordPopupForceAI(raw);
+    });
   });
 
   /* ============================================================
