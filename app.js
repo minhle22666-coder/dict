@@ -4093,7 +4093,7 @@ function dropdownRow(label, note, opts, onChange){
    under them; move a dial and the round simply starts again.
    ============================================================ */
 const PG_META = {
-  type:  { art:'box-lettertrail.png', fox:'fox-letter-trail.png', name:'Letter Trail' },
+  type:  { art:'box-lettertrail.png', fox:'fox-letter-trail.webp', name:'Letter Trail' },
   match: { art:'box-wordpairs.png',   fox:'fox-word-pairs.webp',  name:'Word Pairs'  }
 };
 function setQCountIdx(i){ setQCount(QCOUNTS[Math.max(0,Math.min(QCOUNTS.length-1,+i))]); }
