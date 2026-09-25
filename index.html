@@ -998,21 +998,76 @@
      read as standing in front of the card rather than printed on it.
      Background follows the story's own rule — The Nameless Field is arc 1,
      so bg-arc1.webp, darkened and dimmed so white text holds up on it. */
-  .fh-hero{position:relative;overflow:visible;height:126px;margin-bottom:20px}
+  .fh-hero{position:relative;overflow:visible;height:158px;margin-bottom:20px}
   .fh-hero-bg{position:absolute;inset:0;overflow:hidden;border-radius:18px;
     background:#2E5A52;box-shadow:0 10px 24px rgba(0,0,0,.32)}
   .fh-hero-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55}
   .fh-hero-bg::after{content:'';position:absolute;inset:0;
     background:linear-gradient(100deg,rgba(5,30,34,.78) 0%,rgba(5,30,34,.5) 46%,rgba(5,30,34,.18) 78%)}
+  /* Star dust crossing the field, quick. Two layers at different speeds
+     so it has depth instead of one flat sheet sliding by; z-index puts
+     them over the darkening scrim, which is a pseudo-element and would
+     otherwise paint on top of them. */
+  .fh-stars{position:absolute;inset:-14%;z-index:2;pointer-events:none;
+    filter:drop-shadow(0 0 5.1px rgba(190,240,255,.9));
+    background-image:
+      radial-gradient(4.2px 4.2px at 6% 18%,#fff,transparent),
+      radial-gradient(3.2px 3.2px at 14% 62%,rgba(206,248,255,.95),transparent),
+      radial-gradient(4.8px 4.8px at 21% 34%,#fff,transparent),
+      radial-gradient(3.4px 3.4px at 28% 78%,rgba(224,255,248,.9),transparent),
+      radial-gradient(3.9px 3.9px at 35% 12%,#fff,transparent),
+      radial-gradient(2.9px 2.9px at 43% 52%,rgba(206,248,255,.85),transparent),
+      radial-gradient(4.4px 4.4px at 50% 86%,#fff,transparent),
+      radial-gradient(3.4px 3.4px at 57% 28%,rgba(224,255,248,.9),transparent),
+      radial-gradient(3.9px 3.9px at 64% 66%,#fff,transparent),
+      radial-gradient(3.2px 3.2px at 72% 40%,rgba(206,248,255,.9),transparent),
+      radial-gradient(4.9px 4.9px at 79% 8%,#fff,transparent),
+      radial-gradient(3.4px 3.4px at 86% 74%,rgba(224,255,248,.9),transparent),
+      radial-gradient(3.9px 3.9px at 93% 46%,#fff,transparent),
+      radial-gradient(3.2px 3.2px at 98% 22%,rgba(206,248,255,.9),transparent);
+    animation:fh-star-a 2.6s linear infinite}
+  .fh-stars.b{
+    background-image:
+      radial-gradient(2.9px 2.9px at 3% 54%,rgba(255,255,255,.8),transparent),
+      radial-gradient(3.7px 3.7px at 11% 8%,#fff,transparent),
+      radial-gradient(2.7px 2.7px at 18% 88%,rgba(206,248,255,.8),transparent),
+      radial-gradient(3.4px 3.4px at 26% 44%,#fff,transparent),
+      radial-gradient(2.7px 2.7px at 33% 68%,rgba(224,255,248,.8),transparent),
+      radial-gradient(3.9px 3.9px at 41% 24%,#fff,transparent),
+      radial-gradient(2.9px 2.9px at 48% 60%,rgba(206,248,255,.85),transparent),
+      radial-gradient(3.4px 3.4px at 55% 4%,#fff,transparent),
+      radial-gradient(2.7px 2.7px at 63% 82%,rgba(224,255,248,.8),transparent),
+      radial-gradient(3.7px 3.7px at 70% 50%,#fff,transparent),
+      radial-gradient(2.9px 2.9px at 77% 30%,rgba(206,248,255,.85),transparent),
+      radial-gradient(3.4px 3.4px at 84% 92%,#fff,transparent),
+      radial-gradient(2.7px 2.7px at 91% 58%,rgba(224,255,248,.8),transparent),
+      radial-gradient(3.9px 3.9px at 97% 16%,#fff,transparent);
+    animation:fh-star-b 1.7s linear infinite;opacity:.75}
+  @keyframes fh-star-a{
+    0%{transform:translate3d(10%,5%,0);opacity:.45}
+    45%{opacity:1}
+    100%{transform:translate3d(-12%,-8%,0);opacity:.4}}
+  @keyframes fh-star-b{
+    0%{transform:translate3d(-8%,-4%,0);opacity:.35}
+    50%{opacity:.95}
+    100%{transform:translate3d(13%,9%,0);opacity:.3}}
   /* Half the height it was, kept hard against the right edge, and the feet
      still land below the card so he reads as stepping out of it. */
-  .fh-hero-fox{position:absolute;right:6px;bottom:-16px;height:66%;width:auto;z-index:3;
+  /* Fixed pixels, not a percentage of the card. The card grew by a
+     quarter and a percentage height would have grown the fox with it —
+     he was sized by hand and is meant to stay that size. */
+  .fh-hero-fox{position:absolute;right:6px;bottom:-16px;height:83px;width:auto;z-index:3;
     filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}
   /* a contact shadow, so the feet sit ON something */
   .fh-hero-shadow{position:absolute;right:16px;bottom:-14px;width:62px;height:13px;z-index:2;
     border-radius:50%;pointer-events:none;
     background:radial-gradient(ellipse at center,rgba(0,0,0,.45) 0%,rgba(0,0,0,0) 70%)}
-  .fh-hero-in{position:relative;z-index:3;padding:18px 0 0 22px;max-width:60%}
+  /* The title sits low, right on top of its own blurb, and Continue is
+     pinned to the floor of the card with the space between them left
+     open. Stacked tight at the top, the extra height just read as an
+     empty box with writing in one corner. */
+  .fh-hero-in{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;
+    padding:52px 0 14px 22px;max-width:62%}
   .fh-hero-t{font-size:17px;font-weight:800;color:#fff;letter-spacing:-.015em;line-height:1.14;
     text-shadow:0 2px 8px rgba(0,0,0,.55),0 0 16px rgba(200,255,246,.28)}
   .fh-hero-s{margin-top:3px;font-size:10px;font-weight:400;line-height:1.4;
@@ -1023,7 +1078,8 @@
   /* margin-left 0: it shares the block's left edge with the title and the
      blurb, which it did not before — it was indented 18px on its own. And
      lighter: a soft diagonal wash rather than a filled pill. */
-  .fh-cta{display:inline-flex;align-items:center;gap:5px;margin:10px 0 0 0;height:25px;
+  .fh-cta{display:inline-flex;align-self:flex-start;align-items:center;gap:5px;
+    margin:auto 0 0 0;height:25px;
     padding:0 14px;border-radius:999px;border:none;cursor:pointer;
     font-family:inherit;font-size:11px;font-weight:700;color:#F2FFFB;
     background:linear-gradient(120deg,rgba(226,255,250,.3) 0%,rgba(140,226,210,.18) 55%,rgba(90,190,180,.12) 100%);
@@ -1112,10 +1168,15 @@
     border-radius:18px;aspect-ratio:152/128;
     box-shadow:0 8px 20px rgba(0,0,0,.32),inset 0 0 0 1px rgba(255,255,255,.1);
     transition:transform .16s cubic-bezier(.3,1.3,.4,1),box-shadow .16s ease}
-  .fh-game.g1{background:linear-gradient(150deg,#2FA79B 0%,#1E7C84 100%)}
-  .fh-game.g2{background:linear-gradient(150deg,#4A62E0 0%,#2C36A8 100%)}
-  .fh-game.g3{background:linear-gradient(150deg,#A8D64A 0%,#6FA52C 100%)}
-  .fh-game.g4{background:linear-gradient(150deg,#C2413F 0%,#7E1F24 100%)}
+  /* Glass, not paint. The four colours were fully opaque and sat on the
+     page like stickers; at just under half strength with a blur behind
+     them the island still shows through and they read as part of the
+     same world. */
+  .fh-game{backdrop-filter:blur(12px) saturate(1.5);-webkit-backdrop-filter:blur(12px) saturate(1.5)}
+  .fh-game.g1{background:linear-gradient(150deg,rgba(47,167,155,.52) 0%,rgba(30,124,132,.38) 100%)}
+  .fh-game.g2{background:linear-gradient(150deg,rgba(74,98,224,.52) 0%,rgba(44,54,168,.38) 100%)}
+  .fh-game.g3{background:linear-gradient(150deg,rgba(168,214,74,.52) 0%,rgba(111,165,44,.38) 100%)}
+  .fh-game.g4{background:linear-gradient(150deg,rgba(194,65,63,.52) 0%,rgba(126,31,36,.38) 100%)}
   /* Anchored to the BOTTOM-RIGHT, not centred. Centring left an empty
      band under every fox and cut their feet off mid-card; sitting them on
      the bottom edge means the crop happens where a crop belongs. Each is
@@ -1136,7 +1197,7 @@
   /* the shade climbs from the bottom so the label always has something
      dark under it, whatever the art behind is doing */
   .fh-game::after{content:'';position:absolute;inset:0;z-index:1;
-    background:linear-gradient(0deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.28) 26%,rgba(0,0,0,0) 56%)}
+    background:linear-gradient(0deg,rgba(0,0,0,.5) 0%,rgba(0,0,0,.2) 26%,rgba(0,0,0,0) 56%)}
   /* pressed: the card dips, a light wash flashes, then it springs back */
   .fh-game:active{transform:scale(.94);box-shadow:0 3px 10px rgba(0,0,0,.34)}
   .fh-game::before{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;
@@ -4745,7 +4806,11 @@
   </div>
 
   <div class="fh-hero">
-    <div class="fh-hero-bg"><img src="./bg-arc1.webp" alt="" onerror="this.style.display='none'"/></div>
+    <div class="fh-hero-bg">
+      <img src="./bg-arc1.webp" alt="" onerror="this.style.display='none'"/>
+      <i class="fh-stars" aria-hidden="true"></i>
+      <i class="fh-stars b" aria-hidden="true"></i>
+    </div>
     <div class="fh-hero-shadow"></div>
     <img class="fh-hero-fox" src="./fox-hero.png" alt="" onerror="this.style.display='none'"/>
     <div class="fh-hero-in">

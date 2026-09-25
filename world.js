@@ -1226,7 +1226,14 @@ export async function bootFocciWorld(root, opts) {
                same number. */
             station.houses.push({
               x: mx, z: mz, y: floorY, doorY: my, cx: c.x, cz: c.z,
-              ring, spark, lamp, inside: false, inner: inner, roomR: Math.max(inner, 4.6)
+              /* The room has to reach its own front door. On the big
+                 house the step is ten units out from the middle, and a
+                 4.6 bubble meant he crossed the whole building without
+                 ever counting as inside it. A wide bubble is safe because
+                 being inside also requires being at the floor's HEIGHT,
+                 which out on the grass below he never is. */
+              ring, spark, lamp, inside: false, inner: inner,
+              roomR: Math.max(inner, Math.hypot(mx - c.x, mz - c.z) + 1.5)
             });
             /* The doorway ring answers a tap as well as a step, so you can
                go in from across the room instead of steering into a
@@ -2101,33 +2108,25 @@ export async function bootFocciWorld(root, opts) {
     if (room.houses && room.houses.length) {
       let anyInside = false, insideHut = null;
       for (const h of room.houses) {
-        /* The doorway is a door, both ways.
+        /* You walk in, and you walk out. That is the whole rule.
 
-           Walking it as a distance test could not work: the big house's
-           doorstep is eight units from the middle of the room, so he
-           crossed into "inside" and straight back out one step later, and
-           once out the door was behind him and there was no way back in.
-           Step on the marker and he goes in; walk out of the room and he
-           is put back on the marker. No gap either way.
+           The version before this made the doorway a portal: step on the
+           marker and be placed inside, leave the room and be placed back
+           on the marker. It trapped him. Being set back down on the
+           marker put him straight back in range of it, so he went in
+           again, and there was no way out of the house at all.
 
-           The height test matters as much as ever — the hut is directly
-           below you when you are standing on its roof, and without it the
-           floor clamp would drag him down through the thatch. */
-        const atFloor = Math.abs(character.position.y - h.y) < 2.6;
-        const onStep = Math.abs(character.position.y - h.doorY) < 2.0
-          && Math.hypot(h.x - cx, h.z - cz) < 1.3;
-        const inRoom = atFloor && Math.hypot(h.cx - cx, h.cz - cz) < h.roomR;
-        let near = h.inside;
-        if (!h.inside && onStep) {
-          near = true;
-          // one step over the threshold, so he is standing in the room
-          const bx = h.cx - h.x, bz = h.cz - h.z, bl = Math.hypot(bx, bz) || 1;
-          charState.x = h.cx - (bx / bl) * Math.min(1.4, bl * 0.4);
-          charState.z = h.cz - (bz / bl) * Math.min(1.4, bl * 0.4);
-        } else if (h.inside && !inRoom) {
-          near = false;
-          charState.x = h.x; charState.z = h.z;   // back out onto the marker
-        }
+           So: no teleporting, either way. He is inside while he is over
+           the building's floor plan AND at its floor height. The height
+           test is what keeps standing on the ROOF from counting — the hut
+           is directly below you up there, and without it the floor clamp
+           would drag him down through the thatch. */
+        /* Looser once he is in than it is to get in. Walking across a
+           room the ground under him rises and falls a little, and a
+           single threshold had the walls fading in and out as he crossed
+           — measured as ".III...I.." on one pass. */
+        const atFloor = Math.abs(character.position.y - h.y) < (h.inside ? 3.8 : 2.6);
+        const near = atFloor && Math.hypot(h.cx - cx, h.cz - cz) < h.roomR;
         if (near) { anyInside = true; insideHut = h; }
         if (near !== h.inside) {
           h.inside = near;
@@ -2147,33 +2146,33 @@ export async function bootFocciWorld(root, opts) {
       /* Pull the camera in close and drop it to head height, so being
          inside actually looks like being inside a small room rather than
          watching a hut from thirty feet up. */
-      if (!!insideHut !== !!room._wasInside) {
-        room._wasInside = !!insideHut;
-        if (insideHut) {
-          /* Looking DOWN into the room. At radius 4.4 and a near-level
-             phi the camera sat inside the hut's own wall and the screen
-             filled with brown. From above, with the roof faded out, the
-             room actually reads. */
-          camBeforeHut = { phi: cam.tPhi, radius: cam.tRadius };
-          /* The camera has to stay INSIDE the room, above him and looking
-             down. Anywhere further out than the walls and it is in the
-             hillside the big house is built against, with the screen full
-             of brown rock; anywhere near level and it is in the wall
-             itself. So: high enough to see over the furniture, and never
-             further out horizontally than the room is wide. */
-          const rr = insideHut.inner || 2.9;
-          cam.tRadius = Math.max(4, Math.min(7.5, rr * 0.95));
-          cam.tPhi = 0.5;
-        } else if (camBeforeHut) {
-          cam.tRadius = camBeforeHut.radius; cam.tPhi = camBeforeHut.phi;
-          camBeforeHut = null;
-        }
-      }
+      /* The camera is deliberately NOT moved on the way in.
+
+         Three attempts went the other way — overhead, then low and close,
+         then pulled in against a sight line — and every one of them put
+         it inside something. These buildings have solid wooden upper
+         floors (an opaque blocker measured 1.19 units above his head) and
+         the big one is built into a hillside, so there is no position
+         near him that is reliably clear. Meanwhile the walls are already
+         ghosted to 0.07, which means the ordinary outside view looks
+         straight through the shell and shows him in the room.
+
+         The one thing worth doing is making sure nothing opaque is in the
+         way from wherever the player has the camera, and that is handled
+         in updateCamera. */
+      room._wasInside = !!insideHut;
       if (anyInside !== room._inHouse) {
         room._inHouse = anyInside;
         // fade the walls and roofs as a group — they are merged by material
         room.collidables[0].traverse((o) => {
-          if (!o.isMesh || !o.userData.isBuilding) return;
+          /* The walls and roof were the only things being ghosted, and
+             these buildings have solid wooden upper floors — measured as
+             an opaque surface 1.19 units above his head. Whatever the
+             camera did, that deck was between it and him. Decking counts
+             as shell while he is indoors. */
+          if (!o.isMesh) return;
+          const nm = (o.material && o.material.name) || '';
+          if (!o.userData.isBuilding && !/floor|wood|madera|plank|suelo/i.test(nm)) return;
           o.material.transparent = true;
           /* Ghosted almost to nothing, and taken out of the depth buffer
              while it is. At 0.13 with depth writing on you were looking
@@ -2396,7 +2395,6 @@ export async function bootFocciWorld(root, opts) {
      line the first time Focci is close enough to use something, and never
      again after that — a tutorial you can finish, not a nag. */
   const hintsShown = new Set();
-  let camBeforeHut = null;
   function hintNear(key, text) {
     if (hintsShown.has(key)) return;
     hintsShown.add(key);
@@ -2516,30 +2514,6 @@ export async function bootFocciWorld(root, opts) {
     const cz = charState.z + cam.radius * sinPhi * Math.cos(cam.theta);
     const cy = character.position.y + cam.radius * Math.cos(cam.phi);
     camera.position.set(cx, cy + 1.1, cz);
-    /* Indoors, don't let anything solid get between the camera and him.
-
-       Fading the walls is not enough in the big house: its upper floor and
-       decking are WOOD, not wall material, so they never faded, and the
-       camera five units up was simply inside them — a screen full of flat
-       yellow with Focci somewhere underneath it. Sight-line test from his
-       head outwards, ignoring anything already see-through, and pull the
-       camera in to just short of whatever it finds. Only while he is
-       indoors: outdoors this would have the camera flinching at trees. */
-    const inHut = rooms[currentRoomKey]._insideHut;
-    if (inHut) {
-      const look = new THREE.Vector3(charState.x, character.position.y + 1.0, charState.z);
-      const away = camera.position.clone().sub(look);
-      const far = away.length();
-      away.normalize();
-      raycaster.set(look, away);
-      raycaster.far = far;
-      const blocked = raycaster.intersectObject(rooms[currentRoomKey].collidables[0], true)
-        .find((h) => !(h.object.material && h.object.material.transparent && h.object.material.opacity < 0.5));
-      raycaster.far = Infinity;
-      if (blocked && blocked.distance < far - 0.2) {
-        camera.position.copy(look).addScaledVector(away, Math.max(1.5, blocked.distance - 0.4));
-      }
-    }
     camera.lookAt(charState.x, character.position.y + 1.0, charState.z);
   }
 
@@ -2779,13 +2753,8 @@ export async function bootFocciWorld(root, opts) {
     } else if (type === 'word-treasure') {
       collectTreasure(room);
     } else if (type === 'hut-door') {
-      // walk him in rather than making him thread a 1.3-unit doorway
-      const h = room.houses && room.houses[obj.userData.houseIndex];
-      if (h) {
-        charState.x = h.cx; charState.z = h.cz;
-        h.inside = true;
-        spawnPickupBurst(room, h.x, h.y + 0.5, h.z, 0xFFD98A);
-      }
+      // The marker is a sign now, not a door. Tapping it says where it goes.
+      root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: 'Somewhere to sleep. Walk on in.' } }));
     } else if (type === 'hut-bed') {
       root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: HUT_LINES[Math.floor(Math.random() * HUT_LINES.length)] } }));
       spawnPickupBurst(room, obj.position.x, obj.position.y, obj.position.z, 0x8FD8FF);
@@ -2994,11 +2963,29 @@ export async function bootFocciWorld(root, opts) {
        and once he is up on the sky lawn at y 52 his own height carries the
        ceiling with him. */
     let surf = surfaceYIn(room, charState.x, charState.z, Math.max(GROUND_CEIL, character.position.y + 2.5));
-    /* Inside a hut the topmost surface under him IS the roof — these
-       models have no interior floor at all. While he is in there the
-       doorway's own ground height is the floor, which is the only reason
-       walking in does not fire him up onto the thatch. */
-    if (room._insideHut) surf = { y: room._insideHut.y, water: false, building: false, hit: true };
+    /* A roof over your head does not pick you up.
+
+       The ground probe takes the topmost surface, so walking towards a
+       hut put Focci ON its roof the moment he crossed under the eaves —
+       which is both the old "he only ever flies up onto the roof"
+       complaint and the reason he could never get inside: to be counted
+       as indoors he has to be at floor height, and the roof had already
+       taken him nine units above it.
+
+       So near a house, a building surface well above his head is
+       something he is UNDER, and the floor is what he stands on. A
+       building surface at his own feet is one he is ON, and it stays —
+       that is what keeps rooftops climbable. Only near a house: the
+       tower cap elsewhere is still reached by walking up onto it. */
+    if (room.houses) {
+      for (const h of room.houses) {
+        if (Math.hypot(h.cx - charState.x, h.cz - charState.z) > h.roomR) continue;
+        if (surf.building && surf.y > character.position.y + 1.2 && surf.y > h.y + 0.5) {
+          surf = { y: h.y, water: false, building: false, hit: true };
+        }
+        break;
+      }
+    }
     charState.inWater = surf.water;
     const swing = (walking && !surf.water) ? Math.sin(charState.walkT) * 0.55 : 0;
     // Biped gait: each arm swings opposite the leg on its own side.
@@ -3093,7 +3080,7 @@ export async function bootFocciWorld(root, opts) {
      anything — where the water actually is, whether a prop landed on the
      ground — except by eye, and eyeballing a 3D scene through a screenshot
      has been wrong every single time it was tried. */
-  window.__fw = { scene, camera, rooms, cam, charState, surfaceYIn, THREE,
+  window.__fw = { scene, camera, rooms, cam, charState, character, surfaceYIn, THREE,
     get room() { return rooms[currentRoomKey]; },
     get state() { return { pending: !!pendingTravel, flight: !!flight, declined: Array.from(declined), camMode, inspectMode }; },
     animalModel, toggleCamMode, setCamMode,
