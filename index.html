@@ -1197,6 +1197,20 @@
   .fh-loading img{width:90px;animation:cheer 2.2s ease-in-out infinite}
 
   /* ============================================================
+     NUMERALS
+
+     Raleway's figures do not sit on the same line as its capitals — put
+     "B1" in it and the 1 rides low against the B. Anywhere a number sits
+     inside a word or a label, the text switches to Helvetica, which
+     draws lining figures. Everything else in the app stays Raleway.
+     ============================================================ */
+  .num, .ht-lv, .rb-meta, .xp-num, .xp-m-n, .xp-val, .ht-cap i,
+  .ht-rlv, .ht-rsub, .ht-count, .fh-game .lv, .rz-stats b, .rz-barlab b,
+  .xp-lvl, .xp-next b, .ht-ts, .pg-lv, .pg-xp{
+    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
+    font-variant-numeric:lining-nums tabular-nums}
+
+  /* ============================================================
      HOT TAKE
 
      A newsstand and a reading room. The shelf is cards built from the
@@ -1220,6 +1234,16 @@
   .ht-banner{position:relative;margin-bottom:16px}
   .ht-banner img.bg{display:block;width:100%;border-radius:18px;
     box-shadow:0 10px 26px rgba(0,0,0,.4)}
+  /* The words are ours now. The supplied art used to carry them baked in,
+     which meant they were a picture of text — soft at any size and
+     impossible to change. */
+  .ht-btext{position:absolute;left:18px;top:0;bottom:0;z-index:2;width:62%;
+    display:flex;flex-direction:column;justify-content:center;gap:5px;
+    pointer-events:none}
+  .ht-bt{font-size:21px;font-weight:800;letter-spacing:-.02em;color:#fff;
+    text-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ht-bs{font-size:10.5px;font-weight:400;line-height:1.45;color:rgba(255,255,255,.84);
+    text-shadow:0 1px 5px rgba(0,0,0,.55)}
   /* Sat down into the box rather than floating above it. At -30px he was
      hovering clear of the banner with nothing under him. */
   .ht-banner img.fox{position:absolute;right:2px;bottom:-6px;width:96px;z-index:2;
@@ -1239,25 +1263,46 @@
 
   /* Mastheads, not words. Four tap targets of equal weight: everything,
      then the three papers as they actually look. */
-  .ht-srcrow{display:grid;grid-template-columns:.72fr 1fr 1fr 1fr;gap:8px}
-  .ht-src{position:relative;height:46px;display:flex;align-items:center;justify-content:center;
-    padding:0 6px;border:none;border-radius:14px;cursor:pointer;overflow:hidden;
+  .ht-srcrow{display:grid;grid-template-columns:.62fr 1fr 1fr 1fr;gap:7px}
+  /* Two rows, one height, both slim.
+
+     Glass belongs on the level chips, which are our own controls. It does
+     NOT belong wrapped around a masthead: a logo needs a flat opaque
+     ground to be legible, and a translucent frame around it only adds a
+     second border nobody asked for. So the plate IS the button — the
+     artwork on its own card, dimmed until it is chosen. */
+  .ht-src{height:38px;padding:0;border:none;border-radius:11px;cursor:pointer;overflow:hidden;
     font-family:inherit;font-size:11.5px;font-weight:800;letter-spacing:.01em;
-    background:#F4F7F5;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
-    opacity:.5;filter:grayscale(.45);transition:opacity .18s ease,filter .18s ease,transform .12s ease}
-  .ht-src.dark{background:#141A1E}
-  .ht-src.all{background:rgba(255,255,255,.09);color:rgba(215,245,252,.9);
-    filter:none;box-shadow:inset 0 0 0 1px rgba(160,220,245,.22)}
-  .ht-src img{max-width:100%;max-height:22px;object-fit:contain;display:block}
+    background-color:#F6F9F7;background-repeat:no-repeat;background-position:center;
+    background-size:auto 13px;
+    opacity:.72;transition:opacity .2s ease,box-shadow .2s ease,transform .12s ease}
+  .ht-src.dark{background-color:#10161A}
   .ht-src:active{transform:scale(.95)}
-  .ht-src.on{opacity:1;filter:none;box-shadow:0 0 0 2px #8CF0D4,0 4px 14px rgba(0,0,0,.35)}
-  .ht-src.all.on{background:linear-gradient(180deg,#CFF6E8,#7FDCC8);color:#06312C}
-  .ht-chip{flex:none;padding:7px 14px;border:none;border-radius:999px;cursor:pointer;
+  .ht-src.on{opacity:1;box-shadow:0 0 0 2px #8CF0D4,0 3px 12px rgba(0,0,0,.3)}
+  .ht-src.b-ted{background-image:url('./logo-ted.png')}
+  .ht-src.b-guardian{background-image:url('./logo-guardian.png')}
+  .ht-src.b-abc{background-image:url('./logo-abcnews.png')}
+  /* "All" is a control of ours, not a masthead, so it takes the same glass
+     the level chips take. */
+  .ht-src.all{opacity:1;color:rgba(222,246,252,.8);background-color:transparent;
+    background-image:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.05));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.22);
+    backdrop-filter:blur(10px) saturate(1.3);-webkit-backdrop-filter:blur(10px) saturate(1.3)}
+  .ht-src.all.on{color:#F4FFFC;
+    background-image:linear-gradient(140deg,rgba(150,244,214,.36),rgba(90,205,190,.2));
+    box-shadow:inset 0 0 0 1px rgba(170,255,228,.7),0 0 18px rgba(130,240,205,.28)}
+
+  .ht-chip{flex:none;height:38px;padding:0 16px;border:none;border-radius:11px;cursor:pointer;
     font-family:inherit;font-size:11.5px;font-weight:700;letter-spacing:.01em;
-    color:rgba(210,240,250,.72);background:rgba(255,255,255,.08);
-    box-shadow:inset 0 0 0 1px rgba(160,220,245,.18);transition:transform .12s ease}
+    color:rgba(222,246,252,.8);
+    background:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.05));
+    box-shadow:inset 0 0 0 1px rgba(180,235,250,.22),0 2px 8px rgba(0,0,0,.2);
+    backdrop-filter:blur(10px) saturate(1.3);-webkit-backdrop-filter:blur(10px) saturate(1.3);
+    transition:transform .12s ease,box-shadow .2s ease,color .2s ease}
   .ht-chip:active{transform:scale(.94)}
-  .ht-chip.on{color:#06312C;background:linear-gradient(180deg,#CFF6E8,#7FDCC8);box-shadow:none}
+  .ht-chip.on{color:#F4FFFC;
+    background:linear-gradient(140deg,rgba(150,244,214,.36),rgba(90,205,190,.2));
+    box-shadow:inset 0 0 0 1px rgba(170,255,228,.7),0 0 18px rgba(130,240,205,.28)}
   .ht-count{margin:0 2px 12px;font-size:10.5px;font-weight:700;letter-spacing:.08em;
     text-transform:uppercase;color:rgba(170,232,246,.55)}
 
@@ -5024,15 +5069,19 @@
       </button>
     </div>
     <div class="ht-banner">
-      <img class="bg" src="./hot-take-banner.png" alt="Hot Take" onerror="this.style.display='none'"/>
+      <img class="bg" src="./box-hottake.png" alt="" onerror="this.style.display='none'"/>
+      <div class="ht-btext">
+        <div class="ht-bt">Hot Take</div>
+        <div class="ht-bs">Welcome to Hot Takes! Pick a news story or TED Talk, answer a few quick questions from our AI, and share what you think</div>
+      </div>
       <img class="fox" src="./fox-hot-take.webp" alt="" onerror="this.style.display='none'"/>
     </div>
     <div class="ht-filters">
       <div class="ht-srcrow" id="ht-src">
         <button class="ht-src all on" data-v="all" onclick="htSetSrc('all')">All</button>
-        <button class="ht-src dark" data-v="ted" onclick="htSetSrc('ted')" aria-label="TED"><img src="./logo-ted.png" alt="TED"/></button>
-        <button class="ht-src" data-v="guardian" onclick="htSetSrc('guardian')" aria-label="The Guardian"><img src="./logo-guardian.png" alt="The Guardian"/></button>
-        <button class="ht-src" data-v="abc" onclick="htSetSrc('abc')" aria-label="ABC News"><img src="./logo-abcnews.png" alt="ABC News"/></button>
+        <button class="ht-src dark b-ted" data-v="ted" onclick="htSetSrc('ted')" aria-label="TED"></button>
+        <button class="ht-src b-guardian" data-v="guardian" onclick="htSetSrc('guardian')" aria-label="The Guardian"></button>
+        <button class="ht-src b-abc" data-v="abc" onclick="htSetSrc('abc')" aria-label="ABC News"></button>
       </div>
       <div class="ht-row" id="ht-lvl">
         <button class="ht-chip on" data-v="all" onclick="htSetLevel('all')">All levels</button>

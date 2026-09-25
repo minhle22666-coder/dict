@@ -7,9 +7,10 @@
    into the code.
 
    Two rules give it a shape:
-     - you start with four open, and finishing one opens two more, so
-       there is always somewhere to go next and never ninety things
-       shouting at once;
+     - you start with four open, and finishing one opens another from
+       the same masthead, so there is always somewhere to go next, never
+       ninety things shouting at once, and each paper unfolds at the
+       pace you actually read it;
      - everything still locked is shown blacked out rather than hidden,
        because a wall you can see over is an invitation and an empty
        page is not.
@@ -23,7 +24,7 @@
 
   var HT_LS = 'fc_hottake';
   var START_OPEN = 4;        // how many are unlocked on day one
-  var UNLOCK_PER_FINISH = 2; // and how many each finished piece opens
+  // finishing one opens another from the same masthead — see unlockFrom
   var FINISH_XP = 6;
 
   var DATA = null;           // { version, items:[...] }
@@ -65,16 +66,24 @@
     return state;
   }
 
-  function unlockMore(state, n) {
-    var locked = DATA.items.filter(function (it) { return state.unlocked.indexOf(it.id) < 0; });
-    var opened = [];
-    for (var i = 0; i < n && locked.length; i++) {
-      var k = Math.floor(Math.random() * locked.length);
-      opened.push(locked[k].id);
-      state.unlocked.push(locked[k].id);
-      locked.splice(k, 1);
-    }
-    return opened;
+  /* Finish a Guardian piece and the Guardian opens another one. Reading
+     follows an appetite — someone who has just enjoyed a TED talk wants
+     the next TED talk, not two random business stories — and it means
+     each masthead unfolds at the pace you actually read it.
+
+     If that source has nothing left, the unlock falls through to whatever
+     else is still shut rather than being quietly lost. */
+  function unlockFrom(state, src) {
+    var mine = [], other = [];
+    DATA.items.forEach(function (it) {
+      if (state.unlocked.indexOf(it.id) >= 0) return;
+      (it.src === src ? mine : other).push(it);
+    });
+    var pool = mine.length ? mine : other;
+    if (!pool.length) return null;
+    var pick = pool[Math.floor(Math.random() * pool.length)];
+    state.unlocked.push(pick.id);
+    return pick;
   }
 
   /* ---------------- data ---------------- */
@@ -432,12 +441,12 @@
     var first = state.done.indexOf(current.id) < 0;
     if (first) {
       state.done.push(current.id);
-      var opened = unlockMore(state, UNLOCK_PER_FINISH);
+      var opened = unlockFrom(state, current.src);
       save(state);
       if (window.addXP) window.addXP(FINISH_XP);
       if (window.fwToast) {
-        window.fwToast(opened.length
-          ? 'Read. ' + opened.length + ' more stories opened up'
+        window.fwToast(opened
+          ? 'Read. ' + SRC_LABEL[opened.src] + ' opened another one'
           : 'Read. That is every story on the stand');
       }
     }
