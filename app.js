@@ -6690,5 +6690,8 @@ function wireOnboarding(){
    became a window property — residents.js reads it through window and was
    silently seeing 0 XP, so every feed was refused as "not enough". */
 window.getXP=getXP; window.getDailyXP=getDailyXP; window.getDailyGoal=getDailyGoal;
+/* hottake.js asks Focci things, and these are consts in this file rather
+   than globals, so without the bridge it silently had no API key. */
+window.getKey=getKey; window.getModel=getModel;
 window.toggleSave=toggleSave; window.jump=jump; window.forceAI=forceAI; window.backToHome=backToHome;
 window.startReview=startReview; window.checkReview=checkReview; window.skipReview=skipReview; window.nextReview=nextReview;

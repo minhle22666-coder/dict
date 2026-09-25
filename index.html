@@ -1220,6 +1220,148 @@
   .fh-loading img{width:90px;animation:cheer 2.2s ease-in-out infinite}
 
   /* ============================================================
+     HOT TAKE
+
+     A newsstand and a reading room. The shelf is cards built from the
+     article's own picture; the reader is one column of text with
+     nothing else in it, because that is what reading wants.
+     ============================================================ */
+  .ht-scrim{position:fixed;inset:0;z-index:90;display:none;flex-direction:column;
+    background:
+      radial-gradient(120% 50% at 50% 0%,rgba(36,104,120,.5),transparent 68%),
+      linear-gradient(180deg,#0A2430 0%,#04131D 100%);
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif}
+  html.ht-on .ht-scrim{display:flex}
+  .ht-shelf{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:calc(env(safe-area-inset-top,0px) + 14px) 14px calc(env(safe-area-inset-bottom,0px) + 22px)}
+  html.ht-read .ht-shelf{display:none}
+
+  /* the banner, with the fox stepping out of it */
+  .ht-banner{position:relative;margin-bottom:16px}
+  .ht-banner img.bg{display:block;width:100%;border-radius:18px;
+    box-shadow:0 10px 26px rgba(0,0,0,.4)}
+  .ht-banner img.fox{position:absolute;right:-2px;top:-30px;width:104px;z-index:2;
+    filter:drop-shadow(0 6px 12px rgba(0,0,0,.45))}
+  .ht-x{position:absolute;left:10px;top:10px;z-index:3;width:30px;height:30px;
+    border:none;border-radius:50%;cursor:pointer;font-family:inherit;font-size:14px;
+    color:rgba(240,255,252,.9);background:rgba(4,20,28,.5);
+    box-shadow:inset 0 0 0 1px rgba(170,232,246,.3)}
+
+  .ht-filters{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+  .ht-row{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .ht-row::-webkit-scrollbar{display:none}
+  .ht-chip{flex:none;padding:7px 14px;border:none;border-radius:999px;cursor:pointer;
+    font-family:inherit;font-size:11.5px;font-weight:700;letter-spacing:.01em;
+    color:rgba(210,240,250,.72);background:rgba(255,255,255,.08);
+    box-shadow:inset 0 0 0 1px rgba(160,220,245,.18);transition:transform .12s ease}
+  .ht-chip:active{transform:scale(.94)}
+  .ht-chip.on{color:#06312C;background:linear-gradient(180deg,#CFF6E8,#7FDCC8);box-shadow:none}
+  .ht-count{margin:0 2px 12px;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;color:rgba(170,232,246,.55)}
+
+  .ht-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ht-card{position:relative;display:block;width:100%;aspect-ratio:3/4;padding:0;border:none;
+    border-radius:18px;overflow:hidden;cursor:pointer;text-align:left;
+    background:#0C2531;box-shadow:0 8px 20px rgba(0,0,0,.4),inset 0 0 0 1px rgba(160,220,245,.16);
+    transition:transform .16s cubic-bezier(.3,1.3,.4,1)}
+  .ht-card:active{transform:scale(.95)}
+  .ht-card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .ht-card::after{content:'';position:absolute;inset:0;
+    background:linear-gradient(0deg,rgba(2,14,20,.94) 0%,rgba(2,14,20,.62) 34%,rgba(2,14,20,.06) 68%)}
+  .ht-cap{position:absolute;left:10px;right:10px;bottom:9px;z-index:2;display:block}
+  .ht-cap b{display:block;font-size:12.5px;font-weight:800;line-height:1.28;color:#fff;
+    text-shadow:0 2px 6px rgba(0,0,0,.7);
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .ht-cap i{display:block;margin-top:4px;font-style:normal;font-size:9.5px;font-weight:700;
+    letter-spacing:.05em;text-transform:uppercase;color:rgba(190,235,250,.72)}
+  .ht-lv{position:absolute;left:9px;top:9px;z-index:2;padding:3px 8px;border-radius:999px;
+    font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#06312C;
+    background:linear-gradient(180deg,#CFF6E8,#7FDCC8)}
+  .ht-play{position:absolute;right:9px;top:9px;z-index:2;width:22px;height:22px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;
+    background:rgba(226,60,60,.9);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  .ht-tick{position:absolute;right:9px;bottom:9px;z-index:3;width:20px;height:20px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;
+    color:#06312C;background:#8CF0D4}
+  .ht-card.done img{filter:saturate(.55) brightness(.75)}
+  /* locked: blacked out on purpose, so you can see there is more */
+  .ht-card.locked{background:#030B10;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+  .ht-lockface{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:3px;padding:14px;text-align:center}
+  .ht-lockface span{font-size:17px;color:rgba(255,255,255,.2)}
+  .ht-lockface b{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    color:rgba(255,255,255,.28)}
+  .ht-lockface i{font-style:normal;font-size:9.5px;line-height:1.35;color:rgba(255,255,255,.18)}
+  .ht-empty{grid-column:1/-1;padding:40px 10px;text-align:center;font-size:12.5px;
+    color:rgba(200,232,246,.6)}
+
+  /* ---------------- the reader ---------------- */
+  .ht-reader{position:absolute;inset:0;z-index:4;display:none;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;background:linear-gradient(180deg,#0A2430 0%,#04131D 100%);
+    padding-bottom:calc(env(safe-area-inset-bottom,0px) + 30px)}
+  html.ht-read .ht-reader{display:block}
+  .ht-rtop{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;
+    gap:10px;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;
+    background:linear-gradient(180deg,rgba(10,36,48,.96),rgba(10,36,48,0))}
+  .ht-back{border:none;border-radius:999px;cursor:pointer;padding:7px 14px;
+    font-family:inherit;font-size:12px;font-weight:700;color:rgba(224,250,255,.88);
+    background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(160,220,245,.24)}
+  .ht-back:active{transform:scale(.95)}
+  .ht-hero{margin:0 14px;border-radius:18px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.4)}
+  .ht-hero img{display:block;width:100%}
+  .ht-embed{margin:0 14px;border-radius:18px;overflow:hidden;background:#000;
+    box-shadow:0 10px 26px rgba(0,0,0,.45)}
+  .ht-embed iframe{display:block;width:100%;aspect-ratio:16/9;border:0}
+  .ht-rbody{max-width:640px;margin:0 auto;padding:18px 20px 0}
+  .ht-rmeta{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .ht-rsrc{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#8CF0D4}
+  .ht-rlv{padding:2px 8px;border-radius:999px;font-size:9.5px;font-weight:800;
+    color:rgba(220,248,255,.8);background:rgba(255,255,255,.1)}
+  .ht-rtitle{margin:0;font-size:24px;font-weight:800;line-height:1.2;letter-spacing:-.02em;color:#fff}
+  .ht-rsub{margin-top:7px;font-size:11px;color:rgba(190,230,246,.6)}
+  .ht-tnote{margin:22px 0 -4px;font-size:10px;font-weight:800;letter-spacing:.16em;
+    text-transform:uppercase;color:rgba(170,232,246,.5)}
+  /* the column itself: generous, quiet, and selectable */
+  .ht-text{margin-top:18px;-webkit-user-select:text;user-select:text}
+  .ht-line{margin:0 0 15px;font-size:15.5px;line-height:1.72;color:rgba(255,255,255,.88)}
+  .ht-line::selection,.ht-line *::selection{background:rgba(140,240,212,.32)}
+  .ht-ts{display:inline-block;margin-right:8px;padding:1px 7px;border:none;border-radius:6px;
+    vertical-align:1px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:800;
+    color:#06312C;background:#7FDCC8}
+  .ht-srclink{display:inline-block;margin-top:4px;font-size:12px;font-weight:700;color:#8CF0D4;
+    text-decoration:none}
+
+  .ht-finish{margin:26px 0 0;padding:16px;border-radius:20px;
+    background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(160,220,245,.18)}
+  .ht-fh{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:10px}
+  .ht-finish textarea{width:100%;box-sizing:border-box;padding:11px 13px;border:none;border-radius:14px;
+    resize:vertical;font-family:inherit;font-size:13.5px;line-height:1.5;color:#fff;
+    background:rgba(4,20,28,.6);box-shadow:inset 0 0 0 1px rgba(160,220,245,.22)}
+  .ht-finish textarea::placeholder{color:rgba(190,230,246,.4)}
+  .ht-reply{display:none;margin-top:11px;padding:12px 14px;border-radius:14px;font-size:13px;
+    line-height:1.55;color:#EAFFFA;background:rgba(140,240,212,.1);
+    box-shadow:inset 0 0 0 1px rgba(140,240,212,.24)}
+  .ht-reply b{display:block;margin-bottom:4px;font-size:10px;font-weight:800;letter-spacing:.14em;
+    text-transform:uppercase;color:#8CF0D4}
+  .ht-done{width:100%;height:44px;margin-top:12px;border:none;border-radius:999px;cursor:pointer;
+    font-family:inherit;font-size:13.5px;font-weight:800;color:#06312C;
+    background:linear-gradient(180deg,#BFF4E4,#6FD9C4);
+    box-shadow:0 4px 14px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.65)}
+  .ht-done:active{transform:scale(.97)}
+
+  /* the little bar that appears over a selection */
+  .ht-sel{position:fixed;z-index:95;transform:translate(-50%,0) scale(.9);opacity:0;
+    pointer-events:none;display:flex;gap:2px;padding:4px;border-radius:999px;
+    background:rgba(8,32,40,.94);box-shadow:0 8px 22px rgba(0,0,0,.5),inset 0 0 0 1px rgba(160,230,245,.3);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    transition:opacity .16s ease,transform .16s cubic-bezier(.3,1.3,.4,1)}
+  .ht-sel.show{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
+  .ht-sel button{border:none;border-radius:999px;cursor:pointer;padding:8px 14px;
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif;font-size:12px;font-weight:700;
+    color:#EAFFFA;background:transparent}
+  .ht-sel button:active{background:rgba(255,255,255,.12)}
+
+  /* ============================================================
      THE XP PANEL
 
      A quick view of the one number the whole island runs on: what Focci
@@ -4837,6 +4979,37 @@
 <button id="dict-back" onclick="closeDictPage()" aria-label="Back to the island">← Back to the island</button>
 <div class="fw-voyage" id="fw-voyage"></div>
 <div class="fw-hint" id="fw-hint"></div>
+<div class="ht-scrim" id="ht-scrim">
+  <div class="ht-shelf" id="ht-shelf">
+    <div class="ht-banner">
+      <button class="ht-x" onclick="htClose()" aria-label="Close">✕</button>
+      <img class="bg" src="./hot-take-banner.png" alt="Hot Take" onerror="this.style.display='none'"/>
+      <img class="fox" src="./fox-hot-take.webp" alt="" onerror="this.style.display='none'"/>
+    </div>
+    <div class="ht-filters">
+      <div class="ht-row" id="ht-src">
+        <button class="ht-chip on" data-v="all" onclick="htSetSrc('all')">Everything</button>
+        <button class="ht-chip" data-v="ted" onclick="htSetSrc('ted')">TED Talks</button>
+        <button class="ht-chip" data-v="guardian" onclick="htSetSrc('guardian')">The Guardian</button>
+        <button class="ht-chip" data-v="ap" onclick="htSetSrc('ap')">AP News</button>
+      </div>
+      <div class="ht-row" id="ht-lvl">
+        <button class="ht-chip on" data-v="all" onclick="htSetLevel('all')">Any level</button>
+        <button class="ht-chip" data-v="A2" onclick="htSetLevel('A2')">A2</button>
+        <button class="ht-chip" data-v="B1" onclick="htSetLevel('B1')">B1</button>
+        <button class="ht-chip" data-v="B2" onclick="htSetLevel('B2')">B2</button>
+        <button class="ht-chip" data-v="C1" onclick="htSetLevel('C1')">C1</button>
+      </div>
+    </div>
+    <div class="ht-count" id="ht-count"></div>
+    <div class="ht-grid" id="ht-grid"></div>
+  </div>
+  <div class="ht-reader" id="ht-reader"></div>
+  <div class="ht-sel" id="ht-sel">
+    <button class="ht-sel-word" onclick="htSelLookup()">Look up</button>
+    <button onclick="htSelAsk()">Ask Focci</button>
+  </div>
+</div>
 <div class="xp-scrim" id="xp-scrim">
   <button class="xp-close" onclick="xpClose()" aria-label="Close">✕</button>
   <div class="xp-hero">
@@ -5074,6 +5247,7 @@
 </div>
 
 <script src="./residents.js"></script>
+<script src="./hottake.js"></script>
 <script src="./app.js"></script>
 <script src="./story-content.js"></script>
 <script src="./story.js"></script>
@@ -5480,10 +5654,7 @@
     // takes a moment to build.
     if (btn) { btn.classList.remove('tapped'); void btn.offsetWidth; btn.classList.add('tapped'); }
     setTimeout(() => {
-      if (mode === 'hottake') {
-        if (window.fwToast) fwToast('Hot Take is still being written');
-        return;
-      }
+      if (mode === 'hottake') { if (window.htOpen) htOpen(); return; }
       openFwPanel('review');
       if (window.setPracticeMode) setPracticeMode(mode);
     }, 150);
