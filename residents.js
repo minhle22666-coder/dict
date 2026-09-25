@@ -262,6 +262,10 @@
     var lvl = resLevel(r);
     var mate = r.mateId ? resLoad().find(function (x) { return x.id === r.mateId; }) : null;
     var h = '';
+    /* The card is about a particular animal, so it should show it. The
+       picture is filled in by rzOpen, which renders it off the same 3D
+       model the resident is built from. */
+    h += '<div class="rz-pic" data-species="' + esc(r.species) + '"></div>';
     h += '<div class="rz-head"><div class="rz-name">' + esc(r.name) + '</div>'
        + '<div class="rz-species">' + esc(sp.label) + ' · ' + resStage(r) + '</div></div>';
     h += '<div class="rz-bar rz-l' + lvl + '"><i style="width:' + Math.round(r.energy) + '%"></i></div>';

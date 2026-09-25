@@ -376,7 +376,6 @@
       if (!text.contains(sel.anchorNode)) return hide();
       var r = sel.getRangeAt(0).getBoundingClientRect();
       pop.dataset.sel = s;
-      pop.querySelector('.ht-sel-word').textContent = s.split(/\s+/).length === 1 ? 'Look up' : 'Look up first word';
       pop.classList.add('show');
       var top = Math.max(60, r.top - 52);
       pop.style.top = top + 'px';
@@ -387,20 +386,24 @@
     document.getElementById('ht-reader').addEventListener('scroll', hide, { passive: true });
   }
 
-  window.htSelLookup = function () {
-    var pop = document.getElementById('ht-sel');
-    var s = (pop.dataset.sel || '').trim();
-    if (!s) return;
-    var word = s.split(/\s+/)[0].replace(/[^A-Za-z'-]/g, '');
-    pop.classList.remove('show');
-    if (word && window.openDictPage) window.openDictPage(word.toLowerCase());
-  };
-
-  window.htSelAsk = function () {
+  /* One button. A single word the dictionary already knows opens its own
+     entry — there is no sense paying an AI round trip to translate a word
+     that is sitting in the database with a full entry behind it. Anything
+     longer, or anything unknown, goes to Focci. */
+  window.htSelAsk = async function () {
     var pop = document.getElementById('ht-sel');
     var s = (pop.dataset.sel || '').trim();
     pop.classList.remove('show');
     if (!s) return;
+    if (s.split(/\s+/).length === 1 && typeof window.idbGet === 'function') {
+      var w = s.toLowerCase().replace(/[^a-z'-]/g, '');
+      if (w) {
+        try {
+          var rec = await window.idbGet(window.norm ? window.norm(w) : w);
+          if (rec && rec.data) { if (window.openDictPage) window.openDictPage(w); return; }
+        } catch (e) {}
+      }
+    }
     askFocci('Explain this, simply, for a Vietnamese learner of English:\n\n"' + s + '"');
   };
 

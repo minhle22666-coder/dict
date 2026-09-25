@@ -1211,6 +1211,60 @@
     font-variant-numeric:lining-nums tabular-nums}
 
   /* ============================================================
+     THE WORD PAGE OVER EVERYTHING ELSE
+
+     The newsstand sits at z-index 90 and the word page at 51, so looking
+     a word up from an article opened the entry underneath the article
+     and nothing appeared to happen. The full-screen overlays stand down
+     while a word is open; they come straight back when it closes.
+
+     The doubled selectors are deliberate. html.ht-on .ht-scrim{display:flex}
+     lives further down the file at the same specificity, so an equal rule
+     up here simply loses; repeating the class outweighs it without
+     reaching for !important. Same for the chrome, which is held closed by
+     a :not() rule that counts for more than a plain class.
+     ============================================================ */
+  html.dict-open .ht-scrim.ht-scrim,
+  html.dict-open .xp-scrim.xp-scrim,
+  html.dict-open .rb-scrim.rb-scrim,
+  html.dict-open .jn-scrim.jn-scrim{display:none}
+  html.dict-open #fw-chrome#fw-chrome{display:block}
+  html.dict-open .fx-xp{display:none}
+
+  /* ============================================================
+     NOTHING TO SELECT IN A GAME
+
+     Holding a word to think about it brought up iOS's Copy / Look Up
+     bubble over the answer you were trying to read.
+     ============================================================ */
+  .pg-card .match-opt, .pg-card .mh-ch, .pg-card .mh-count,
+  .pg-q, .pg-bub, .pg-note, .pg-lab, .pg-head .name{
+    -webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+
+  /* ============================================================
+     THE XP PILL
+
+     What Focci has earned, always in the corner, and a way into the
+     panel that breaks it down.
+     ============================================================ */
+  /* In the row, between the search field and the menu. Floating it at a
+     fixed top-right put it straight over the banner artwork on every page
+     that has one. */
+  .fx-xp{flex:none;display:flex;align-items:center;gap:5px;height:38px;padding:0 12px;
+    border:none;border-radius:999px;cursor:pointer;
+    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
+    font-size:12.5px;font-weight:700;color:#EAFFF9;
+    background:linear-gradient(140deg,rgba(150,244,214,.3),rgba(40,120,120,.34));
+    box-shadow:inset 0 0 0 1px rgba(170,255,228,.42),0 4px 14px rgba(0,0,0,.3);
+    backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4);
+    transition:transform .14s ease}
+  .fx-xp:active{transform:scale(.93)}
+  .fx-xp b{font-weight:800;color:#BFF4E4}
+  /* the world's copy floats, because the world has no row to sit in */
+  #fw-chrome .fx-xp{position:absolute;right:62px;pointer-events:auto;
+    top:calc(env(safe-area-inset-top,0px) + 12px)}
+
+  /* ============================================================
      WHAT YOU LOOKED UP BEFORE
 
      The search box opened onto nothing. Every word already looked up is
@@ -1790,6 +1844,10 @@
     box-shadow:0 0 0 1px rgba(150,230,220,.24),0 -10px 44px rgba(0,0,0,.5);
     animation:rz-in .3s cubic-bezier(.3,1.25,.4,1)}
   @keyframes rz-in{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+  .rz-pic{width:112px;height:112px;margin:0 auto 10px;border-radius:50%;
+    background-color:rgba(255,255,255,.07);background-repeat:no-repeat;
+    background-position:center;background-size:88%;
+    box-shadow:inset 0 0 0 1px rgba(150,230,220,.22)}
   .rz-head{margin-bottom:12px}
   .rz-name{font-size:19px;font-weight:800;color:#fff;letter-spacing:-.01em}
   .rz-species{margin-top:2px;font-size:11.5px;font-weight:500;color:rgba(190,240,232,.8)}
@@ -1949,7 +2007,10 @@
        than glassy. brightness() lifts the blurred world into a pale
        luminous haze first and saturate() keeps a hint of its colour, so the
        white sits on light instead of on sludge. */
-    background:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(244,253,252,.5) 40%,rgba(216,245,244,.48) 100%);
+    /* Near-opaque. At half transparency this was readable over the
+       island but not over the newsstand, which is nearly black — the
+       teal text came out at almost no contrast against it. */
+    background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(246,253,252,.96) 40%,rgba(226,247,246,.96) 100%);
     backdrop-filter:blur(30px) saturate(1.7) brightness(1.4);
     -webkit-backdrop-filter:blur(30px) saturate(1.7) brightness(1.4);
     --tint:#1FAFB4; --pri-l:#178E93; --pri-d:#67DEE1;
@@ -5223,6 +5284,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
         <input id="ht-search-input" type="search" inputmode="search" placeholder="Translate or compare words (e.g. say, tell)" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
       </label>
+      <button class="fx-xp" onclick="xpOpen()" aria-label="Your XP">⚡ <b>0</b></button>
       <button class="fh-grid-btn" aria-label="Menu" onclick="fmOpen()">
         <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2.6"/><rect x="13" y="3" width="8" height="8" rx="2.6"/><rect x="3" y="13" width="8" height="8" rx="2.6"/><rect x="13" y="13" width="8" height="8" rx="2.6"/></svg>
       </button>
@@ -5254,7 +5316,6 @@
   </div>
   <div class="ht-reader" id="ht-reader"></div>
   <div class="ht-sel" id="ht-sel">
-    <button class="ht-sel-word" onclick="htSelLookup()">Look up</button>
     <button onclick="htSelAsk()">Ask Focci</button>
   </div>
 </div>
@@ -5350,7 +5411,8 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
       <input id="fh-search-input" type="search" inputmode="search" placeholder="Translate or compare words (e.g. say, tell)" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
     </label>
-    <button class="fh-grid-btn" aria-label="Settings" onclick="fhOpenSettings()">
+    <button class="fx-xp" onclick="xpOpen()" aria-label="Your XP">⚡ <b>0</b></button>
+      <button class="fh-grid-btn" aria-label="Settings" onclick="fhOpenSettings()">
       <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2.6"/><rect x="13" y="3" width="8" height="8" rx="2.6"/><rect x="3" y="13" width="8" height="8" rx="2.6"/><rect x="13" y="13" width="8" height="8" rx="2.6"/></svg>
     </button>
   </div>
@@ -5405,6 +5467,7 @@
      empty space still lets drag/pinch through to the canvas below) with
      pointer-events:auto on each actual control. -->
 <div id="fw-chrome">
+  <button class="fx-xp fw-ui" onclick="xpOpen()" aria-label="Your XP">⚡ <b>0</b></button>
   <!-- always-on search bar — no tap-to-reveal icon, this IS the home screen now -->
   <div class="fw-searchbar fw-ui">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -5823,6 +5886,15 @@
     document.getElementById('rz-card').innerHTML = window.resInfoHtml(rec);
     document.documentElement.classList.add('rz-on');
     document.getElementById('rz-say').classList.remove('show');
+    /* Put the animal's face on its own card. Rendered off the very model
+       standing out there on the island, so it is that creature and not a
+       stock picture of the species. */
+    const slot = document.querySelector('#rz-card .rz-pic');
+    if (slot && window.fwPortrait) {
+      Promise.resolve(window.fwPortrait(rec.species)).then((url) => {
+        if (url && slot.isConnected) slot.style.backgroundImage = 'url(' + url + ')';
+      }).catch(() => {});
+    }
   };
   window.rzClose = function () { document.documentElement.classList.remove('rz-on'); };
   window.resFeedFromCard = function (id) {
@@ -5956,6 +6028,15 @@
   document.documentElement.classList.add('home-on');
   document.querySelector('#fw-overlay').style.display = 'none';
   openFocciWorld3D();
+
+  /* ---- the XP pill, kept current ---- */
+  window.fxRefreshXP = function () {
+    if (!window.getXP) return;
+    const n = getXP().toLocaleString();
+    document.querySelectorAll('.fx-xp b').forEach((b) => { b.textContent = n; });
+  };
+  fxRefreshXP();
+  setInterval(fxRefreshXP, 4000);
 
   /* ---- the search box remembers ----
      Every lookup is already in the history with its meaning in the
