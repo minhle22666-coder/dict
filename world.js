@@ -407,6 +407,57 @@ export async function bootFocciWorld(root, opts) {
      takes the first spot that passes, then relaxes the requirements one at
      a time rather than giving up — a diamond slightly off the ideal shelf
      is far better than four in a heap. */
+  /* Somewhere with a view.
+
+     findSpotOnBearing deliberately hunts for FLAT ground, which is right
+     for a mushroom and wrong for a gateway: the four diamonds stood about
+     in open grass where you walked past them without ever looking up.
+
+     This keeps the same validity rules and then, among everything that
+     passes, takes the spot standing highest above its OWN surroundings --
+     the top of a mound, a rock shelf, the raised ground the lamps stand
+     on. Prominence rather than absolute height, so one gateway does not
+     end up halfway up the mountain while the other three sit on the
+     shore.
+
+     It searches the whole quadrant, not a narrow cone. Measured on the
+     ring the old code used, 8 to 15 units out, the best prominence
+     anywhere was 0.2 -- that stretch of island is simply flat, and no
+     amount of preferring high ground finds a hill that is not there.
+     Across the quadrant it is 1.3 to 5.4.
+
+     The expensive check goes last: walking a line back to spawn costs far
+     more than reading four cells, so candidates are ranked first and only
+     the best few are asked whether he can actually get there. */
+  function findHighSpotOnBearing(room, bearing, rMin, rMax) {
+    const cands = [];
+    for (let ri = 0; ri <= 24; ri++) {
+      const r = rMin + ((rMax - rMin) * ri) / 24;
+      for (let ai = -6; ai <= 6; ai++) {
+        const a = bearing + ai * 0.1;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        const su = groundAt(room, x, z);
+        if (!su.hit || su.water || su.building) continue;
+        if (!isStableGround(room, x, z, su.y)) continue;
+        let around = 0, n = 0;
+        for (let k = 0; k < 8; k++) {
+          const th = (k / 8) * Math.PI * 2;
+          const nb = groundAt(room, x + Math.cos(th) * 2.6, z + Math.sin(th) * 2.6);
+          if (nb.hit) { around += nb.y; n++; }
+        }
+        if (!n) continue;
+        cands.push({ x: x, z: z, y: su.y, p: su.y - around / n });
+      }
+    }
+    cands.sort((u, v) => v.p - u.p);
+    for (let i = 0; i < cands.length && i < 14; i++) {
+      const c = cands[i];
+      if (isReachableFromSpawn(room, c.x, c.z, c.y)) return { x: c.x, z: c.z, y: c.y };
+    }
+    if (cands.length) return { x: cands[0].x, z: cands[0].z, y: cands[0].y };
+    return findSpotOnBearing(room, bearing, rMin, rMax);
+  }
+
   function findSpotOnBearing(room, bearing, rMin, rMax) {
     const tries = [
       (su, x, z) => su.hit && !su.water && !su.building && isStableGround(room, x, z, su.y) && isReachableFromSpawn(room, x, z, su.y),
@@ -1741,10 +1792,12 @@ export async function bootFocciWorld(root, opts) {
       // One per compass corner — NE, SE, SW, NW — so all four are actually
       // findable and each leads to its own land.
       const bearing = (Math.PI / 4) + (Math.PI / 2) * i;
-      let spot = findSpotOnBearing(station, bearing, 8, 15);
+      /* The whole quadrant, not a ring: the 8-to-15 band the diamonds used
+         to be confined to is the flattest part of the island. */
+      let spot = findHighSpotOnBearing(station, bearing, 7, 27);
       // and clear of the launch pad, which is picked before these
       if (station.skyPad && Math.hypot(spot.x - station.skyPad.x, spot.z - station.skyPad.z) < 3) {
-        spot = findSpotOnBearing(station, bearing + 0.5, 9, 16);
+        spot = findHighSpotOnBearing(station, bearing + 0.5, 9, 27);
       }
       const spawned = spawnDiamond(station, spot.x, spot.y, spot.z, 'teleport', i, ARC_GLOW_COLORS[i % ARC_GLOW_COLORS.length]);
       station.teleports.push({ obj: spawned.obj, mixer: spawned.mixer, x: spot.x, z: spot.z, arcIndex: i, title, locked: false });
@@ -2461,29 +2514,38 @@ export async function bootFocciWorld(root, opts) {
           }, 'sky');
       } else if (Math.hypot(p.x - cx, p.z - cz) > 7) declined.delete('sky');
     }
-    /* The boat, moored out on the water. Wade to it and it offers the trip. */
+    /* The boat, moored out on the water.
+
+       There is no longer a card asking whether he would like to set sail.
+       Climbing into a boat that is pointed at the open sea IS the answer;
+       being asked to confirm it afterwards was a dialog standing between
+       him and the thing he had just done. Wade out, jump, and if the deck
+       catches his feet on the way down, the voyage starts.
+
+       The deck sits 0.36 above the waterline and his jump carries 1.77, so
+       coming down onto it is an easy thing to do on purpose and a hard
+       thing to do by accident -- he has to be over the boat, already
+       falling, and low enough for it to be underfoot. */
     if (room === station && room.boat && !flight && !pendingTravel && !room.boat.sailing) {
       const b = room.boat;
-      const d = Math.hypot(b.x - cx, b.z - cz);
-      if (d > 11) declined.delete('boat');
-      if (d < 3.4) {
-        hintNear('boat', 'Wade out to the boat and climb aboard');
-        askTravel('boat', 'Set sail',
-          'Somewhere out there is someone with no island to go home to. Take the boat and look?',
-          'Cast off', () => startVoyage(room), 'boat');
+      const dDeck = Math.hypot((b.x + b.deckDX) - cx, (b.z + b.deckDZ) - cz);
+      if (dDeck < 4.5) hintNear('boat', 'Jump aboard');
+      if (dDeck < 1.9 && charState.jumpY > 0.02 && charState.vy <= 0
+          && character.position.y <= b.deckY + 0.8) {
+        startVoyage(room);
       }
     }
-    /* Same for the four diamonds: step in, get asked, decide. */
-    if (room.teleports && room.teleports.length && !flight && !pendingTravel) {
+    /* The diamonds no longer stop him on his way past.
+
+       Walking within two units of one used to raise the travel card, so
+       crossing the island meant dismissing gateways he had no intention of
+       using. They are landmarks now: they sit up where you can see them
+       and they ask only when he taps one, which onInteract already
+       handles. All that is left here is re-arming a gateway he turned
+       down once he is well clear of it. */
+    if (room.teleports && room.teleports.length) {
       for (const tp of room.teleports) {
-        const key = 'arc' + tp.arcIndex;
-        const d = Math.hypot(tp.x - cx, tp.z - cz);
-        if (d > 7) declined.delete(key);        // far enough away to re-arm
-        if (d > 1.8) continue;
-        askTravel('arc', tp.title || 'Another land',
-          'A gateway hums here. Travel to ' + (tp.title || 'another land') + '?',
-          'Yes, take me', () => { enterRoom(arcRoomKeys[tp.arcIndex]); onOpenArc(tp.arcIndex, ARC_TITLES[tp.arcIndex]); }, key);
-        break;
+        if (Math.hypot(tp.x - cx, tp.z - cz) > 7) declined.delete('arc' + tp.arcIndex);
       }
     }
   }
