@@ -3884,20 +3884,22 @@ async function renderSaySaved(box, head, stale){
     h+='<div class="sy-detail">';
     if(a.ctx) h+='<div class="sy-blk"><div class="sy-blk-l">Situation</div><div class="sy-blk-t">'+esc(a.ctx)+'</div></div>';
     if(a.vi)  h+='<div class="sy-blk"><div class="sy-blk-l">You were asked to say</div><div class="sy-blk-t vi">\u201C'+esc(a.vi)+'\u201D</div></div>';
-    if(a.fb || vm){
-      h+='<div class="write-fb write-fb-'+(v||'neutral')+'">'
-        +(vm?'<div class="write-fb-v"><span class="write-fb-ico">'+vm.ico+'</span>'+vm.lbl+'</div>':'')
-        +(a.fb?'<div class="write-fb-t">'+esc(a.fb)+'</div>':'')+'</div>';
-    }
+    /* What you actually typed, with the wrong or unnatural parts struck
+       through and Focci's fix right beside them -- the same reading the
+       play screen gives right after you check it. This used to be a big
+       colored "Close - small tweak" badge plus one summary sentence, with
+       the sentence you actually typed nowhere on the page (the closed
+       card can already have been overwritten with whichever alternative
+       you picked -- see pickSpeakUpAnswer). The one thing worth keeping
+       from that badge is the coach's one-line diagnosis, so it stays,
+       just folded into the same plain block style as Situation and the
+       Vietnamese prompt instead of shouting on its own. Older saved
+       rounds have no "segments" (saved before this existed) and just
+       skip straight to the note. */
+    if(Array.isArray(a.segments) && a.segments.length) h+=speakUpSegmentsHtml(a.segments);
+    if(a.fb) h+='<div class="sy-blk"><div class="sy-blk-l">Focci\u2019s note</div><div class="sy-blk-t">'+esc(a.fb)+'</div></div>';
     const mistakes=Array.isArray(a.mistakes)?a.mistakes.filter(x=>x&&(x.wrong||x.right)):[];
-    if(mistakes.length){
-      h+='<ul class="su-mistakes">';
-      mistakes.forEach(m=>{
-        h+='<li><b class="wrong">'+esc(m.wrong||'')+'</b> \u2192 <b class="ok">'+esc(m.right||'')+'</b>'
-          +(m.note?' <span>('+esc(m.note)+')</span>':'')+'</li>';
-      });
-      h+='</ul>';
-    }
+    if(mistakes.length) h+=speakUpMistakesHtml(mistakes);
     if(a.fixed || a.natural){
       h+='<div class="write-alts">';
       if(a.fixed) h+='<div class="write-alt'+(a.liked==='fixed'?' liked':'')+'"><span class="write-alt-n">\u2b50</span>'
@@ -4855,7 +4857,7 @@ function speakUpMistakesHtml(mistakes){
   let h='<ul class="su-mistakes">';
   list.forEach(m=>{
     h+='<li><b class="wrong">'+esc(m.wrong||'')+'</b> → <b class="ok">'+esc(m.right||'')+'</b>'
-      +(m.note?' <span>('+esc(m.note)+')</span>':'')+'</li>';
+      +((m.note||m.note_vi)?' <span>('+esc(m.note||m.note_vi)+')</span>':'')+'</li>';
   });
   h+='</ul>';
   return h;
@@ -5019,8 +5021,31 @@ function gradeSpeakUpPrompt(promptObj, userAnswer){
   +'ORIGINAL wrong wording and "fix" is the correction. Classify each segment:\n'
   +'  level 1 = correct AND natural, no change needed.\n'
   +'  level 2 = grammatically correct but a native speaker would not phrase it this way — stiff/translated-sounding, still understandable.\n'
-  +'  level 3 = grammatically wrong, or confusing/unclear to a native listener. MUST include "fix".\n'
-  +'Keep segments as short natural phrase chunks, not single letters, and not the whole sentence as one blob unless it truly has zero issues.\n\n'
+  +'  level 3 = grammatically wrong, or confusing/unclear to a native listener. MUST include "fix".\n\n'
+  +'SEGMENT SIZE — this is the part you get wrong most often, so read it twice:\n'
+  +'Every level-2 or level-3 segment must be the SMALLEST span that actually contains the problem — normally '
+  +'1 to 5 words, almost never a whole clause and never a whole sentence. If only ONE WORD is wrong (a vocabulary '
+  +'mix-up, a wrong preposition, a typo), ONLY that word is level 2/3 — the correct words sitting right next to it '
+  +'on either side are separate level-1 segments, even though splitting the sentence that way takes more segments. '
+  +'Do not fold a correct neighboring clause into a flagged segment just because it is nearby.\n'
+  +'If a sentence has two SEPARATE problems in two different places, that is TWO segments, never one merged '
+  +'segment spanning both — each with its own "fix" that repairs only its own problem and leaves the other one\'s '
+  +'wording untouched.\n'
+  +'A segment\'s "fix" may only change the word(s) that are actually wrong or unnatural. Every other word already '
+  +'inside that same segment\'s "text" must survive into "fix" unchanged, even if you personally would have '
+  +'phrased the whole clause differently — that preference is not a reason to touch it. If you cannot point to a '
+  +'change and explain it as part of the SAME single issue this segment is flagging, do not make that change.\n'
+  +'The fix must never quietly drop something the learner\'s sentence actually said. If their sentence conveyed '
+  +'two linked ideas ("don\'t do X here, do Y instead"), the fix must still express both — never simplify away '
+  +'to just one half because it reads more smoothly.\n\n'
+  +'Example of the mistake to avoid — do NOT do this:\n'
+  +'Learner wrote: "You just go straight to the end of this aisle." Only "aisle" is wrong (should be "alley" — '
+  +'a narrow street, not a supermarket aisle).\n'
+  +'WRONG (whole sentence swept into one level-3 block over a single wrong word):\n'
+  +'  [{"text":"You just go straight to the end of this aisle.","level":3,"fix":"You just go straight to the end of this alley."}]\n'
+  +'CORRECT (only the wrong word is flagged, everything else stays level 1):\n'
+  +'  [{"text":"You just go straight to the end of this","level":1},\n'
+  +'   {"text":"aisle.","level":3,"fix":"alley."}]\n\n'
   +'ALSO score the attempt out of 100 on how NATURAL it sounds to a native ear. This is NOT a grammar test \u2014 '
   +'a grammatically flawless sentence that no native would ever say scores lower than a slightly rough one that '
   +'lands perfectly. Use these bands exactly:\n'
@@ -5057,6 +5082,13 @@ async function askGradeSpeakUp(promptObj, userAnswer){
   const data=JSON.parse(txt.slice(s,e+1));
   if(!Array.isArray(data.segments) || !data.segments.length) data.segments=[{text:userAnswer, level:1}];
   if(!Array.isArray(data.mistakes)) data.mistakes=[];
+  /* The model returns "note_vi" (matching every other *_vi field in this
+     schema), but the renderer that draws the mistake list during PLAY has
+     always read "note" -- so the explanation only ever showed up in Saved,
+     where a separate mapping step (saveWriteAttempt, below) happened to
+     rename it. Renamed here instead, once, so every reader downstream can
+     just ask for ".note" and get it, during play or after saving. */
+  data.mistakes=data.mistakes.map(m=>({wrong:String((m&&m.wrong)||''), right:String((m&&m.right)||''), note:String((m&&(m.note_vi||m.note))||'')}));
   if(!data.fixed_sentence) data.fixed_sentence=userAnswer;
   if(!data.natural_sample) data.natural_sample=userAnswer;
   data.score=normSpeakUpScore(data.score, data.verdict);
@@ -5113,7 +5145,10 @@ function saySave(list){
 }
 function saveWriteAttempt(promptObj, userAnswer, result){
   const mistakes=(Array.isArray(result.mistakes)?result.mistakes:[]).filter(m=>m)
-    .map(m=>({wrong:String(m.wrong||''), right:String(m.right||''), note:String(m.note_vi||'')}));
+    .map(m=>({wrong:String(m.wrong||''), right:String(m.right||''), note:String(m.note||m.note_vi||'')}));
+  const segments=(Array.isArray(result.segments)?result.segments:[]).filter(s=>s&&s.text)
+    .map(s=>{const lvl=s.level===3?3:(s.level===2?2:1); const seg={text:String(s.text), level:lvl};
+      if(lvl===3) seg.fix=String(s.fix||''); return seg;});
   const rec={
     id: now().toString(36)+Math.random().toString(36).slice(2,6), ts: now(),
     pid: promptObj.id, topic: promptObj.topic, ctx: promptObj.context, vi: promptObj.vi,
@@ -5123,6 +5158,7 @@ function saveWriteAttempt(promptObj, userAnswer, result){
     grade: speakUpBand(normSpeakUpScore(result.score, result.verdict)).g,
     fb: String(result.feedback_vi||''),
     mistakes,
+    segments,
     fixed: String(result.fixed_sentence||userAnswer),
     natural: String(result.natural_sample||userAnswer)
   };
