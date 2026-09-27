@@ -2495,6 +2495,23 @@ function ygWaitForFrame(wrap, timeout){
 function ygDiag(){ console.log(_ygDiag); return _ygDiag; }
 window.ygDiag = ygDiag;
 
+/* Closing the word page only ever toggled the html.dict-open class --
+   CSS that hides #v-home, nothing that touches what is actually still
+   sitting inside it. A YouGlish video already mounted there is a real
+   YouTube player in a real iframe, and it kept right on playing behind
+   whatever the class swap covered it with. There is no postMessage
+   protocol to ask a cross-origin embed to pause politely; removing it
+   from the DOM is the one teardown guaranteed to actually stop it.
+   Called from both exits (the back button / swipe-back path and the
+   "return to island" path) rather than folded into just one of them, so
+   neither can be the one that quietly leaves audio running. */
+function ygStopVideo(){
+  _ygSeq++;                                   // any mount still in flight is now stale
+  const box = document.getElementById('youglish-box');
+  if(box) box.innerHTML = '';
+}
+window.ygStopVideo = ygStopVideo;
+
 const YG_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
   + 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 

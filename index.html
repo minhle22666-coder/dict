@@ -6697,6 +6697,9 @@
   };
   window.closeDictPage = function () {
     document.documentElement.classList.remove('dict-open');
+    // A YouGlish video may still be playing inside the page being hidden —
+    // see ygStopVideo's own comment for why a class toggle can't stop it.
+    if (window.ygStopVideo) window.ygStopVideo();
   };
   (function () {
     const pill = document.getElementById('fw-word-progress');
@@ -6715,6 +6718,7 @@
     document.querySelectorAll('.view').forEach((x) => x.classList.remove('active'));
     document.getElementById('fw-panel-close').style.display = 'none';
     document.documentElement.classList.remove('dict-open');
+    if (window.ygStopVideo) window.ygStopVideo();
     // Speak Up darkens the document root so the PWA's home-indicator strip
     // doesn't show the cream page background; undo it on every exit path,
     // not just the ones that route back through the games hub.
