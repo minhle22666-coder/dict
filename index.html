@@ -603,16 +603,20 @@
   /* meaning card — the Vietnamese answer is the hero, everything else is
      supporting detail underneath it */
   .feel{position:relative;overflow:hidden;background:linear-gradient(150deg,var(--primary-bg),var(--cyan-bg));
-    border:1px solid var(--line);border-radius:var(--r-sm);padding:16px 17px 17px;margin:16px 0}
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:16px;margin:16px 0}
   .feel::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--grad-hero)}
-  .feel-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+  .feel-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
   .feel-lbl{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-2)}
   .feel .reg{font-size:10.5px;font-weight:700;color:var(--muted);background:var(--surface);
-    border:1px solid var(--line);border-radius:99px;padding:3px 10px;margin-left:auto}
+    border:1px solid var(--line);border-radius:99px;padding:4px 8px;margin-left:auto}
   .feel-eq{font-size:22px;font-weight:800;line-height:1.3;letter-spacing:-.015em;color:var(--primary)}
   .feel-eq .no-eq{font-size:15px;font-weight:600;font-style:italic;opacity:.75;color:var(--muted)}
-  .feel-note{color:var(--text);opacity:.9;font-size:14px;margin-top:9px;line-height:1.55}
-  .feel-scene,.feel-warn{font-size:13.5px;line-height:1.6;border-radius:13px;padding:11px 13px;margin-top:11px}
+  .feel-note{color:var(--text);opacity:.9;font-size:14px;margin-top:8px;line-height:1.55}
+  /* Spacing here (padding/margin) now steps along the page's 8/12/16/24/32
+     scale rather than hand-tuned odd values (9, 11, 13, 15, 18px) that
+     accumulated one fix at a time -- close enough to look intentional
+     individually, but never quite lining up against each other. */
+  .feel-scene,.feel-warn{font-size:13.5px;line-height:1.6;border-radius:12px;padding:12px 16px;margin-top:12px}
   .feel-scene{background:var(--surface);border:1px solid var(--line);color:var(--text)}
   .feel-warn{background:var(--coral-bg);color:var(--coral)}
   .fs-lbl,.fw-lbl{display:block;font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
@@ -676,16 +680,16 @@
   .yg-link-text{display:flex;flex-direction:column;gap:2px}
   .yg-link-text b{font-size:13.5px;color:var(--text);text-decoration:none}
 
-  .forms{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
-  .form{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:9px 11px;flex:1;min-width:78px;text-align:center}
+  .forms{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+  .form{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:8px 12px;flex:1;min-width:78px;text-align:center}
   .form .k{font-size:9.5px;color:var(--muted-2);font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-  .form .v{font-size:14px;font-weight:600;margin-top:3px;line-height:1.35}
+  .form .v{font-size:14px;font-weight:600;margin-top:4px;line-height:1.35}
 
-  /* senses grouped by part of speech */
-  .pos-group{border-left:3px solid var(--blue);padding-left:14px;margin-bottom:18px}
-  .pos-group-h{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  /* senses grouped by part of speech -- same 8/12/16/24/32 spacing pass as .feel above */
+  .pos-group{border-left:3px solid var(--blue);padding-left:16px;margin-bottom:16px}
+  .pos-group-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
   .pos-count{font-size:11px;color:var(--muted-2);font-weight:600}
-  .sense{margin-bottom:15px}
+  .sense{margin-bottom:16px}
   .sense-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   .senseno{width:21px;height:21px;border-radius:8px;background:var(--surface-2);color:var(--muted);
     font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
@@ -2323,8 +2327,25 @@
        -- a dusty rose says "the opposite of these" just as clearly and
        belongs to the same picture. */
     --amber:#12787D;
-    --coral:#C2657B;
-    --muted-2:#7FA6A7}
+    /* #C2657B read fine as an accent but measured 3.2:1 for body text
+       against this page's light backgrounds -- under the 4.5:1 normal-text
+       floor, on the "don't confuse with" callout and the antonym chips
+       both. Darkened until it cleared 4.5:1 (comes out around 4.9:1) while
+       staying a rose rather than sliding into red. */
+    --coral:#A8435C;
+    --muted-2:#7FA6A7;
+    /* --coral-bg never followed --coral here: it is declared once per
+       theme (:root / :root[data-theme]) as its own literal rgba, not as
+       color-mix(var(--coral) ...), so overriding --coral above left every
+       coral-bg surface on this page -- the "don't confuse with" callout,
+       the antonym chips -- still painted from the app's ambient theme
+       instead of from the rose this page actually uses. On a dark
+       session that is rgba(255,107,122,.16): a saturated hot-pink wash
+       sitting a dusty-rose text on top of it, which is exactly the "seam"
+       this whole page has otherwise been rid of. Deriving it from the
+       live --coral, the way --primary-bg already does from --primary,
+       means the two can't drift apart again. */
+    --coral-bg:color-mix(in srgb, var(--coral) 14%, transparent)}
   html.dict-open #v-home .hist-star.on,
   html.dict-open #v-home .expr-star.on,
   html.dict-open #v-home .icon-act.star.on{color:#E0A63C}

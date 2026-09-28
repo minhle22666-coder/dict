@@ -2519,7 +2519,12 @@ function ygLinkBtn(word){
   const url = 'https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
   return '<a class="yg-link-btn" href="'+url+'" target="_blank" rel="noopener">'
     + '<span class="yg-link-ico">\u2197</span>'
-    + '<span class="yg-link-text"><b>Open With Browser</b></span></a>';
+    /* Vietnamese everywhere else on this button's own row ("Nghe
+       trong câu thật", "Video từ YouGlish"); this was the one
+       label still in English, sitting right between two Vietnamese
+       ones and reading like a leftover rather than a deliberate
+       choice. */
+    + '<span class="yg-link-text"><b>Mở bằng trình duyệt</b></span></a>';
 }
 
 /* Nạp widget thật vào khung. Chỉ được gọi khi người dùng chủ động
@@ -2702,9 +2707,19 @@ function renderEntry(rec, queriedAs, formNote){
   renderFamilyChips(w);
 
   if(d.vi_equivalent||d.vi_feel||d.vi_not){
-    // The meaning card: one clear Vietnamese answer, then the colour behind it.
+    /* This card and the Meanings section below it were both answering
+       "what does this word mean", in two different ways, under a label
+       ("Nghĩa tiếng Việt" -- THE Vietnamese meaning) that claimed to be
+       the definitive one. On a word with several senses that reads as a
+       contradiction the moment Meanings gives a different translation
+       for sense 1 than the word here -- which one is right?
+
+       It never claimed to be wrong, it just never said what it actually
+       is: the fast, single answer to hold onto before reading further,
+       not a competing definition. Renamed to say exactly that; Meanings
+       is where every distinct sense actually lives. */
     h+='<div class="feel">';
-    h+='<div class="feel-top"><span class="feel-lbl">Nghĩa tiếng Việt</span>'
+    h+='<div class="feel-top"><span class="feel-lbl">Nghĩa nhanh</span>'
       +(d.register?'<span class="reg">'+esc(d.register)+'</span>':'')+'</div>';
     h+='<div class="feel-eq">'
       +(d.vi_equivalent?esc(d.vi_equivalent)
