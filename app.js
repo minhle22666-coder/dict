@@ -4089,6 +4089,12 @@ function levelOf(word){
   if(!_levels) return 0;
   return _levels.get(String(word||'').toLowerCase())||0;
 }
+/* The levels if they happen to be in memory already, and null if loading
+   them would mean fetching 304KB. Lets a caller that only WANTS the
+   levels — rather than needs them — skip the file instead of blocking on
+   it. There is exactly one Map now; the world module used to parse its
+   own second copy of the same file. */
+window.levelsIfLoaded = function(){ return _levels; };
 const CEFR_TO_LV={A1:1,A2:2,B1:3,B2:4,C1:5,C2:6};
 /* levels.txt chỉ phủ những từ có trong danh sách tần suất, nên từ mới do AI
    sinh ra hầu như không bao giờ có nhãn. Giờ prompt trả về "cefr" và nhãn

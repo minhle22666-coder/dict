@@ -6089,23 +6089,9 @@
   import { bootFocciWorld } from './world.js';
   import { FOCCI_ANGEL_MESSAGES } from './random-quotes.js';
 
-  let _levelsPromise = null;
-  function loadLevels() {
-    if (_levelsPromise) return _levelsPromise;
-    _levelsPromise = fetch('./levels.txt').then(r => r.text()).then(text => {
-      const map = new Map();
-      for (const line of text.split('\n')) {
-        if (!line) continue;
-        const idx = line.lastIndexOf('\t');
-        if (idx === -1) continue;
-        const word = line.slice(0, idx).trim();
-        const level = parseInt(line.slice(idx + 1).trim(), 10);
-        if (word && !isNaN(level)) map.set(word, level);
-      }
-      return map;
-    });
-    return _levelsPromise;
-  }
+  /* A second copy of app.js's levels loader used to live here, fetching
+     and parsing the same 304KB file into its own separate Map. Its only
+     caller was getNextTargetWord below, which no longer needs it. */
 
   let worldApi = null;
   /* Loading the world and SHOWING it are separate now. It used to reveal
@@ -6143,13 +6129,24 @@
       // Was a bare TODO stub — every mushroom pickup fired this and got
       // silently discarded, so "collecting" one visibly did nothing at all.
       onWordFound: () => { addXP(2); },
+      /* This runs while the island is still loading, and it used to await
+         levels.txt first — 304KB fetched and parsed on the critical path
+         so that one hidden word could be filtered to B1–C2. (Parsed
+         twice, in fact: app.js keeps its own copy of the same file in its
+         own Map, and this had a second loader of its own.)
+
+         The level filter is a nicety here, not a requirement, so it is
+         applied only if the levels are ALREADY in memory — which they
+         will be the moment anything else asks for them. Otherwise the
+         length filter alone picks the word and the file is left to load
+         when something actually needs it. */
       getNextTargetWord: async () => {
-        const levels = await loadLevels();
         const words = await dsAllWords();
-        const pool = words.filter(w => {
-          const lvl = levels.get(w);
-          return lvl >= 3 && lvl <= 6 && w.length >= 4 && w.length <= 9 && !w.includes(' ');
-        });
+        const fits = (w) => w.length >= 4 && w.length <= 9 && !w.includes(' ');
+        const levels = (window.levelsIfLoaded && window.levelsIfLoaded()) || null;
+        const pool = levels
+          ? words.filter(w => { const lv = levels.get(w); return lv >= 3 && lv <= 6 && fits(w); })
+          : words.filter(fits);
         return pool[Math.floor(Math.random() * pool.length)] || 'focci';
       },
       onLetterProgress: (word, mask) => {
