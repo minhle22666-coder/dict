@@ -3737,7 +3737,7 @@ function svRow(r, due, box){
   return '<div class="sv-row" onclick="jump(\''+safeW+'\')">'
     + '<div class="sv-mid"><span class="sv-w">'+w+'</span>'
     + (eq?'<span class="sv-e">'+esc(eq)+'</span>':'')
-    + '<span class="sv-foot">'+srsMeter(box)+'<span class="sv-when">'+srsWhen(due)+'</span></span>'
+    + '<span class="sv-foot">'+srsMeter(box)+'<span class="sv-when num">'+srsWhen(due)+'</span></span>'
     + '</div>'
     + '<button class="sv-star" onclick="event.stopPropagation();toggleSave(\''+safeW+'\')" aria-label="Unsave">★</button>'
     + '</div>';
@@ -3853,7 +3853,7 @@ async function renderSaved(){
   // ---------- tab Vault ----------
   let words=all.filter(r=>r.saved && r.data && !r.data.explain && !r.alias);
   if(head) head.innerHTML='<img class="hdr-ico" src="./decor-earth.webp" alt=""/>'
-    +words.length+' word'+(words.length===1?'':'s')+' collected';
+    +'<b class="num">'+words.length+'</b> word'+(words.length===1?'':'s')+' collected';
   if(!words.length){
     box.innerHTML='<div class="empty"><img class="ill" src="./mascot-explore.webp" alt=""/>'
       +'<h3>No saved words yet</h3><p>Tap the star \u2606 on any word to save it here.</p></div>';
@@ -3879,7 +3879,7 @@ async function renderSaved(){
   /* Dải nhắc ôn: chỉ một hành động, và nó là hành động đúng về mặt học tập
      — truy xuất chủ động, không phải đọc lại danh sách. */
   h+='<div class="sv-hero'+(dueNow.length?'':' calm')+'">';
-  h+='<div class="sv-hero-n">'+dueNow.length+'</div>';
+  h+='<div class="sv-hero-n num">'+dueNow.length+'</div>';
   h+='<div class="sv-hero-t"><b>'+(dueNow.length?'words due today':'nothing due right now')+'</b>'
     +'<span>'+(dueNow.length
         ? 'Recall it yourself before checking the answer \u2014 that\u2019s when memory actually forms.'
@@ -3890,7 +3890,7 @@ async function renderSaved(){
   const sec=(title, note, arr)=>{
     if(!arr.length) return '';
     let s='<div class="sv-sec"><div class="sv-sec-h"><b>'+title+'</b>'
-      +'<span>'+arr.length+'</span>'
+      +'<span class="num">'+arr.length+'</span>'
       +(note?'<i>'+note+'</i>':'')+'</div>';
     for(const x of arr) s+=svRow(x.r, x.due, x.box);
     return s+'</div>';

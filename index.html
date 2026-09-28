@@ -1401,41 +1401,112 @@
     color:rgba(200,240,236,.6)}
 
   /* ============================================================
-     SAVED, in the app's own green
+     SAVED, REBUILT
 
-     This panel was still wearing the old purple card theme while
-     everything around it had moved to green glass.
+     It was green glass laid over .fw-panel's backdrop, and that backdrop
+     is still rgba(36,16,72) -- deep purple, the last of the old theme.
+     Green over purple reads as neither. The rest of the app long since
+     moved to light mint (the word page, home), so this page moves with
+     it rather than trying to be legible on a background that belongs to
+     a design nobody uses any more.
+
+     Typography follows one rule throughout: Raleway says the words,
+     Helvetica says the numbers. Raleway's figures are old-style -- they
+     hang below the baseline and vary in width -- which is wrong for a
+     column of counts and dates that should line up with each other.
+     Everything numeric here carries .num, which is the app's existing
+     switch for exactly that.
      ============================================================ */
-  #v-saved{font-family:'Raleway Local','Raleway',system-ui,sans-serif}
-  #v-saved .sv-tabs{background:linear-gradient(140deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
-    box-shadow:inset 0 0 0 1px rgba(180,235,250,.2);
-    backdrop-filter:blur(12px) saturate(1.3);-webkit-backdrop-filter:blur(12px) saturate(1.3)}
-  #v-saved .sv-tab{color:rgba(222,246,252,.72);background:none;border:none}
-  #v-saved .sv-tab.on{color:#06312C;background:linear-gradient(180deg,#CFF6E8,#7FDCC8);
-    box-shadow:0 2px 10px rgba(0,0,0,.25)}
-  #v-saved .saved-count{color:rgba(214,244,238,.82)}
-  #v-saved .sort-cycle{color:rgba(214,244,238,.82);border:none;border-radius:999px;padding:7px 13px;
-    background:linear-gradient(140deg,rgba(255,255,255,.13),rgba(255,255,255,.05));
-    box-shadow:inset 0 0 0 1px rgba(180,235,250,.2)}
-  #v-saved .sv-row{border:none;border-radius:16px;margin-bottom:9px;padding:13px 14px;
-    background:linear-gradient(140deg,rgba(255,255,255,.1),rgba(255,255,255,.04));
-    box-shadow:inset 0 0 0 1px rgba(180,235,250,.16),0 4px 14px rgba(0,0,0,.2);
-    backdrop-filter:blur(10px) saturate(1.25);-webkit-backdrop-filter:blur(10px) saturate(1.25)}
-  #v-saved .sv-row:active{transform:scale(.985)}
-  #v-saved .sv-w{color:#fff;font-weight:800}
-  #v-saved .sv-e{color:rgba(206,242,236,.78)}
-  #v-saved .sv-when,#v-saved .sv-foot{color:rgba(186,226,240,.62);
-    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif}
-  #v-saved .sv-star{color:#FFD98A;background:none;border:none}
-  #v-saved .sv-sec-h{color:rgba(170,232,246,.6);font-weight:800;letter-spacing:.1em;
-    text-transform:uppercase;font-size:10px}
-  #v-saved .sv-hero{border:none;border-radius:20px;
-    background:linear-gradient(140deg,rgba(150,244,214,.2),rgba(60,150,140,.12));
-    box-shadow:inset 0 0 0 1px rgba(170,255,228,.28)}
-  #v-saved .sv-hero-n{color:#EAFFF9;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif}
-  #v-saved .sv-hero-t{color:rgba(226,250,244,.86)}
-  #v-saved .sv-hero-go{color:#06312C;background:linear-gradient(180deg,#CFF6E8,#7FDCC8);border:none}
-  #v-saved .empty{color:rgba(206,242,236,.75)}
+  #v-saved{font-family:'Raleway Local','Raleway',system-ui,sans-serif;
+    background:linear-gradient(180deg,rgba(236,250,246,.97) 0%,rgba(223,244,239,.97) 45%,rgba(210,238,232,.97) 100%);
+    backdrop-filter:blur(26px) saturate(1.6) brightness(1.25);
+    -webkit-backdrop-filter:blur(26px) saturate(1.6) brightness(1.25);
+    --sv-ink:#123C40; --sv-soft:#4E8184; --sv-faint:#7BA5A6;
+    --sv-card:#FBFFFE; --sv-edge:rgba(31,175,180,.2); --sv-accent:#12787D}
+
+  /* --- the three collections --- */
+  #v-saved .sv-tabs{gap:4px;padding:4px;border-radius:16px;border:none;margin-bottom:16px;
+    background:rgba(18,120,125,.08);box-shadow:inset 0 0 0 1px var(--sv-edge)}
+  #v-saved .sv-tab{padding:9px 4px;border-radius:12px;font-size:12.5px;font-weight:700;
+    color:var(--sv-soft);background:none;border:none;box-shadow:none}
+  #v-saved .sv-tab.on{color:#fff;font-weight:800;
+    background:linear-gradient(160deg,#2AAFB4,#12787D);
+    box-shadow:0 3px 10px rgba(18,120,125,.28)}
+
+  /* --- how many, and in what order --- */
+  #v-saved .saved-count{font-size:13px;font-weight:700;color:var(--sv-soft)}
+  #v-saved .saved-count .hdr-ico-svg{color:var(--sv-accent)}
+  #v-saved .sort-cycle{padding:7px 13px;border-radius:999px;border:none;font-size:12px;font-weight:700;
+    color:var(--sv-soft);background:var(--sv-card);box-shadow:inset 0 0 0 1px var(--sv-edge)}
+  #v-saved .sort-cycle svg{stroke:var(--sv-accent)}
+
+  /* --- what is due, and the one thing to do about it --- */
+  #v-saved .sv-hero{gap:14px;padding:16px;margin-bottom:20px;border-radius:20px;border:none;
+    background:linear-gradient(150deg,rgba(42,175,180,.16),rgba(251,255,254,.9) 70%);
+    box-shadow:inset 0 0 0 1px var(--sv-edge),0 4px 16px rgba(18,120,125,.08)}
+  #v-saved .sv-hero.calm{background:var(--sv-card)}
+  #v-saved .sv-hero-n{min-width:48px;height:48px;border-radius:16px;font-size:22px;font-weight:800;color:#fff;
+    background:linear-gradient(160deg,#2AAFB4,#12787D);box-shadow:0 4px 12px rgba(18,120,125,.3)}
+  #v-saved .sv-hero.calm .sv-hero-n{color:var(--sv-accent);background:rgba(18,120,125,.1);box-shadow:none}
+  #v-saved .sv-hero-t b{color:var(--sv-ink);font-weight:800}
+  #v-saved .sv-hero-t span{color:var(--sv-soft)}
+  #v-saved .sv-hero-go{color:#fff;border:none;font-weight:800;
+    background:linear-gradient(160deg,#2AAFB4,#12787D);box-shadow:0 4px 12px rgba(18,120,125,.28)}
+
+  /* --- the sections --- */
+  #v-saved .sv-sec{margin-bottom:24px}
+  #v-saved .sv-sec-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;
+    font-size:10.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--sv-faint)}
+  #v-saved .sv-sec-h b{color:var(--sv-accent)}
+  #v-saved .sv-sec-h span{padding:1px 7px;border-radius:99px;font-size:10px;
+    color:var(--sv-accent);background:rgba(18,120,125,.1)}
+  #v-saved .sv-sec-h i{margin-left:auto;font-style:normal;letter-spacing:.06em;color:var(--sv-faint)}
+
+  /* --- a saved word ---
+     The word leads, its meaning sits under it, and everything that is
+     bookkeeping (how strong it is, when it comes back) drops to the
+     bottom line in the smallest type on the card. Before, all three
+     competed at nearly the same weight. */
+  #v-saved .sv-row{display:flex;align-items:center;gap:12px;margin-bottom:8px;padding:14px 15px;
+    border:none;border-radius:16px;background:var(--sv-card);
+    box-shadow:inset 0 0 0 1px var(--sv-edge),0 2px 10px rgba(18,120,125,.06);
+    transition:transform .14s ease,box-shadow .14s ease}
+  #v-saved .sv-row:active{transform:scale(.985);box-shadow:inset 0 0 0 1px var(--sv-accent)}
+  #v-saved .sv-mid{flex:1;min-width:0}
+  #v-saved .sv-w{display:block;font-size:16px;font-weight:800;color:var(--sv-ink);letter-spacing:-.01em}
+  #v-saved .sv-e{display:block;margin-top:2px;font-size:13px;font-weight:500;color:var(--sv-soft);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #v-saved .sv-foot{display:flex;align-items:center;gap:9px;margin-top:7px}
+  #v-saved .sv-when{font-size:11px;font-weight:700;color:var(--sv-faint)}
+  #v-saved .sv-star{color:#E0A63C;background:none;border:none;font-size:19px;line-height:1}
+
+  /* strength: five steps, filled up to where this word has got to */
+  #v-saved .sv-meter{display:inline-flex;gap:3px}
+  #v-saved .sv-meter i{width:13px;height:4px;border-radius:99px;background:rgba(18,120,125,.15)}
+  #v-saved .sv-meter i.on{background:linear-gradient(90deg,#2AAFB4,#12787D)}
+
+  #v-saved .empty{color:var(--sv-soft)}
+  #v-saved .empty h3{color:var(--sv-ink)}
+  #v-saved .btn{color:#fff;background:linear-gradient(160deg,#2AAFB4,#12787D);border:none}
+
+  /* Raleway everywhere, Helvetica wherever a number or a date has to line
+     up with the one above it.
+
+     The first of these has to carry `body .view.fw-panel` in front of it:
+     there is a blanket `body .view.fw-panel *` rule setting Exo 2 on
+     every descendant of every panel, and a rule that specific beats an
+     inherited font no matter what #v-saved says on its own. That is why
+     the saved words were still coming out in Exo 2 after this page was
+     told to use Raleway. */
+  body .view.fw-panel#v-saved,
+  body .view.fw-panel#v-saved *{
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif}
+  body .view.fw-panel#v-saved .num,
+  body .view.fw-panel#v-saved .sv-when,
+  body .view.fw-panel#v-saved .sv-hero-n,
+  body .view.fw-panel#v-saved .sv-sec-h span{
+    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
+    font-variant-numeric:lining-nums tabular-nums}
 
   /* ============================================================
      SETTINGS, in the app's own green
@@ -5088,6 +5159,14 @@
      this button disappears underneath it entirely. Dropping it below that
      whole row avoids the collision outright rather than fighting stacking
      order. */
+  /* Gone in favour of the gesture. It sat at top-left, on top of the very
+     first tab of whatever panel was open -- on Saved it clipped "The
+     Cache" down to "e Cache" -- and it was the second way out of a screen
+     that already had one. Swiping left-to-right closes any panel now; see
+     wirePanelSwipeBack. Kept in the markup rather than deleted so the map
+     popup, which reuses this class inside its own scroller, still has its
+     button. */
+  #fw-panel-close{display:none !important}
   .fw-panel-close{position:fixed;top:calc(env(safe-area-inset-top,0px) + 70px);left:18px;z-index:52;
     width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;color:#fff;
     display:flex;align-items:center;justify-content:center;
@@ -6722,6 +6801,49 @@
     document.getElementById('fw-menu-cluster').classList.remove('open');
     fhShowHome();
   };
+
+  /* Left-to-right anywhere on an open panel closes it.
+
+     Every panel used to carry a floating X as its only way out, which
+     landed on top of the first tab and duplicated a gesture people
+     already expect from every other app. The games panel had its own
+     swipe handler bound to #review-area; this is the same idea bound
+     once, at the document, so Saved, Hot Take, Settings and the rest all
+     get it without each needing to remember to wire it up.
+
+     Guards, in order: only while a panel is actually open, only a single
+     finger, only a clearly horizontal run of at least 60px, only if it
+     did not start inside something that scrolls sideways (the word-family
+     chip row, a code block), and not from a text field. A slow drag is a
+     scroll, not a swipe. */
+  (function () {
+    let sx = 0, sy = 0, st = 0, live = false;
+    const SIDEWAYS = '.family-scroll, .ht-row, .sv-tabs, .sx-tabs, input, textarea';
+    document.addEventListener('touchstart', (e) => {
+      live = false;
+      if (!document.documentElement.classList.contains('panel-open')) return;
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (t.target && t.target.closest && t.target.closest(SIDEWAYS)) return;
+      sx = t.clientX; sy = t.clientY; st = Date.now(); live = true;
+    }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      if (!live) return;
+      live = false;
+      if (!document.documentElement.classList.contains('panel-open')) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy;
+      if (Date.now() - st > 800) return;                  // a slow drag is a scroll
+      if (dx < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+      /* The games panel runs its own swipe: inside a round it steps
+         through questions, and outside one it already backs out a level.
+         Leave that alone rather than closing the whole panel underneath
+         it. */
+      if (document.getElementById('v-review') &&
+          document.getElementById('v-review').classList.contains('active')) return;
+      closeFwPanel();
+    }, { passive: true });
+  })();
 
   window.closeFwPanel = function () {
     document.documentElement.classList.remove('panel-open');
