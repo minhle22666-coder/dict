@@ -1096,6 +1096,44 @@ function phraseMatchState(query, hits){
 }
 
 /* ============================================================
+   ONE RETRY POLICY FOR EVERY GEMINI CALL
+
+   askJSON -- the bulk importer, which runs in the background and which
+   nobody sits watching -- already backed off and retried on 429 and 5xx.
+   The two calls a person actually waits on, looking a word up and
+   translating a phrase, did not: the first 429 ("rate limit") or 503
+   ("the model is overloaded") came straight back as an error card.
+   Gemini hands those out often and unpredictably, which is exactly what
+   "sometimes the AI answers, sometimes it doesn't" looks like from the
+   outside -- nothing about the word changed, only which second you
+   happened to ask in.
+
+   A reply cut off at the token ceiling gets the same treatment. It is
+   not valid JSON, so it used to surface as a bare PARSE error:
+   indistinguishable from a real failure, and just as intermittent,
+   because whether a reply fits under the ceiling depends on how verbose
+   the model felt that run. Now it is recognised for what it is and
+   asked again.
+   ============================================================ */
+async function geminiPost(url, body, attempt){
+  attempt = attempt || 0;
+  const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)});
+  if((res.status===429 || res.status>=500) && attempt<3){
+    await new Promise(r=>setTimeout(r, 700*Math.pow(2, attempt)));
+    return geminiPost(url, body, attempt+1);
+  }
+  return res;
+}
+/* The text of the first candidate, plus whether the model ran out of room
+   partway through saying it. */
+function geminiText(data){
+  const c = (data && data.candidates && data.candidates[0]) || null;
+  const txt = (((c && c.content && c.content.parts) || []).map(p=>p.text||'').join(''));
+  return { txt: txt, truncated: !!(c && c.finishReason === 'MAX_TOKENS') };
+}
+
+/* ============================================================
    PHRASE / SENTENCE TRANSLATION — for anything longer than a single
    word or short collocation. Auto-detects direction (EN↔VI).
    ============================================================ */
@@ -1122,16 +1160,26 @@ async function translatePhrase(text){
     +'4. "input_check" ONLY evaluates the ENGLISH side. If source_lang is "en", judge whether the ORIGINAL text itself reads as something a native speaker would actually say — set natural=false only for genuine non-native tells (word-for-word translation from Vietnamese, wrong preposition/collocation, unnatural word order), not for text that is merely short, casual or simple. If source_lang is "vi", always set natural=true with issue="" and better=[] (nothing to flag — the English side here is the translation Focci produced, not the user\u2019s own phrasing).\n'
     +'5. MATCH THE EXACT SHADE OF CERTAINTY/TONE, NOT JUST THE GENERAL MEANING. Vietnamese has several distinct levels for "I think" that a lazy translation flattens into one: "tôi nghĩ" (plain opinion), "tôi tin" (confident, closer to "I believe"), "tôi cho là"/"tôi đoán là" (tentative/guessing — closer to "I suppose so"/"I guess so"/"I\u2019d assume so"), "có lẽ" (probably/maybe). "primary" must be the option that matches the SPECIFIC shade of the source, not the most generic/common phrase for that general category — e.g. "tôi cho là vậy" should surface "I suppose so" or "I guess so" as primary or a close alternative, not default to the more assertive "I think so"/"I believe so" every time. The same care applies going VI\u2192EN as well as EN\u2192VI: preserve hedging, confidence, and formality, don\u2019t just preserve the topic.\n\n'
     +'TEXT:\n'+text;
+  /* 1600 was not enough room for the schema this prompt asks for -- a
+     primary, two or three alternatives, up to six gloss pairs, a note and
+     an input_check with its own list -- so a wordier-than-usual run got
+     cut off mid-string and came back as a parse failure. */
   const body={ contents:[{parts:[{text:prompt}]}],
-    generationConfig:{ temperature:0.2, maxOutputTokens:1600, responseMimeType:"application/json" } };
-  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    generationConfig:{ temperature:0.2, maxOutputTokens:3000, responseMimeType:"application/json" } };
+  let res=await geminiPost(url, body);
   if(!res.ok){
     let m=res.status; try{const e=await res.json(); m=(e.error&&e.error.message)||m;}catch(_){}
     if(res.status===400||res.status===403) throw new Error('BAD_KEY:'+m);
     throw new Error('API:'+m);
   }
-  const data=await res.json();
-  let raw=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
+  let data=await res.json();
+  let got=geminiText(data);
+  if(got.truncated){
+    // ran out of room, not a bad answer -- ask once more before giving up
+    res=await geminiPost(url, body);
+    if(res.ok){ data=await res.json(); got=geminiText(data); }
+  }
+  let raw=got.txt;
   raw=raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
   // Bắt theo dấu ngoặc {…} đầu/cuối thay vì JSON.parse thẳng chuỗi đã strip —
   // model đôi khi vẫn kèm vài chữ dẫn trước dấu { dù đã dặn "no commentary",
@@ -1291,7 +1339,7 @@ async function askGemini(word, opts){
     contents:[{parts:[{text:buildPrompt(word, exact)}]}],
     generationConfig:{ temperature:0.3, responseMimeType:"application/json" }
   };
-  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const res=await geminiPost(url, body);
   if(!res.ok){
     let m=res.status; try{const e=await res.json(); m=(e.error&&e.error.message)||m;}catch(_){}
     if(res.status===400||res.status===403) throw new Error('BAD_KEY:'+m);
@@ -6034,11 +6082,8 @@ async function askJSON(prompt,attempt){
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   const body={contents:[{parts:[{text:prompt}]}],
     generationConfig:{temperature:0.1,responseMimeType:"application/json",thinkingConfig:{thinkingBudget:0}}};
-  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if((res.status===429||res.status>=500)&&attempt<4){
-    await new Promise(r=>setTimeout(r,900*Math.pow(2,attempt)));
-    return askJSON(prompt,attempt+1);
-  }
+  // backs off on 429/5xx like every other call now -- see geminiPost
+  const res=await geminiPost(url, body);
   if(!res.ok){ let m=res.status; try{const e=await res.json();m=(e.error&&e.error.message)||m;}catch(_){}
     throw new Error(String(m).slice(0,90)); }
   const data=await res.json();
