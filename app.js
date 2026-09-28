@@ -3977,6 +3977,7 @@ async function renderSaySaved(box, head, stale){
        rounds have no "segments" (saved before this existed) and just
        skip straight to the note. */
     if(Array.isArray(a.segments) && a.segments.length) h+=speakUpSegmentsHtml(a.segments);
+    if(Array.isArray(a.missing) && a.missing.length) h+=speakUpMissingHtml(a.missing);
     if(a.fb) h+='<div class="sy-blk"><div class="sy-blk-l">Focci\u2019s note</div><div class="sy-blk-t">'+esc(a.fb)+'</div></div>';
     const mistakes=Array.isArray(a.mistakes)?a.mistakes.filter(x=>x&&(x.wrong||x.right)):[];
     if(mistakes.length) h+=speakUpMistakesHtml(mistakes);
@@ -4937,6 +4938,19 @@ function speakUpSegmentsHtml(segments){
   h+='</div>';
   return h;
 }
+/* What the Vietnamese asked for that never made it into the answer.
+
+   Without this a capped score is just a number that feels unfair: the
+   English on screen looks fine, every mistake listed has been fixed, and
+   yet it scored 15. The reason is the part that ISN'T on screen, so it
+   has to be put there. */
+function speakUpMissingHtml(missing){
+  const list=(Array.isArray(missing)?missing:[]).map(x=>String(x||'').trim()).filter(Boolean);
+  if(!list.length) return '';
+  let h='<div class="su-missing"><div class="su-missing-h">Chưa nói tới</div><ul>';
+  list.forEach(m=>{ h+='<li>'+esc(m)+'</li>'; });
+  return h+'</ul></div>';
+}
 function speakUpMistakesHtml(mistakes){
   const list=(Array.isArray(mistakes)?mistakes:[]).filter(m=>m&&(m.wrong||m.right));
   if(!list.length) return '';
@@ -5056,6 +5070,7 @@ function renderWrite(){
       +'<b>Coach’s Feedback:</b> '+esc(writeResult.feedback_vi||'')+'</div>';
     h+='<div class="su-feedback">';
     h+=speakUpScoreHtml(writeResult.score);
+    h+=speakUpMissingHtml(writeResult.missing_vi);
     h+=speakUpSegmentsHtml(writeResult.segments);
     h+=speakUpMistakesHtml(writeResult.mistakes);
     h+='<button class="su-ans-lbl" onclick="pickSpeakUpAnswer(\'fixed\')">'
@@ -5132,20 +5147,40 @@ function gradeSpeakUpPrompt(promptObj, userAnswer){
   +'CORRECT (only the wrong word is flagged, everything else stays level 1):\n'
   +'  [{"text":"You just go straight to the end of this","level":1},\n'
   +'   {"text":"aisle.","level":3,"fix":"alley."}]\n\n'
-  +'ALSO score the attempt out of 100 on how NATURAL it sounds to a native ear. This is NOT a grammar test \u2014 '
-  +'a grammatically flawless sentence that no native would ever say scores lower than a slightly rough one that '
-  +'lands perfectly. Use these bands exactly:\n'
-  +'  0-40  (D): nobody would understand what they meant \u2014 the grammar has collapsed, or the meaning has drifted away from the Vietnamese.\n'
-  +'  40-70 (C): the message does get across, but several parts are unnatural, or the grammar is noticeably off.\n'
-  +'  70-90 (B): well expressed and a native understands it completely; just slightly unnatural in places.\n'
-  +'  90-100 (A): well expressed, natural, no grammar errors, a native understands it completely. It does NOT have to match "natural_sample" \u2014 a different but equally natural phrasing still scores in this band.\n\n'
+  +'NOW THE SCORE. Work it out in two steps, in this order. Do not skip to a number.\n\n'
+  +'STEP 1 \u2014 DID THEY SAY THE THING? Go through the Vietnamese sentence and list every distinct idea in it: '
+  +'each request, each reason, each detail, each time reference. Then check, one by one, which of those actually '
+  +'appear in what the learner wrote. "coverage" is the percentage of those ideas that made it into their English, '
+  +'and "missing_vi" names the ones that did not.\n'
+  +'This is the step you skip, and skipping it is the single worst thing you can do here. A short, perfectly '
+  +'fluent fragment that answers a long Vietnamese sentence is NOT a good attempt \u2014 it is mostly a blank page. '
+  +'Fluent English that leaves out three quarters of what was asked has FAILED the task, however pretty the words are.\n\n'
+  +'STEP 2 \u2014 HOW WELL DID THEY SAY IT? Only now judge how natural the English is. This part is NOT a grammar '
+  +'test: a grammatically flawless sentence no native would say scores lower than a slightly rough one that lands.\n\n'
+  +'The final "score" is capped by coverage. It can never be higher than "coverage", because you cannot express '
+  +'something well that you did not express at all. Within that ceiling, use these bands:\n'
+  +'  0-40  (D): most of the Vietnamese never made it across, or the grammar has collapsed, or it is a fragment rather than a finished thought.\n'
+  +'  40-70 (C): the main idea is there but pieces are missing, or several parts are unnatural, or the grammar is noticeably off.\n'
+  +'  70-90 (B): everything the Vietnamese said is there and a native understands it completely; just slightly unnatural in places.\n'
+  +'  90-100 (A): everything is there, natural, no grammar errors. It does NOT match "natural_sample" necessarily \u2014 a different but equally natural phrasing still scores here.\n\n'
+  +'Spread the numbers out. Two attempts with visibly different amounts wrong must not come back with the same '
+  +'score. Pick the exact number the bands and the coverage cap point at, not a comfortable middle.\n\n'
+  +'WORKED EXAMPLE of the mistake to avoid:\n'
+  +'Vietnamese: "Anh cho em xin th\u00eam t\u1edbi s\u00e1ng mai \u0111\u01b0\u1ee3c kh\u00f4ng \u1ea1, chi\u1ec1u nay em g\u1eedi anh b\u1ea3n nh\u00e1p tr\u01b0\u1edbc \u0111\u1ec3 anh xem h\u01b0\u1edbng. V\u00ec b\u00ean kh\u00e1ch v\u1eeba \u0111\u1ed5i l\u1ea1i y\u00eau c\u1ea7u \u1edf ph\u1ea7n \u0111\u1ea7u n\u00ean em ph\u1ea3i l\u00e0m l\u1ea1i g\u1ea7n nh\u01b0 t\u1eeb \u0111\u1ea7u."\n'
+  +'Learner wrote: "Could you please Exten"\n'
+  +'WRONG: score 75, because "Could you please extend" is natural English. It is natural English that says almost '
+  +'nothing the Vietnamese said, and it is not even a finished sentence.\n'
+  +'RIGHT: coverage around 15 \u2014 they opened the request and nothing else. No deadline, no draft this afternoon, '
+  +'no client change, no starting over. missing_vi lists those four. score around 15, band D.\n\n'
   +'Return ONLY this JSON:\n{\n'
-  +'  "score": 0-100 integer, following the bands above,\n'
+  +'  "coverage": 0-100 integer \u2014 share of the Vietnamese ideas that actually appear in their English,\n'
+  +'  "missing_vi": ["ý trong câu tiếng Việt mà họ CHƯA nói ra, viết ngắn bằng tiếng Việt — mảng rỗng nếu đã nói đủ"],\n'
+  +'  "score": 0-100 integer, never above "coverage", following the bands above,\n'
   +'  "verdict": "good" | "close" | "off",\n'
   +'  "feedback_vi": "Nếu câu ĐÃ ĐÚNG VÀ TỰ NHIÊN HOÀN TOÀN: khen 1 câu ngắn gọn. Nếu KHÔNG: 1 câu tiếng Việt NGẮN GọN nêu ĐÚNG vấn đề CHÍNH của cả câu (không liệt kê từng lỗi ở đây, chỉ tóm tắt vấn đề lớn nhất, ví dụ tư duy dịch word-by-word, sai giới từ, sai thời...).",\n'
   +'  "segments": [ {"text":"...", "level":1|2|3, "fix":"chỉ có nếu level 3"} ],\n'
   +'  "mistakes": [ {"wrong":"cụm sai/không tự nhiên (khớp với 1 segment level 2 hoặc 3)", "right":"cụm đúng/tự nhiên hơn", "note_vi":"giải thích RẤT ngắn gọn bằng tiếng Việt"} ],\n'
-  +'  "fixed_sentence": "Sửa lại CHÍNH CÂU CỦA HỌC VIÊN cho tự nhiên/đúng hơn — giữ tối đa cấu trúc/từ vựng của học viên, chỉ sửa đúng chỗ sai.",\n'
+  +'  "fixed_sentence": "Câu của học viên, sửa cho đúng/tự nhiên VÀ nói đủ những ý còn thiếu trong missing_vi. Giữ tối đa cấu trúc/từ vựng họ đã dùng, nhưng nếu họ bỏ sót ý thì phải viết thêm phần đó — một bản sửa vẫn thiếu ý thì không phải là bản sửa.",\n'
   +'  "natural_sample": "Một câu HOÀN TOÀN khác, casual/tự nhiên như người bản xứ THẬT SỰ sẽ nói, không cần bám theo cấu trúc câu của học viên."\n'
   +'}\n'
   +'If the learner\'s sentence was already fully correct and natural: verdict="good", segments is one level:1 segment for the whole sentence, mistakes is empty, fixed_sentence equals their own sentence, and natural_sample is a genuinely different (not a correction) natural alternative.\n'
@@ -5178,6 +5213,30 @@ async function askGradeSpeakUp(promptObj, userAnswer){
   if(!data.fixed_sentence) data.fixed_sentence=userAnswer;
   if(!data.natural_sample) data.natural_sample=userAnswer;
   data.score=normSpeakUpScore(data.score, data.verdict);
+
+  /* The coverage cap, enforced here and not only asked for in the prompt.
+
+     The score used to measure one thing -- how natural the English
+     sounded -- and nothing checked whether the answer said what the
+     Vietnamese said. So "Could you please Exten", four words against a
+     sixty-word prompt, came back 75/100 and a "Good": the fragment is
+     perfectly natural English, it just answers almost none of the
+     question. The model is now asked to work out coverage first, but a
+     model asked to hold itself to a ceiling will sometimes drift over
+     it, and this is the exact failure that made the scores worthless.
+     So the ceiling is applied in code too. */
+  const cov = Number(data.coverage);
+  if(isFinite(cov)){
+    data.coverage = Math.max(0, Math.min(100, Math.round(cov)));
+    if(data.score > data.coverage) data.score = data.coverage;
+  }else{
+    data.coverage = null;
+  }
+  if(!Array.isArray(data.missing_vi)) data.missing_vi = [];
+  data.missing_vi = data.missing_vi.map(x=>String(x||'').trim()).filter(Boolean).slice(0,6);
+  /* verdict has to follow the score it is sitting next to, or the card
+     says "Sounds natural!" over a 15. */
+  data.verdict = data.score >= 70 ? 'good' : (data.score >= 40 ? 'close' : 'off');
   return data;
 }
 /* Naturalness out of 100, bucketed A/B/C/D. Defined once so the play
@@ -5245,6 +5304,8 @@ function saveWriteAttempt(promptObj, userAnswer, result){
     fb: String(result.feedback_vi||''),
     mistakes,
     segments,
+    missing: (Array.isArray(result.missing_vi)?result.missing_vi:[]).map(x=>String(x||'')).filter(Boolean),
+    coverage: (typeof result.coverage==='number') ? result.coverage : null,
     fixed: String(result.fixed_sentence||userAnswer),
     natural: String(result.natural_sample||userAnswer)
   };
