@@ -3162,22 +3162,46 @@ export async function bootFocciWorld(root, opts) {
      ============================================================ */
   const TRACKS = ['ambient-lofi.mp3', 'calm-piano.mp3', 'feeling-content.mp3'];
   let trackIdx = 0;
-  const bgm = new Audio(AUDIO(TRACKS[trackIdx]));
+  /* The track is 1.16MB and handing the URL straight to new Audio() starts
+     that download immediately -- in the same moment the island is pulling
+     down 12MB of models, on the same connection, while someone watches a
+     loading screen. Nothing is audible until playback actually starts, so
+     the file has no business competing for that bandwidth. preload='none'
+     holds it back; the src is attached on the first real play. */
+  const bgm = new Audio();
+  bgm.preload = 'none';
   bgm.loop = true; bgm.volume = 0.35;
   let soundOn = true;
-  bgm.play().catch(function () {
-    var unlock = function () { bgm.play().catch(function () {}); canvas.removeEventListener('pointerdown', unlock); };
-    canvas.addEventListener('pointerdown', unlock);
-  });
+  function bgmPlay() {
+    if (!bgm.src) bgm.src = AUDIO(TRACKS[trackIdx]);
+    return bgm.play();
+  }
+  /* And it starts once the island has finished arriving, not alongside
+     it. preload='none' alone was not enough: autoplay succeeds here, so
+     play() attached the src and pulled the file down immediately anyway,
+     straight back into the middle of the model downloads. Ambience a
+     couple of seconds late is not something anyone notices; a loading
+     screen a couple of seconds longer is. */
+  function bgmStart() {
+    bgmPlay().catch(function () {
+      var unlock = function () { bgmPlay().catch(function () {}); canvas.removeEventListener('pointerdown', unlock); };
+      canvas.addEventListener('pointerdown', unlock);
+    });
+  }
+  /* Hung off the end of the boot sequence rather than a timer -- a timer
+     fires on schedule whether or not the island has arrived, so on the
+     slow connection this is meant to help it would land right back in
+     the middle of the downloads. */
+  window.__fwStartMusic = bgmStart;
   function toggleSound() {
     soundOn = !soundOn;
-    if (soundOn) bgm.play().catch(() => {}); else bgm.pause();
+    if (soundOn) bgmPlay().catch(() => {}); else bgm.pause();
     return soundOn;
   }
   function nextTrack() {
     trackIdx = (trackIdx + 1) % TRACKS.length;
     bgm.src = AUDIO(TRACKS[trackIdx]);
-    if (soundOn) bgm.play().catch(() => {});
+    if (soundOn) bgm.play().catch(() => {});   // src just set by hand, so play() directly
     return TRACKS[trackIdx];
   }
 
@@ -3569,6 +3593,9 @@ export async function bootFocciWorld(root, opts) {
     get state() { return { pending: !!pendingTravel, flight: !!flight, declined: Array.from(declined), camMode, inspectMode }; },
     animalModel, toggleCamMode, setCamMode,
     jump() { startJump(rooms[currentRoomKey]); } };
+
+  // island's here — now the ambience can have the connection to itself
+  if (window.__fwStartMusic) { const go = window.__fwStartMusic; window.__fwStartMusic = null; go(); }
 
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, get currentRoom() { return currentRoomKey; } };
   } catch (err) {
