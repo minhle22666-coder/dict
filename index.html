@@ -1236,50 +1236,30 @@
   html.dict-open .fx-xp{display:none}
 
   /* ============================================================
-     THE WORD PAGE: NO HAIRLINES, AND A BETTER GREEN
+     THE WORD PAGE WEARS THE SAME CLOTHES AS THE PEEK CARD
 
-     Fifteen classes on this page were each drawing their own 0.8px
-     border — chips, forms, examples, the YouGlish panel, the part of
-     speech group — so the entry read as a diagram of rectangles laid
-     over the glass instead of one sheet. Found by walking the rendered
-     page and listing everything with a border or an inset ring, rather
-     than by guessing at selectors.
+     Tap a word in Word Pairs after answering and you get the whole entry
+     in a card -- renderEntry(), exactly the same markup as this page,
+     but with none of the overrides below it. That version was the one
+     that read properly: the verb forms are four separate tiles, each
+     section sits in its own panel, the hairlines are what tell one block
+     from the next.
 
-     The meaning block was a brown-to-teal wash, which is the one colour
-     pair on the page that belongs to the old theme. It is mint now, with
-     a single bright rule down its edge to do the work the box was doing.
+     This page had been getting the opposite treatment, one complaint at
+     a time. A hairline was reported as a stray line, so every border on
+     the page came off; the tiles were reported as showing their seams,
+     so they were merged into one strip. What was left was correct in the
+     narrow sense -- no stray anything -- and shapeless: every block the
+     same flat wash, nothing to say where one ended.
+
+     So: the format overrides are gone. What stays is colour. The entry
+     renders in its native shape and the variables underneath it are
+     retuned from the old cream-and-brown to this app's green, which is
+     the one real difference between the peek card and what belongs here.
+     Anything that needs to change about the shape of this page should be
+     changed in the base rules now, where the peek card gets it too.
      ============================================================ */
-  html.dict-open #v-home .family-chip,
-  html.dict-open #v-home .yg-wrap,
-  html.dict-open #v-home .yg-link-btn,
-  html.dict-open #v-home .form,
-  html.dict-open #v-home .ex,
-  html.dict-open #v-home .chip,
-  html.dict-open #v-home .syn,
-  html.dict-open #v-home .ant,
-  html.dict-open #v-home .tap,
-  html.dict-open #v-home .lv-tag{border:none}
-  html.dict-open #v-home .pos-group{border-left-color:rgba(47,191,195,.4)}
-  /* The second pass. Walking the page again with the pseudo-elements
-     included turned up the ones that were left: the whole .entry is
-     itself boxed in a 0.8px rectangle, and every .expr and .prep-item
-     draws a hairline under itself. Those are the lines still cutting the
-     word family and the sections apart. Space does the separating now —
-     the rule stays only on .pos-group, where it reads as hierarchy
-     rather than as a box. */
-  html.dict-open #v-home .entry{border:none}
-  html.dict-open #v-home .expr,
-  html.dict-open #v-home .prep-item,
-  html.dict-open #v-home .coll-item,
-  html.dict-open #v-home .idiom{border:none}
-  html.dict-open #v-home .expr + .expr,
-  html.dict-open #v-home .prep-item + .prep-item{margin-top:6px}
-
-  html.dict-open #v-home .feel{
-    background:linear-gradient(150deg,rgba(103,222,225,.2),rgba(150,244,214,.12) 60%,rgba(255,255,255,.5));
-    border:none;border-left:3px solid #2FBFC3;border-radius:16px}
-  html.dict-open #v-home .feel .feel-k{color:#12787D;letter-spacing:.14em}
-  html.dict-open #v-home .feel .feel-v{color:#0E6E73}
+  html.dict-open #v-home .pos-group{border-left-color:var(--primary)}
 
   /* ============================================================
      FOCCI SAYS THE WHOLE THING
@@ -2289,7 +2269,12 @@
     /* Near-opaque. At half transparency this was readable over the
        island but not over the newsstand, which is nearly black — the
        teal text came out at almost no contrast against it. */
-    background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(246,253,252,.96) 40%,rgba(226,247,246,.96) 100%);
+    /* Deeper than the cards that sit on it. While the entry was one flat
+       sheet this could be near-white; now that every block is a panel
+       again, a near-white page behind near-white panels shows nothing at
+       all. The peek popup gets this for free -- its backdrop is the dark
+       scrim behind the card. */
+    background:linear-gradient(180deg,rgba(226,246,242,.97) 0%,rgba(214,240,235,.97) 45%,rgba(201,234,229,.97) 100%);
     backdrop-filter:blur(30px) saturate(1.7) brightness(1.4);
     -webkit-backdrop-filter:blur(30px) saturate(1.7) brightness(1.4);
     --tint:#1FAFB4; --pri-l:#178E93; --pri-d:#67DEE1;
@@ -2314,11 +2299,24 @@
        palette at :root, which is where the brown underline under the
        YouGlish link and the warm grey labels were coming from on a page
        that is otherwise green. */
-    --surface:rgba(240,253,250,.9);
-    --surface-2:rgba(168,238,224,.24);
-    --line:rgba(31,175,180,.13);
+    --surface:#FBFFFE;
+    --surface-2:#EAF7F4;
+    --surface-3:#DCEFEB;
+    /* Visible on purpose now. With the format restored the hairline is
+       structure -- it is what separates one collocation from the next --
+       rather than the stray artefact it looked like when every block was
+       the same flat wash. */
+    --line:rgba(31,175,180,.22);
     --text:#123C40;
     --muted:#5E8C8E;
+    /* .feel's wash and the headword's gradient both read from these. The
+       cyan pair was still coming from whichever ambient theme the app
+       happened to be in, so the meaning card mixed a teal --primary-bg
+       with a stranger's cyan. */
+    --cyan:#2FBFC3;
+    --cyan-bg:color-mix(in srgb, var(--cyan) 13%, transparent);
+    --grad-text:linear-gradient(135deg,#12787D,#2AAFB4);
+    --shadow:0 4px 16px rgba(18,120,125,.10);
     /* The last two warm colours on the page. --amber was carrying the
        preposition keywords and the word-family words, which is where the
        orange on a mint sheet was coming from; the saved star still wants
@@ -2349,36 +2347,15 @@
   html.dict-open #v-home .hist-star.on,
   html.dict-open #v-home .expr-star.on,
   html.dict-open #v-home .icon-act.star.on{color:#E0A63C}
-  /* The panes themselves get an edge and a soft lift, so they read as
-     separate sheets of glass over the haze rather than flat fills. */
-  /* No rims. Every block on the entry was drawing a pale hairline border
-     from the app's default card theme, so the page read as a grid of
-     boxes laid on the glass rather than as one flat sheet. The soft drop
-     shadow does all the separating that is wanted here. */
-  html.dict-open #v-home .entry > div,
-  html.dict-open #v-home .card,
-  html.dict-open #v-home .sense,
-  html.dict-open #v-home .block{
-    border:none;box-shadow:0 2px 14px rgba(18,120,125,.07)}
-  html.dict-open #v-home .entry > div::before,
-  html.dict-open #v-home .entry > div::after{border-color:transparent}
-  /* One strip, not four cards. With the cards tinted rather than white
-     the 8px gaps between them became the thing you noticed -- four slots
-     of bare page showing through a mint bar. Closing the gaps and ruling
-     between the forms says the same thing without cutting the row up. */
-  html.dict-open #v-home .forms{gap:0;border-radius:14px;overflow:hidden;
-    background:rgba(168,238,224,.24)}
-  html.dict-open #v-home .form{background:none;border-radius:0;
-    box-shadow:inset 1px 0 0 rgba(31,175,180,.15)}
-  html.dict-open #v-home .form:first-child{box-shadow:none}
   /* The world's own fan-out menu sits at z-index 56, above this page, and
      was hanging over the entry. It belongs to the island, not here. */
   html.dict-open .fw-menu-cluster{display:none}
-  /* The headword came through in the app's warm brown, which on a mint page
-     is the one thing that reads as belonging to a different design. */
-  html.dict-open #v-home .headword{color:#12787D}
-  html.dict-open #v-home .phon{color:#2A9AA0}
-  html.dict-open #v-home .entry{background:transparent}
+  /* The entry itself is not a card here -- the page is. In the peek popup
+     the card IS the entry, floating on a dark backdrop; full screen there
+     is no backdrop to float on, so the outer shell drops away and the
+     blocks inside it do the work. Everything inside keeps its own panel,
+     which is the part that was missing. */
+  html.dict-open #v-home .entry{background:transparent;border:none;box-shadow:none;padding:0}
   /* Two search bars were stacking over this page and the first one was
      eating the top of the entry.
 
