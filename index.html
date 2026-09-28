@@ -1401,110 +1401,164 @@
     color:rgba(200,240,236,.6)}
 
   /* ============================================================
-     SAVED, REBUILT
+     SAVED — ALL THREE TABS, ONE PALETTE
 
-     It was green glass laid over .fw-panel's backdrop, and that backdrop
-     is still rgba(36,16,72) -- deep purple, the last of the old theme.
-     Green over purple reads as neither. The rest of the app long since
-     moved to light mint (the word page, home), so this page moves with
-     it rather than trying to be legible on a background that belongs to
-     a design nobody uses any more.
+     The previous pass restyled the vault tab and stopped. The Casebook
+     and Speak Up tabs kept card styles written for a dark background —
+     pale text, translucent lavender fills — and the page underneath them
+     had just been turned light. Light text on a light page is why it
+     came out washed out and unreadable: not "too white" by choice, but
+     one tab redecorated and two left behind.
 
-     Typography follows one rule throughout: Raleway says the words,
-     Helvetica says the numbers. Raleway's figures are old-style -- they
-     hang below the baseline and vary in width -- which is wrong for a
-     column of counts and dates that should line up with each other.
-     Everything numeric here carries .num, which is the app's existing
-     switch for exactly that.
+     So the tokens live on the panel and every tab reads from them.
+     Green, as asked — mint page, mint-tinted cards rather than white —
+     with amber carrying the warm accents (grades, stars, the things that
+     want to catch the eye). Nothing here is a bare #fff.
+
+     Weight comes off by removing nesting rather than by removing colour:
+     no card inside a card, one shadow depth, hairlines instead of boxes
+     wherever a divider will do.
      ============================================================ */
-  #v-saved{font-family:'Raleway Local','Raleway',system-ui,sans-serif;
-    background:linear-gradient(180deg,rgba(236,250,246,.97) 0%,rgba(223,244,239,.97) 45%,rgba(210,238,232,.97) 100%);
-    backdrop-filter:blur(26px) saturate(1.6) brightness(1.25);
-    -webkit-backdrop-filter:blur(26px) saturate(1.6) brightness(1.25);
-    --sv-ink:#123C40; --sv-soft:#4E8184; --sv-faint:#7BA5A6;
-    --sv-card:#FBFFFE; --sv-edge:rgba(31,175,180,.2); --sv-accent:#12787D}
+  #v-saved{
+    --sv-ink:#0E3B3E; --sv-soft:#4C7E7F; --sv-faint:#7FA8A6;
+    --sv-card:#F2FAF7; --sv-card-2:#E4F3EE; --sv-line:rgba(20,110,110,.16);
+    --sv-teal:#12787D; --sv-teal-2:#2AAFB4; --sv-amber:#C9821A; --sv-amber-bg:rgba(224,166,60,.16);
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif;
+    background:linear-gradient(180deg,#E2F3ED 0%,#D5ECE5 46%,#C9E5DD 100%);
+    backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5)}
 
-  /* --- the three collections --- */
-  #v-saved .sv-tabs{gap:4px;padding:4px;border-radius:16px;border:none;margin-bottom:16px;
-    background:rgba(18,120,125,.08);box-shadow:inset 0 0 0 1px var(--sv-edge)}
+  /* ---- shared chrome: tabs, count, sort ---- */
+  #v-saved .sv-tabs{gap:4px;padding:4px;margin-bottom:18px;border:none;border-radius:16px;
+    background:rgba(18,120,125,.09);box-shadow:none}
   #v-saved .sv-tab{padding:9px 4px;border-radius:12px;font-size:12.5px;font-weight:700;
     color:var(--sv-soft);background:none;border:none;box-shadow:none}
-  #v-saved .sv-tab.on{color:#fff;font-weight:800;
-    background:linear-gradient(160deg,#2AAFB4,#12787D);
-    box-shadow:0 3px 10px rgba(18,120,125,.28)}
-
-  /* --- how many, and in what order --- */
+  #v-saved .sv-tab.on{color:#fff;font-weight:800;background:var(--sv-teal);box-shadow:none}
+  #v-saved .saved-head{margin-bottom:16px}
   #v-saved .saved-count{font-size:13px;font-weight:700;color:var(--sv-soft)}
-  #v-saved .saved-count .hdr-ico-svg{color:var(--sv-accent)}
-  #v-saved .sort-cycle{padding:7px 13px;border-radius:999px;border:none;font-size:12px;font-weight:700;
-    color:var(--sv-soft);background:var(--sv-card);box-shadow:inset 0 0 0 1px var(--sv-edge)}
-  #v-saved .sort-cycle svg{stroke:var(--sv-accent)}
+  #v-saved .saved-count .hdr-ico-svg{color:var(--sv-teal)}
+  #v-saved .sort-cycle{padding:7px 13px;border:none;border-radius:999px;font-size:12px;font-weight:700;
+    color:var(--sv-soft);background:var(--sv-card);box-shadow:none}
+  #v-saved .sort-cycle svg{stroke:var(--sv-teal)}
+  #v-saved .empty{color:var(--sv-soft)}
+  #v-saved .empty h3{color:var(--sv-ink)}
+  #v-saved .btn{color:#fff;background:var(--sv-teal);border:none;box-shadow:none}
 
-  /* --- what is due, and the one thing to do about it --- */
-  #v-saved .sv-hero{gap:14px;padding:16px;margin-bottom:20px;border-radius:20px;border:none;
-    background:linear-gradient(150deg,rgba(42,175,180,.16),rgba(251,255,254,.9) 70%);
-    box-shadow:inset 0 0 0 1px var(--sv-edge),0 4px 16px rgba(18,120,125,.08)}
-  #v-saved .sv-hero.calm{background:var(--sv-card)}
-  #v-saved .sv-hero-n{min-width:48px;height:48px;border-radius:16px;font-size:22px;font-weight:800;color:#fff;
-    background:linear-gradient(160deg,#2AAFB4,#12787D);box-shadow:0 4px 12px rgba(18,120,125,.3)}
-  #v-saved .sv-hero.calm .sv-hero-n{color:var(--sv-accent);background:rgba(18,120,125,.1);box-shadow:none}
+  /* ---- tab 1: the vault ---- */
+  #v-saved .sv-hero{gap:14px;padding:16px;margin-bottom:22px;border:none;border-radius:20px;
+    background:var(--sv-card);box-shadow:none}
+  #v-saved .sv-hero-n{min-width:46px;height:46px;border-radius:15px;font-size:21px;font-weight:800;
+    color:#fff;background:var(--sv-teal);box-shadow:none}
+  #v-saved .sv-hero.calm .sv-hero-n{color:var(--sv-teal);background:rgba(18,120,125,.12)}
   #v-saved .sv-hero-t b{color:var(--sv-ink);font-weight:800}
   #v-saved .sv-hero-t span{color:var(--sv-soft)}
-  #v-saved .sv-hero-go{color:#fff;border:none;font-weight:800;
-    background:linear-gradient(160deg,#2AAFB4,#12787D);box-shadow:0 4px 12px rgba(18,120,125,.28)}
+  #v-saved .sv-hero-go{color:#fff;border:none;font-weight:800;background:var(--sv-teal);box-shadow:none}
 
-  /* --- the sections --- */
-  #v-saved .sv-sec{margin-bottom:24px}
-  #v-saved .sv-sec-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;
+  #v-saved .sv-sec{margin-bottom:26px}
+  #v-saved .sv-sec-h{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;padding-bottom:7px;
+    border-bottom:1px solid var(--sv-line);
     font-size:10.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--sv-faint)}
-  #v-saved .sv-sec-h b{color:var(--sv-accent)}
-  #v-saved .sv-sec-h span{padding:1px 7px;border-radius:99px;font-size:10px;
-    color:var(--sv-accent);background:rgba(18,120,125,.1)}
-  #v-saved .sv-sec-h i{margin-left:auto;font-style:normal;letter-spacing:.06em;color:var(--sv-faint)}
+  #v-saved .sv-sec-h b{color:var(--sv-teal)}
+  #v-saved .sv-sec-h span{color:var(--sv-faint)}
+  #v-saved .sv-sec-h i{margin-left:auto;font-style:normal;letter-spacing:.06em}
 
-  /* --- a saved word ---
-     The word leads, its meaning sits under it, and everything that is
-     bookkeeping (how strong it is, when it comes back) drops to the
-     bottom line in the smallest type on the card. Before, all three
-     competed at nearly the same weight. */
-  #v-saved .sv-row{display:flex;align-items:center;gap:12px;margin-bottom:8px;padding:14px 15px;
-    border:none;border-radius:16px;background:var(--sv-card);
-    box-shadow:inset 0 0 0 1px var(--sv-edge),0 2px 10px rgba(18,120,125,.06);
-    transition:transform .14s ease,box-shadow .14s ease}
-  #v-saved .sv-row:active{transform:scale(.985);box-shadow:inset 0 0 0 1px var(--sv-accent)}
+  /* A saved word is a line, not a card. Six cards stacked with shadows is
+     what made this feel heavy; a rule between rows says the same thing. */
+  #v-saved .sv-row{display:flex;align-items:center;gap:12px;margin:0;padding:13px 2px;
+    border:none;border-radius:0;background:none;box-shadow:none;
+    border-bottom:1px solid var(--sv-line)}
+  #v-saved .sv-sec .sv-row:last-child{border-bottom:none}
+  #v-saved .sv-row:active{background:rgba(18,120,125,.05)}
   #v-saved .sv-mid{flex:1;min-width:0}
   #v-saved .sv-w{display:block;font-size:16px;font-weight:800;color:var(--sv-ink);letter-spacing:-.01em}
   #v-saved .sv-e{display:block;margin-top:2px;font-size:13px;font-weight:500;color:var(--sv-soft);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #v-saved .sv-foot{display:flex;align-items:center;gap:9px;margin-top:7px}
+  #v-saved .sv-foot{display:flex;align-items:center;gap:9px;margin-top:6px}
   #v-saved .sv-when{font-size:11px;font-weight:700;color:var(--sv-faint)}
   #v-saved .sv-star{color:#E0A63C;background:none;border:none;font-size:19px;line-height:1}
-
-  /* strength: five steps, filled up to where this word has got to */
   #v-saved .sv-meter{display:inline-flex;gap:3px}
-  #v-saved .sv-meter i{width:13px;height:4px;border-radius:99px;background:rgba(18,120,125,.15)}
-  #v-saved .sv-meter i.on{background:linear-gradient(90deg,#2AAFB4,#12787D)}
+  #v-saved .sv-meter i{width:12px;height:3px;border-radius:99px;background:rgba(20,110,110,.16)}
+  #v-saved .sv-meter i.on{background:var(--sv-teal-2)}
 
-  #v-saved .empty{color:var(--sv-soft)}
-  #v-saved .empty h3{color:var(--sv-ink)}
-  #v-saved .btn{color:#fff;background:linear-gradient(160deg,#2AAFB4,#12787D);border:none}
+  /* ---- tab 2: the casebook (lookup history) ---- */
+  #v-saved .hist-item{border:none;border-radius:0;background:none;box-shadow:none;
+    padding:13px 2px;border-bottom:1px solid var(--sv-line)}
+  #v-saved .hist-item:active{background:rgba(18,120,125,.05)}
+  #v-saved .hist-ico,#v-saved .hist-ico-svg{color:var(--sv-teal)}
+  #v-saved .hist-top .w{color:var(--sv-ink);font-weight:800}
+  #v-saved .hist-mid,#v-saved .hist-sub{color:var(--sv-soft)}
+  #v-saved .hist-star{color:var(--sv-faint);background:none;border:none}
+  #v-saved .hist-star.on{color:#E0A63C}
+  #v-saved .hist-del{color:var(--sv-faint);background:none;border:none}
+  #v-saved .hist-count,#v-saved .hist-more{color:var(--sv-soft);background:none;border:none}
 
-  /* Raleway everywhere, Helvetica wherever a number or a date has to line
-     up with the one above it.
+  /* ---- tab 3: speak up ---- */
+  #v-saved .sy-legend{margin-bottom:14px;border:none;border-radius:14px;padding:10px 14px;
+    background:var(--sv-card);color:var(--sv-soft);font-size:12.5px}
+  #v-saved .sy-legend summary{color:var(--sv-soft);font-weight:700}
+  #v-saved .sy-legend li{color:var(--sv-soft)}
+  #v-saved .sy-legend b{color:var(--sv-ink)}
+  #v-saved .sy-legend p{color:var(--sv-faint)}
 
-     The first of these has to carry `body .view.fw-panel` in front of it:
-     there is a blanket `body .view.fw-panel *` rule setting Exo 2 on
-     every descendant of every panel, and a rule that specific beats an
-     inherited font no matter what #v-saved says on its own. That is why
-     the saved words were still coming out in Exo 2 after this page was
-     told to use Raleway. */
+  #v-saved .sy-row{margin-bottom:10px;border:none;border-radius:16px;overflow:hidden;
+    background:var(--sv-card);box-shadow:none}
+  #v-saved .sy-head{gap:11px;padding:13px 14px}
+  #v-saved .sy-head:active{background:var(--sv-card-2)}
+  #v-saved .sy-you-t{color:var(--sv-ink);font-weight:700;font-size:14.5px}
+  #v-saved .sy-meta{color:var(--sv-faint);font-size:11px;font-weight:600}
+  #v-saved .sy-head .wf-x{color:var(--sv-faint)}
+  #v-saved .sy-detail{padding:2px 14px 14px}
+  #v-saved .sy-blk{margin-bottom:12px}
+  #v-saved .sy-blk-l{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--sv-faint)}
+  #v-saved .sy-blk-t{color:var(--sv-soft);font-size:13px;line-height:1.55}
+  #v-saved .sy-blk-t.vi{color:var(--sv-ink);font-weight:600}
+
+  /* the grade, and the one place warm colour earns its keep */
+  #v-saved .sy-grade{color:#fff;font-weight:800;border:none}
+  #v-saved .sy-grade-a{background:#1E9E6A}
+  #v-saved .sy-grade-b{background:var(--sv-teal)}
+  #v-saved .sy-grade-c{background:#C9821A}
+  #v-saved .sy-grade-d{background:#C2603A}
+
+  /* the two alternatives: flat panels on the card, not cards on a card */
+  #v-saved .write-alts{margin-top:2px}
+  #v-saved .write-alt{border:none;border-radius:14px;background:var(--sv-card-2);box-shadow:none;
+    padding:12px 13px}
+  #v-saved .write-alt.liked{box-shadow:inset 0 0 0 1.5px var(--sv-teal-2)}
+  #v-saved .write-alt-n{color:#fff;background:var(--sv-teal)}
+  #v-saved .write-alt-en{color:var(--sv-ink)}
+
+  #v-saved .sy-acts{gap:8px;margin-top:14px}
+  #v-saved .sy-acts .go{color:#fff;background:var(--sv-teal);border:none}
+  #v-saved .sy-acts .rm{color:var(--sv-soft);background:var(--sv-card-2);border:none}
+
+  /* the word-level diff and its notes, reused from the play screen */
+  #v-saved .su-diff{margin:0 0 12px;font-size:13.5px;line-height:1.55;text-align:left;color:var(--sv-ink)}
+  #v-saved .su-seg-1{color:var(--sv-soft)}
+  #v-saved .su-seg-2{color:#C9821A}
+  #v-saved .su-seg-3{color:#C2603A}
+  #v-saved .su-fix{color:#1E9E6A}
+  #v-saved .su-mistakes{margin:0 0 12px}
+  #v-saved .su-mistakes li{color:var(--sv-ink)}
+  #v-saved .su-mistakes b.wrong,#v-saved .su-mistakes b.ok{color:var(--sv-ink)}
+  #v-saved .su-mistakes span{color:var(--sv-faint)}
+  #v-saved .su-missing{background:var(--sv-amber-bg);box-shadow:none}
+  #v-saved .su-missing-h{color:var(--sv-amber)}
+  #v-saved .su-missing li{color:#6B4E14}
+
+  /* Raleway for words, Helvetica for anything that has to line up in a
+     column of numbers. The `body .view.fw-panel *` rule sets Exo 2 on
+     every descendant of every panel, so both of these have to carry that
+     much specificity to land at all. */
   body .view.fw-panel#v-saved,
   body .view.fw-panel#v-saved *{
     font-family:'Raleway Local','Raleway',system-ui,sans-serif}
   body .view.fw-panel#v-saved .num,
   body .view.fw-panel#v-saved .sv-when,
   body .view.fw-panel#v-saved .sv-hero-n,
-  body .view.fw-panel#v-saved .sv-sec-h span{
+  body .view.fw-panel#v-saved .sy-grade,
+  body .view.fw-panel#v-saved .sy-meta,
+  body .view.fw-panel#v-saved .hist-count{
     font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
     font-variant-numeric:lining-nums tabular-nums}
 
