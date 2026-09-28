@@ -82,7 +82,11 @@
     for (var i = SPAN - 1; i >= 0; i--) out.push(new Date(end.getTime() - i * DAY));
     return out;
   }
-  var DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  /* The axis used to read S M T W T F S S M T W T F S. Over a fortnight
+     that is the same seven letters twice, two of them ("T", "S") already
+     ambiguous on their own, and nothing anywhere saying WHICH Tuesday.
+     The day number says it in the same width and needs no legend -- the
+     month is already spelled out in the range line above the chart. */
 
   window.jnRenderChart = function () {
     var host = document.getElementById('jn-chart');
@@ -111,7 +115,7 @@
       return '<div class="jn-col' + (isToday ? ' now' : '') + '">'
         + '<div class="jn-bar"><i style="height:' + Math.max(counts[i] ? 8 : 2, h) + '%"></i></div>'
         + '<div class="jn-n num">' + (counts[i] || '') + '</div>'
-        + '<div class="jn-d">' + DOW[d.getDay()] + '</div>'
+        + '<div class="jn-d num">' + d.getDate() + '</div>'
         + '</div>';
     }).join('');
   };

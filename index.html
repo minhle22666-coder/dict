@@ -964,8 +964,17 @@
      home left home-on set, which kept hiding #fw-chrome and is why that
      screen had a bare gap where the search bar should be. */
   html.home-on:not(.panel-open) #fw-chrome,
-  html.home-on .fw-menu-cluster,
+  /* Same :not(.panel-open) as the search bar above, and for the same
+     reason. Opening Hot Take or a mini game from home leaves home-on set,
+     so an unconditional rule here took the menu away for the whole time
+     you were in the game -- no way back to saved, games, progress or the
+     map without backing all the way out first. */
+  html.home-on:not(.panel-open) .fw-menu-cluster,
   html.home-on #fw-word-progress{display:none}
+  /* The music belongs to the island. It is the island's ambience, not the
+     app's, so the control for it has no business sitting in the menu while
+     you are reading an article or playing a round. */
+  html.home-on #fw-sound-btn{display:none}
 
   /* search row */
   /* Long-press on iOS was raising the Look Up / Share callout and dragging
@@ -1518,7 +1527,10 @@
     background:linear-gradient(180deg,#FFF6DC 0%,#FFD98A 38%,rgba(226,150,50,.6) 100%);
     box-shadow:0 0 14px rgba(255,200,110,.45)}
   .jn-n{font-size:9px;font-weight:800;color:rgba(214,244,238,.78);min-height:11px}
-  .jn-d{font-size:8.5px;font-weight:700;color:rgba(190,230,246,.42)}
+  /* Carries the date now, not a one-letter weekday, so it earns a little
+     more size and contrast. Tabular figures (via .num) keep all fourteen
+     columns the same width whether the day is 7 or 28. */
+  .jn-d{font-size:9.5px;font-weight:700;color:rgba(190,230,246,.6)}
 
   /* the way in, with a light going round it */
   .jn-btn{position:relative;display:flex;align-items:center;justify-content:center;gap:9px;
