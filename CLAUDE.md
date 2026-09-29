@@ -140,6 +140,17 @@ etc.) are hardcoded literal rgba per theme, **not** derived from their
 solid colour. Override `--coral` and `--coral-bg` will not follow. Only
 `--primary-bg` uses `color-mix(var(--primary) …)`.
 
+**`cache.addAll()` is atomic — one 404 kills the whole install.** `sw.js`
+precached four `./focci-world/...` paths left over from when the world
+lived in a subfolder, plus a `logo-guardian.png` that was not there. All
+of them 404'd, so the install rejected **every time**, and the app had no
+offline mode at all: verified on the live page, the cache existed and held
+exactly **0 entries**, with no service worker ever active. Every open
+re-downloaded everything. It installs one file at a time now, each failure
+swallowed and logged, so a missing illustration costs that illustration
+and nothing else. If you add to `SHELL`, check the path exists — the flat
+layout rule below is exactly what got this wrong.
+
 **Flat layout — never prefix a path with a subfolder.** `index.html` sits
 at the *same* level as `world.js`, `vendor/`, `assets/`. Always `./thing`,
 never `./focci-world/thing`. A wrong prefix on an ES module import 404s,
@@ -202,10 +213,49 @@ raycast) is kept only for the sky island (above `GROUND_CEIL`) and for
 cliff cells where blending would float Focci in the air. Don't casually
 add a per-frame raycast.
 
-**Point lights are not frustum-culled by three.js.** Every light in the
-scene is compiled into every material's shader. The island has 19 and
-they were half the frame cost. `tickLightCull()` handles this — leave it
-alone unless you measure.
+**Changing the number of visible lights recompiles every shader.** This
+is the one that made the app close itself on iPhone, and it is worth
+understanding before you touch lighting again.
+
+three.js bakes the light *count* into every program it builds, so a
+different count is a different program for every material in the scene.
+Measured by driving the count by hand and timing `renderer.render()`:
+
+| visible point lights | frame | programs |
+|---|---|---|
+| 0 | 265 ms | 12 |
+| 2 | 320 ms | 17 |
+| 5 | 414 ms | 22 |
+| 8 | 477 ms | 27 |
+| 3 | 345 ms | 32 |
+| any count seen before | 0.6 ms | 32 |
+
+A quarter to half a second of blocked main thread **per count the player
+had not produced yet**, on a desktop. A phone compiles several times
+slower, so those are multi-second freezes, and iOS kills a WebKit process
+that stops responding — the "trắng trang rồi tự thoát" report.
+
+The old `tickLightCull()` caused this: it hid lights that could not reach
+the screen, which is a count change every 0.12s. `spawnPickupBurst` made
+it worse by adding a light and removing it again, which is why *picking
+something up* was the most reliable way to crash.
+
+It is now `tickLightPool()`. The scene holds exactly `LIGHT_BUDGET` (5)
+point lights, added once, **never hidden, never removed**. Every other
+point light is a source: invisible from birth, never rendered, read only
+for its position/colour/intensity/falloff, which the pool copies onto its
+own lights each frame. One program set for the whole session.
+
+**If you add a point light anywhere, use `sourceLight()`, not
+`new THREE.PointLight`.** Born visible and hidden by the next scan is not
+good enough — every frame drawn in that 0.12s gap counts it. Measured:
+twelve burst lights created visible still cost 10 new programs; created
+invisible, 0.
+
+Scoring is from `character.position`, not the camera, and skips lights
+whose room is hidden (`inLiveRoom()`) — every room Group is parked at the
+same origin and switched with `.visible`, so an arc land's diamond sits a
+few units from where Focci stands in the station.
 
 ---
 
@@ -226,6 +276,12 @@ alone unless you measure.
 | `dict-00*.json` | ~45MB of dictionary seed shards. Not fetched at boot. |
 | `assets/glb/` | 22 models, 13MB after quantization. |
 | `vendor/three/` | three.js r149 + GLTFLoader, both minified. |
+
+### Known-missing files (pre-existing, not yet chased)
+`fonts/raleway-variable.woff2` and `fonts/raleway-italic-variable.woff2`
+are referenced and absent — the Google Fonts `<link>` is what is actually
+dressing the page. `seed-7000.json` is named in `seed-files.txt` and is
+not in the repo either. All three 404 on every open.
 
 ### Things that are NOT wired to anything
 `fishing-animation-preview-v2.html`, `generate.html`, `shard-tool.html`
@@ -250,6 +306,20 @@ Everything below is committed and pushed to `main`.
   Vietnamese said) and caps the score by it, in code as well as in the
   prompt. A four-word fragment used to score 75/100.
 - Saved rebuilt across all three tabs on one green palette.
+- **The 3D world no longer white-screens and closes the app.** The cause
+  was shader recompilation, not memory or triangles — see the light-count
+  note above. Measured after: first frame 722ms → 112ms, worst frame while
+  walking 265–477ms → 9.2ms, recompiles while picking things up 10 → 0.
+- The four arc lands load when someone walks through a gateway instead of
+  at boot (`ensureArcRoom()`), which is the deferral the previous session
+  left as optional. 5 rooms built at boot → 1; 371 meshes → 237; 181k
+  triangles → 130k. The word hunt deals letters by room **key** now, and
+  `flushPendingLetters()` drops a land's letters in when it is built.
+- `sw.js` actually installs now (0 cached entries → 64), so offline works.
+- Removed 8 files nothing referenced: `animal-duck-baby.glb`,
+  `forest-kit.glb`, `hub-island.glb`, `bush-kit.glb`, `chest.glb`, and the
+  `fishing-animation-preview-v2.html` / `generate.html` / `shard-tool.html`
+  tools. `git log` has them if one is ever wanted back.
 
 **In flight — I stopped mid-task here:**
 
@@ -275,13 +345,9 @@ Everything below is committed and pushed to `main`.
    it's visually heavy and they don't want to read it. Simple, refined,
    easy to scan.
 
-4. **Optional, previously agreed:** defer the four arc-room environments
-   (`ARC_ENV_FILES` in world.js ~1104) until someone actually teleports.
-   Worth ~2.5MB and ~1.3s of boot CPU and keeps all four lands. This is
-   the alternative to deleting `waterfall.glb` — **do not delete that
-   file**, it is one of the four lands, not decoration. (I described it
-   as decoration when asking the user, which was wrong, and they agreed
-   to delete it on that basis.)
+4. ~~Defer the four arc-room environments.~~ **Done** — see
+   `ensureArcRoom()`. `waterfall.glb` is still here and still one of the
+   four lands, not decoration; do not delete it.
 
 ---
 

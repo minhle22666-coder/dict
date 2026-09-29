@@ -20,6 +20,26 @@ function loadGLB(url) {
   return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
 }
 
+/* ---------- lamps, as data ----------
+   Every point light in this scene except the fixed budget pool (see "A
+   LIGHT COUNT THAT NEVER CHANGES" further down) is a SOURCE light: a
+   position, a colour and an intensity that the pool reads and copies onto
+   one of its own lights. A source light is never rendered, so it is born
+   invisible and stays that way.
+
+   Born invisible specifically, rather than hidden by the pool's next scan.
+   The scan runs every 0.12s, and a light created visible is counted by
+   every frame drawn in that gap -- which is a light count three.js has not
+   compiled for, which is a fresh set of shader programs and the stall this
+   whole design exists to avoid. Measured: creating twelve burst lights
+   visible and letting the pool hide them afterwards still cost 10 new
+   programs; created invisible, it costs 0. */
+function sourceLight(color, intensity, distance, decay) {
+  const l = new THREE.PointLight(color, intensity, distance, decay);
+  l.visible = false;
+  return l;
+}
+
 /* ============================================================
    BOOT
    ============================================================ */
@@ -516,7 +536,7 @@ export async function bootFocciWorld(root, opts) {
   let burstLights = 0;
   function spawnPickupBurst(room, x, y, z, color) {
     const N = 7, DURATION = 0.65;
-    const light = burstLights < 2 ? new THREE.PointLight(color, 1.6, 4, 2) : null;
+    const light = burstLights < 2 ? sourceLight(color, 1.6, 4, 2) : null;
     if (light) { burstLights++; light.position.set(x, y, z); room.group.add(light); }
     const sprites = [];
     for (let i = 0; i < N; i++) {
@@ -1103,9 +1123,13 @@ export async function bootFocciWorld(root, opts) {
      ============================================================ */
   const ARC_ENV_FILES = ['island.glb', 'camp.glb', 'waterfall.glb', 'secretcamp.glb'];
   const arcCount = Math.min(ARC_TITLES.length, 4);
+  /* The four arc environments used to be fetched here too, and their rooms
+     built before the first frame -- 2.5MB of GLB, 300ms of build measured
+     on the boot marks, and 85k triangles held in memory for four places
+     most players never walk into. They load when someone actually steps
+     through a gateway now; see ensureArcRoom() below. */
   const [
     hub, mushGlb, birdGlb, skyGlb, pondGlb, boatGlb, doeGlb, diamondGlb, focciGlb,
-    ...arcGltfs
   ] = await Promise.all([
     loadGLB(ASSET('fox-island.glb')),
     loadGLB(ASSET('mushrooms.glb')),
@@ -1116,7 +1140,6 @@ export async function bootFocciWorld(root, opts) {
     loadGLB(ASSET('doe.glb')),
     loadGLB(ASSET('teleport-diamond.glb')),
     loadGLB(ASSET('focci.glb')),
-    ...Array.from({ length: arcCount }, (_, i) => loadGLB(ASSET(ARC_ENV_FILES[i]))),
   ]);
 
   /* The raw diamond is 5.3 units tall (roughly 4x Focci's own height) with
@@ -1153,7 +1176,7 @@ export async function bootFocciWorld(root, opts) {
     room.interactive.push(d);
     const glowY = groundedY + diamondSize.y * diamondScale * 0.5;
     const col = glowColor !== undefined ? glowColor : DIAMOND_GLOW_COLOR;
-    const light = new THREE.PointLight(col, 1.3, 7, 2);
+    const light = sourceLight(col, 1.3, 7, 2);
     light.position.set(x, glowY, z);
     room.group.add(light);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: col, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -1336,7 +1359,7 @@ export async function bootFocciWorld(root, opts) {
     station.group.add(skyHalo);
     // Kept gentle: at 2.2 the halo plus the light blew the whole island out
     // to near-white and you could not see the blossom at all.
-    const skyLight = new THREE.PointLight(0xFF8FC8, 0.75, SKY_SPAN * 1.3, 2);
+    const skyLight = sourceLight(0xFF8FC8, 0.75, SKY_SPAN * 1.3, 2);
     skyLight.position.set(SKY_OFFSET.x, SKY_OFFSET.y + 5, SKY_OFFSET.z);
     station.group.add(skyLight);
     station.sky.halo = skyHalo;
@@ -1375,7 +1398,7 @@ export async function bootFocciWorld(root, opts) {
     addInvisibleHitbox(station, sakura.x, sakura.y + SKY_SPAN * 0.09, sakura.z, SKY_SPAN * 0.055, 'vine-tree');
     station.vineTree = { obj: skyGlb.scene, x: sakura.x, z: sakura.z };
     const treeGlowColor = 0xFFC7E4;
-    const treeLight = new THREE.PointLight(treeGlowColor, 0.9, SKY_SPAN * 0.45, 2);
+    const treeLight = sourceLight(treeGlowColor, 0.9, SKY_SPAN * 0.45, 2);
     treeLight.position.set(sakura.x, sakura.y + SKY_SPAN * 0.13, sakura.z);
     station.group.add(treeLight);
     const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: treeGlowColor, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -1429,7 +1452,7 @@ export async function bootFocciWorld(root, opts) {
         );
         beam.position.set(c.x, peakY + 2.1, c.z);
         station.group.add(beam);
-        const violet = new THREE.PointLight(0xA875FF, 1.5, 12, 2);
+        const violet = sourceLight(0xA875FF, 1.5, 12, 2);
         violet.position.set(c.x, peakY + 1.6, c.z);
         station.group.add(violet);
         station.skyPad = { glow: halo, beam, light: violet, x: c.x, y: peakY, z: c.z };
@@ -1561,7 +1584,7 @@ export async function bootFocciWorld(root, opts) {
             spark.position.set(mx, my + 0.9, mz);
             station.group.add(spark);
             // the lamp that comes on once he is inside
-            const lamp = new THREE.PointLight(0xFFCE87, 0, 7, 2);
+            const lamp = sourceLight(0xFFCE87, 0, 7, 2);
             lamp.position.set(c.x, c.y + 1.4, c.z);
             station.group.add(lamp);
             /* The room has to reach at least as far as its own front door.
@@ -1811,52 +1834,65 @@ export async function bootFocciWorld(root, opts) {
      NOTE: none of your 4 environment files is literally a desert — this is
      a placeholder pairing until you have (or want) a proper desert asset.
      ============================================================ */
-  const arcRoomKeys = [];
-  for (let i = 0; i < arcCount; i++) {
-    const key = 'arc' + (i + 1);
-    arcRoomKeys.push(key);
-    const room = makeRoom(key, ARC_TITLES[i]);
-    const gltf = arcGltfs[i];
-    gltf.scene.updateMatrixWorld(true);
-    mergeStaticByMaterial(gltf.scene);
-    const box = new THREE.Box3().setFromObject(gltf.scene);
-    const size = box.getSize(new THREE.Vector3());
-    const scale = 26 / Math.max(size.x, size.z);
-    gltf.scene.scale.setScalar(scale);
-    gltf.scene.position.y = -box.min.y * scale;
-    gltf.scene.updateMatrixWorld(true); // see the matching comment on the hub setup above
-    tagWater(gltf.scene);
-    room.group.add(gltf.scene);
-    room.collidables.push(gltf.scene);
-    room.field = buildHeightField(room, 18);
-    room.spawn = { x: 0, z: 4 };
+  const arcRoomKeys = Array.from({ length: arcCount }, (_, i) => 'arc' + (i + 1));
+  /* One promise per land, made the first time someone travels there and
+     then kept, so a second visit is instant and two taps in a row cannot
+     build the same room twice. */
+  const arcRoomJobs = new Map();
+  function ensureArcRoom(i) {
+    if (arcRoomJobs.has(i)) return arcRoomJobs.get(i);
+    const job = (async () => {
+      const key = arcRoomKeys[i];
+      const gltf = await loadGLB(ASSET(ARC_ENV_FILES[i]));
+      const room = makeRoom(key, ARC_TITLES[i]);
+      gltf.scene.updateMatrixWorld(true);
+      mergeStaticByMaterial(gltf.scene);
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const size = box.getSize(new THREE.Vector3());
+      const scale = 26 / Math.max(size.x, size.z);
+      gltf.scene.scale.setScalar(scale);
+      gltf.scene.position.y = -box.min.y * scale;
+      gltf.scene.updateMatrixWorld(true); // see the matching comment on the hub setup above
+      tagWater(gltf.scene);
+      room.group.add(gltf.scene);
+      room.collidables.push(gltf.scene);
+      room.field = buildHeightField(room, 18);
+      room.spawn = { x: 0, z: 4 };
 
-    // a "return to station" diamond in every arc room (reuses the same
-    // loaded diamondGlb from the station room above — spawnDiamond() takes
-    // care of the same correct-size + grounded + glowing treatment).
-    // findGroundSpot near the room's own center instead of a blind (0,0,0)
-    // — same off-ground risk as everything else if that exact point isn't
-    // actually solid on a given arc environment.
-    scatterMushrooms(room, 3, 11, 8);
+      // a "return to station" diamond in every arc room (reuses the same
+      // loaded diamondGlb from the station room above — spawnDiamond() takes
+      // care of the same correct-size + grounded + glowing treatment).
+      // findGroundSpot near the room's own center instead of a blind (0,0,0)
+      // — same off-ground risk as everything else if that exact point isn't
+      // actually solid on a given arc environment.
+      scatterMushrooms(room, 3, 11, 8);
 
-    const homeSpot = findGroundSpot(room, 0, 6);
-    const homeSpawned = spawnDiamond(room, homeSpot.x, homeSpot.y, homeSpot.z, 'teleport-home');
-    room._homeTeleport = { obj: homeSpawned.obj, mixer: homeSpawned.mixer };
+      const homeSpot = findGroundSpot(room, 0, 6);
+      const homeSpawned = spawnDiamond(room, homeSpot.x, homeSpot.y, homeSpot.z, 'teleport-home');
+      room._homeTeleport = { obj: homeSpawned.obj, mixer: homeSpawned.mixer };
 
-    // one "whole word" treasure per arc land — an occasional shortcut to
-    // finding the current hunted word without spelling it letter by letter.
-    // findGroundSpot instead of an unvalidated random angle/radius, same
-    // floating-prop fix as everywhere else.
-    {
-      const tex = makeWordTreasureTexture('?');
-      const treasure = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshStandardMaterial({ map: tex, flatShading: true, emissive: 0xffdd88, emissiveIntensity: 0.3 }));
-      const spot = findGroundSpot(room, 4, 10);
-      treasure.position.set(spot.x, spot.y + 0.6, spot.z);
-      treasure.userData.interactType = 'word-treasure';
-      room.group.add(treasure);
-      room.interactive.push(treasure);
-      room.wordTreasure = { obj: treasure, x: spot.x, z: spot.z, y: spot.y, tex, found: false };
-    }
+      // one "whole word" treasure per arc land — an occasional shortcut to
+      // finding the current hunted word without spelling it letter by letter.
+      // findGroundSpot instead of an unvalidated random angle/radius, same
+      // floating-prop fix as everywhere else.
+      {
+        const tex = makeWordTreasureTexture('?');
+        const treasure = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshStandardMaterial({ map: tex, flatShading: true, emissive: 0xffdd88, emissiveIntensity: 0.3 }));
+        const spot = findGroundSpot(room, 4, 10);
+        treasure.position.set(spot.x, spot.y + 0.6, spot.z);
+        treasure.userData.interactType = 'word-treasure';
+        room.group.add(treasure);
+        room.interactive.push(treasure);
+        room.wordTreasure = { obj: treasure, x: spot.x, z: spot.z, y: spot.y, tex, found: false };
+      }
+      /* Letters of the current hunt dealt to this land while it did not
+         exist yet. startNewWordHunt() deals every letter a room by KEY
+         rather than by object, precisely so this can be picked up here. */
+      flushPendingLetters(room);
+      return room;
+    })();
+    arcRoomJobs.set(i, job);
+    return job;
   }
 
   /* ============================================================
@@ -1888,42 +1924,70 @@ export async function bootFocciWorld(root, opts) {
 
   const wordHunt = { word: '', letters: [], respawnPending: false };
   function clearWordHunt() {
-    wordHunt.letters.forEach((l) => (l.room || station).group.remove(l.obj));
+    wordHunt.letters.forEach((l) => { if (l.obj) (l.room || station).group.remove(l.obj); });
     wordHunt.letters = [];
   }
   function progressMask() {
     return wordHunt.word.split('').map((ch, i) => (wordHunt.letters[i] && wordHunt.letters[i].found ? ch.toUpperCase() : '_')).join('');
   }
+  /* Building one letter cube. Split out of startNewWordHunt because a
+     letter dealt to an arc land can no longer always be placed when the
+     hunt starts -- that land may not have been built yet. */
+  function placeLetter(host, slot, index) {
+    // Validated placement, like every other prop: a raw random point used
+    // to drop letters past the island's edge, over open air.
+    const spot = findGroundSpot(host, 3, 13);
+    const tex = makeLetterTexture(slot.letter, LETTER_BG[index % LETTER_BG.length]);
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ map: tex, flatShading: true }));
+    cube.position.set(spot.x, spot.y + 0.75, spot.z);
+    cube.rotation.set(0.3, Math.random() * Math.PI, 0.1);
+    cube.castShadow = true;
+    cube.userData.interactType = 'letter';
+    host.group.add(cube);
+    host.interactive.push(cube);
+    slot.obj = cube;
+    slot.room = host;
+  }
+
+  /* An arc land has just finished building: give it the letters that were
+     dealt to it while it did not exist. A letter already collected by the
+     word-treasure shortcut is not re-placed. */
+  function flushPendingLetters(room) {
+    for (let i = 0; i < wordHunt.letters.length; i++) {
+      const slot = wordHunt.letters[i];
+      if (!slot || slot.obj || slot.found || slot.roomKey !== room.key) continue;
+      placeLetter(room, slot, i);
+    }
+  }
+
   async function startNewWordHunt() {
     const word = String((await getNextTargetWord()) || 'focci').toLowerCase().replace(/[^a-z]/g, '') || 'focci';
     clearWordHunt();
     wordHunt.word = word;
     wordHunt.respawnPending = false;
-    /* Letters are spread over ALL the islands, not just the station — the
+    /* Letters are spread over ALL the islands, not just the station -- the
        arc lands had none at all, so there was nothing to find once you
        teleported. Every island is guaranteed at least one when the word is
-       long enough to go round, and the rest fall where they fall. */
-    const hostKeys = Object.keys(rooms);
-    const hosts = [];
+       long enough to go round, and the rest fall where they fall.
+
+       Dealt by room KEY rather than by room object, because the arc lands
+       are built on demand now and three of the four usually do not exist
+       when a hunt starts. A letter whose land is not there yet keeps its
+       slot (progressMask() counts by position, so the slots have to stay
+       in order) and is placed by flushPendingLetters() the moment that
+       land is built. */
+    const hostKeys = ['station'].concat(arcRoomKeys);
+    const keys = [];
     for (let i = 0; i < word.length; i++) {
-      hosts.push(i < hostKeys.length ? rooms[hostKeys[i]] : rooms[hostKeys[Math.floor(Math.random() * hostKeys.length)]]);
+      keys.push(i < hostKeys.length ? hostKeys[i] : hostKeys[Math.floor(Math.random() * hostKeys.length)]);
     }
     // shuffle, so the first letters are not always on the same island
-    for (let i = hosts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = hosts[i]; hosts[i] = hosts[j]; hosts[j] = tmp; }
+    for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = keys[i]; keys[i] = keys[j]; keys[j] = tmp; }
     for (let i = 0; i < word.length; i++) {
-      const host = hosts[i];
-      // Validated placement, like every other prop: a raw random point used
-      // to drop letters past the island's edge, over open air.
-      const spot = findGroundSpot(host, 3, 13);
-      const tex = makeLetterTexture(word[i], LETTER_BG[i % LETTER_BG.length]);
-      const cube = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ map: tex, flatShading: true }));
-      cube.position.set(spot.x, spot.y + 0.75, spot.z);
-      cube.rotation.set(0.3, Math.random() * Math.PI, 0.1);
-      cube.castShadow = true;
-      cube.userData.interactType = 'letter';
-      host.group.add(cube);
-      host.interactive.push(cube);
-      wordHunt.letters.push({ obj: cube, letter: word[i], found: false, phase: Math.random() * Math.PI * 2, room: host });
+      const slot = { obj: null, letter: word[i], found: false, phase: Math.random() * Math.PI * 2, room: null, roomKey: keys[i] };
+      wordHunt.letters.push(slot);
+      const host = rooms[keys[i]];
+      if (host) placeLetter(host, slot, i);
     }
     // refresh every arc room's treasure to point at the same hunt
     Object.values(rooms).forEach((r) => { if (r.wordTreasure) r.wordTreasure.found = false, (r.wordTreasure.obj.visible = true); });
@@ -2120,7 +2184,7 @@ export async function bootFocciWorld(root, opts) {
     put(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.55, 8), HUT_WOOD), 1.4, 0.3, -0.5);
     put(new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.08, 14), HUT_WOOD), 1.4, 0.6, -0.5);
     const lamp = put(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.32, 0.24), HUT_LAMP), 1.4, 0.8, -0.5);
-    const lampLight = new THREE.PointLight(0xFFCE87, 0, 6, 2);
+    const lampLight = sourceLight(0xFFCE87, 0, 6, 2);
     lampLight.position.set(1.4, 1.0, -0.5); g.add(lampLight);
     // a stool and a shelf of books
     put(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.42, 10), HUT_WOOD), 0.5, 0.21, 0.9);
@@ -2567,7 +2631,7 @@ export async function bootFocciWorld(root, opts) {
     const tr = room.wordTreasure;
     if (!tr || tr.found) return;
     tr.found = true; tr.obj.visible = false;
-    wordHunt.letters.forEach((l) => { if (!l.found) { l.found = true; l.obj.visible = false; } });
+    wordHunt.letters.forEach((l) => { if (!l.found) { l.found = true; if (l.obj) l.obj.visible = false; } });
     onLetterProgress(wordHunt.word, progressMask());
     completeWordHunt();
   }
@@ -2766,10 +2830,33 @@ export async function bootFocciWorld(root, opts) {
   }
 
   function activeRoom() { return rooms[currentRoomKey]; }
-  function enterRoom(key, spawnOverride) {
-    Object.values(rooms).forEach((r) => { r.group.visible = false; });
-    currentRoomKey = key;
+  /* Async only for a land that has not been built yet. An async function
+     runs its body synchronously up to the first await, so enterRoom('station')
+     -- including the one during setup, before there is anything to await --
+     still switches rooms in the same tick it always did. Callers do not need
+     to await this; nothing they do afterwards depends on the switch. */
+  let roomLoading = false;
+  async function enterRoom(key, spawnOverride) {
+    const arcIdx = arcRoomKeys.indexOf(key);
+    if (arcIdx !== -1 && !rooms[key]) {
+      /* Two taps on a gateway while the first is still fetching would
+         otherwise queue two trips, and the second would land after the
+         player had already arrived and walked off. */
+      if (roomLoading) return;
+      roomLoading = true;
+      if (window.fwToast) fwToast('Crossing over\u2026');
+      try { await ensureArcRoom(arcIdx); }
+      catch (err) {
+        console.error('Focci World: could not build ' + key, err);
+        if (window.fwToast) fwToast('That land will not open just now');
+        return;
+      }
+      finally { roomLoading = false; }
+    }
     const r = rooms[key];
+    if (!r) return;
+    Object.values(rooms).forEach((rr) => { rr.group.visible = false; });
+    currentRoomKey = key;
     r.group.visible = true;
     const sp = spawnOverride || r.spawn;
     charState.x = sp.x; charState.z = sp.z;
@@ -3330,58 +3417,139 @@ export async function bootFocciWorld(root, opts) {
   }
 
   /* ============================================================
-     LAMPS YOU CANNOT SEE COST AS MUCH AS LAMPS YOU CAN
+     A LIGHT COUNT THAT NEVER CHANGES
 
-     three.js frustum-culls meshes but never lights: every point light in
-     the scene is compiled into every material's fragment shader and
-     evaluated for every lit pixel, whether it is a lantern at your feet
-     or one on the far shore behind your back. The island carries
-     nineteen -- lamp posts, window glows, hearths -- and measured here
-     they were exactly half the cost of a frame: 3.45ms with them in,
-     1.68ms with them out.
+     The previous version of this pass culled point lights by hiding the
+     ones that could not reach the screen. It was right about the frame
+     cost -- nineteen lights were half of it -- and wrong about what it
+     would cost to fix, because hiding a light changes how many lights
+     three.js sees, and three.js compiles the light count into every
+     shader it builds. A different count is a different program for every
+     material in the scene.
 
-     A point light with a falloff distance reaches nothing past that
-     radius, so if the sphere it could possibly light misses the view, it
-     cannot change a single visible pixel and may as well not be there.
-     One sitting at zero intensity -- which is every lamp in daylight --
-     is already contributing nothing.
+     Measured by driving the count by hand and timing renderer.render():
 
-     Culling on those two rules leaves five lights of the nineteen and
-     takes the frame from 3.20ms to 1.91ms, with the picture identical.
+         visible point lights     frame       programs
+                 0                265 ms         12
+                 2                320 ms         17
+                 5                414 ms         22
+                 8                477 ms         27
+                 3                345 ms         32
+           any count seen before  0.6 ms         32
 
-     The pass itself is free -- 0.038ms to find the lights, 0.005ms to
-     test them -- so the only reason not to run it every frame is that
-     changing the light count makes three.js swap shader programs, and a
-     lamp sitting exactly on the edge of the screen would thrash. Every
-     eighth of a second settles that without anyone seeing a lamp's glow
-     arrive late. A light with no falloff distance reaches everywhere and
-     is never culled on position.
+     Every count the player had not produced yet cost a quarter to half a
+     second of blocked main thread, on a desktop, to compile five more
+     programs. A phone compiles shaders several times slower, so those are
+     multi-second freezes there -- and iOS kills a WebKit process that
+     stops responding, which is the white screen and the app closing by
+     itself. Picking something up was the most reliable way to trigger it,
+     because spawnPickupBurst adds a point light and then takes it away
+     again: two more counts, two more compiles.
+
+     So the count is fixed now. The scene holds exactly LIGHT_BUDGET point
+     lights, they are added once, they are never hidden, and they are
+     never removed. Everything that used to BE a light is now read as data
+     -- position, colour, intensity, falloff -- and the budget lights are
+     moved onto whichever ones matter most from where the player is
+     standing. A slot with nothing to do sits at intensity 0, which costs
+     the shader an already-compiled multiply and costs a recompile
+     nothing.
+
+     Result: one program set, compiled once, for the whole session. The
+     per-frame saving the old cull was after is kept -- only LIGHT_BUDGET
+     lights are ever evaluated, not nineteen -- without paying for it in
+     compiles.
      ============================================================ */
-  const LIGHT_CULL_S = 0.12;
-  let lightCullAt = 0;
-  const cullLights = [];
-  const cullFrustum = new THREE.Frustum();
-  const cullMat = new THREE.Matrix4();
-  const cullSphere = new THREE.Sphere();
-  const cullPos = new THREE.Vector3();
-  function tickLightCull(t) {
-    if (t - lightCullAt < LIGHT_CULL_S) return;
-    lightCullAt = t;
-    cullLights.length = 0;
-    scene.traverse((o) => { if (o.isPointLight) cullLights.push(o); });
-    if (cullLights.length < 5) return;        // too few to be worth the churn
-    camera.updateMatrixWorld();
-    cullMat.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-    cullFrustum.setFromProjectionMatrix(cullMat);
-    for (let i = 0; i < cullLights.length; i++) {
-      const l = cullLights[i];
-      if (l.intensity <= 0.005) { l.visible = false; continue; }
-      if (!l.distance) { l.visible = true; continue; }
-      l.getWorldPosition(cullPos);
-      cullSphere.set(cullPos, l.distance);
-      l.visible = cullFrustum.intersectsSphere(cullSphere);
+  const LIGHT_BUDGET = 5;
+  /* Five, because that is what the old frustum cull left standing on a
+     typical night frame, and it measured 1.91 ms against 3.20 ms for all
+     nineteen. Fewer looks wrong the moment two lamps and a diamond are on
+     screen together; more costs frame time for lights nobody can pick out. */
+  const poolLights = [];
+  for (let i = 0; i < LIGHT_BUDGET; i++) {
+    const l = new THREE.PointLight(0xffffff, 0, 1, 2);
+    l.visible = true;          // never toggled -- see the note above
+    scene.add(l);
+    poolLights.push(l);
+  }
+
+  /* Finding the source lights is a full scene.traverse, which is the only
+     expensive part of this (0.038 ms measured), so the list is rebuilt on
+     a slow cadence and the values are read off it every frame. A light
+     that appears or disappears -- a pickup burst, a room change -- shows
+     up within LIGHT_SCAN_S, which is well inside the 0.65 s a burst
+     lasts. */
+  const LIGHT_SCAN_S = 0.12;
+  let lightScanAt = -1;
+  const srcLights = [];
+  const srcPos = new THREE.Vector3();
+  const focusPos = new THREE.Vector3();
+
+  /* Every room is a Group parked at the same origin and switched with
+     .visible, so an arc room's teleport-home diamond sits a few units from
+     where Focci stands in the station. Scoring by distance alone would
+     hand a budget slot to a light in a room nobody is in. The light's own
+     .visible is no use for this -- this pass sets it false and leaves it
+     false -- so ask its parents instead. */
+  function inLiveRoom(o) {
+    for (let n = o.parent; n && n !== scene; n = n.parent) {
+      if (!n.visible) return false;
+    }
+    return true;
+  }
+
+  function tickLightPool(t) {
+    if (t - lightScanAt >= LIGHT_SCAN_S) {
+      lightScanAt = t;
+      srcLights.length = 0;
+      scene.traverse((o) => {
+        if (!o.isPointLight || poolLights.indexOf(o) !== -1) return;
+        /* Hidden once and left hidden. These objects stay in the scene
+           graph because the rest of the code keeps handles on them and
+           animates their intensity (the vine tree pulses, lamps come up
+           at dusk); they are just never rendered as lights again. Their
+           values are what this pass reads. */
+        o.visible = false;
+        srcLights.push(o);
+      });
+    }
+
+    /* Score from where the player is, not from the camera: the camera can
+       be swung round behind Focci, and a lamp at his feet still lights the
+       ground the player is actually looking at. */
+    focusPos.copy(character.position);
+
+    const picked = [];
+    for (let i = 0; i < srcLights.length; i++) {
+      const l = srcLights[i];
+      if (l.intensity <= 0.005) continue;             // a lamp in daylight
+      if (!l.parent) continue;                        // removed mid-burst
+      if (!inLiveRoom(l)) continue;                   // another room's lamp
+      l.getWorldPosition(srcPos);
+      const d = srcPos.distanceTo(focusPos);
+      let score;
+      if (!l.distance) score = l.intensity;           // infinite reach
+      else if (d >= l.distance) continue;             // cannot reach him at all
+      else {
+        const f = 1 - d / l.distance;
+        score = l.intensity * f * f;
+      }
+      picked.push({ l: l, score: score, x: srcPos.x, y: srcPos.y, z: srcPos.z });
+    }
+    picked.sort((a, b) => b.score - a.score);
+
+    for (let i = 0; i < LIGHT_BUDGET; i++) {
+      const p = poolLights[i];
+      const src = picked[i];
+      if (!src) { p.intensity = 0; continue; }        // idle slot, still visible
+      p.position.set(src.x, src.y, src.z);
+      p.color.copy(src.l.color);
+      p.intensity = src.l.intensity;
+      p.distance = src.l.distance || 0;
+      p.decay = src.l.decay;
     }
   }
+
 
   function animate() {
     requestAnimationFrame(animate);
@@ -3424,7 +3592,7 @@ export async function bootFocciWorld(root, opts) {
         if (cb) cb();
       }
       updateCamera();
-      tickLightCull(t);
+      tickLightPool(t);
       renderer.render(scene, camera);
       return;
     }
@@ -3576,7 +3744,7 @@ export async function bootFocciWorld(root, opts) {
     room.teleports.forEach((tp) => tp.mixer.update(dt));
     if (room._homeTeleport) room._homeTeleport.mixer.update(dt);
     room.mushrooms.forEach((m) => { if (!m.found) m.obj.rotation.y = t * 0.6; });
-    wordHunt.letters.forEach((l) => { if (!l.found) { l.obj.rotation.y = t * 0.5 + l.phase; l.obj.position.y += Math.sin(t * 2 + l.phase) * 0.0006; } });
+    wordHunt.letters.forEach((l) => { if (!l.found && l.obj) { l.obj.rotation.y = t * 0.5 + l.phase; l.obj.position.y += Math.sin(t * 2 + l.phase) * 0.0006; } });
     if (room.wordTreasure && !room.wordTreasure.found) {
       room.wordTreasure.obj.rotation.y = t * 0.8;
       room.wordTreasure.obj.position.y = room.wordTreasure.y + 0.6 + Math.sin(t * 1.6) * 0.1;
@@ -3620,7 +3788,7 @@ export async function bootFocciWorld(root, opts) {
     }
 
     updateCamera();
-    tickLightCull(t);
+    tickLightPool(t);
     renderer.render(scene, camera);
   }
 

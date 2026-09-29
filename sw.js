@@ -1,11 +1,9 @@
 /* Focci service worker — offline app shell.
    Bump CACHE version whenever you change ANY file, to force an update.
-   Only small, essential files are precached on install (so a typo in one
-   of the many illustration paths can never break the whole install) —
-   every image is cached automatically the first time it's fetched
-   successfully, which happens naturally the first time you open the
-   app online. */
-const CACHE = 'focci-v185';
+   Only small, essential files are precached on install — every image is
+   cached automatically the first time it's fetched successfully, which
+   happens naturally the first time you open the app online. */
+const CACHE = 'focci-v188';
 const SHELL = [
   './',
   './index.html',
@@ -30,19 +28,36 @@ const SHELL = [
   './icon-180.png',
   './icon-192.png',
   './icon-512.png',
-  './focci-world/world.js',
-  './focci-world/theme-overrides.css',
-  './focci-world/vendor/three/three.module.js',
-  './focci-world/vendor/three/GLTFLoader.js'
-  // the .glb/.mp3 files under focci-world/assets/ are NOT in this list on
-  // purpose — the fetch handler below already caches any same-origin GET
-  // the first time it succeeds, so they'll be cached automatically the
-  // first time someone opens the 3D world, without bloating initial install.
+  './world.js',
+  './theme-overrides.css',
+  './vendor/three/three.module.js',
+  './vendor/three/GLTFLoader.js'
+  // These four used to be listed under './focci-world/...', left over from
+  // the days when the world lived in a subfolder. The repo is flat, so all
+  // four 404'd — and cache.addAll() rejects the WHOLE install if a single
+  // request fails, so the install never once completed. Measured on the
+  // live app: the cache existed and held exactly 0 entries, and no service
+  // worker was ever active. That is why the app had no offline mode at all
+  // and re-downloaded everything on every open.
+  //
+  // the .glb/.mp3 files under assets/ are NOT in this list on purpose —
+  // the fetch handler below already caches any same-origin GET the first
+  // time it succeeds, so they'll be cached automatically the first time
+  // someone opens the 3D world, without bloating initial install.
 ];
 
 self.addEventListener('install', (e) => {
+  /* One file at a time, each failure swallowed, instead of addAll().
+     addAll() is atomic: one 404 anywhere in SHELL and the whole install
+     rejects, leaving an empty cache and no worker — which is exactly what
+     had been happening. A missing illustration should cost that one
+     illustration, not the entire offline mode. */
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE).then((c) => Promise.all(
+      SHELL.map((url) => c.add(url).catch((err) => {
+        console.warn('[sw] precache skipped', url, err && err.message);
+      }))
+    )).then(() => self.skipWaiting())
   );
 });
 
