@@ -1,0 +1,345 @@
+# Focci's Little Tales — working notes
+
+Read this before touching anything. Most of what follows was learned the
+expensive way, and several items will silently waste an hour each if you
+rediscover them yourself.
+
+Line numbers here were correct at `30827ae` and drift with every edit —
+grep for the quoted code instead of trusting them.
+
+---
+
+## What this is
+
+A Vietnamese → English vocabulary PWA, built by one person as a hobby
+project. Two halves that share one codebase:
+
+- **A 2D app** — dictionary lookup (offline-first, IndexedDB), a story
+  mode, mini games (Word Pairs, Letter Trail, Speak Up, Hot Take), a
+  Saved area, a journal.
+- **A 3D island** — Three.js. You walk a fox called Focci around, find
+  letters, rescue animals, sail a boat, teleport between four "lands".
+
+No build step. No framework. No package.json. Plain `<script>` tags and
+one ES module. Everything ships as-is.
+
+## Who you're working for
+
+Non-technical hobby developer. Vietnamese speaker — **reply in
+Vietnamese**, and write commit messages in English. They describe
+problems by what they see ("the box is ugly", "it shows the old page"),
+not by cause, so the first job on any report is almost always to find
+the actual mechanism rather than to patch the symptom.
+
+They push straight to `main` on `minhle22666-coder/dict` and have
+standing authorisation for that. Commit and push as you go.
+
+They notice when you claim something is done and it isn't. Don't call a
+pass an "overhaul" unless you've checked every surface it touches — see
+the Saved page story below.
+
+## Running it
+
+```bash
+python -m http.server 8080
+```
+
+`.claude/launch.json` already defines this as `static-server`. It must be
+served over HTTP — `file://` breaks GLTFLoader.
+
+---
+
+## THE CACHING PROBLEM — read this first
+
+This has cost more time than every other issue combined, and it will
+happen to you.
+
+There are **three** independent cache layers between a file on disk and
+the code running in the browser:
+
+1. **Service worker** (`sw.js`) — was cache-first for everything.
+2. **The browser's HTTP disk cache** — survives tab close, survives
+   clearing Cache Storage, survives unregistering the service worker.
+   There is no JS API to purge it.
+3. **The page's already-loaded copy** — nothing reloads until you navigate.
+
+**Symptoms you will misread as bugs:** a fix that "doesn't work", a page
+that "still shows the old version", computed CSS values that don't match
+the file you just edited, a function whose `.toString()` is the old body.
+
+**What's already been done about it:** `sw.js` is now network-first for
+`.html`/`.js`/`.css` (cache-first for images/models/fonts, which are big
+and renamed rather than edited), and it requests code with
+`cache: 'no-cache'` so the HTTP layer can't answer behind its back. That
+fixes it for real users.
+
+**It does NOT fix your dev loop.** When verifying your own work:
+
+```js
+// ALWAYS confirm what's actually running before trusting a measurement
+performance.getEntriesByType('resource')
+  .filter(r => /app\.js/.test(r.name))
+  .map(r => r.deliveryType)          // "cache" means you're testing stale code
+```
+
+Reliable workarounds, in order of preference:
+
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v181`).
+  Do this even for a one-line CSS edit. The user relies on it.
+- Fetch fresh and re-install just the functions you're testing:
+  ```js
+  const src = await (await fetch('/app.js?b='+Date.now(), {cache:'no-store'})).text();
+  // extract a function by brace-matching, then:
+  (0,eval)('fnName = ' + body.replace(/^function \w+/, 'function'));
+  ```
+  Top-level `function` declarations are writable globals, so this works.
+  Top-level `let`/`const` are **not** on `window` but **are** reachable
+  from `eval` in the console.
+- For CSS, fetch `index.html` fresh, extract every `<style>` block, and
+  append them — later rules win on source order.
+- Restarting the python server sometimes helps. Closing the tab does not.
+
+---
+
+## Other things that will bite you
+
+**Heredocs mangle backslashes.** `bash -c 'python - <<EOF'` with `\n`,
+`\t`, `→` in the payload will corrupt them. This has produced a
+literal newline inside a JS string literal (syntax error, whole app
+dead) more than once. **Write patch scripts with the Write tool, then
+run them.** Don't inline Python in a heredoc if it contains escapes.
+
+**`\u` escapes are literal text in these source files.** `app.js`
+contains `'→'` as six characters in some places and a real `→`
+glyph in others, inconsistently. When pattern-matching for a patch,
+check which one you're looking at (`sed -n 'NNNp' file`) — a mismatch
+just fails the assertion, but assuming wrong wastes a cycle.
+
+**`body .view.fw-panel *` sets `Exo 2` on every descendant of every
+panel** (index.html ~line 5202). Any font rule scoped less specifically
+than that silently loses. If you set a font and it doesn't change, this
+is why. You need `body .view.fw-panel#your-id *` to beat it.
+
+**`.fw-panel`'s backdrop is still purple** —
+`rgba(36,16,72,.58)` at index.html ~line 5148. This is the last of an
+old theme and it shows through every translucent card in every panel
+that doesn't override it. The user has complained about purple
+repeatedly; **this single line is the cause** for the mini games and
+anything else still wearing it. Saved and Speak Up override it locally.
+Changing it at the root is the outstanding high-leverage fix.
+
+**There are two parallel CSS token systems.** An older cream/brown set
+(`--bg:#F8F3E6`, `--surface:#F3ECDD`) and a newer `--tint`-based
+light/dark theme set. Both declare `:root`. Which one wins depends on
+source order and on which scope you're in. **Never reason about a
+variable's value from the source — read it off a live element** with
+`getComputedStyle(el).getPropertyValue('--x')`.
+
+Related trap: the `-bg` companion tokens (`--coral-bg`, `--amber-bg`,
+etc.) are hardcoded literal rgba per theme, **not** derived from their
+solid colour. Override `--coral` and `--coral-bg` will not follow. Only
+`--primary-bg` uses `color-mix(var(--primary) …)`.
+
+**Flat layout — never prefix a path with a subfolder.** `index.html` sits
+at the *same* level as `world.js`, `vendor/`, `assets/`. Always `./thing`,
+never `./focci-world/thing`. A wrong prefix on an ES module import 404s,
+and a failed module import kills the **entire** `<script type="module">`
+block silently — no partial execution, no error you'll notice. This broke
+the 3D world completely once.
+
+**`story.js` and `dict-system.js` are each wrapped in a file-spanning
+IIFE.** Nothing inside them reaches `window` on its own — not `const`,
+not `let`, not even a plain `function` declaration, because the IIFE is
+the top level as far as scoping goes. **`app.js` is the exception**: it
+is *not* wrapped, so a top-level `function` there does become a global
+(this is why the `eval` trick in the caching section works on app.js).
+
+If you need something out of story.js or dict-system.js, add
+`window.X = X;` **inside that file's own IIFE**, next to the existing
+exports at the bottom — not in an external bridge script, where the
+identifier was never in scope. Getting this wrong throws a
+`ReferenceError` that kills the rest of that `<script>` block, which is
+how `openFocciWorld3D()` once silently stopped booting the world at all.
+Currently exported from story.js: `ARC_LANDS`, `arcUnlocked`,
+`showWordSheet`, `condensedEntryHTML`, `assetUrl`. From dict-system.js:
+`dsSync`, `dsScreen`, `dsExport`, `dsImport`, `dsCount`, `dsState`,
+`dsAllWords`.
+
+**Skinned meshes: `.clone(true)` does not rebind the skeleton.** Animals
+come out as pale blobs. `world.js` has a hand-written `cloneSkinned()`
+because only `three.module.js` and `GLTFLoader.js` are vendored — no
+SkeletonUtils.
+
+**After setting a mesh's `scale`/`position`/`rotation`, call
+`object.updateMatrixWorld(true)` again** before you raycast against it or
+read a `Box3` from it. Stale world matrices were the real cause of props
+appearing to float away from the ground; it looked like a placement bug
+for a long time.
+
+**Don't trust `hits[0]` or `hits[last]` from a downward raycast on this
+island.** It is a lumpy sculpted rock: a ray can slip through a gap and
+land on the underside of an overhang. `surfaceYIn` and `isStableGround`
+exist because of this — use them rather than a bare raycast.
+
+**Three.js is r149, minified** (593KB, minified from the dev build with
+esbuild). `GLTFLoader.js` likewise. There is no DRACOLoader, which is why
+the GLB models use quantization rather than Draco compression.
+
+**Models are quantized.** `assets/glb/*.glb` went through
+`gltf-transform prune --keep-attributes false` → `dedup` → `quantize`.
+22MB → 13MB. This is safe and verified (identical topology, worst vertex
+drift 0.0027 units on a 55-unit island; the collision grid steps 0.6).
+**If you regenerate or replace a model, run it through the same pipeline
+or the island gets heavy again.** Don't use `gltf-transform optimize` —
+it includes `simplify`, which changes geometry, and the island's
+triangles are what the collision height field is rasterised from.
+
+**The world's collision is a height field, not raycasts.** `world.js`
+rasterises the island into a 0.6-unit grid at boot (`buildHeightField`)
+and everything that moves reads `groundSmooth()`. A raycast costs 2.5ms;
+the grid costs about a thousandth of that. `surfaceYIn` (the real
+raycast) is kept only for the sky island (above `GROUND_CEIL`) and for
+cliff cells where blending would float Focci in the air. Don't casually
+add a per-frame raycast.
+
+**Point lights are not frustum-culled by three.js.** Every light in the
+scene is compiled into every material's shader. The island has 19 and
+they were half the frame cost. `tickLightCull()` handles this — leave it
+alone unless you measure.
+
+---
+
+## File map
+
+| File | What's in it |
+|---|---|
+| `index.html` | 441KB. **All CSS**, all markup, and several inline scripts including the ES module that boots the world. The biggest file and the one most edits touch. |
+| `app.js` | 373KB. Dictionary, search, IndexedDB, games, Saved, Gemini calls. |
+| `world.js` | 186KB. The entire 3D island. ES module, `bootFocciWorld()`. |
+| `story.js` | Story mode + the word "peek" sheet (`condensedEntryHTML`). |
+| `story-content.js` | Story text. |
+| `residents.js` | Rescued-animal species, names, breeding. |
+| `hottake.js` / `hottake.json` | Newsstand reader + 90 articles. |
+| `journal.js` | The learning journal + its chart. |
+| `dict-system.js` | Dictionary seeding helpers. |
+| `sw.js` | Service worker. **Bump `CACHE` on every change.** |
+| `dict-00*.json` | ~45MB of dictionary seed shards. Not fetched at boot. |
+| `assets/glb/` | 22 models, 13MB after quantization. |
+| `vendor/three/` | three.js r149 + GLTFLoader, both minified. |
+
+### Things that are NOT wired to anything
+`fishing-animation-preview-v2.html`, `generate.html`, `shard-tool.html`
+are standalone tools/experiments. `.sy-body` CSS is dead (renamed to
+`.sy-detail` long ago). Don't spend time on them.
+
+---
+
+## Current state
+
+Everything below is committed and pushed to `main`.
+
+**Recently finished:**
+- Boot payload 18.2MB → under 10MB (model quantization, minified three.js,
+  PNG→WebP, music and `levels.txt` off the critical path).
+- 3D movement no longer raycasts per frame; point lights culled.
+- House walls are solid; double-tap a hut to go inside in first person.
+- Word page restored to the format the Word Pairs peek card kept, in green.
+- Gemini calls all share one retry policy (`geminiPost`) — 429/5xx and
+  MAX_TOKENS truncation were making lookups fail at random.
+- Speak Up grading now measures **coverage** (did the answer say what the
+  Vietnamese said) and caps the score by it, in code as well as in the
+  prompt. A four-word fragment used to score 75/100.
+- Saved rebuilt across all three tabs on one green palette.
+
+**In flight — I stopped mid-task here:**
+
+1. **Mini games (Word Pairs, Letter Trail) still need the design pass.**
+   - The purple is `.fw-panel`'s backdrop, index.html ~5148. Changing it
+     to green fixes games and every other un-overridden panel at once.
+     This was the exact next edit when work stopped.
+   - Remove the `← Games` button (`hub-back`, `gameShell()` in app.js
+     ~4215) and the `✕` (`rb-quit`, `roundBar()` ~4319). The user wants
+     both gone, replaced by swipe-right-to-go-back. `wirePracticeSwipe()`
+     already handles swipe when not mid-round; mid-round it advances
+     questions, so decide what an unanswered right-swipe should do.
+   - Fonts need the `body .view.fw-panel#id *` treatment described above.
+   - The setup controls at the top of a game are cramped and unstyled.
+
+2. **Pressing back/X in those games still lands on the OLD game page.**
+   Reported, not yet diagnosed. `gameSwipeBack()` (app.js ~4346) has
+   history here — a previous version tested for a `.game-tab` element the
+   rebuilt games no longer render and fell through to `showView('home')`,
+   the old dashboard. Start there.
+
+3. **The journal page needs the same treatment as Saved** — the user says
+   it's visually heavy and they don't want to read it. Simple, refined,
+   easy to scan.
+
+4. **Optional, previously agreed:** defer the four arc-room environments
+   (`ARC_ENV_FILES` in world.js ~1104) until someone actually teleports.
+   Worth ~2.5MB and ~1.3s of boot CPU and keeps all four lands. This is
+   the alternative to deleting `waterfall.glb` — **do not delete that
+   file**, it is one of the four lands, not decoration. (I described it
+   as decoration when asking the user, which was wrong, and they agreed
+   to delete it on that basis.)
+
+---
+
+## How to work on this
+
+**Measure, don't eyeball.** Screenshots of the 3D scene have been wrong
+every time they were trusted. Read computed styles, read
+`renderer.info`, time things with `performance.now()`. When you claim a
+number in a commit message, have actually measured it.
+
+**Verify against the live page, and verify you're testing fresh code**
+(see the caching section). A "fix that didn't work" is stale code often
+enough that it should be your first hypothesis.
+
+**Find the mechanism.** Every genuinely good fix in this repo's history
+came from finding why, not from patching what. Examples worth imitating:
+the Speak Up score was measuring naturalness and nothing was comparing
+against the Vietnamese; the AI lookups failed at random because only the
+background call retried; the word page looked flat because each of five
+past complaints removed one more border.
+
+**Don't nuke broadly to satisfy a narrow complaint.** The user once sent
+a checklist saying "remove every box-shadow, force `--line` transparent,
+`display:none` all pseudo-elements". Applying that literally would have
+stripped deliberate design elements across the whole app. A scan showed
+there were no unintended hairlines left at all. Say so, with evidence,
+rather than complying.
+
+**"Redesign the layout" means restructure the composition, not recolour
+it.** This has been said more than once and recolouring has been
+rejected more than once. Change what sits where, the hierarchy, the
+grouping — not just the palette. And when the user supplies a reference
+image, *measure* it (sizes, spacing, weights) rather than paraphrasing
+the vibe.
+
+**A panel-wide theme override bleeds into every sub-screen inside it.**
+Scope to an id (`#v-saved`) and check the other tabs/screens under the
+same parent before declaring done. This is exactly how the Saved "fix"
+shipped broken: one tab restyled, two left with dark-background card
+styles on a newly light page.
+
+**Browser-pane screenshots only capture roughly the left 80% of the
+emulated viewport** and the pane sometimes fails to reflow after
+`resize_window` — content renders in a narrow column with dark space
+beside it. That's a tool artifact, not a CSS bug. Reload after resizing,
+and prefer reading computed values over judging layout from the image.
+
+**To test AI-dependent UI without burning quota**, stub `window.fetch`
+for `generativelanguage` URLs and return a canned response. The Speak Up
+coverage-cap fix was verified entirely this way — `localStorage` key for
+the API key is `sd_key`.
+
+**Comments in this codebase explain WHY, including what was tried and
+failed.** Match that. They have repeatedly saved re-debugging the same
+thing. Keep them.
+
+**Commit messages** are prose, in English, explaining the mechanism and
+what was measured. Look at `git log` for the register.
+
+**Attribution:** end commit messages with the `Co-Authored-By` line the
+harness reminder specifies (the model name changes between sessions).
