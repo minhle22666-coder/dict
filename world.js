@@ -1421,30 +1421,75 @@ export async function bootFocciWorld(root, opts) {
          here that is the weather-vane tower at (-1.9, -0.1), y 31.6.
          Looking only at roof-material meshes picked a hut instead, which
          is why climbing "the roof" never triggered anything. */
-      let best = null;
+      /* Found from the tower's own vertices, not from a mesh's bounding box.
+
+         The old search took the tallest MESH and started from the centre
+         of its box. But the hub is merged by material at boot
+         (mergeStaticByMaterial), and the tower shares its material with
+         half the village: the "tallest mesh" was merged_phongE1, a box
+         38 units wide. Its centre only happened to land near the tower,
+         and the grid sweep around it then picked the single highest cell
+         it could find -- which is the weather vane's pole, a spike at
+         29.6, not the cap Focci stands on at 26.5. Two faults came of it:
+
+           * the pad sat 3 units above anywhere he could stand, and the
+             trigger allows 2, so reaching the top of the tower never
+             asked to go to Zen Island at all;
+           * everything placed on the pad -- the violet halo, the beam,
+             the light -- sat 0.78 units off the tower's axis, on the
+             side the vane happens to point.
+
+         Measured on the vertices near the top: every band from y 26 up
+         agrees on one axis, (-0.70, -1.0), so it is taken from the
+         topmost two units (the spire and the vane, which are built on it).
+         The cap is where most of the geometry below the spire sits --
+         a flat platform 1.7 across at 26.5. */
+      const tv = new THREE.Vector3();
+      let topY = -Infinity, topX = 0, topZ = 0;
+      station.collidables[0].updateMatrixWorld(true);
       station.collidables[0].traverse((o) => {
         if (!o.isMesh) return;
-        const b = new THREE.Box3().setFromObject(o);
-        if (!best || b.max.y > best.max.y) best = b;
-      });
-      if (best) {
-        /* The bounding-box centre of the tallest mesh is not the top of the
-           tower — that mesh is the weather vane, whose box centre sits off
-           the tower's own axis. Sweep a small grid around it and take the
-           highest point you could actually stand on; that is the cap. */
-        const c0 = best.getCenter(new THREE.Vector3());
-        let c = c0, peakY = -Infinity;
-        for (let dx = -2.5; dx <= 2.5; dx += 0.25) {
-          for (let dz = -2.5; dz <= 2.5; dz += 0.25) {
-            const px = c0.x + dx, pz = c0.z + dz;
-            const su2 = groundAt(station, px, pz);
-            if (su2.hit && !su2.water && su2.y > peakY) { peakY = su2.y; c = new THREE.Vector3(px, su2.y, pz); }
-          }
+        const pos = o.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          tv.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+          if (tv.y < GROUND_CEIL && tv.y > topY) { topY = tv.y; topX = tv.x; topZ = tv.z; }
         }
-        if (peakY === -Infinity) { const su = groundAt(station, c0.x, c0.z); peakY = su.hit ? su.y : best.max.y; c = c0; }
+      });
+      if (topY > -Infinity) {
+        const eachNearTop = (fn) => station.collidables[0].traverse((o) => {
+          if (!o.isMesh) return;
+          const pos = o.geometry.attributes.position;
+          for (let i = 0; i < pos.count; i++) {
+            tv.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+            if (Math.hypot(tv.x - topX, tv.z - topZ) <= 3) fn(tv);
+          }
+        });
+        // the cap: the height most of the geometry below the spire sits at
+        const bins = new Map();
+        eachNearTop((q) => {
+          if (q.y > topY - 7 && q.y < topY - 3.5) {
+            const b = Math.round(q.y * 4) / 4;
+            bins.set(b, (bins.get(b) || 0) + 1);
+          }
+        });
+        let peakY = topY - 5, bestN = 0;
+        bins.forEach((n, y) => { if (n > bestN) { bestN = n; peakY = y; } });
+        /* The axis: the middle of that platform. The vane's arrow reaches
+           out to one side, so a box around the top of the spire is pulled
+           half a unit towards wherever it points (tried: -0.19 against
+           the true -0.70). The cap is symmetrical. */
+        let mnx = Infinity, mxx = -Infinity, mnz = Infinity, mxz = -Infinity;
+        eachNearTop((q) => {
+          if (Math.abs(q.y - peakY) > 0.5) return;
+          if (q.x < mnx) mnx = q.x; if (q.x > mxx) mxx = q.x;
+          if (q.z < mnz) mnz = q.z; if (q.z > mxz) mxz = q.z;
+        });
+        const c = { x: (mnx + mxx) / 2, z: (mnz + mxz) / 2 };
         const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xB07CFF, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
         halo.scale.setScalar(4.2);
-        halo.position.set(c.x, peakY + 1.3, c.z);
+        // over the vane's tip, not inside it: the old peakY + 1.3 put the
+        // halo's centre at 30.9, below the top of the vane at 31.6
+        halo.position.set(c.x, topY + 0.8, c.z);
         station.group.add(halo);
         const beam = new THREE.Mesh(
           new THREE.CylinderGeometry(0.55, 1.05, 4.2, 14, 1, true),
@@ -1763,7 +1808,10 @@ export async function bootFocciWorld(root, opts) {
           deckLift: deck ? (deck.y - restY) : bSize.y * bScale * 0.34,
           deckY: deck ? deck.y : SEA_Y + bSize.y * bScale * 0.34,
           glowLift: bSize.y * bScale * 0.9,
-          homeX: bx, homeZ: bz, sailing: 0
+          homeX: bx, homeZ: bz, sailing: 0,
+          // the hull's footprint on the water, for walking into it
+          axisX: longAxis.x, axisZ: longAxis.z,
+          halfLen: halfLen, halfWid: Math.min(bSize.x, bSize.z) * bScale * 0.5
         };
       }
     }
@@ -2082,19 +2130,71 @@ export async function bootFocciWorld(root, opts) {
     return clone;
   }
 
-  async function buildResident(room, rec) {
+  /* The box of what an animal actually looks like standing there.
+
+     Box3.setFromObject on a skinned mesh measures the geometry's own
+     positions, before the skeleton has moved any of them. Since the GLBs
+     were quantized that is worse than a bind pose: the quantized positions
+     sit in a -1..1 cube and the real size lives in the bones and the bind
+     matrix, so four of the five species reported a box exactly 2 units
+     across whatever they were. Every resident was then normalised off that
+     2, and measured against where the vertices really end up:
+
+         species   meant   was     (longest side, adult)
+         rabbit    0.55    0.11
+         duck      0.60    0.22
+         wolf      1.05    0.36
+         sheep     0.95    0.67
+         cat       0.70    1.75
+
+     -- the rabbit a fifth of its size and the cat two and a half times
+     its own. Taking each vertex through boneTransform first gives the
+     posed shape, which is what the sizing was always meant to be of. */
+  function skinnedBox(obj) {
+    const box = new THREE.Box3(), v = new THREE.Vector3();
+    obj.traverse((o) => {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
+      const pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        if (o.isSkinnedMesh) o.boneTransform(i, v);
+        v.applyMatrix4(o.matrixWorld);
+        box.expandByPoint(v);
+      }
+    });
+    return box;
+  }
+  /* A spot on the beach next to where he landed, on the land side and at
+     about his height, so the two of them are in the same shot. */
+  function spotNear(room, near) {
+    // not on top of someone already standing there -- a pair coming home
+    // together all took the first spot that passed and stood inside each other
+    const taken = (x, z) => (room.residents || []).some((b) => Math.hypot(b.obj.position.x - x, b.obj.position.z - z) < 0.9);
+    const start = Math.floor(Math.random() * 24);
+    for (let j = 0; j < 24; j++) {
+      const i = (start + j) % 24;
+      const r = 1.6 + (i % 4) * 0.6;
+      const a = Math.atan2(-near.awayX, -near.awayZ) + ((i * 0.9) % 2.4) - 1.2;
+      const x = near.x + Math.sin(a) * r, z = near.z + Math.cos(a) * r;
+      if (taken(x, z)) continue;
+      const g = groundAt(room, x, z);
+      if (g.hit && !g.water && !g.building && Math.abs(g.y - near.y) < 1.2) return { x: x, y: g.y, z: z };
+    }
+    return null;
+  }
+  async function buildResident(room, rec, near) {
     const gltf = await animalModel(rec.species);
     if (!gltf) return null;
     const obj = cloneSkinned(gltf.scene);
     obj.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(obj);
+    const box = skinnedBox(obj);
     const size = box.getSize(new THREE.Vector3());
     // normalise to a 1-unit creature, then apply the species' own adult
     // size and how grown this individual is
     const base = 1 / Math.max(size.x, size.y, size.z, 0.0001);
     const scale = base * (window.resScale ? window.resScale(rec) : 0.8);
     obj.scale.setScalar(scale);
-    const spot = findFlatGroundSpot(room, 4, 12, 0.9, 30);
+    const spot = (near && spotNear(room, near)) || findFlatGroundSpot(room, 4, 12, 0.9, 30);
     const footOffset = box.min.y * scale;
     obj.position.set(spot.x, spot.y - footOffset, spot.z);
     obj.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -2337,7 +2437,7 @@ export async function bootFocciWorld(root, opts) {
      sharing one id. The check is live now, and an id is claimed BEFORE
      the await rather than after it. */
   const residentsBuilding = new Set();
-  async function syncResidents(room) {
+  async function syncResidents(room, near) {
     if (!window.resLoad) return;
     const recs = window.resTick ? window.resTick() : window.resLoad();
     room.residents = room.residents || [];
@@ -2345,7 +2445,7 @@ export async function bootFocciWorld(root, opts) {
       if (residentsBuilding.has(rec.id)) continue;
       if (room.residents.some((b) => b.id === rec.id)) continue;
       residentsBuilding.add(rec.id);
-      try { await buildResident(room, rec); }
+      try { await buildResident(room, rec, near); }
       finally { residentsBuilding.delete(rec.id); }
     }
   }
@@ -2354,6 +2454,29 @@ export async function bootFocciWorld(root, opts) {
   /* Focci climbs in, the boat drifts out and fades, and the rescue board
      takes over. resolveVoyage() brings it back — with a passenger or
      without one, the return leg is the same. */
+  /* The boat was never solid. Nothing stopped him at the hull, so
+     wading up to it walked him straight through the middle of it and out
+     the far side -- the "đi xuyên qua thuyền" report. The hull is a
+     box on the water now, the way the huts' walls are: walk into it and
+     he stops at the side, and slides along it at an angle.
+
+     Only while he is on his feet. Airborne he passes over the gunwale,
+     because that is how you get IN: jump from beside it and you come
+     down on the deck, which is what starts the voyage below. And a point
+     already inside does not trap him -- only stepping from outside to
+     inside is refused. */
+  function inHull(b, x, z, grow) {
+    const dx = x - b.x, dz = z - b.z;
+    const along = dx * b.axisX + dz * b.axisZ;
+    const across = -dx * b.axisZ + dz * b.axisX;
+    return Math.abs(along) < b.halfLen * 0.92 + grow && Math.abs(across) < b.halfWid * 0.9 + grow;
+  }
+  function hullStops(room, x, z) {
+    const b = room.boat;
+    if (!b || b.sailing || b.halfLen === undefined) return false;
+    if (charState.jumpY > 0.2) return false;
+    return inHull(b, x, z, 0) && !inHull(b, charState.x, charState.z, 0);
+  }
   function startVoyage(room) {
     const b = room.boat; if (!b || b.sailing) return;
     b.sailing = 0.5;                     // climbing in
@@ -2444,11 +2567,28 @@ export async function bootFocciWorld(root, opts) {
         // he swings himself off the bow and wades back up the beach
         character.visible = (camMode !== 'fpv');
         charState.x = b.x; charState.z = b.z;
+        /* The camera comes round to the sea side to watch him land.
+
+           All voyage long it hangs on the LAND side of the dock, looking
+           out after the boat -- tTheta is atan2(-away), so at a radius of
+           28 it sat twenty-eight units inland, inside the hills and the
+           huts. Coming home it stayed there and only closed to 14, which
+           is still behind a roof: the "camera zooms into the roof and you
+           can't see Focci or the animal" report. From out over the water
+           there is nothing between the lens and the beach. */
         flyTo(room, { x: b.dockX, y: b.dockY, z: b.dockZ }, () => {
           spawnLandingPuff(room, b.dockX, b.dockY, b.dockZ);
-          cam.tRadius = 14; cam.tPhi = 1.05;
+          cam.tTheta = Math.atan2(away.x, away.z);
+          cam.tRadius = 10; cam.tPhi = 1.1;
         }, { dur: 1.0, lift: 2.4, spin: 0, trail: 'splash' });
-        if (b.bringing) { b.bringing = null; syncResidents(room); }
+        /* And whoever came back with him is put down beside him, on the
+           beach, where the camera is looking. It used to be placed at a
+           random flat spot anywhere on the island, so the reunion the
+           whole voyage was for happened out of sight. */
+        if (b.bringing) {
+          b.bringing = null;
+          syncResidents(room, { x: b.dockX, y: b.dockY, z: b.dockZ, awayX: away.x, awayZ: away.z });
+        }
         root.dispatchEvent(new CustomEvent('focci-voyage', { detail: { phase: 'home' } }));
       }
     }
@@ -2568,7 +2708,7 @@ export async function bootFocciWorld(root, opts) {
        ground level does nothing. */
     if (room === station && room.skyPad && room.sky && !flight && !pendingTravel) {
       const p = room.skyPad;
-      if (Math.hypot(p.x - cx, p.z - cz) < 2 && Math.abs(character.position.y - p.y) < 2) {
+      if (Math.hypot(p.x - cx, p.z - cz) < 2.2 && character.position.y > p.y - 1.5) {
         askTravel('sky', 'Zen Island',
           'Would you like to visit Zen Island and meet the prophetic spirit of the wisdom trees?',
           'Take Me There', () => {
@@ -2595,7 +2735,8 @@ export async function bootFocciWorld(root, opts) {
       const b = room.boat;
       const dDeck = Math.hypot((b.x + b.deckDX) - cx, (b.z + b.deckDZ) - cz);
       if (dDeck < 4.5) hintNear('boat', 'Jump aboard');
-      if (dDeck < 1.9 && charState.jumpY > 0.02 && charState.vy <= 0
+      const over = dDeck < 1.9 || (b.halfLen !== undefined && inHull(b, cx, cz, 0.25));
+      if (over && charState.jumpY > 0.02 && charState.vy <= 0
           && character.position.y <= b.deckY + 0.8) {
         startVoyage(room);
       }
@@ -2807,8 +2948,67 @@ export async function bootFocciWorld(root, opts) {
     moveVec.x = 0; moveVec.y = 0;
     spawnPickupBurst(room, charState.x, character.position.y + 0.4, charState.z, 0xFF9ED2);
   }
+  /* Getting up on a roof.
+
+     Walking under the eaves used to put Focci on the roof, which is how
+     the tower top -- the way up to Zen Island -- was ever reached. That
+     was taken out on purpose: it is also why he could never get INSIDE a
+     hut, because the roof had lifted him nine units above the floor
+     before he got through the door. So a surface over his head near a
+     house now counts as a ceiling (see the ground probe in animate()),
+     and with that, no roof on the island could be reached at all. The
+     eaves are 6.3 to 7.3 units above the floor, and a jump peaks at 1.77.
+
+     The two wants are now two different actions. Walking under a roof
+     takes him in; jumping under one, or facing one, takes him up onto it.
+     The hop is a short flyTo, the same move as climbing into the boat,
+     rather than a jump tall enough to reach -- a 7-unit vertical leap
+     would look like flying, and stretch every other jump with it.
+
+     He needs somewhere to stand when he lands: isStableGround refuses the
+     side of a chimney or the spike of the weather vane, and the search
+     walks forward from under him so it takes the NEAREST roof, not some
+     far ridge behind the one he is looking at. */
+  const CLIMB_REACH = 8.5;
+  function roofHopTarget(room) {
+    if (!room.houses || room._insideHut) return null;
+    const near = room.houses.some((h) => Math.hypot(h.cx - charState.x, h.cz - charState.z) <= h.roomR + 1.5);
+    if (!near) return null;
+    const feet = charState.lastGroundY !== undefined ? charState.lastGroundY : character.position.y;
+    /* The tower cap is a destination, not just a roof, and the general
+       search cannot find it: it is a platform 1.7 across ringed by a
+       vertical wall, so isStableGround's four neighbours 0.7 out land on
+       the cone or the vane pole and it is refused every time. Measured
+       walking it: he reached the tower roof at 19.98, 2.44 from the axis,
+       and jumped there for as long as you like. Anywhere on the roof round
+       the tower, a jump goes to the middle of the cap. */
+    const pad = room.skyPad;
+    if (pad && Math.hypot(pad.x - charState.x, pad.z - charState.z) < 4.2
+        && pad.y > feet + 1.2 && pad.y <= feet + CLIMB_REACH) {
+      const ax = charState.x - pad.x, az = charState.z - pad.z, al = Math.hypot(ax, az) || 1;
+      return { x: pad.x + (ax / al) * 0.5, y: pad.y, z: pad.z + (az / al) * 0.5 };
+    }
+    const fx = Math.sin(charState.angle), fz = Math.cos(charState.angle);
+    for (const ahead of [0, 0.6, 1.2, 1.8, 2.4]) {
+      const x = charState.x + fx * ahead, z = charState.z + fz * ahead;
+      const g = groundAt(room, x, z);
+      if (!g.hit || g.water || !g.building) continue;
+      if (g.y <= feet + 1.2 || g.y > feet + CLIMB_REACH) continue;
+      if (!isStableGround(room, x, z, g.y)) continue;
+      return { x: x, y: g.y, z: z };
+    }
+    return null;
+  }
   function startJump(room) {
     if (charState.jumpY > 0.001) return;
+    if (!flight && !charState.inWater) {
+      const hop = roofHopTarget(room);
+      if (hop) {
+        flyTo(room, hop, () => { spawnLandingPuff(room, hop.x, hop.y, hop.z); },
+          { dur: 0.75, lift: 1.6, spin: 0, trail: null });
+        return;
+      }
+    }
     // A leap out of the shallows is shorter and throws water, not petals.
     if (charState.inWater) {
       charState.vy = JUMP_V * 0.66;
@@ -2913,10 +3113,14 @@ export async function bootFocciWorld(root, opts) {
     character.visible = (m !== 'fpv');
     if (m === 'fpv') { cam.tPhi = 1.45; cam.tRadius = 7; fpvPitch = -0.05; }
     else { cam.tPhi = 1.05; cam.tRadius = 14; }
-    /* 68 shrank everything ahead of him and 56 still did; both views use the
-       same 50 now, so stepping into his eyes changes where you stand, not
-       how big the island looks. */
-    camera.fov = 50;
+    /* 68 shrank everything ahead of him and 56 still did, so both views
+       went to 50. Then his eyes were "too zoomed in", and the reason is
+       the phone: fov is the VERTICAL angle, and on a portrait screen
+       (390x844, aspect 0.46) a vertical 50 is only 24 degrees across --
+       a view through a tube. 62 gives 31 across, which is the "a little
+       wider" that was asked for without going back to 68's 37. The
+       third-person view keeps 50; it was never the complaint. */
+    camera.fov = m === 'fpv' ? 62 : 50;
     camera.updateProjectionMatrix();
   }
   function toggleCamMode() {
@@ -2965,11 +3169,42 @@ export async function bootFocciWorld(root, opts) {
       return;
     }
     const sinPhi = Math.sin(cam.phi);
-    const cx = charState.x + cam.radius * sinPhi * Math.sin(cam.theta);
-    const cz = charState.z + cam.radius * sinPhi * Math.cos(cam.theta);
-    const cy = character.position.y + cam.radius * Math.cos(cam.phi);
-    camera.position.set(cx, cy + 1.1, cz);
+    const ox = cam.radius * sinPhi * Math.sin(cam.theta);
+    const oz = cam.radius * sinPhi * Math.cos(cam.theta);
+    const oy = cam.radius * Math.cos(cam.phi) + 0.1;
+    const k = camClearance(ox, oy, oz);
+    camera.position.set(charState.x + ox * k, character.position.y + 1.0 + oy * k, charState.z + oz * k);
     camera.lookAt(charState.x, character.position.y + 1.0, charState.z);
+  }
+
+  /* Keeping something between the lens and Focci from swallowing the shot.
+
+     There was no camera collision at all: the rig orbits him at whatever
+     radius it has been given, so a hut roof or a hillside that happens to
+     lie on that line fills the screen and he is simply gone. Measured
+     while testing the tower climb, the view was a flat grey wall.
+
+     The height field already knows the top of everything he could be
+     behind -- ground, cliffs, roofs -- so the line out to the camera is
+     sampled against it, and the camera is drawn in to just short of the
+     first sample that is under a surface. Fourteen grid reads a frame; no
+     raycast. It comes in quickly and goes back out slowly, so a gable
+     sliding past does not make the view pump. Not on the sky island (the
+     field stops below it) or indoors, where the view is his own eyes. */
+  let camPull = 1;
+  function camClearance(ox, oy, oz) {
+    const room = activeRoom();
+    let want = 1;
+    if (room && room.field && !room._insideHut && character.position.y < GROUND_CEIL) {
+      const N = 14, tx = charState.x, ty = character.position.y + 1.0, tz = charState.z;
+      for (let i = 1; i <= N; i++) {
+        const s = i / N;
+        const g = groundAt(room, tx + ox * s, tz + oz * s);
+        if (g.hit && g.y + 0.5 > ty + oy * s) { want = Math.max(0.22, s - 1.5 / N); break; }
+      }
+    }
+    camPull += (want - camPull) * (want < camPull ? 0.35 : 0.06);
+    return camPull;
   }
 
   /* ---------- one-finger walk (drag from press point), two-finger look+zoom ---------- */
@@ -3252,8 +3487,13 @@ export async function bootFocciWorld(root, opts) {
     } else if (type === 'sky-gate') {
       if (room.skyPad) {
         const p = room.skyPad;
+        /* Home is the middle of the cap. The old landing spot, 1.2 off
+           centre, is past the edge of a platform 1.7 across, and he came
+           down on the slope of the cone. 'sky' goes into declined so that
+           arriving on the cap does not immediately ask whether he would
+           like to go straight back up; it clears once he walks away. */
         askTravel('home', 'Fox Island', 'Head back down to Fox Island?', 'Yes, take me home',
-          () => flyTo(room, { x: p.x, y: p.y + 0.1, z: p.z + 1.2 }, null));
+          () => { declined.add('sky'); flyTo(room, { x: p.x, y: p.y + 0.1, z: p.z + 0.5 }, null); });
       }
     } else if (type === 'mushroom') {
       // obj here is the invisible hitbox (see addInvisibleHitbox), not the
@@ -3620,9 +3860,10 @@ export async function bootFocciWorld(root, opts) {
          eaves on the way past. */
       const feet = charState.lastGroundY !== undefined ? charState.lastGroundY : character.position.y;
       const nx = charState.x + stepX, nz = charState.z + stepZ;
-      if (!blockedAt(room, nx, nz, feet)) { charState.x = nx; charState.z = nz; }
-      else if (!blockedAt(room, nx, charState.z, feet)) charState.x = nx;
-      else if (!blockedAt(room, charState.x, nz, feet)) charState.z = nz;
+      const stops = (x, z) => blockedAt(room, x, z, feet) || hullStops(room, x, z);
+      if (!stops(nx, nz)) { charState.x = nx; charState.z = nz; }
+      else if (!stops(nx, charState.z)) charState.x = nx;
+      else if (!stops(charState.x, nz)) charState.z = nz;
       charState.angle = Math.atan2(moveX, moveZ);
       charState.walkT += dt * (charState.inWater ? 4.5 : 8.5);
     } else charState.walkT += dt * 2;
@@ -3705,6 +3946,16 @@ export async function bootFocciWorld(root, opts) {
         }
         break;
       }
+    }
+    /* On the tower cap the cap is the floor. The probe comes down from
+       above and the first thing it meets there is the weather vane:
+       measured, he arrived on the cap and was stood at 31.4 -- on the tip
+       of the vane, five units over the platform at 26.5. The pole is
+       thin enough to stand beside; it is not somewhere to stand. */
+    const pad = room.skyPad;
+    if (pad && Math.hypot(pad.x - charState.x, pad.z - charState.z) < 0.95
+        && character.position.y > pad.y - 1.5 && character.position.y < pad.y + 6) {
+      surf = { y: pad.y, water: false, building: true, hit: true };
     }
     charState.lastGroundY = surf.y;
     charState.inWater = surf.water;

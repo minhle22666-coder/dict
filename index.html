@@ -6185,7 +6185,8 @@
       onOpenSayIt: () => { addXP(6); if (window.fwToast) fwToast('A little treasure \u2014 +6 XP'); },
       // Was a bare TODO stub — every mushroom pickup fired this and got
       // silently discarded, so "collecting" one visibly did nothing at all.
-      onWordFound: () => { addXP(2); },
+      // One mushroom, one XP -- asked for directly. It was 2.
+      onWordFound: () => { addXP(1); },
       /* This runs while the island is still loading, and it used to await
          levels.txt first — 304KB fetched and parsed on the critical path
          so that one hidden word could be filtered to B1–C2. (Parsed
