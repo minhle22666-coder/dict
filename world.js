@@ -71,7 +71,13 @@ export async function bootFocciWorld(root, opts) {
   // ridge and a flat plain caught exactly the same light.
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  /* 1.5 on a phone, not 2. The screen is 3x, so this was already a
+     compromise, and every pixel is shaded with five point lights, a shadow
+     lookup and 4x antialiasing: 1.5 is 44% fewer of them for a flat-shaded
+     low-poly island that holds its edges at that density. A phone running
+     the island warm was the complaint; fill rate is what warms it. */
+  const COARSE = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, COARSE ? 1.5 : 2));
   if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
   if ('NoToneMapping' in THREE) renderer.toneMapping = THREE.NoToneMapping;
 
@@ -3232,6 +3238,9 @@ export async function bootFocciWorld(root, opts) {
     pointers.clear(); singleId = null; moveOrigin = null;
     moveVec.x = 0; moveVec.y = 0; lastPinch = null; lastOrbitMid = null; fpvLast = null;
   }
+  let lastInputAt = 0;
+  ['pointerdown', 'pointermove', 'wheel'].forEach((ev) =>
+    canvas.addEventListener(ev, () => { lastInputAt = performance.now(); }, { passive: true }));
   canvas.addEventListener('pointerdown', (e) => {
     if (overlayOpen()) return;
     // Touching the world always gives control straight back.
@@ -3791,6 +3800,7 @@ export async function bootFocciWorld(root, opts) {
   }
 
 
+  let halfRateSkip = false;
   function animate() {
     requestAnimationFrame(animate);
     /* Nothing of this scene is visible while a full-screen panel covers
@@ -3800,6 +3810,17 @@ export async function bootFocciWorld(root, opts) {
        back up, but skip the work and reset the clock's delta so Focci
        doesn't lurch forward by the whole paused duration on resume. */
     if (overlayOpen()) { releaseGesture(); clock.getDelta(); return; }
+    /* Half rate while nobody is doing anything. Standing still, the island
+       still has water, birds and a grazing doe to move, but none of it
+       needs sixty frames a second, and a GPU drawing the same view sixty
+       times a second is a phone getting warm in your hand. Anything that
+       is steering or animating him -- a finger down, a flight, the boat,
+       a jump -- and the full rate is back on the next frame. Skipped frames
+       do not read the clock, so the next one's dt covers both and nothing
+       slows down. */
+    const busy = pointers.size > 0 || flight || (activeRoom().boat && activeRoom().boat.sailing)
+      || charState.jumpY > 0 || performance.now() - lastInputAt < 1200;
+    if (!busy) { halfRateSkip = !halfRateSkip; if (halfRateSkip) return; }
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
     const room = activeRoom();

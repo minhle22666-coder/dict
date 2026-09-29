@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v181`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v190`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -257,6 +257,45 @@ whose room is hidden (`inLiveRoom()`) — every room Group is parked at the
 same origin and switched with `.visible`, so an arc land's diamond sits a
 few units from where Focci stands in the station.
 
+**Never size a skinned model off `Box3.setFromObject`.** Since
+quantization the geometry's own positions sit in a -1..1 cube and the
+real size lives in the bones, so four of the five animals reported a box
+of exactly 2 whatever they were (the rabbit came out a fifth of its size,
+the cat 2.5x). Use `skinnedBox()` in world.js, which runs every vertex
+through `boneTransform` first.
+
+**Roofs are reached by jumping, not walking.** Near a house a surface over
+Focci's head is a ceiling (that is what lets him go indoors), so walking
+never lifts him onto a roof. `roofHopTarget()` hops him onto the nearest
+standable roof when he jumps under or facing one; on the roof around the
+tower a jump goes to the cap. `station.skyPad` is the tower's own axis and
+cap height, found from its vertices -- not from a mesh box, because after
+the boot-time merge the "tallest mesh" is 38 units wide.
+
+**The camera pulls in rather than sitting behind a roof.**
+`camClearance()` samples the Focci-to-lens line against the height field
+(14 grid reads, no raycast). There was no camera collision at all before.
+
+**One back gesture for the whole app: `window.fwBack()` in index.html.**
+Every panel's X is hidden (`#fw-panel-close{display:none !important}`),
+so a screen the swipe does not know about is a screen you cannot leave.
+If you add an overlay, add its close to `fwBack()` in stack order, topmost
+first. Do not add a second touch handler that goes back -- two handlers
+on one gesture closed a layer AND the one under it. The games' own
+handler only ever takes swipes to the LEFT (next question).
+
+**Nothing may animate forever under a panel.** The panels are glass
+(`#v-review` blurs what is behind it at 34px), so a looping animation on
+the page underneath is a full-screen blur recomputed every frame -- that
+was the heat and the stutter in the games. `#fw-home` pauses whenever a
+layer covers it (including `::before/::after`, which `*` does not reach).
+Anything always on screen should stop after a few loops, as the search
+icon's pulse now does.
+
+**The island runs at half rate when nobody is touching it** (`halfRateSkip`
+in `animate()`), and at a pixel ratio of 1.5 on touch screens. Both are
+for heat, not frame time.
+
 ---
 
 ## File map
@@ -320,26 +359,33 @@ Everything below is committed and pushed to `main`.
   `forest-kit.glb`, `hub-island.glb`, `bush-kit.glb`, `chest.glb`, and the
   `fishing-animation-preview-v2.html` / `generate.html` / `shard-tool.html`
   tools. `git log` has them if one is ever wanted back.
+- Zen Island is reachable again (jump onto a roof, jump onto the tower
+  cap); the violet halo sits on the tower's axis; animals are their own
+  size; the boat is solid and coming home shows Focci and whoever he
+  brought; a mushroom is 1 XP; first person is fov 62.
+- Swipe right is back on every screen (13 checked with real TouchEvents).
+- Saved redrawn as grouped lists in one CSS block at the end of the
+  stylesheet: rows 100px -> 59px, 4 -> 9 words to a phone screen. The
+  Casebook's opened entries were near-white on mint (old purple theme)
+  and are readable now. The menu drawer no longer throws a grey shadow
+  down the right edge of every screen.
 
 **In flight — I stopped mid-task here:**
 
 1. **Mini games (Word Pairs, Letter Trail) still need the design pass.**
    - The purple is `.fw-panel`'s backdrop, index.html ~5148. Changing it
      to green fixes games and every other un-overridden panel at once.
-     This was the exact next edit when work stopped.
-   - Remove the `← Games` button (`hub-back`, `gameShell()` in app.js
-     ~4215) and the `✕` (`rb-quit`, `roundBar()` ~4319). The user wants
-     both gone, replaced by swipe-right-to-go-back. `wirePracticeSwipe()`
-     already handles swipe when not mid-round; mid-round it advances
-     questions, so decide what an unanswered right-swipe should do.
    - Fonts need the `body .view.fw-panel#id *` treatment described above.
    - The setup controls at the top of a game are cramped and unstyled.
+   - ~~Remove `← Games` and the round's `✕`.~~ **Done.** A right swipe is
+     back (home, or Saved for a review started there); a round that has
+     been played into asks for a second swipe first. `practiceStage` is
+     'playing' the moment a rebuilt game opens -- the setup and the
+     question are one screen -- so use `practiceHasProgress()`, not it.
 
-2. **Pressing back/X in those games still lands on the OLD game page.**
-   Reported, not yet diagnosed. `gameSwipeBack()` (app.js ~4346) has
-   history here — a previous version tested for a `.game-tab` element the
-   rebuilt games no longer render and fell through to `showView('home')`,
-   the old dashboard. Start there.
+2. ~~Back in the games lands on the OLD game page.~~ **Done.** The `←
+   Games` button called `renderGameHub()`, the old hub, and so did
+   `showView('review')` with no game named. Neither can reach it now.
 
 3. **The journal page needs the same treatment as Saved** — the user says
    it's visually heavy and they don't want to read it. Simple, refined,
@@ -388,6 +434,16 @@ Scope to an id (`#v-saved`) and check the other tabs/screens under the
 same parent before declaring done. This is exactly how the Saved "fix"
 shipped broken: one tab restyled, two left with dark-background card
 styles on a newly light page.
+
+**The Browser pane is usually hidden, and a hidden page gets no
+`requestAnimationFrame` at all** -- the island's loop simply stops, so
+every position you read is frozen. To drive the world from the console:
+set `window.__fwAwake = true`, replace `requestAnimationFrame` with a
+`setTimeout(cb, 16)` shim, and take one screenshot to let the pending
+native frame fire. To steer Focci with synthetic `PointerEvent`s, stub
+`canvas.setPointerCapture` first -- it throws for a pointer the browser
+never saw, and that exception aborts the handler before it records the
+touch. The roof climb, the boat, and the tower were all tested this way.
 
 **Browser-pane screenshots only capture roughly the left 80% of the
 emulated viewport** and the pane sometimes fails to reflow after

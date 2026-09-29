@@ -251,7 +251,12 @@
   .searchbox:focus-within{border-color:var(--primary);
     box-shadow:0 0 0 3px var(--primary-bg)}
   .searchbox svg{flex:none;width:19px;height:19px;stroke:var(--primary);
-    filter:drop-shadow(0 0 5px var(--primary-bg));animation:search-pulse 3.5s ease-in-out infinite}
+    filter:drop-shadow(0 0 5px var(--primary-bg));animation:search-pulse 3.5s ease-in-out 3}
+  /* Three pulses, then still. It was infinite, on every screen including
+     the island: one looping animation is enough to keep the compositor
+     producing a new frame sixty times a second on a page where nothing
+     else is moving, and this one sits inside a blurred glass bar, so each
+     of those frames re-blurs the bar too. */
   @keyframes search-pulse{0%,100%{opacity:.85;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
   .searchbox input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:16px;padding:13px 0;min-width:0}
   .searchbox input::placeholder{color:var(--muted-2)}
@@ -1034,6 +1039,30 @@
     60%{background:#FF9A3C}
     100%{transform:translate3d(var(--dx),calc(-1 * var(--rise)),0) scale(.25);
       opacity:0;background:#E2452A}}
+  /* The home page stops moving when something covers it.
+
+     Its twenty-two looping animations -- eighteen embers, the dust, the
+     spinning edge, the journal ring -- kept running underneath every panel.
+     Counted with document.getAnimations() while playing Word Pairs and
+     while reading Saved: 22 of the 24 infinite animations running belonged
+     to a page nobody could see. And the panels are glass: #v-review blurs
+     what is behind it at 34px, so each of those frames was a full-screen
+     blur recomputed sixty times a second over an image that had moved by a
+     pixel. That is the heat, and it is what made scrolling and swiping in
+     the games stutter -- the page on top was waiting on a blur of the page
+     underneath. Paused, the covered page is one still frame and the blur
+     of it is worked out once. */
+  html.panel-open #fw-home, html.panel-open #fw-home *,
+  html.panel-open #fw-home *::before, html.panel-open #fw-home *::after,
+  html.dict-open #fw-home, html.dict-open #fw-home *,
+  html.dict-open #fw-home *::before, html.dict-open #fw-home *::after,
+  html.ht-on #fw-home, html.ht-on #fw-home *,
+  html.ht-on #fw-home *::before, html.ht-on #fw-home *::after,
+  html.jn-on #fw-home, html.jn-on #fw-home *,
+  html.jn-on #fw-home *::before, html.jn-on #fw-home *::after{animation-play-state:paused !important}
+  /* (the ::before/::after lines are not optional: the dust, the spinning
+     edge and the journal ring are drawn on pseudo-elements, which `*`
+     does not reach -- with only the first form, three kept running.) */
   /* Restored: the ember patch replaced a CSS range by index and took
      these with it — the hero's own layout, its fox, its title, its
      Continue button and the sparkle divider all vanished, which is
@@ -1345,36 +1374,13 @@
     box-shadow:0 0 10px rgba(140,240,212,.5);transition:width .6s cubic-bezier(.25,1,.4,1)}
   html.dict-open .fw-exp,html.panel-open .fw-exp{display:none}
 
-  /* ============================================================
-     SAVED IN DAYLIGHT
-
-     The green glass written for this panel assumed a dark page. On the
-     app's light theme it was white-on-cream — invisible rims and grey
-     text. Same shapes, daylight colours.
-     ============================================================ */
-  :root[data-theme="light"] #v-saved .sv-tabs{
-    background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px rgba(30,150,150,.16)}
-  :root[data-theme="light"] #v-saved .sv-tab{color:#2C6F72}
-  :root[data-theme="light"] #v-saved .sv-tab.on{color:#04333A;
-    background:linear-gradient(180deg,#A9EFE2,#5FC9BE)}
-  :root[data-theme="light"] #v-saved .saved-count{color:#2C6F72}
-  :root[data-theme="light"] #v-saved .sort-cycle{color:#2C6F72;
-    background:rgba(255,255,255,.72);box-shadow:inset 0 0 0 1px rgba(30,150,150,.18)}
-  :root[data-theme="light"] #v-saved .sv-row{
-    background:rgba(255,255,255,.78);
-    box-shadow:inset 0 0 0 1px rgba(30,150,150,.14),0 3px 12px rgba(20,90,95,.07)}
-  :root[data-theme="light"] #v-saved .sv-w{color:#123C40}
-  :root[data-theme="light"] #v-saved .sv-e{color:#3E7A7C}
-  :root[data-theme="light"] #v-saved .sv-when,
-  :root[data-theme="light"] #v-saved .sv-foot{color:#6A9A9B}
-  :root[data-theme="light"] #v-saved .sv-star{color:#E0A63C}
-  :root[data-theme="light"] #v-saved .sv-sec-h{color:#4E8B8D}
-  :root[data-theme="light"] #v-saved .sv-hero{
-    background:linear-gradient(140deg,rgba(150,240,220,.55),rgba(255,255,255,.7));
-    box-shadow:inset 0 0 0 1px rgba(40,170,165,.26)}
-  :root[data-theme="light"] #v-saved .sv-hero-n{color:#0B4448}
-  :root[data-theme="light"] #v-saved .sv-hero-t{color:#2C6F72}
-  :root[data-theme="light"] #v-saved .empty{color:#4E8B8D}
+  /* (The "SAVED IN DAYLIGHT" overrides that lived here are gone. Written
+     for an older dark version of this panel, every one of them carried
+     :root[data-theme="light"] -- specificity 1,3,0 against 1,1,0 for the
+     rebuild's own rules -- so on the light theme each saved word was put
+     back into a white card with a shadow, and the lighter list the rebuild
+     had drawn never showed on a phone at all. The panel's look is in one
+     place now: SAVED, ONE BLOCK, at the end of this stylesheet.) */
 
   /* ============================================================
      WHAT YOU LOOKED UP BEFORE
@@ -2329,13 +2335,23 @@
   .fm-panel{position:fixed;top:0;right:0;bottom:0;z-index:79;width:min(272px,78vw);
     display:flex;flex-direction:column;
     padding:calc(env(safe-area-inset-top,0px) + 14px) 0 calc(env(safe-area-inset-bottom,0px) + 12px);
-    transform:translateX(100%);transition:transform .32s cubic-bezier(.22,1,.36,1);
+    transform:translateX(100%);
+    /* Closed, it has no shadow and is not drawn. Parked off the right edge
+       it still cast -18px 0 44px of black leftwards, at z-index 79 -- above
+       every panel -- so every screen in the app had a grey band down its
+       right side (measured: #fm-panel at x 390-662, the only thing there).
+       Hidden as well, so its 26px blur is not composited while shut. The
+       visibility change waits for the slide to finish. */
+    visibility:hidden;
+    transition:transform .32s cubic-bezier(.22,1,.36,1),visibility 0s linear .32s;
     background:linear-gradient(200deg,rgba(150,214,212,.34) 0%,rgba(72,150,150,.3) 40%,rgba(30,86,90,.36) 100%);
     backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);
-    box-shadow:-18px 0 44px rgba(0,0,0,.4),inset 1px 0 0 rgba(255,255,255,.22);
+    box-shadow:none;
     border-radius:24px 0 0 24px;
     font-family:'Raleway Local','Raleway',system-ui,sans-serif}
-  html.menu-on .fm-panel{transform:translateX(0)}
+  html.menu-on .fm-panel{transform:translateX(0);visibility:visible;
+    transition:transform .32s cubic-bezier(.22,1,.36,1),visibility 0s;
+    box-shadow:-18px 0 44px rgba(0,0,0,.4),inset 1px 0 0 rgba(255,255,255,.22)}
   .fm-head{display:flex;align-items:center;gap:11px;padding:4px 20px 16px}
   .fm-head svg{width:22px;height:22px;color:#EAFFFB}
   .fm-head b{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.01em;
@@ -3318,11 +3334,8 @@
   .setup-avail b{color:var(--primary)}
   .btn.disabled{opacity:.45;pointer-events:none}
 
-  /* live round: one slim bar, a quit cross, and the question. Nothing else. */
+  /* live round: one slim bar and the question. Nothing else. */
   .round-bar{display:flex;align-items:center;gap:12px;margin-bottom:18px}
-  .rb-quit{width:32px;height:32px;flex:none;border-radius:11px;background:var(--surface-2);
-    color:var(--muted);font-size:15px;display:flex;align-items:center;justify-content:center}
-  .rb-quit:active{transform:scale(.9)}
   .rb-mid{flex:1;min-width:0}
   .rb-mid .rev-dots,.rb-mid .rev-slim{margin-bottom:0}
   .rb-count{flex:none;font-size:14px;font-weight:800;color:var(--primary)}
@@ -3796,16 +3809,6 @@
   .hub-mini-t{position:relative;z-index:1;font-size:14.5px;font-weight:800;display:block}
   .hub-mini-s{position:relative;z-index:1;font-size:10.5px;color:var(--muted);display:block;margin-top:3px}
   .mini-type{border-color:var(--blue)} .mini-match{border-color:var(--mint)}
-  /* Glass, and out from under the panel's own close button. It was a
-     plain text link tucked into the top-left corner, right where the
-     round X sits, so half of it was covered. */
-  .hub-back{display:inline-flex;align-items:center;height:32px;margin:0 0 12px 46px;
-    padding:0 14px;border:none;border-radius:999px;cursor:pointer;
-    font-family:inherit;font-size:12px;font-weight:700;color:rgba(226,250,244,.9);
-    background:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.05));
-    box-shadow:inset 0 0 0 1px rgba(180,235,250,.24);
-    backdrop-filter:blur(10px) saturate(1.3);-webkit-backdrop-filter:blur(10px) saturate(1.3)}
-  .hub-back:active{transform:scale(.95)}
 
   .bonus-strip{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
     padding:16px 17px;box-shadow:var(--shadow)}
@@ -5309,6 +5312,143 @@
     -webkit-touch-callout:default;
     -webkit-user-select:text;-moz-user-select:text;-ms-user-select:text;user-select:text}
 
+
+  /* ============================================================
+     SAVED, ONE BLOCK
+
+     Everything the panel looks like, in one place and last in source
+     order, so nothing earlier can quietly put the old look back. There
+     were four layers of Saved rules before this -- the original two-tab
+     styles, a dark-glass pass, a daylight pass and the rebuild -- and which
+     one won depended on specificity nobody could see from the file.
+
+     Measured against a phone screenshot of it (390 wide): a row was 100px
+     and four words filled the screen; the due card was 122px for one
+     number and one button; the count was printed three times in the top
+     half; the menu button sat on the fourth row. Now: rows about 60px,
+     each group one surface ruled into lines, the due strip one tappable
+     line, one count, and room under the list for the menu button.
+
+     Selectors carry body .view.fw-panel#v-saved so they also beat the
+     `body .view.fw-panel *` font rule without a second copy of each.
+     ============================================================ */
+  /* The strip under the home indicator is the document's own background,
+     which is dark teal -- the "dark band at the bottom" of the screen. */
+  html:has(#v-saved.active), html:has(#v-saved.active) body{background:#C9E5DD}
+
+  body .view.fw-panel#v-saved{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 110px)}
+
+  /* tabs: a quiet segmented control */
+  body .view.fw-panel#v-saved .sv-tabs{display:flex;gap:2px;padding:3px;margin:0 0 16px;
+    border:0;border-radius:14px;background:rgba(18,120,125,.09);box-shadow:none}
+  body .view.fw-panel#v-saved .sv-tab{flex:1;padding:8px 4px;border-radius:11px;border:0;
+    font-size:13px;font-weight:700;letter-spacing:0;color:var(--sv-soft);background:none;box-shadow:none}
+  body .view.fw-panel#v-saved .sv-tab.on{color:#fff;background:var(--sv-teal);box-shadow:0 1px 3px rgba(10,70,72,.18)}
+
+  /* the one count, and the sort */
+  body .view.fw-panel#v-saved .saved-head{display:flex;align-items:center;justify-content:space-between;
+    margin:0 2px 12px}
+  body .view.fw-panel#v-saved .saved-count{display:flex;align-items:center;gap:6px;
+    font-size:13px;font-weight:600;color:var(--sv-soft)}
+  body .view.fw-panel#v-saved .saved-count b{font-weight:800;color:var(--sv-ink)}
+  body .view.fw-panel#v-saved .saved-count .hdr-ico,
+  body .view.fw-panel#v-saved .saved-count .hdr-ico-svg{width:16px;height:16px;color:var(--sv-teal)}
+  body .view.fw-panel#v-saved .sort-cycle{display:inline-flex;align-items:center;gap:6px;
+    height:30px;padding:0 12px;border:0;border-radius:999px;
+    font-size:12px;font-weight:700;color:var(--sv-soft);background:rgba(255,255,255,.6);box-shadow:none}
+  body .view.fw-panel#v-saved .sort-cycle svg{width:14px;height:14px;stroke:var(--sv-teal)}
+
+  /* what is due: one line, and the whole line is the button */
+  body .view.fw-panel#v-saved .sv-due{display:flex;align-items:center;gap:12px;width:100%;
+    margin:0 0 22px;padding:12px 12px 12px 16px;border:0;border-radius:18px;text-align:left;
+    background:var(--sv-card);box-shadow:none;cursor:pointer}
+  body .view.fw-panel#v-saved .sv-due:active{background:var(--sv-card-2)}
+  body .view.fw-panel#v-saved .sv-due-n{flex:none;min-width:28px;font-size:26px;font-weight:800;
+    line-height:1;color:var(--sv-teal)}
+  body .view.fw-panel#v-saved .sv-due-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  body .view.fw-panel#v-saved .sv-due-t b{font-size:14.5px;font-weight:800;color:var(--sv-ink)}
+  body .view.fw-panel#v-saved .sv-due-t i{font-style:normal;font-size:12px;font-weight:500;color:var(--sv-soft)}
+  body .view.fw-panel#v-saved .sv-due-go{flex:none;padding:9px 16px;border-radius:999px;
+    font-size:13px;font-weight:800;color:#fff;background:var(--sv-teal)}
+  body .view.fw-panel#v-saved .sv-due.calm{cursor:default}
+  body .view.fw-panel#v-saved .sv-due.calm .sv-due-n{color:var(--sv-faint)}
+
+  /* a group: a label over one ruled surface */
+  body .view.fw-panel#v-saved .sv-sec{margin:0 0 20px}
+  body .view.fw-panel#v-saved .sv-sec-h{display:flex;align-items:baseline;gap:7px;margin:0 4px 7px;
+    padding:0;border:0;font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+  body .view.fw-panel#v-saved .sv-sec-h b{font-weight:800;color:var(--sv-teal)}
+  body .view.fw-panel#v-saved .sv-sec-h span{padding:0;border:0;background:none;font-weight:700;color:var(--sv-soft)}
+  /* was --sv-faint in white caps on mint: there, but not legible */
+  body .view.fw-panel#v-saved .sv-sec-h i{margin-left:auto;font-style:normal;font-weight:600;
+    letter-spacing:.02em;text-transform:none;font-size:11.5px;color:var(--sv-soft)}
+  body .view.fw-panel#v-saved .sv-group{border-radius:18px;overflow:hidden;background:var(--sv-card)}
+
+  body .view.fw-panel#v-saved .sv-row{display:flex;align-items:center;gap:10px;margin:0;
+    padding:10px 6px 10px 16px;border:0;border-radius:0;background:none;box-shadow:none;transform:none}
+  body .view.fw-panel#v-saved .sv-row + .sv-row{border-top:1px solid var(--sv-line)}
+  body .view.fw-panel#v-saved .sv-row:active{background:var(--sv-card-2)}
+  body .view.fw-panel#v-saved .sv-mid{flex:1;min-width:0;display:block}
+  body .view.fw-panel#v-saved .sv-l1{display:flex;align-items:center;gap:9px;min-width:0}
+  body .view.fw-panel#v-saved .sv-w{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:15.5px;font-weight:700;letter-spacing:-.005em;line-height:1.3;color:var(--sv-ink)}
+  body .view.fw-panel#v-saved .sv-e{display:block;margin-top:1px;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-size:13px;font-weight:500;line-height:1.35;color:var(--sv-soft)}
+  /* strength: five dots beside the word, quiet until they fill */
+  body .view.fw-panel#v-saved .sv-meter{flex:none;display:inline-flex;gap:2px}
+  body .view.fw-panel#v-saved .sv-meter i{width:4px;height:4px;border-radius:50%;background:rgba(20,110,110,.18)}
+  body .view.fw-panel#v-saved .sv-meter i.on{background:var(--sv-teal-2)}
+  body .view.fw-panel#v-saved .sv-when{flex:none;font-size:11.5px;font-weight:600;color:var(--sv-faint)}
+  body .view.fw-panel#v-saved .sv-star{flex:none;width:34px;height:34px;display:flex;align-items:center;
+    justify-content:center;padding:0;border:0;border-radius:50%;background:none;
+    font-size:17px;line-height:1;color:#D69A2E}
+
+  /* the casebook: the same surfaces, one per comparison */
+  body .view.fw-panel#v-saved .wf-row{margin:0 0 8px;border:0;border-radius:18px;background:var(--sv-card);box-shadow:none}
+  body .view.fw-panel#v-saved .wf-head{padding:13px 14px 13px 16px}
+  body .view.fw-panel#v-saved .wf-head:active{background:var(--sv-card-2)}
+  body .view.fw-panel#v-saved .wf-q{font-size:15px;font-weight:700;color:var(--sv-ink)}
+  body .view.fw-panel#v-saved .wf-n{padding:0;border:0;background:none;font-size:12px;font-weight:700;color:var(--sv-faint)}
+  body .view.fw-panel#v-saved .wf-x{color:var(--sv-faint)}
+  body .view.fw-panel#v-saved .wf-body{padding:0 14px 14px}
+  body .view.fw-panel#v-saved .wf-body .wh-item{border:0;box-shadow:none;border-radius:14px;background:var(--sv-card-2);
+    margin-bottom:8px}
+  body .view.fw-panel#v-saved .wh-root{border:0;box-shadow:none;border-radius:14px;background:rgba(18,120,125,.08)}
+  body .view.fw-panel#v-saved .wf-acts button{border:0;box-shadow:none;border-radius:12px;
+    color:var(--sv-teal);background:var(--sv-card-2)}
+  /* What is inside an opened comparison. These blocks are shared with the
+     explain page and were still wearing its old purple theme: text at
+     rgb(246,241,255) and lavender accents at rgb(196,181,253), measured
+     on the open card -- near-white on a mint card, so the word, its
+     meaning, the root, the examples and the quick take were all but
+     invisible the moment a Casebook entry was opened. */
+  body .view.fw-panel#v-saved .wh-root-lbl{color:var(--sv-teal)}
+  body .view.fw-panel#v-saved .wh-root-f{color:var(--sv-ink)}
+  body .view.fw-panel#v-saved .wh-root-g{color:var(--sv-soft)}
+  body .view.fw-panel#v-saved .wh-w{color:var(--sv-ink)}
+  body .view.fw-panel#v-saved .wh-w-arrow{color:var(--sv-teal-2)}
+  body .view.fw-panel#v-saved .wh-vi{color:var(--sv-soft)}
+  body .view.fw-panel#v-saved .wh-key{font-size:14.5px;font-weight:700;color:var(--sv-ink);
+    background:rgba(18,120,125,.08);border-left-color:var(--sv-teal-2);box-shadow:none}
+  body .view.fw-panel#v-saved .wh-diff{color:var(--sv-soft)}
+  body .view.fw-panel#v-saved .wh-typ span{color:var(--sv-teal);background:rgba(18,120,125,.1);border:0;box-shadow:none}
+  body .view.fw-panel#v-saved .wh-ex{border-left-color:var(--sv-line)}
+  body .view.fw-panel#v-saved .wh-ex-en{color:var(--sv-ink)}
+  body .view.fw-panel#v-saved .wh-ex-vi{color:var(--sv-faint)}
+  body .view.fw-panel#v-saved .wh-etym{color:var(--sv-soft)}
+  body .view.fw-panel#v-saved .wh-etym b{color:var(--sv-ink)}
+  body .view.fw-panel#v-saved .wh-etym i{color:var(--sv-faint)}
+  body .view.fw-panel#v-saved .wh-hook{color:var(--sv-ink);background:var(--sv-amber-bg);
+    border-left-color:var(--sv-amber);box-shadow:none}
+  body .view.fw-panel#v-saved .wh-hook span{color:var(--sv-amber)}
+
+  /* speak up: the same surfaces, one per sentence */
+  body .view.fw-panel#v-saved .sy-legend{margin:0 0 12px;border:0;border-radius:14px;background:rgba(255,255,255,.5)}
+  body .view.fw-panel#v-saved .sy-row{margin:0 0 8px;border:0;border-radius:18px;background:var(--sv-card);box-shadow:none}
+  body .view.fw-panel#v-saved .sy-head{padding:12px 14px}
+  body .view.fw-panel#v-saved .sy-you-t{font-size:14.5px;font-weight:700;line-height:1.4;color:var(--sv-ink)}
+
+  body .view.fw-panel#v-saved .empty{padding:36px 20px;text-align:center}
 </style>
 <link rel="stylesheet" href="./theme-overrides.css">
 </head>
@@ -6857,47 +6997,117 @@
     fhShowHome();
   };
 
-  /* Left-to-right anywhere on an open panel closes it.
+  /* ============================================================
+     BACK -- one gesture, one handler, every screen.
 
-     Every panel used to carry a floating X as its only way out, which
-     landed on top of the first tab and duplicated a gesture people
-     already expect from every other app. The games panel had its own
-     swipe handler bound to #review-area; this is the same idea bound
-     once, at the document, so Saved, Hot Take, Settings and the rest all
-     get it without each needing to remember to wire it up.
+     Left to right, anywhere, goes back ONE step. It used to be three
+     handlers that each knew about part of the app: one on the word page,
+     one inside the games, one for panels. Measured by firing a real
+     TouchEvent swipe on each screen:
 
-     Guards, in order: only while a panel is actually open, only a single
-     finger, only a clearly horizontal run of at least 60px, only if it
-     did not start inside something that scrolls sideways (the word-family
-     chip row, a code block), and not from a text field. A slow drag is a
-     scroll, not a swipe. */
-  (function () {
-    let sx = 0, sy = 0, st = 0, live = false;
-    const SIDEWAYS = '.family-scroll, .ht-row, .sv-tabs, .sx-tabs, input, textarea';
-    document.addEventListener('touchstart', (e) => {
-      live = false;
-      if (!document.documentElement.classList.contains('panel-open')) return;
-      if (e.touches.length !== 1) return;
-      const t = e.touches[0];
-      if (t.target && t.target.closest && t.target.closest(SIDEWAYS)) return;
-      sx = t.clientX; sy = t.clientY; st = Date.now(); live = true;
-    }, { passive: true });
-    document.addEventListener('touchend', (e) => {
-      if (!live) return;
-      live = false;
-      if (!document.documentElement.classList.contains('panel-open')) return;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - sx, dy = t.clientY - sy;
-      if (Date.now() - st > 800) return;                  // a slow drag is a scroll
-      if (dx < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
-      /* The games panel runs its own swipe: inside a round it steps
-         through questions, and outside one it already backs out a level.
-         Leave that alone rather than closing the whole panel underneath
-         it. */
-      if (document.getElementById('v-review') &&
-          document.getElementById('v-review').classList.contains('active')) return;
+         Saved, Progress, Settings, word page      went back
+         Speak Up          went home but left #v-review .active, which
+                           the 3D world reads as "covered" -- it stayed
+                           frozen the next time it was opened
+         Letter Trail, Word Pairs                  nothing
+         Hot Take, Journal, XP, the menu           nothing -- no handler
+
+     and #fw-panel-close is hidden everywhere (display:none !important),
+     so on those screens there was no way out at all.
+
+     fwBack() is the whole map of "what is on top, and what is under it",
+     topmost first. It returns false when there is nowhere to go back to.
+     ============================================================ */
+  let fwLeaveAt = 0;
+  window.fwBack = function () {
+    const H = document.documentElement, on = (c) => H.classList.contains(c);
+    const active = (id) => { const v = document.getElementById(id); return !!(v && v.classList.contains('active')); };
+    if (on('ask-on') && window.fwAnswer) { fwAnswer(false); return true; }
+    if (on('rz-on') && window.rzClose) { rzClose(); return true; }
+    const sheet = document.getElementById('word-sheet');
+    if (sheet && sheet.classList.contains('show') && window.closeWordSheet) { closeWordSheet(); return true; }
+    if (on('menu-on')) { fmClose(); return true; }
+    if (on('xp-on')) { xpClose(); return true; }
+    if (on('jn-on') && window.jnClose) { jnClose(); return true; }
+    if (on('ht-on')) {
+      if (on('ht-read') && window.htBackToShelf) htBackToShelf(); else if (window.htClose) htClose();
+      return true;
+    }
+    if (on('dict-open')) { closeDictPage(); return true; }
+    if (on('panel-open')) {
+      if (active('v-review')) {
+        /* From a game, back is where you came from -- home, or Saved for a
+           review started there. Only a round that has been played into
+           asks first, with a second swipe inside a couple of seconds: a
+           swipe to the right used to mean "next question", so someone
+           mid-round may well do it out of habit. A game just opened
+           leaves on the first swipe. */
+        if (window.practiceHasProgress && practiceHasProgress() && Date.now() - fwLeaveAt > 2500) {
+          fwLeaveAt = Date.now();
+          if (window.fwToast) fwToast('Swipe right again to leave this round');
+          return true;
+        }
+        fwLeaveAt = 0;
+        if (typeof dueReviewMode !== 'undefined' && dueReviewMode) {
+          dueReviewMode = false;
+          openFwPanel('saved');
+          return true;
+        }
+      }
       closeFwPanel();
+      return true;
+    }
+    return false;
+  };
+
+  /* The gesture. The thresholds are the word page's, which were tuned on
+     a phone (a v75 swipe at 48px fired on a resting thumb): at least three
+     moves, then 90px, or 64px if it is moving fast, inside 1.2s, and the
+     page stops scrolling once the run is clearly sideways so it does not
+     drift while you swipe. It fires during the move, not at the end, so it
+     answers the moment the gesture is unmistakable.
+
+     Not from anything that scrolls or drags sideways itself -- the chip
+     rows, the tab strips, the rescue board's card carousel, a slider, a
+     text field -- and not on the 3D island itself, where one finger
+     dragging is how you walk. */
+  (function () {
+    const SIDEWAYS = 'input, textarea, select, [contenteditable], [data-noswipe], '
+      + '.family-scroll, .ht-row, .sv-tabs, .sx-tabs, .chips, .suggest-drop, .yg-wrap, '
+      + '#rb-cards, .rb-cards, .rb-track';
+    let sx = 0, sy = 0, st = 0, lastX = 0, lastT = 0, moves = 0, live = false, fired = false, locked = false;
+    const unlock = () => { if (locked) { document.body.style.overflow = ''; locked = false; } };
+    const reset = () => { live = false; moves = 0; unlock(); };
+    document.addEventListener('touchstart', (e) => {
+      fired = false; reset();
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0], el = t.target;
+      if (el && el.closest && el.closest(SIDEWAYS)) return;
+      if (el && el.id === 'fw-canvas') return;             // walking, not going back
+      if (document.documentElement.classList.contains('rb-on')) return;
+      sx = lastX = t.clientX; sy = t.clientY; st = lastT = Date.now(); live = true;
     }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+      if (!live || fired) return;
+      const t = e.touches[0], now = Date.now();
+      const dx = t.clientX - sx, dy = t.clientY - sy;
+      const vx = (t.clientX - lastX) / Math.max(1, now - lastT);
+      lastX = t.clientX; lastT = now; moves++;
+      if (!locked) {
+        if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+        if (Math.abs(dy) > Math.abs(dx) || dx < 0) { reset(); return; }
+        document.body.style.overflow = 'hidden';
+        locked = true;
+      }
+      if (dx < -30) { reset(); return; }
+      const far = dx >= 90 || (dx >= 64 && vx > 0.25);
+      if (moves >= 3 && far && now - st < 1200) {
+        fired = true; reset();
+        window.fwBack();
+      }
+    }, { passive: true });
+    document.addEventListener('touchend', reset, { passive: true });
+    document.addEventListener('touchcancel', reset, { passive: true });
   })();
 
   window.closeFwPanel = function () {

@@ -3727,15 +3727,23 @@ window.setSettingsTab=function(cat){
     p.style.display = p.dataset.cat===cat ? '' : 'none');
 };
 
-function svRow(r, due, box){
+/* One line of a list, not a card of its own. Word and its strength on
+   the first line, the meaning under it, when it is next due at the right.
+   A row was 100px tall -- four words to a phone screen -- because the
+   strength and the date sat on a third line of their own; folded into the
+   first line and the right edge, a row is about sixty.
+
+   In "Review now" the date is left off: every row there says "due now",
+   and the heading already has. */
+function svRow(r, due, box, showWhen){
   const eq=(r.data&&r.data.vi_equivalent)||'';
   const w=esc(r.word);
   const safeW=w.replace(/'/g,"\\'");
   return '<div class="sv-row" onclick="jump(\''+safeW+'\')">'
-    + '<div class="sv-mid"><span class="sv-w">'+w+'</span>'
+    + '<div class="sv-mid"><div class="sv-l1"><span class="sv-w">'+w+'</span>'+srsMeter(box)+'</div>'
     + (eq?'<span class="sv-e">'+esc(eq)+'</span>':'')
-    + '<span class="sv-foot">'+srsMeter(box)+'<span class="sv-when num">'+srsWhen(due)+'</span></span>'
     + '</div>'
+    + (showWhen?'<span class="sv-when num">'+srsWhen(due)+'</span>':'')
     + '<button class="sv-star" onclick="event.stopPropagation();toggleSave(\''+safeW+'\')" aria-label="Unsave">★</button>'
     + '</div>';
 }
@@ -3849,8 +3857,7 @@ async function renderSaved(){
 
   // ---------- tab Vault ----------
   let words=all.filter(r=>r.saved && r.data && !r.data.explain && !r.alias);
-  if(head) head.innerHTML='<img class="hdr-ico" src="./decor-earth.webp" alt=""/>'
-    +'<b class="num">'+words.length+'</b> word'+(words.length===1?'':'s')+' collected';
+  if(head) head.innerHTML='<b class="num">'+words.length+'</b> word'+(words.length===1?'':'s')+' saved';
   if(!words.length){
     box.innerHTML='<div class="empty"><img class="ill" src="./mascot-explore.webp" alt=""/>'
       +'<h3>No saved words yet</h3><p>Tap the star \u2606 on any word to save it here.</p></div>';
@@ -3873,28 +3880,37 @@ async function renderSaved(){
   if(savedSort!=='newest'){ applySort(dueNow); applySort(upNext); applySort(solid); }
 
   let h='';
-  /* Dải nhắc ôn: chỉ một hành động, và nó là hành động đúng về mặt học tập
-     — truy xuất chủ động, không phải đọc lại danh sách. */
-  h+='<div class="sv-hero'+(dueNow.length?'':' calm')+'">';
-  h+='<div class="sv-hero-n num">'+dueNow.length+'</div>';
-  h+='<div class="sv-hero-t"><b>'+(dueNow.length?'words due today':'nothing due right now')+'</b>'
-    +'<span>'+(dueNow.length
-        ? 'Recall it yourself before checking the answer \u2014 that\u2019s when memory actually forms.'
-        : 'You\u2019re all caught up. Come back when a word is due \u2014 reviewing it before then won\u2019t help it stick.')+'</span></div>';
-  if(dueNow.length) h+='<button class="sv-hero-go" onclick="startSavedReview()">Review now</button>';
-  h+='</div>';
+  /* What is due, as one line you can tap. It was a card with a 46px
+     number tile, a four-line paragraph on how memory works, and a button
+     -- and the same count was then printed again as the heading of the
+     list right under it, and a third time in the header ("18" three times
+     in the top half of the screen). The whole strip is the button now,
+     the sentence is five words, and the list heading does not repeat the
+     number. */
+  if(dueNow.length){
+    h+='<button class="sv-due" onclick="startSavedReview()">'
+      +'<span class="sv-due-n num">'+dueNow.length+'</span>'
+      +'<span class="sv-due-t"><b>due today</b><i>Recall first, then check</i></span>'
+      +'<span class="sv-due-go">Review</span></button>';
+  }else{
+    h+='<div class="sv-due calm"><span class="sv-due-n num">0</span>'
+      +'<span class="sv-due-t"><b>All caught up</b><i>Nothing is due right now</i></span></div>';
+  }
 
-  const sec=(title, note, arr)=>{
+  /* Each group is one surface with rows ruled inside it, the way a
+     settings list is -- rather than rows floating loose on the page, or
+     every row its own card. */
+  const sec=(title, note, arr, count, showWhen)=>{
     if(!arr.length) return '';
     let s='<div class="sv-sec"><div class="sv-sec-h"><b>'+title+'</b>'
-      +'<span class="num">'+arr.length+'</span>'
-      +(note?'<i>'+note+'</i>':'')+'</div>';
-    for(const x of arr) s+=svRow(x.r, x.due, x.box);
-    return s+'</div>';
+      +(count?'<span class="num">'+arr.length+'</span>':'')
+      +(note?'<i>'+note+'</i>':'')+'</div><div class="sv-group">';
+    for(const x of arr) s+=svRow(x.r, x.due, x.box, showWhen);
+    return s+'</div></div>';
   };
-  h+=sec('Review now','weakest first',dueNow);
-  h+=sec('Coming up','left until due',upNext);
-  h+=sec('Mastered','reviewed rarely now',solid);
+  h+=sec('Review now','weakest first',dueNow,false,false);
+  h+=sec('Coming up','next review',upNext,true,true);
+  h+=sec('Mastered','rarely now',solid,true,true);
   box.innerHTML=h;
 }
 
@@ -4030,6 +4046,10 @@ async function startSavedReview(){
   if(!due.length) return;   // phòng hờ — nút này vốn chỉ hiện khi có từ tới hạn
   dueReviewMode=true;
   try{ localStorage.setItem(POOL_LS,'saved'); }catch(e){}
+  /* Named, so showView sets up Letter Trail cleanly rather than whatever
+     game was last open -- if that was Speak Up its own panel styling came
+     along with it. */
+  window.__pendingPractice='type';
   showView('review');
   await loadLevels();
   practiceMode='type';
@@ -4206,11 +4226,14 @@ function pgControls(){
   return h+'</div>';
 }
 
+/* No back button. There was a "\u2190 Games" pill here, and it called
+   renderGameHub() -- the old games page, from before the games moved onto
+   the home screen -- which is exactly the "back lands on the old page"
+   report. Back is a swipe from left to right now, everywhere (fwBack in
+   index.html), and from a game it goes where you came from. */
 function gameShell(body){
   const m=PG_META[practiceMode]||PG_META.match;
-  const back=(typeof renderGameHub==='function')
-    ? '<button class="hub-back" onclick="renderGameHub()">\u2190 Games</button>' : '';
-  return '<div class="pg">'+back
+  return '<div class="pg">'
     +'<div class="pg-head">'
     +  '<img class="bg" src="./'+m.art+'" alt="" onerror="this.style.display=\'none\'"/>'
     +  '<div class="name">'+m.name+'</div>'
@@ -4310,10 +4333,11 @@ async function startReview(){
   return renderPracticeSetup();
 }
 
-/* A thin bar at the top of a live round: quit back to setup + progress. */
+/* A thin bar at the top of a live round: progress and the count. The quit
+   cross that led it is gone, as asked; leaving a round is a swipe to the
+   right (twice, so a stray one doesn't throw the round away -- fwBack). */
 function roundBar(idx,total,states){
   return '<div class="round-bar">'
-    +'<button class="rb-quit" onclick="quitRound()" aria-label="Back to setup">✕</button>'
     +'<div class="rb-mid">'+practiceProgress(states)+'</div>'
     +'<div class="rb-count">'+(idx+1)+'<span>/'+total+'</span></div></div>';
 }
@@ -4327,6 +4351,17 @@ window.quitRound=quitRound;
    The listener lives on #review-area, which survives every innerHTML
    rewrite, so it is wired exactly once. */
 function practiceAnswered(){ return practiceMode==='match' ? !!matchPicked : !!revState; }
+/* Is there anything in this round to lose? fwBack asks before leaving a
+   round that has been played into, and not before leaving one that has
+   not. practiceStage cannot tell you: the rebuilt games draw their setup
+   controls and the live question on one screen, so it reads 'playing' the
+   moment a game opens. */
+function practiceHasProgress(){
+  if(practiceMode==='match') return matchIdx>0 || !!matchPicked;
+  if(practiceMode==='type') return revIdx>0 || !!revState;
+  return false;
+}
+window.practiceHasProgress=practiceHasProgress;
 function practiceAdvance(dir){
   if(practiceStage!=='playing') return;
   if(!practiceAnswered()){ toast('Answer first — then swipe to continue'); return; }
@@ -4339,23 +4374,13 @@ function practiceAdvance(dir){
   },170);
 }
 window.practiceAdvance=practiceAdvance;
-/* Lùi một bậc trong tab Game. Thứ tự bậc: cảnh truyện → hub → trang chủ. */
+/* Back from the games is fwBack's job now (index.html), the same as from
+   every other screen. This used to do it by hand, and did it half-way:
+   it took panel-open off and showed the home page but left #v-review
+   .active, which the 3D world reads as "a panel is covering me" -- so the
+   next time you opened the island it stayed parked and would not move. */
 function gameSwipeBack(){
-  const area=$('#review-area');
-  const inStory = !!(area && area.querySelector('.story-view'));
-  /* The old test looked for .game-tab, a tab strip the rebuilt games no
-     longer render, so every swipe in Word Pairs or Letter Trail fell
-     straight through to showView('home') — the OLD dashboard. From a
-     game, back is the app's home page; from a story scene, the map. */
-  if(inStory && typeof renderGameHub==='function'){ renderGameHub(); window.scrollTo(0,0); return; }
-  if(window.fhShowHome){
-    document.documentElement.classList.remove('panel-open');
-    const close=document.getElementById('fw-panel-close');
-    if(close) close.style.display='none';
-    fhShowHome();
-    return;
-  }
-  showView('home');
+  if(window.fwBack) window.fwBack();
 }
 window.gameSwipeBack=gameSwipeBack;
 
@@ -4377,14 +4402,13 @@ function wirePracticeSwipe(){
     const ae=document.activeElement;
     if(ae && (ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) ae.blur();
 
-    /* Ngoài lúc đang chơi một vòng, vuốt phải trong tab Game là LÙI một
-       bậc chứ không phải chuyển câu: đang đọc cảnh → về màn hub; đang ở
-       hub → về trang chủ. Trước đây cử chỉ này không làm gì cả ở hub. */
-    if(practiceStage!=='playing'){
-      if(dx>0) gameSwipeBack();
-      return;
-    }
-    practiceAdvance(dx<0?'left':'right');
+    /* Only a swipe to the LEFT belongs to the game: it turns to the next
+       question. A swipe to the right is back, everywhere in the app, and
+       the document-level handler in index.html takes it -- this one used
+       to take both directions as "next", so there was no way to use the
+       gesture people reach for to leave. */
+    if(dx>0 || practiceStage!=='playing') return;
+    practiceAdvance('left');
   },{passive:true});
   document.addEventListener('keydown',(e)=>{
     const v=$('#v-review'); if(!v || !v.classList.contains('active')) return;
@@ -4410,7 +4434,7 @@ function practiceProgress(states){
 /* One shared "you answered — now move on" affordance. */
 function swipeOn(){
   return '<div class="swipe-cue" onclick="practiceAdvance(\'left\')">'
-    +'<span class="sc-txt">Swipe or tap to continue</span><span class="sc-arrow">›</span></div>';
+    +'<span class="sc-txt">Swipe left or tap to continue</span><span class="sc-arrow">›</span></div>';
 }
 
 /* The mascot + speech line shared by both games. */
@@ -6682,8 +6706,10 @@ function showView(v){
       const m=window.__pendingPractice; window.__pendingPractice=null;
       setPracticeMode(m);
     }
-    else if(typeof renderGameHub==='function') renderGameHub();
-    else startReview();
+    /* Not the old hub (renderGameHub): with nothing named, open the game
+       last played. The hub is the page the games left behind when they
+       moved to the home screen, and this was the other way to reach it. */
+    else setPracticeMode(practiceMode||'match');
   }
   if(v==='stats') renderInsights();
   if(v==='settings'){ refreshStats(); if(typeof scanRefreshState==='function'){ scanRefreshState().catch(()=>{}); missRefreshState(); } if(typeof renderTargetLevelUI==='function') renderTargetLevelUI(); }
@@ -6693,6 +6719,11 @@ function showView(v){
    theo chiều ngang, không bắt đầu từ trong ô nhập hay vùng cuộn ngang
    (dải chip, hộp gợi ý) để không tranh chấp với chúng. */
 function wireSwipeBack(){
+  /* Retired: the word page is one of the screens fwBack (index.html) knows
+     how to leave, and two handlers on one gesture closed the word page AND
+     whatever sat under it. Its thresholds -- three moves, 90px or 64px
+     fast, a scroll lock once the run is clearly sideways -- went with it. */
+  return;
   const view=$('#v-home'); if(!view || view._swipeBack) return;
   view._swipeBack=1;
   let sx=0, sy=0, st=0, live=false, fired=false, locked=false, moves=0, lastT=0, lastX=0;
