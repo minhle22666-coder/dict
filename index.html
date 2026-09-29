@@ -767,6 +767,10 @@
   .nm-go{margin-left:auto;color:var(--muted-2);font-size:18px}
 
   /* ---- expedition (AI lookup) scene ---- */
+  /* The desert's own orange underneath the picture: the first time a
+     comparison loads, the scene is up before bg-desert.webp has arrived,
+     and the white caption was sitting on the mint page for that moment. */
+  .quest-scene{background-color:#E9A25C}
   .quest-scene{position:relative;border-radius:var(--r);overflow:hidden;height:300px;background-size:cover;
     background-position:center;box-shadow:var(--shadow);display:flex;align-items:flex-end;justify-content:center;border:1px solid var(--line)}
   .quest-scene .q-rock{position:absolute;bottom:14px;left:10px;width:88px;opacity:.95;z-index:0}
@@ -5449,6 +5453,75 @@
   body .view.fw-panel#v-saved .sy-you-t{font-size:14.5px;font-weight:700;line-height:1.4;color:var(--sv-ink)}
 
   body .view.fw-panel#v-saved .empty{padding:36px 20px;text-align:center}
+
+  /* ============================================================
+     ONE SEARCH ROW
+
+     The home page's row is the pattern: a round field (37px, 13px Raleway,
+     "Translate or compare words") and the 41px grid button that opens the
+     menu, 14px under the safe area with 18px margins. #fw-chrome's row --
+     over the island and over every panel -- now has exactly that shape,
+     size and position, so moving between pages does not swap one search
+     bar for another. It used to be a 50px grey slab, 14px margins, 15px
+     type, "Search a word…", with a round gear parked over its right end.
+
+     What changes with the page is colour only. Over the island it keeps a
+     faint dark tint behind the white, because a daytime sky is nearly
+     white and home's pure white glass would vanish against it. On the
+     light pages -- the word page and Saved -- it turns white with teal ink,
+     the same pill in daylight colours.
+     ============================================================ */
+  .fw-topbar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);left:18px;right:18px;
+    display:flex;align-items:center;gap:10px;pointer-events:none}
+  .fw-topbar .fw-searchbar{position:static;flex:1;min-width:0;pointer-events:auto;
+    display:flex;align-items:center;gap:9px;height:37px;box-sizing:border-box;padding:0 15px;
+    border:0;border-radius:999px;
+    background:rgba(8,40,42,.26);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  .fw-topbar .fw-searchbar svg{flex:none;width:17px;height:17px;color:rgba(255,255,255,.92);opacity:1;
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
+  body .fw-topbar .fw-searchbar input{flex:1;min-width:0;border:none;background:none;outline:none;
+    color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3);
+    font-family:'Raleway Local','Raleway',system-ui,sans-serif;font-size:13px;font-weight:400;letter-spacing:0}
+  body .fw-topbar .fw-searchbar input::placeholder{color:rgba(255,255,255,.7);font-weight:300}
+  .fw-topbar .fw-gear{position:static;flex:none;pointer-events:auto;
+    width:41px;height:41px;border-radius:13px;border:0;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;
+    background:rgba(8,40,42,.26);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);transition:transform .14s ease}
+  .fw-topbar .fw-gear svg{width:19px;height:19px;filter:none}
+  .fw-topbar .fw-gear:active{transform:scale(.92)}
+
+  /* daylight: the word page and Saved */
+  html.dict-open .fw-topbar .fw-searchbar, html:has(#v-saved.active) .fw-topbar .fw-searchbar,
+  html.dict-open .fw-topbar .fw-gear, html:has(#v-saved.active) .fw-topbar .fw-gear{
+    background:rgba(255,255,255,.86);border:0;
+    box-shadow:inset 0 0 0 1px rgba(18,120,125,.18),0 4px 14px rgba(18,120,125,.08)}
+  html.dict-open .fw-topbar .fw-searchbar svg, html:has(#v-saved.active) .fw-topbar .fw-searchbar svg,
+  html.dict-open .fw-topbar .fw-gear, html:has(#v-saved.active) .fw-topbar .fw-gear{color:#12787D;filter:none}
+  html.dict-open body .fw-topbar .fw-searchbar input, html:has(#v-saved.active) body .fw-topbar .fw-searchbar input{
+    color:#0E3B3E;text-shadow:none}
+  html.dict-open body .fw-topbar .fw-searchbar input::placeholder,
+  html:has(#v-saved.active) body .fw-topbar .fw-searchbar input::placeholder{color:rgba(14,59,62,.46)}
+
+  /* Panels start clear of the row: it ends at safe-area + 55px, and the
+     content began at + 74 -- a 19px gap on paper, and on a phone the row
+     plus its shadow left the first line of every panel pressed up under
+     it. + 84 gives it room to breathe. */
+  body .view.fw-panel{padding-top:calc(env(safe-area-inset-top,0px) + 84px)}
+
+  /* Saved's three tabs: words with a line under the one you are on.
+     A filled teal capsule in a tinted track was the heaviest thing on a
+     page that is otherwise lines and white space, and it sat right under
+     the search row. */
+  body .view.fw-panel#v-saved .sv-tabs{display:flex;gap:22px;padding:0 4px;margin:0 0 20px;
+    border:0;border-radius:0;background:none;box-shadow:inset 0 -1px 0 var(--sv-line)}
+  body .view.fw-panel#v-saved .sv-tab{flex:none;position:relative;padding:0 0 11px;border:0;border-radius:0;
+    background:none;box-shadow:none;font-size:14.5px;font-weight:600;letter-spacing:-.005em;color:var(--sv-faint)}
+  body .view.fw-panel#v-saved .sv-tab.on{background:none;box-shadow:none;color:var(--sv-ink);font-weight:800}
+  body .view.fw-panel#v-saved .sv-tab.on::after{content:'';position:absolute;left:0;right:0;bottom:0;
+    height:2.5px;border-radius:2px;background:var(--sv-teal)}
+  body .view.fw-panel#v-saved .sv-tab:active{transform:none;opacity:.7}
 </style>
 <link rel="stylesheet" href="./theme-overrides.css">
 </head>
@@ -6102,8 +6175,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
       <input id="fh-search-input" type="search" inputmode="search" placeholder="Translate or compare words (e.g. say, tell)" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
     </label>
-    <button class="fx-xp" onclick="xpOpen()" aria-label="Your XP"><b>0</b></button>
-      <button class="fh-grid-btn" aria-label="Settings" onclick="fhOpenSettings()">
+    <!-- The XP pill that sat here is gone, as asked; XP is still one tap
+         away in the menu ("Your XP"). -->
+      <button class="fh-grid-btn" aria-label="Menu" onclick="fhOpenSettings()">
       <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2.6"/><rect x="13" y="3" width="8" height="8" rx="2.6"/><rect x="3" y="13" width="8" height="8" rx="2.6"/><rect x="13" y="13" width="8" height="8" rx="2.6"/></svg>
     </button>
   </div>
@@ -6177,18 +6251,23 @@
     <span class="fw-exp-lv">Lv <i>1</i></span>
     <span class="fw-exp-track"><s></s></span>
   </button>
-  <!-- always-on search bar — no tap-to-reveal icon, this IS the home screen now -->
-  <div class="fw-searchbar fw-ui">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-    <input id="fw-search-input" type="search" inputmode="search" placeholder="Search a word…" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
+  <!-- The search row, built the way the home page's is: a round field
+       and the grid button that opens the menu. It used to be its own
+       thing -- a grey slab reading "Search a word…" across the full width
+       with a gear floating over its right end -- so every page other than
+       home had a different search bar from home. Same shape, size, words
+       and button everywhere now; only the colours follow the page under
+       it (see ONE SEARCH ROW). Class names are kept: the suggestion
+       dropdown finds its field by .fw-searchbar. -->
+  <div class="fw-topbar">
+    <label class="fw-searchbar fw-ui">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      <input id="fw-search-input" type="search" inputmode="search" placeholder="Translate or compare words (e.g. say, tell)" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search" />
+    </label>
+    <button class="fw-gear fw-ui" id="fw-settings-btn" aria-label="Menu" onclick="fmOpen()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2.6"/><rect x="13" y="3" width="8" height="8" rx="2.6"/><rect x="3" y="13" width="8" height="8" rx="2.6"/><rect x="13" y="13" width="8" height="8" rx="2.6"/></svg>
+    </button>
   </div>
-
-  <!-- Settings didn't have a spot in the requested menu but the API key / theme /
-       daily-goal controls still need to live somewhere, so it gets its own quiet
-       corner icon instead of crowding the fan menu. -->
-  <button class="fw-gear" id="fw-settings-btn" aria-label="Settings" onclick="openFwPanel('settings')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3h-4l-.3 2.9a8 8 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.9 7.9 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a8 8 0 0 0 1.7 1L11 21h4l.3-2.9a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6Z"/></svg>
-  </button>
 
   <div class="fw-wisdom-veil" id="fw-wisdom-veil"></div>
   <div class="fw-toast fw-ui" id="fw-toast"></div>
@@ -6719,19 +6798,30 @@
   // Focci's World is no longer the boot screen; the home page is.
   window.closeFocciWorld3D = function () { fhShowHome(); };
 
-  const searchInput = document.querySelector('#fw-search-input');
-  searchInput.addEventListener('keydown', async (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    const raw = searchInput.value.trim();
+  /* ONE lookup, for every search field in the app.
+
+     There were three copies of this -- the home page's, the newsstand's
+     and the one floating over everything else -- and all three went
+     straight to the dictionary: norm the text, look it up, show the word
+     sheet. None of them ever looked at a comma, so "general, generic"
+     was looked up as one word and came back as a word card, never as the
+     comparison it obviously is. The app's own search() has known how to
+     tell the two apart all along (isExplainQuery: every part short, no
+     sentence punctuation -- so "Well, I don't think so" is still
+     translated, not compared); these fields simply never called it.
+
+     A comparison opens on the word page and goes through search(), which
+     hands it to runExplain -- a saved one reopens without spending a
+     token, a new one asks the AI. */
+  window.fwRunSearch = async function (raw) {
+    raw = String(raw || '').trim();
     if (!raw) return;
-    searchInput.blur();
-    /* While a word page is open, a second search should replace the entry
-       on it. It used to raise the little word sheet instead, which lands
-       UNDER the open page — so from the reader's side, searching again
+    if (window.isExplainQuery && isExplainQuery(raw)) { openDictPage(raw); return; }
+    /* While a word page is open, a second search replaces the entry on
+       it. It used to raise the little word sheet instead, which lands
+       UNDER the open page -- from the reader's side, searching again
        simply did nothing. */
     if (document.documentElement.classList.contains('dict-open')) {
-      searchInput.value = '';
       openDictPage(window.norm(normalizeSpelling(raw)));
       return;
     }
@@ -6739,6 +6829,18 @@
     const rec = await idbGet(word);
     if (rec) showWordSheet(condensedEntryHTML(rec));
     else wordPopupForceAI(raw);
+  };
+  ['#fw-search-input', '#fh-search-input', '#ht-search-input'].forEach((sel) => {
+    const el = document.querySelector(sel);
+    if (el) el.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const raw = el.value.trim();
+      if (!raw) return;
+      el.blur();
+      el.value = '';
+      window.fwRunSearch(raw);
+    });
   });
 
   /* Home first, island second. #fw-overlay starts hidden and the load runs
@@ -6876,22 +6978,8 @@
     window.addEventListener('resize', function () { if (host) place(host); });
   })();
 
-  /* Both search boxes — the home page's and the newsstand's — run the
-     same lookup. */
-  ['#fh-search-input', '#ht-search-input'].forEach((sel) => {
-    const el = document.querySelector(sel);
-    if (el) el.addEventListener('keydown', async (e) => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      const raw = el.value.trim();
-      if (!raw) return;
-      el.blur();
-      const word = window.norm(normalizeSpelling(raw));
-      const rec = await idbGet(word);
-      if (rec) showWordSheet(condensedEntryHTML(rec));
-      else wordPopupForceAI(raw);
-    });
-  });
+  /* (The home page's and the newsstand's own copies of the lookup were
+     here. All three fields share fwRunSearch now, above.) */
 
   /* ============================================================
      FLOATING GLASS MENU — the fan-out menu (wand/sound/map above the

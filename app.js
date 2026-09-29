@@ -615,7 +615,19 @@ function isExplainQuery(s){
      phẩy nào cũng bị hiểu nhầm thành yêu cầu so sánh từ, nên câu có dấu
      phẩy bị đẩy nhầm sang Compare Words và không dịch được. Giờ chỉ coi
      là so sánh từ khi MỌI phần đều ngắn (≤4 từ) và không có dấu kết câu. */
-  return parts.every(p=>p.split(/\s+/).filter(Boolean).length<=4 && !/[.?!]/.test(p));
+  if(!parts.every(p=>p.split(/\s+/).filter(Boolean).length<=4 && !/[.?!]/.test(p))) return false;
+  /* The length rule alone did not keep that promise: "Well, I don't think
+     so" is two parts of one and four words, so it passed and was sent to
+     be compared. A part of two or more words that opens with a subject --
+     I, you, she, it, there... -- or carries a "n't" is a clause, and the
+     whole thing is a sentence to translate. Idioms do not open that way
+     ("make up your mind", "a close call"), so a comparison of phrases
+     still is one; a single word is always a word, even "well". */
+  const SUBJ=/^(i|i'm|i'll|i've|i'd|you|you're|you'll|you've|he|he's|she|she's|we|we're|we'll|they|they're|they'll|it|it's|there|there's)$/;
+  return !parts.some(p=>{
+    const w=p.toLowerCase().split(/\s+/).filter(Boolean);
+    return w.length>=2 && (SUBJ.test(w[0].replace(/[’]/g,"'")) || /n['’]t\b/.test(p.toLowerCase()));
+  });
 }
 function explainWordsOf(s){
   return String(s||'').split(',').map(x=>norm(x)).filter(Boolean).slice(0,6);
@@ -806,8 +818,12 @@ function explainState(query, data, saved, posMap){
 
       // thứ duy nhất cần nhớ — cỡ chữ lớn nhất trong thẻ
       const key=it.key||it.diff||'';
-      if(key) h+='<div class="wh-key">'+esc(key)+'</div>';
-      if(it.key && it.diff) h+='<div class="wh-diff">'+esc(it.diff)+'</div>';
+      /* mdBold, not esc: the AI marks the word that carries the
+         difference with **...**, and the Casebook already renders it
+         bold from the same data -- here it came out as literal asterisks,
+         "True of **most** people". mdBold escapes first, then bolds. */
+      if(key) h+='<div class="wh-key">'+mdBold(key)+'</div>';
+      if(it.key && it.diff) h+='<div class="wh-diff">'+mdBold(it.diff)+'</div>';
 
       if(it.typical){
         h+='<div class="wh-typ">';
@@ -843,7 +859,7 @@ function explainState(query, data, saved, posMap){
   }
 
   if(data.contrast){
-    h+='<div class="wh-hook"><span>which to pick</span>'+esc(data.contrast)+'</div>';
+    h+='<div class="wh-hook"><span>which to pick</span>'+mdBold(data.contrast)+'</div>';
   }
   h+='</div>';
   return h;
@@ -1452,6 +1468,14 @@ async function search(rawWord, forceAI){
   enterResultMode();
   const box=$('#result');
   try{
+  /* A comparison is decided first, before anything treats the text as a
+     word. It used to be checked near the end, after the dictionary lookup,
+     the fuzzy "did you mean", the phrase index and -- the one that bit --
+     the API-key check: "general, generic" with no key came back as
+     "isn't in your library yet, add your key", even when that comparison
+     was already saved and runExplain would have reopened it for free.
+     Vietnamese keeps its own reverse lookup below. */
+  if(!forceAI && !isVN && isExplainQuery(word)){ await runExplain(word); return; }
 
   // Vietnamese → offline reverse lookup, ALWAYS tried first, regardless of
   // spaces — most Vietnamese words are written with spaces between

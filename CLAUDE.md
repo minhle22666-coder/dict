@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v190`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v191`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -291,6 +291,23 @@ was the heat and the stutter in the games. `#fw-home` pauses whenever a
 layer covers it (including `::before/::after`, which `*` does not reach).
 Anything always on screen should stop after a few loops, as the search
 icon's pulse now does.
+
+**Every search field goes through `window.fwRunSearch()` (index.html).**
+There were three copies of the lookup -- home, Hot Take, and the row over
+everything else -- and none of them looked at commas, so "general,
+generic" came back as a word card. `fwRunSearch` sends anything
+`isExplainQuery()` accepts to the word page, where `search()` now checks
+for a comparison FIRST (it used to be after the API-key check, so a saved
+comparison was refused for want of a key). `isExplainQuery` treats a
+multi-word part that opens with a subject pronoun or has "n't" as a
+sentence to translate. If you add a search field, wire it to
+`fwRunSearch`, not to `idbGet`.
+
+**There is one search row design: the home page's.** `#fw-chrome`'s
+`.fw-topbar` copies its geometry exactly (safe-area + 14px, 18px margins,
+37px pill, 41px grid button that opens the menu); only its colours change,
+by page, in the ONE SEARCH ROW block. Panels start at safe-area + 84px so
+nothing sits pressed under it.
 
 **The island runs at half rate when nobody is touching it** (`halfRateSkip`
 in `animate()`), and at a pixel ratio of 1.5 on touch screens. Both are
