@@ -2588,14 +2588,44 @@ export async function bootFocciWorld(root, opts) {
   }
 
   /* ============================================================
-     CHARACTER (Focci) — same verified vest/movement/camera system
+     CHARACTER (Focci) — same verified movement/camera system
      ============================================================ */
-  const orangeMat = new THREE.MeshStandardMaterial({ color: 0xff7a1f, flatShading: true, roughness: 0.7 });
-  const creamMat = new THREE.MeshStandardMaterial({ color: 0xfff3df, flatShading: true, roughness: 0.7 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x2a1c10, flatShading: true, roughness: 0.7 });
-  const redMat = new THREE.MeshStandardMaterial({ color: 0xf23c2e, flatShading: true, roughness: 0.7 });
-  const vestMat = new THREE.MeshStandardMaterial({ color: 0x1f8f2a, flatShading: true, roughness: 0.7 });
-  const pocketMat = new THREE.MeshStandardMaterial({ color: 0x145c1c, flatShading: true, roughness: 0.7 });
+  const orangeMat = new THREE.MeshStandardMaterial({ color: 0xf5822b, flatShading: true, roughness: 0.68 });
+  const creamMat = new THREE.MeshStandardMaterial({ color: 0xfff6ea, flatShading: true, roughness: 0.7 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x241a12, flatShading: true, roughness: 0.6 });
+  const redMat = new THREE.MeshStandardMaterial({ color: 0xe03b30, flatShading: true, roughness: 0.7 });
+  const vestMat = new THREE.MeshStandardMaterial({ color: 0x7d8f4e, flatShading: true, roughness: 0.78 });
+  const bootMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, flatShading: true, roughness: 0.75 });
+  const glintMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.35 });
+
+  /* The vendored three.module.js is r149 trimmed to the core, so there is no
+     RoundedBoxGeometry (it ships in examples/jsm, which is not vendored —
+     the same gap that forced cloneSkinned() to be written by hand).
+
+     This is the standard construction: take a segmented box, clamp each
+     vertex into the box shrunk by r on every axis, then push it back out to
+     distance r from that clamped point. Face centres land exactly where they
+     started, edges and corners round off. Three segments is the sweet spot —
+     enough for the bevel to read as a curve, few enough that flatShading
+     still facets it into the hyper-casual look rather than smoothing it. */
+  const _rbV = new THREE.Vector3();
+  function roundedBox(w, h, d, r, seg) {
+    r = Math.min(r, w / 2, h / 2, d / 2);
+    const g = new THREE.BoxGeometry(w, h, d, seg || 3, seg || 3, seg || 3);
+    const pos = g.attributes.position;
+    const ix = w / 2 - r, iy = h / 2 - r, iz = d / 2 - r;
+    for (let i = 0; i < pos.count; i++) {
+      _rbV.fromBufferAttribute(pos, i);
+      const cx = Math.max(-ix, Math.min(ix, _rbV.x));
+      const cy = Math.max(-iy, Math.min(iy, _rbV.y));
+      const cz = Math.max(-iz, Math.min(iz, _rbV.z));
+      _rbV.set(_rbV.x - cx, _rbV.y - cy, _rbV.z - cz);
+      const len = _rbV.length() || 1;
+      pos.setXYZ(i, cx + (_rbV.x / len) * r, cy + (_rbV.y / len) * r, cz + (_rbV.z / len) * r);
+    }
+    g.computeVertexNormals();
+    return g;
+  }
 
   /* ---------- camera state (declared early: enterRoom() below needs it) ---------- */
   const DEFAULT_CAM = { theta: 0.7, phi: 1.05, radius: 14 };
@@ -2623,51 +2653,107 @@ export async function bootFocciWorld(root, opts) {
     cam.tPhi = 0.72; cam.tRadius = 96;   // room left to pinch further out by hand
   }
 
-  /* Focci, exactly as he was — plain boxes, same sizes, same positions —
-     with two arms added and nothing else touched. Two earlier passes went
-     further than asked (a full sphere-and-capsule rebuild, then a rounded
-     -box bevel) and both were rejected; the brief is only the arms.
+  /* Focci, rebuilt to the hyper-casual reference sheet: soft-bevelled boxes,
+     a cube head with a cream snout, four-sided ears, a red neckerchief with a
+     hanging point, an olive tunic, detached limbs and a simplified tail that
+     ends in a point.
 
-     The arms hang inside Groups pivoted at the shoulder so they swing from
-     there rather than spinning about their own middle, and they swing
-     opposite their own side's front leg in the walk cycle below. */
+     Two earlier restyles (a sphere-and-capsule rebuild, then a bevel pass)
+     were rejected because the brief at the time was only "add arms". This one
+     IS the brief — but three things below are load-bearing for code elsewhere
+     and must not drift:
+
+       • The feet rest at y = 0. animate() does
+         character.position.set(x, surf.y + bob + jumpY, z) with no foot
+         offset, so the origin IS the ground contact point.
+       • Forward is +Z. Facing comes from atan2(moveX, moveZ), so every
+         front-facing part (snout, nose, eyes) sits at positive z and the
+         tail at negative z. Mirror this and he walks backwards.
+       • Total height stays ~1.56. BODY_H (1.7) decides which lintels he
+         passes under, and the first-person eye sits at a fixed +1.18.
+
+     The four limbs are Groups pivoted at hip and shoulder, not bare meshes,
+     so the walk cycle swings them from the joint instead of spinning them
+     about their own middle. animate() writes .rotation.x on exactly these
+     four names. */
   const character = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.5, 0.42), orangeMat); body.position.y = 0.5; character.add(body);
-  const vest = new THREE.Mesh(new THREE.BoxGeometry(0.67, 0.36, 0.46), vestMat); vest.position.y = 0.56; character.add(vest);
-  const pocketL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.05), pocketMat); pocketL.position.set(-0.17, 0.48, 0.25); character.add(pocketL);
-  const pocketR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.05), pocketMat); pocketR.position.set(0.17, 0.48, 0.25); character.add(pocketR);
-  const belly = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.06), creamMat); belly.position.set(0, 0.33, 0.22); character.add(belly);
-  const scarf = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.1, 0.48), redMat); scarf.position.y = 0.8; character.add(scarf);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.4, 0.42), orangeMat); head.position.y = 1.08; character.add(head);
-  const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.22), creamMat); muzzle.position.set(0, 1.0, 0.3); character.add(muzzle);
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.06), darkMat); nose.position.set(0, 1.02, 0.42); character.add(nose);
-  [-0.13, 0.13].forEach((dxv) => {
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.04), darkMat); eye.position.set(dxv, 1.14, 0.32); character.add(eye);
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.26, 4), orangeMat); ear.position.set(dxv * 1.55, 1.42, -0.02); ear.rotation.y = Math.PI / 4; character.add(ear);
-  });
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.5), orangeMat); tail.position.set(0, 0.55, -0.38); tail.rotation.x = 0.4; character.add(tail);
-  const tailTip = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.16), creamMat); tailTip.position.set(0, 0.68, -0.6); character.add(tailTip);
-  /* TWO legs, centred — adding arms to the original four left him with six
-     limbs. The front pair is gone and the back pair moved to z 0, so he
-     stands on two feet under the middle of his body. */
-  const legGeo = new THREE.BoxGeometry(0.16, 0.26, 0.16);
-  const legL = new THREE.Mesh(legGeo, darkMat); legL.position.set(-0.17, 0.13, 0); character.add(legL);
-  const legR = new THREE.Mesh(legGeo, darkMat); legR.position.set(0.17, 0.13, 0); character.add(legR);
 
-  // Arms, on shoulder pivots so they swing from the shoulder. The hands are
-  // darkMat — the same brown as the feet.
-  const armGeo = new THREE.BoxGeometry(0.13, 0.22, 0.14);
-  const handGeo = new THREE.BoxGeometry(0.15, 0.1, 0.16);
-  const makeArm = (x) => {
+  // --- torso: olive tunic, with the orange chest and collar showing above it
+  const tunic = new THREE.Mesh(roundedBox(0.60, 0.46, 0.44, 0.10), vestMat);
+  tunic.position.y = 0.66; character.add(tunic);
+  const chest = new THREE.Mesh(roundedBox(0.45, 0.18, 0.39, 0.07), orangeMat);
+  chest.position.y = 0.92; character.add(chest);
+  const bib = new THREE.Mesh(roundedBox(0.20, 0.12, 0.06, 0.03), creamMat);
+  bib.position.set(0, 0.86, 0.20); character.add(bib);
+  // the satchel rides on his right hip, the one prop the sheet keeps
+  const pouch = new THREE.Mesh(roundedBox(0.13, 0.15, 0.11, 0.035), bootMat);
+  pouch.position.set(0.30, 0.58, 0.03); character.add(pouch);
+
+  // --- neckerchief: a band round the throat plus the point hanging down front
+  const scarf = new THREE.Mesh(roundedBox(0.50, 0.13, 0.45, 0.055), redMat);
+  scarf.position.y = 0.99; character.add(scarf);
+  const scarfTip = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.22, 4), redMat);
+  scarfTip.position.set(0, 0.88, 0.19);
+  scarfTip.rotation.set(Math.PI, Math.PI / 4, 0); character.add(scarfTip);
+
+  // --- head
+  const head = new THREE.Mesh(roundedBox(0.50, 0.42, 0.46, 0.10), orangeMat);
+  head.position.y = 1.15; character.add(head);
+  const muzzle = new THREE.Mesh(roundedBox(0.26, 0.20, 0.21, 0.06), creamMat);
+  muzzle.position.set(0, 1.08, 0.32); character.add(muzzle);
+  const nose = new THREE.Mesh(roundedBox(0.09, 0.08, 0.07, 0.025), darkMat);
+  nose.position.set(0, 1.13, 0.43); character.add(nose);
+  [-0.135, 0.135].forEach((dxv) => {
+    // eye, plus the single specular dot the reference gives it — that dot is
+    // most of what reads as "cute" at the 4.1-unit focusOnFocci close-up.
+    const eye = new THREE.Mesh(roundedBox(0.085, 0.10, 0.05, 0.028), darkMat);
+    eye.position.set(dxv, 1.20, 0.235); character.add(eye);
+    const glint = new THREE.Mesh(roundedBox(0.032, 0.032, 0.02, 0.01), glintMat);
+    glint.position.set(dxv + 0.022, 1.235, 0.255); character.add(glint);
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.135, 0.28, 4), orangeMat);
+    ear.position.set(dxv * 1.25, 1.44, -0.03);
+    ear.rotation.y = Math.PI / 4; character.add(ear);
+    const earIn = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.17, 4), creamMat);
+    earIn.position.set(dxv * 1.25, 1.42, 0.02);
+    earIn.rotation.y = Math.PI / 4; character.add(earIn);
+  });
+
+  // --- tail: one thick bevelled block, ending in a cream point
+  const tail = new THREE.Mesh(roundedBox(0.21, 0.22, 0.46, 0.09), orangeMat);
+  tail.position.set(0, 0.62, -0.34); tail.rotation.x = 0.38; character.add(tail);
+  const tailTip = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.28, 4), creamMat);
+  tailTip.position.set(0, 0.86, -0.55);
+  tailTip.rotation.set(-1.05, Math.PI / 4, 0); character.add(tailTip);
+
+  /* Two legs on hip pivots, each carrying its own boot. The leg mesh hangs
+     BELOW the pivot so the swing reads from the hip; the boot's bottom face
+     lands on y = 0 with the pivot at 0.44 and the boot centred at -0.37. */
+  const legGeo = roundedBox(0.17, 0.32, 0.18, 0.055);
+  const bootGeo = roundedBox(0.21, 0.14, 0.28, 0.05);
+  const makeLeg = (x) => {
     const pivot = new THREE.Group();
-    pivot.position.set(x, 0.66, 0.02);
-    const m = new THREE.Mesh(armGeo, orangeMat); m.position.y = -0.11; pivot.add(m);
-    const hand = new THREE.Mesh(handGeo, darkMat); hand.position.y = -0.26; pivot.add(hand);
+    pivot.position.set(x, 0.44, 0);
+    const m = new THREE.Mesh(legGeo, orangeMat); m.position.y = -0.20; pivot.add(m);
+    const boot = new THREE.Mesh(bootGeo, bootMat); boot.position.set(0, -0.37, 0.04); pivot.add(boot);
     character.add(pivot);
     return pivot;
   };
-  const armL = makeArm(-0.37);
-  const armR = makeArm(0.37);
+  const legL = makeLeg(-0.16);
+  const legR = makeLeg(0.16);
+
+  // Arms on shoulder pivots, paws in the same brown as the boots.
+  const armGeo = roundedBox(0.15, 0.26, 0.16, 0.055);
+  const pawGeo = roundedBox(0.17, 0.13, 0.18, 0.05);
+  const makeArm = (x) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, 0.86, 0.02);
+    const m = new THREE.Mesh(armGeo, orangeMat); m.position.y = -0.14; pivot.add(m);
+    const paw = new THREE.Mesh(pawGeo, bootMat); paw.position.y = -0.31; pivot.add(paw);
+    character.add(pivot);
+    return pivot;
+  };
+  const armL = makeArm(-0.34);
+  const armR = makeArm(0.34);
 
   scene.add(character);
   character.traverse((o) => { if (o.isMesh) o.castShadow = true; });
