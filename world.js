@@ -2826,10 +2826,10 @@ export async function bootFocciWorld(root, opts) {
     character.visible = (m !== 'fpv');
     if (m === 'fpv') { cam.tPhi = 1.45; cam.tRadius = 7; fpvPitch = -0.05; }
     else { cam.tPhi = 1.05; cam.tRadius = 14; }
-    /* 50 (the third-person lens) put the walls on your face; 68 went the
-       other way and shrank everything ahead of him until it was hard to
-       make out. 56 sits between the two. */
-    camera.fov = (m === 'fpv') ? 56 : 50;
+    /* 68 shrank everything ahead of him and 56 still did; both views use the
+       same 50 now, so stepping into his eyes changes where you stand, not
+       how big the island looks. */
+    camera.fov = 50;
     camera.updateProjectionMatrix();
   }
   function toggleCamMode() {
@@ -2863,9 +2863,11 @@ export async function bootFocciWorld(root, opts) {
          Sitting exactly on charState put the camera inside Focci's own
          collision volume at the near plane, so the screen filled with a
          flat colour and it looked as though nothing moved at all. */
-      // tracks where the eyes actually are — the chibi rebuild dropped the
-      // head, so a fixed 1.18 would now float the camera above his ears
-      const eyeY = character.position.y + 1.12 + (Math.sin(charState.walkT * 2) * 0.035);
+      /* The midpoint of the two ear tips rather than his eyes, which sat low
+         enough that his own muzzle took the bottom of the frame. The tips
+         are the highest point of the model (model y 0.9687 of a 0.9687-tall
+         model, x 0, z 0.06), so in world units they are his full height. */
+      const eyeY = character.position.y + 1.60 + (Math.sin(charState.walkT * 2) * 0.035);
       const fx = -Math.sin(cam.theta), fz = -Math.cos(cam.theta);
       camera.position.set(charState.x + fx * 0.32, eyeY, charState.z + fz * 0.32);
       /* fpvPitch is where he is looking up or down, set by dragging. It
