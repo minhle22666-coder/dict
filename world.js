@@ -1104,7 +1104,7 @@ export async function bootFocciWorld(root, opts) {
   const ARC_ENV_FILES = ['island.glb', 'camp.glb', 'waterfall.glb', 'secretcamp.glb'];
   const arcCount = Math.min(ARC_TITLES.length, 4);
   const [
-    hub, mushGlb, birdGlb, skyGlb, pondGlb, boatGlb, doeGlb, diamondGlb,
+    hub, mushGlb, birdGlb, skyGlb, pondGlb, boatGlb, doeGlb, diamondGlb, focciGlb,
     ...arcGltfs
   ] = await Promise.all([
     loadGLB(ASSET('fox-island.glb')),
@@ -1115,6 +1115,7 @@ export async function bootFocciWorld(root, opts) {
     loadGLB(ASSET('boat.glb')),
     loadGLB(ASSET('doe.glb')),
     loadGLB(ASSET('teleport-diamond.glb')),
+    loadGLB(ASSET('focci.glb')),
     ...Array.from({ length: arcCount }, (_, i) => loadGLB(ASSET(ARC_ENV_FILES[i]))),
   ]);
 
@@ -2590,43 +2591,6 @@ export async function bootFocciWorld(root, opts) {
   /* ============================================================
      CHARACTER (Focci) — same verified movement/camera system
      ============================================================ */
-  const orangeMat = new THREE.MeshStandardMaterial({ color: 0xf5822b, flatShading: true, roughness: 0.68 });
-  const creamMat = new THREE.MeshStandardMaterial({ color: 0xfff6ea, flatShading: true, roughness: 0.7 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x241a12, flatShading: true, roughness: 0.6 });
-  const redMat = new THREE.MeshStandardMaterial({ color: 0xe03b30, flatShading: true, roughness: 0.7 });
-  const vestMat = new THREE.MeshStandardMaterial({ color: 0x7d8f4e, flatShading: true, roughness: 0.78 });
-  const bootMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, flatShading: true, roughness: 0.75 });
-  const glintMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.35 });
-
-  /* The vendored three.module.js is r149 trimmed to the core, so there is no
-     RoundedBoxGeometry (it ships in examples/jsm, which is not vendored —
-     the same gap that forced cloneSkinned() to be written by hand).
-
-     This is the standard construction: take a segmented box, clamp each
-     vertex into the box shrunk by r on every axis, then push it back out to
-     distance r from that clamped point. Face centres land exactly where they
-     started, edges and corners round off. Three segments is the sweet spot —
-     enough for the bevel to read as a curve, few enough that flatShading
-     still facets it into the hyper-casual look rather than smoothing it. */
-  const _rbV = new THREE.Vector3();
-  function roundedBox(w, h, d, r, seg) {
-    r = Math.min(r, w / 2, h / 2, d / 2);
-    const g = new THREE.BoxGeometry(w, h, d, seg || 3, seg || 3, seg || 3);
-    const pos = g.attributes.position;
-    const ix = w / 2 - r, iy = h / 2 - r, iz = d / 2 - r;
-    for (let i = 0; i < pos.count; i++) {
-      _rbV.fromBufferAttribute(pos, i);
-      const cx = Math.max(-ix, Math.min(ix, _rbV.x));
-      const cy = Math.max(-iy, Math.min(iy, _rbV.y));
-      const cz = Math.max(-iz, Math.min(iz, _rbV.z));
-      _rbV.set(_rbV.x - cx, _rbV.y - cy, _rbV.z - cz);
-      const len = _rbV.length() || 1;
-      pos.setXYZ(i, cx + (_rbV.x / len) * r, cy + (_rbV.y / len) * r, cz + (_rbV.z / len) * r);
-    }
-    g.computeVertexNormals();
-    return g;
-  }
-
   /* ---------- camera state (declared early: enterRoom() below needs it) ---------- */
   const DEFAULT_CAM = { theta: 0.7, phi: 1.05, radius: 14 };
   const cam = { theta: 0.7, phi: 1.05, radius: 14, tTheta: 0.7, tPhi: 1.05, tRadius: 14 };
@@ -2653,107 +2617,101 @@ export async function bootFocciWorld(root, opts) {
     cam.tPhi = 0.72; cam.tRadius = 96;   // room left to pinch further out by hand
   }
 
-  /* Focci, rebuilt to the hyper-casual reference sheet: soft-bevelled boxes,
-     a cube head with a cream snout, four-sided ears, a red neckerchief with a
-     hanging point, an olive tunic, detached limbs and a simplified tail that
-     ends in a point.
+  /* Focci is the artist's model, assets/glb/focci.glb.
 
-     Two earlier restyles (a sphere-and-capsule rebuild, then a bevel pass)
-     were rejected because the brief at the time was only "add arms". This one
-     IS the brief — but three things below are load-bearing for code elsewhere
-     and must not drift:
+     The source was a single fused 500k-triangle mesh with an AI-baked 4K
+     texture whose colours bled into one another — orange smeared over the
+     top of the snout, brown blotches on the bag and paws, baked shading
+     read as a second colour. It was re-coloured offline: every triangle was
+     snapped to one flat palette colour, each body part only allowed the
+     colours it really has, borders cut along straight planes, and the mesh
+     simplified per colour region with those borders locked. What ships is
+     ~34k triangles in 10 flat materials and no texture (0.98 MB, from 29.8).
 
-       • The feet rest at y = 0. animate() does
-         character.position.set(x, surf.y + bob + jumpY, z) with no foot
-         offset, so the origin IS the ground contact point.
-       • Forward is +Z. Facing comes from atan2(moveX, moveZ), so every
-         front-facing part (snout, nose, eyes) sits at positive z and the
-         tail at negative z. Mirror this and he walks backwards.
-       • Total height stays ~1.56. BODY_H (1.7) decides which lintels he
-         passes under, and the first-person eye sits at a fixed +1.18.
+     It has no skeleton, so one is built here. Weights fade across the hip,
+     shoulder and tail root, so the fused mesh bends at a joint instead of
+     tearing when a limb swings. Where two colour regions meet, the vertices
+     on the seam take the smaller of their weights so the seam never opens.
 
-     The four limbs are Groups pivoted at hip and shoulder, not bare meshes,
-     so the walk cycle swings them from the joint instead of spinning them
-     about their own middle. animate() writes .rotation.x on exactly these
-     four names. */
+     Still load-bearing for the rest of the file: feet at y = 0, forward is
+     +Z, height under BODY_H (1.7); animate() rotates legL/legR/armL/armR and
+     tailPivot, which are the bones below. */
+  const FOCCI_HEIGHT = 1.6;
   const character = new THREE.Group();
+  const rig = new THREE.Group();
+  character.add(rig);
+  const focciSrc = focciGlb.scene;
+  const focciBox = new THREE.Box3().setFromObject(focciSrc);
+  rig.scale.setScalar(FOCCI_HEIGHT / (focciBox.max.y - focciBox.min.y));
 
-  // --- torso: olive tunic, with the orange chest and collar showing above it
-  const tunic = new THREE.Mesh(roundedBox(0.60, 0.46, 0.44, 0.10), vestMat);
-  tunic.position.y = 0.66; character.add(tunic);
-  const chest = new THREE.Mesh(roundedBox(0.45, 0.18, 0.39, 0.07), orangeMat);
-  chest.position.y = 0.92; character.add(chest);
-  const bib = new THREE.Mesh(roundedBox(0.20, 0.12, 0.06, 0.03), creamMat);
-  bib.position.set(0, 0.86, 0.20); character.add(bib);
-  // the satchel rides on his right hip, the one prop the sheet keeps
-  const pouch = new THREE.Mesh(roundedBox(0.13, 0.15, 0.11, 0.035), bootMat);
-  pouch.position.set(0.30, 0.58, 0.03); character.add(pouch);
+  // joints, in the model's own units (it stands 0.97 tall)
+  const rootBone = new THREE.Bone();
+  const makeBone = (x, y, z) => { const b = new THREE.Bone(); b.position.set(x, y, z); rootBone.add(b); return b; };
+  const legL = makeBone(-0.09, 0.19, -0.01);
+  const legR = makeBone(0.09, 0.19, -0.01);
+  const armL = makeBone(-0.215, 0.43, 0.065);
+  const armR = makeBone(0.215, 0.43, 0.065);
+  const tailPivot = makeBone(0, 0.2, -0.16);
+  rig.add(rootBone);
+  rig.updateMatrixWorld(true);
+  const focciBones = [rootBone, legL, legR, armL, armR, tailPivot];
+  const skeleton = new THREE.Skeleton(focciBones);
 
-  // --- neckerchief: a band round the throat plus the point hanging down front
-  const scarf = new THREE.Mesh(roundedBox(0.50, 0.13, 0.45, 0.055), redMat);
-  scarf.position.y = 0.99; character.add(scarf);
-  const scarfTip = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.22, 4), redMat);
-  scarfTip.position.set(0, 0.88, 0.19);
-  scarfTip.rotation.set(Math.PI, Math.PI / 4, 0); character.add(scarfTip);
+  const ramp = (e0, e1, v) => { const t = Math.min(1, Math.max(0, (v - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+  const ARM_MATS = /orange$|paw$/;          // bandana flaps overhang the arm but must not swing with it
+  function jointWeight(x, y, z, matName) {
+    const ax = Math.abs(x);
+    if (z < -0.15 && y < 0.45) return [5, ramp(-0.16, -0.25, z)];
+    /* Limbs move rigidly with only a few millimetres of blend at the joint.
+       A wide blend (first try: over the top third of the leg) put a knee
+       halfway up these short legs and stretched the arms like rubber. */
+    if (ax > 0.162 && y < 0.47 && ARM_MATS.test(matName)) return [x < 0 ? 3 : 4, ramp(0.455, 0.425, y) * ramp(0.160, 0.172, ax)];
+    // Torso underside is at y 0.1725: legs are fully weighted below it, the
+    // belt above is not, and the strip between the legs (|x| < 0.03) stays
+    // put. The satchel is excluded or it would swing with the right leg.
+    const bag = x > -0.005 && y > 0.13 && z > 0.188;   // its sides start at the belt face, z 0.192
+    if (ax < 0.155 && !bag) return [x < 0 ? 1 : 2, ramp(0.178, 0.168, y) * ramp(0.03, 0.045, ax)];
+    return [0, 0];
+  }
 
-  // --- head
-  const head = new THREE.Mesh(roundedBox(0.50, 0.42, 0.46, 0.10), orangeMat);
-  head.position.y = 1.15; character.add(head);
-  const muzzle = new THREE.Mesh(roundedBox(0.26, 0.20, 0.21, 0.06), creamMat);
-  muzzle.position.set(0, 1.08, 0.32); character.add(muzzle);
-  const nose = new THREE.Mesh(roundedBox(0.09, 0.08, 0.07, 0.025), darkMat);
-  nose.position.set(0, 1.13, 0.43); character.add(nose);
-  [-0.135, 0.135].forEach((dxv) => {
-    // eye, plus the single specular dot the reference gives it — that dot is
-    // most of what reads as "cute" at the 4.1-unit focusOnFocci close-up.
-    const eye = new THREE.Mesh(roundedBox(0.085, 0.10, 0.05, 0.028), darkMat);
-    eye.position.set(dxv, 1.20, 0.235); character.add(eye);
-    const glint = new THREE.Mesh(roundedBox(0.032, 0.032, 0.02, 0.01), glintMat);
-    glint.position.set(dxv + 0.022, 1.235, 0.255); character.add(glint);
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.135, 0.28, 4), orangeMat);
-    ear.position.set(dxv * 1.25, 1.44, -0.03);
-    ear.rotation.y = Math.PI / 4; character.add(ear);
-    const earIn = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.17, 4), creamMat);
-    earIn.position.set(dxv * 1.25, 1.42, 0.02);
-    earIn.rotation.y = Math.PI / 4; character.add(earIn);
+  const focciMeshes = [];
+  focciSrc.updateMatrixWorld(true);
+  focciSrc.traverse((o) => { if (o.isMesh) focciMeshes.push(o); });
+  // pass 1: weight per vertex, and the minimum per shared position
+  const seamMin = new Map();
+  const keyOf = (x, y, z) => Math.round(x * 1e4) + ',' + Math.round(y * 1e4) + ',' + Math.round(z * 1e4);
+  const perMesh = focciMeshes.map((m) => {
+    const pos = m.geometry.attributes.position;
+    const out = [];
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const [bone, w] = jointWeight(x, y, z, m.material.name || '');
+      const k = keyOf(x, y, z);
+      const prev = seamMin.get(k);
+      if (!prev || w < prev.w) seamMin.set(k, { bone, w });
+      out.push(k);
+    }
+    return out;
   });
-
-  // --- tail: one thick bevelled block, ending in a cream point
-  const tail = new THREE.Mesh(roundedBox(0.21, 0.22, 0.46, 0.09), orangeMat);
-  tail.position.set(0, 0.62, -0.34); tail.rotation.x = 0.38; character.add(tail);
-  const tailTip = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.28, 4), creamMat);
-  tailTip.position.set(0, 0.86, -0.55);
-  tailTip.rotation.set(-1.05, Math.PI / 4, 0); character.add(tailTip);
-
-  /* Two legs on hip pivots, each carrying its own boot. The leg mesh hangs
-     BELOW the pivot so the swing reads from the hip; the boot's bottom face
-     lands on y = 0 with the pivot at 0.44 and the boot centred at -0.37. */
-  const legGeo = roundedBox(0.17, 0.32, 0.18, 0.055);
-  const bootGeo = roundedBox(0.21, 0.14, 0.28, 0.05);
-  const makeLeg = (x) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, 0.44, 0);
-    const m = new THREE.Mesh(legGeo, orangeMat); m.position.y = -0.20; pivot.add(m);
-    const boot = new THREE.Mesh(bootGeo, bootMat); boot.position.set(0, -0.37, 0.04); pivot.add(boot);
-    character.add(pivot);
-    return pivot;
-  };
-  const legL = makeLeg(-0.16);
-  const legR = makeLeg(0.16);
-
-  // Arms on shoulder pivots, paws in the same brown as the boots.
-  const armGeo = roundedBox(0.15, 0.26, 0.16, 0.055);
-  const pawGeo = roundedBox(0.17, 0.13, 0.18, 0.05);
-  const makeArm = (x) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, 0.86, 0.02);
-    const m = new THREE.Mesh(armGeo, orangeMat); m.position.y = -0.14; pivot.add(m);
-    const paw = new THREE.Mesh(pawGeo, bootMat); paw.position.y = -0.31; pivot.add(paw);
-    character.add(pivot);
-    return pivot;
-  };
-  const armL = makeArm(-0.34);
-  const armR = makeArm(0.34);
+  // pass 2: skinned copies of every colour region, bound to one skeleton
+  focciMeshes.forEach((m, mi) => {
+    const g = m.geometry.clone();
+    const n = g.attributes.position.count;
+    const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
+      const { bone, w } = seamMin.get(perMesh[mi][i]);
+      si[i * 4] = 0; si[i * 4 + 1] = bone;
+      sw[i * 4] = 1 - w; sw[i * 4 + 1] = w;
+    }
+    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+    g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+    const sm = new THREE.SkinnedMesh(g, m.material);
+    sm.castShadow = true;
+    sm.frustumCulled = false;      // bones move him outside the rest-pose bounds
+    rig.add(sm);
+    rig.updateMatrixWorld(true);
+    sm.bind(skeleton);
+  });
 
   scene.add(character);
   character.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -2905,7 +2863,9 @@ export async function bootFocciWorld(root, opts) {
          Sitting exactly on charState put the camera inside Focci's own
          collision volume at the near plane, so the screen filled with a
          flat colour and it looked as though nothing moved at all. */
-      const eyeY = character.position.y + 1.18 + (Math.sin(charState.walkT * 2) * 0.035);
+      // tracks where the eyes actually are — the chibi rebuild dropped the
+      // head, so a fixed 1.18 would now float the camera above his ears
+      const eyeY = character.position.y + 1.12 + (Math.sin(charState.walkT * 2) * 0.035);
       const fx = -Math.sin(cam.theta), fz = -Math.cos(cam.theta);
       camera.position.set(charState.x + fx * 0.32, eyeY, charState.z + fz * 0.32);
       /* fpvPitch is where he is looking up or down, set by dragging. It
@@ -3580,8 +3540,10 @@ export async function bootFocciWorld(root, opts) {
     charState.inWater = surf.water;
     const swing = (walking && !surf.water) ? Math.sin(charState.walkT) * 0.55 : 0;
     // Biped gait: each arm swings opposite the leg on its own side.
-    legL.rotation.x = swing; legR.rotation.x = -swing;
-    armL.rotation.x = -swing; armR.rotation.x = swing;
+    // scaled for the model's short limbs: a full 0.55 rad read as flailing
+    legL.rotation.x = swing * 0.75; legR.rotation.x = -swing * 0.75;
+    armL.rotation.x = -swing * 0.7; armR.rotation.x = swing * 0.7;
+    tailPivot.rotation.y = walking ? Math.sin(charState.walkT) * 0.18 : Math.sin(t * 1.3) * 0.08;
     const bob = surf.water ? Math.sin(t * 3) * 0.05 - 0.32 : (walking ? Math.abs(Math.sin(charState.walkT)) * 0.07 : Math.sin(t * 1.6) * 0.02);
     // Jump arc rides on top of whatever the terrain is doing underneath, so
     // he can leap off a slope and still land on it.
@@ -3598,8 +3560,8 @@ export async function bootFocciWorld(root, opts) {
     // jump reads as the whole model being slid upward.
     if (charState.jumpY > 0.02) {
       const k = Math.min(1, charState.jumpY / 1.2);
-      legL.rotation.x = legR.rotation.x = -0.8 * k;
-      armL.rotation.x = armR.rotation.x = -1.5 * k;
+      legL.rotation.x = legR.rotation.x = -0.45 * k;
+      armL.rotation.x = armR.rotation.x = -0.9 * k;
     }
     character.position.set(charState.x, surf.y + bob + charState.jumpY, charState.z);
 
