@@ -25,7 +25,7 @@
   var HT_LS = 'fc_hottake';
   var START_OPEN = 4;        // how many are unlocked on day one
   // finishing one opens another from the same masthead — see unlockFrom
-  var FINISH_XP = 6;
+  var FINISH_XP = 5;
 
   var DATA = null;           // { version, items:[...] }
   var byId = {};

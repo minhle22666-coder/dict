@@ -5436,18 +5436,6 @@
       </div>
       </div>
 
-      <!-- Hành động chính của trang: to nhất, ồn nhất, mọi thứ khác im lặng -->
-      <button class="jstory" id="jstory" onclick="showStoryIntro()">
-        <span class="jstory-art" id="jstory-art"></span>
-        <span class="glow-border"></span>
-        <img class="jstory-char" src="./mascot-explore.webp" alt="" />
-        <span class="jstory-text">
-          <span class="jstory-land" id="jstory-land"></span>
-          <span class="jstory-title" id="jstory-title">Continue the story</span>
-          <span class="jstory-prog"><i id="jstory-fill"></i></span>
-          <span class="jstory-go">Play &#9654;</span>
-        </span>
-      </button>
 
       <!-- Nhiệm vụ ngày: tiến trình THẬT (số lượt tra/lưu hôm nay + vòng game), nhận thưởng XP -->
       <div class="quests" id="quests">
@@ -5596,7 +5584,7 @@
       <div class="sx-field">
         <label for="goal">Daily XP goal</label>
         <input id="goal" type="number" min="5" step="5" placeholder="20"/>
-        <p class="sx-hint">Search +2 · save +1 · correct answer +2–3 · finish a round +8–10.</p>
+        <p class="sx-hint">Search +1 · save +1 · correct answer +1 · Speak Up +2 · Hot Take +5.</p>
       </div>
       <div class="sx-sep"></div>
       <div class="sx-field">
@@ -5764,12 +5752,6 @@
         <button class="btn ghost sm danger" id="clear-log-btn" style="margin-top:0">Clear</button>
       </div>
       <div class="saved-flash" id="clearlog-flash"></div>
-      <div class="sx-sep"></div>
-      <div class="sx-row">
-        <div class="sx-row-txt"><b>Restart the story</b><span>Wipes decisions, stats and chapters back to Arc 1. Your dictionary is untouched.</span></div>
-        <button class="btn ghost sm danger" id="restart-story-btn" style="margin-top:0">Restart</button>
-      </div>
-      <div class="saved-flash" id="restart-story-flash"></div>
     </div>
     </div>
 
@@ -6118,9 +6100,6 @@
       <button class="fw-mi" aria-label="Progress" onclick="openFwPanel('stats')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="9" cy="7" rx="3" ry="4"/><ellipse cx="16" cy="15" rx="3" ry="4"/></svg>
       </button>
-      <button class="fw-mi" aria-label="Before you begin" onclick="showStoryIntro()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.3-3.5-2-6-2v13c2.5 0 4.5.7 6 2 1.5-1.3 3.5-2 6-2V4c-2.5 0-4.5.7-6 2Z"/><path d="M12 6v13"/></svg>
-      </button>
     </div>
     <button class="fw-fab-menu fw-menu-glass" id="fw-menu-toggle" aria-label="Menu" onclick="toggleFwMenu()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg>
@@ -6135,7 +6114,6 @@
 <script src="./hottake.js"></script>
 <script src="./journal.js"></script>
 <script src="./app.js"></script>
-<script src="./story-content.js"></script>
 <script src="./story.js"></script>
 <script src="./dict-system.js"></script>
 
@@ -6178,13 +6156,11 @@
     worldApi = await bootFocciWorld(document, {
       angelMessages: FOCCI_ANGEL_MESSAGES,
       arcTitles,
-      onOpenArc: (index) => {
-        const arcId = index + 1;
-        if (!arcUnlocked(arcId)) return;
-        closeFocciWorld3D();
-        updateContinueCard(arcId);
-        openStory();
-      },
+      /* Stepping onto an island used to close the overlay and hand straight
+         off to that arc's chapter. The story is retired, so the gateway now
+         just takes you back out to the app — the island itself is still
+         worth walking. */
+      onOpenArc: () => { closeFocciWorld3D(); },
       // Opening a chest used to call showView('review') + setPracticeMode,
       // which drops you into Speak Up with no way back — showView doesn't
       // reveal #fw-panel-close, only openFwPanel does, so the panel came up
@@ -6493,7 +6469,7 @@
       openFwPanel(where === 'saved' ? 'saved' : where);
     }, 240);
   };
-  window.fmGuide = function () { fmClose(); setTimeout(() => showStoryIntro(), 240); };
+  window.fmGuide = function () { fmClose(); };
   window.fmSound = function () {
     if (!worldApi) return;
     const on = worldApi.toggleSound();
@@ -6566,10 +6542,10 @@
     host.innerHTML = html;
   })();
 
-  window.fhContinue = function () {
-    if (window.openFwPanel) openFwPanel('review');
-    if (window.openStory) openStory();
-  };
+  /* Deliberately inert. The story this used to continue is gone and the home
+     hero is being redesigned; the button stays on screen so the layout is
+     unchanged, but it does nothing until that redesign lands. */
+  window.fhContinue = function () { };
   window.fhLearned = function () { fhShowWorld(); };
   window.fhGame = function (btn, mode) {
     // Visible confirmation first — the pop runs whether or not the panel

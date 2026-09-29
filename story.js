@@ -1913,7 +1913,12 @@ window.storyHomeInfo = function(){
   }
   return { arcId:id, name:meta.name, pct, started:isStoryStarted() };
 };
-function openStory(){ _pageDir=0; resetPending(); renderStory(); }
+/* The story is retired. openStory() is kept as a no-op rather than deleted
+   because several call sites (the home Continue button, the world's arc
+   hand-off, showStoryIntro) sit inside index.html's single
+   <script type="module"> block, where one ReferenceError takes out every
+   other statement in the block — including the 3D world's boot. */
+function openStory(){ }
 window.openStory = openStory;
 
 function isStoryStarted(){ return Object.keys(getState().storyLog).length>0; }
@@ -1924,20 +1929,19 @@ window.renderGameHub = function(){
   window.__sayItActive=false;   // leaving Speak Up's play screen — stop auto-saving word lookups
   if(typeof suPanelOn==='function') suPanelOn(false);
   const area=$('#review-area'); if(!area) return;
-  const map=renderWorldMap(); // { hero, more, mapSection } — banner is itself the Play/Continue button
+  /* The story hero, the life-lessons card and the twelve-region map all came
+     out of the story engine, which is gone. What has to stay is the 3D world
+     link: renderWorldMap() was the only place in the app that rendered it,
+     so removing the hub wholesale would have stranded the island with no way
+     in from this tab. */
   let h='<div class="game-hub">';
-
-  h+=map.hero;
-
-  /* The mini-game tiles used to live here. The home page is the mini-game
-     menu now — same three games, better art, and it is the first thing the
-     app shows — so this hub keeps only what is actually its own: the story
-     hero and the land map. Leaving a second, worse copy of the menu here
-     just meant it flashed up for a moment on the way into every game. */
-
-  h+=map.more;
-  h+=map.mapSection;
-
+  h+='<div class="gm-more-row">'
+    +'<button class="gm-more-card explore" onclick="openFocciWorld3D()">'
+      +'<span class="fw-explore-ico">🌍</span>'
+      +'<span class="gm-more-t">Explore in 3D</span>'
+      +'<span class="fw-explore-arrow">→</span>'
+    +'</button>'
+  +'</div>';
   h+='</div>';
   area.innerHTML=h;
 };
@@ -2212,6 +2216,14 @@ if(typeof todaysActivityCount==='function'){
    INIT — nothing to boot eagerly; the hub/settings hooks above
    are called on-demand by app.js's showView().
    ============================================================ */
+
+/* Word taps used to be wired by renderStory(), which no longer runs. The
+   listener is delegated on #review-area — static markup that outlives every
+   innerHTML swap — and Speak Up renders its tappable answers into that same
+   container, so binding once here keeps tapping a word working now that the
+   story is gone. It must stay after that element exists in the document;
+   this file's <script> tag sits well below it. */
+wireWordTaps();
 
 /* The Focci's World 3D bridge (index.html, right after this script tag)
    needs ARC_LANDS/arcUnlocked/showWordSheet/condensedEntryHTML, but this

@@ -121,7 +121,8 @@
 .ws-card { border-radius: 26px 26px 0 0; }
 .ws-word { font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 21px; }
 .ws-vi { font-family: 'Baloo 2', sans-serif; }
-.ws-full { box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 40%, transparent); }
+/* .ws-full is restyled in Part 5 — it used to carry a literal terracotta
+   drop shadow that survived every palette change. */
 
 /* ============================================================
    Part 4: full calming re-theme — Tunic / Monument Valley direction.
@@ -145,12 +146,21 @@
   --muted-2: #8C7F6A;
 
   --primary: #BE7C4E;
-  --primary-bg: color-mix(in srgb, #BE7C4E 14%, transparent);
-  --amber: #C99A4A;    --amber-bg: color-mix(in srgb, #C99A4A 14%, transparent);
-  --blue: #7B93A8;     --blue-bg: color-mix(in srgb, #7B93A8 14%, transparent);
-  --mint: #8CA37E;     --mint-bg: color-mix(in srgb, #8CA37E 14%, transparent);
-  --coral: #B97159;    --coral-bg: color-mix(in srgb, #B97159 14%, transparent);
-  --violet: #93879E;   --violet-bg: color-mix(in srgb, #93879E 14%, transparent);
+  /* Each -bg companion is the 14% tint of the solid above it.
+
+     Deriving it with var() here keeps the pair in step when the solid is
+     edited, but it does NOT make the tint follow a DESCENDANT's override:
+     a custom property is substituted at the element that declares it, and
+     what inherits downward is the already-resolved colour. So a scope that
+     re-tints the page (the word page below sets a mint --primary) has to
+     restate its -bg companions too, or it gets teal text on the terracotta
+     wash this file computed back up at :root. Measured, not assumed. */
+  --primary-bg: color-mix(in srgb, var(--primary) 14%, transparent);
+  --amber: #C99A4A;    --amber-bg: color-mix(in srgb, var(--amber) 14%, transparent);
+  --blue: #7B93A8;     --blue-bg: color-mix(in srgb, var(--blue) 14%, transparent);
+  --mint: #8CA37E;     --mint-bg: color-mix(in srgb, var(--mint) 14%, transparent);
+  --coral: #B97159;    --coral-bg: color-mix(in srgb, var(--coral) 14%, transparent);
+  --violet: #93879E;   --violet-bg: color-mix(in srgb, var(--violet) 14%, transparent);
 
   --grad-hero: linear-gradient(160deg, #C68A5C, #B4744A);
   --on-hero: #FBF6EC;
@@ -187,3 +197,182 @@ body {
   --k-cyan: linear-gradient(140deg, #7B93A8, #63788C);
 }
 .q-row { filter: drop-shadow(0 8px 14px rgba(50, 40, 25, .12)); }
+
+/* ============================================================
+   Part 5: the dictionary word page and the word sheet.
+
+   Two problems, one cause and one composition fault.
+
+   The cause: Part 4 above flattened the whole app to one low-saturation
+   earth palette. That reads as calm on the home screen, but the word page
+   is where eight different kinds of information sit on one scroll — parts
+   of speech, senses, collocations, prepositions, synonyms — and telling
+   them apart is the entire job. At 14% tints of six near-identical browns
+   nothing separated, which is the "trầm quá" complaint. This scope gives
+   the page (and only the page) a saturated, modern set so word-family and
+   part-of-speech colours actually differ from each other.
+
+   The composition fault: html.dict-open #v-home is position:fixed;inset:0
+   and sets only padding-top/bottom, so main{padding:16px} stops applying
+   and the page runs edge to edge with no gutter and no width cap at any
+   screen size. That is the "full screen quá mức" complaint — it was never
+   a colour problem.
+   ============================================================ */
+
+html.dict-open #v-home {
+  /* gutters the fixed positioning took away, and a measure that stops the
+     text stretching the full width of a tablet or desktop window */
+  padding-left: max(18px, env(safe-area-inset-left, 0px));
+  padding-right: max(18px, env(safe-area-inset-right, 0px));
+
+  /* a saturated set, distinct hue to distinct hue, so the POS colours read
+     as different categories rather than six shades of the same brown */
+  --primary: #0FA3AC;
+  --cyan:    #17B6C4;
+  --mint:    #0FA97E;
+  --blue:    #3B82F6;
+  --amber:   #E8930C;
+  --pink:    #E5449B;
+  --coral:   #F0544F;
+  --violet:  #7C5CFF;
+
+  /* restated, not inherited — see the note on the -bg pairs at :root */
+  --primary-bg: color-mix(in srgb, #0FA3AC 13%, transparent);
+  --cyan-bg:    color-mix(in srgb, #17B6C4 13%, transparent);
+  --mint-bg:    color-mix(in srgb, #0FA97E 13%, transparent);
+  --blue-bg:    color-mix(in srgb, #3B82F6 13%, transparent);
+  --amber-bg:   color-mix(in srgb, #E8930C 16%, transparent);
+  --pink-bg:    color-mix(in srgb, #E5449B 13%, transparent);
+  --coral-bg:   color-mix(in srgb, #F0544F 13%, transparent);
+  --violet-bg:  color-mix(in srgb, #7C5CFF 13%, transparent);
+
+  --grad-hero: linear-gradient(135deg, #0FA3AC, #4FD6D8);
+  --grad-text: linear-gradient(135deg, #0B7F87, #17B6C4);
+  --on-hero: #FFFFFF;
+
+  /* the warm brown drop shadow was the other half of the orange cast */
+  --shadow: 0 8px 24px rgba(12, 74, 78, .10);
+  --glow:   0 8px 20px rgba(15, 163, 172, .28);
+}
+html.dict-open #v-home #result { max-width: 640px; margin: 0 auto; }
+
+/* ---- headword ---- */
+html.dict-open #v-home .headword { font-family: 'Baloo 2', sans-serif; letter-spacing: -.015em; }
+html.dict-open #v-home .phon { font-size: 13.5px; }
+
+/* ---- "Nghĩa nhanh": the orange wash came from --primary-bg resolving to
+   terracotta under a mint --primary. Now derived, plus a real edge. ---- */
+html.dict-open #v-home .feel {
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--primary) 11%, #FFFFFF),
+    color-mix(in srgb, var(--cyan) 7%, #FFFFFF));
+  border-color: color-mix(in srgb, var(--primary) 22%, transparent);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 13%, transparent);
+  border-radius: 20px;
+}
+html.dict-open #v-home .feel::before { width: 5px; background: linear-gradient(180deg, var(--primary), var(--cyan)); }
+html.dict-open #v-home .feel-eq { font-family: 'Baloo 2', sans-serif; color: color-mix(in srgb, var(--primary) 82%, #05343A); }
+html.dict-open #v-home .feel-scene { background: rgba(255, 255, 255, .72); }
+
+/* ---- word family: the chips carry the POS colour, so let them show it ---- */
+html.dict-open #v-home .family-scroll { gap: 8px; }
+html.dict-open #v-home .family-chip {
+  border: none;
+  background: color-mix(in srgb, currentColor 13%, #FFFFFF);
+  box-shadow: 0 2px 8px color-mix(in srgb, currentColor 20%, transparent);
+  font-weight: 800;
+  padding: 7px 15px 7px 7px;
+}
+html.dict-open #v-home .fc-pos {
+  background: currentColor;
+  color: #FFFFFF; -webkit-text-fill-color: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+}
+
+/* ---- sections ---- */
+html.dict-open #v-home .sec-h { font-family: 'Baloo 2', sans-serif; color: var(--text); }
+html.dict-open #v-home .pos-group { border-left-width: 4px; border-radius: 0 12px 12px 0; }
+
+/* ---- prepositions: the point of the section is WHICH preposition, so the
+   preposition is the thing that has to be visible from a scroll ---- */
+html.dict-open #v-home .prep-item {
+  background: color-mix(in srgb, var(--primary) 6%, #FFFFFF);
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+html.dict-open #v-home .prep-item:last-child { border-bottom: 1px solid color-mix(in srgb, var(--primary) 16%, transparent); }
+html.dict-open #v-home .prep-w { font-size: 16px; }
+/* the same mark is reused inside collocations, phrasal verbs and idioms */
+html.dict-open #v-home .prep-hl {
+  background: color-mix(in srgb, var(--amber) 22%, transparent);
+  color: color-mix(in srgb, var(--amber) 88%, #4A2A00);
+  font-weight: 800;
+  border-radius: 6px;
+  padding: 0 4px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* ---- YouGlish: the embedded player is gone, so this link is the only
+   pronunciation action left on the page and is styled as the primary one ---- */
+html.dict-open #v-home .yg-link-btn {
+  background: var(--grad-hero);
+  border: none;
+  /* it is an <a>, so without this the UA's default link blue wins on any
+     text that does not set its own colour */
+  color: #FFFFFF;
+  padding: 15px 17px;
+  border-radius: 18px;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 34%, transparent);
+}
+html.dict-open #v-home .yg-link-btn:active { transform: scale(.98); background: var(--grad-hero); }
+html.dict-open #v-home .yg-link-ico {
+  background: rgba(255, 255, 255, .22);
+  color: #FFFFFF;
+  box-shadow: none;
+  font-size: 13px;
+  padding-left: 2px;
+}
+html.dict-open #v-home .yg-link-text { gap: 3px; }
+html.dict-open #v-home .yg-link-text b { color: #FFFFFF; font-size: 15px; font-family: 'Baloo 2', sans-serif; }
+html.dict-open #v-home .yg-link-text i { color: rgba(255, 255, 255, .82); font-style: normal; font-size: 11.5px; font-weight: 600; }
+html.dict-open #v-home .yg-link-go { margin-left: auto; color: rgba(255, 255, 255, .9); font-size: 15px; }
+
+/* ---- the word sheet.
+
+   ensureWordSheet() appends this to document.body, NOT inside #v-home, so
+   none of the scope above reaches it and it kept Part 4's cream-and-brown
+   while the page behind it went mint. It needs its own copy. ---- */
+.word-sheet {
+  --primary: #0FA3AC;
+  --cyan:    #17B6C4;
+  --mint:    #0FA97E;
+  --amber:   #E8930C;
+  --coral:   #F0544F;
+  --primary-bg: color-mix(in srgb, #0FA3AC 13%, transparent);
+  --mint-bg:    color-mix(in srgb, #0FA97E 13%, transparent);
+  --amber-bg:   color-mix(in srgb, #E8930C 16%, transparent);
+  --coral-bg:   color-mix(in srgb, #F0544F 13%, transparent);
+  --surface: #FFFFFF;
+  --surface-2: #F1F8F8;
+  --line: rgba(15, 163, 172, .2);
+  --text: #12363A;
+  --muted: #5B8386;
+  --muted-2: #85A5A7;
+  --grad-hero: linear-gradient(135deg, #0FA3AC, #4FD6D8);
+}
+.word-sheet .ws-card { box-shadow: 0 -18px 46px rgba(8, 44, 48, .26); }
+.word-sheet .ws-word { color: var(--text); }
+.word-sheet .ws-vi { color: color-mix(in srgb, var(--primary) 85%, #05343A); }
+/* was a literal terracotta 3px drop shadow — the orange under this button */
+.word-sheet .ws-full {
+  background: var(--grad-hero);
+  border: none;
+  color: #FFFFFF;
+  padding: 12px;
+  font-size: 13.5px;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 32%, transparent);
+}
+.word-sheet .ws-sense-pos { background: color-mix(in srgb, var(--primary) 13%, transparent); }

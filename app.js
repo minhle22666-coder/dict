@@ -899,7 +899,7 @@ async function runExplain(query){
     const posMap=await posTagMapFor((data.items||[]).map(it=>it.word));
     box.innerHTML=explainState(words.join(', '), data, false, posMap);
     logEvent('search', key);
-    addXP(2);
+    addXP(1);
   }catch(err){
     box.innerHTML=errorState(query, err.message||'');
   }
@@ -1511,7 +1511,7 @@ async function search(rawWord, forceAI){
         }else{
           box.innerHTML=renderEntry(canon, word);
         }
-        maybeLoadYouglish(canon.word); logEvent('search',canon.word); addXP(2); return;
+        maybeLoadYouglish(canon.word); logEvent('search',canon.word); addXP(1); return;
       }
       /* alias "mồ côi" — trỏ tới một bản ghi gốc không còn .data (đã bị
          xoá, hoặc chưa từng lưu xong). KHÔNG rơi xuống dùng "local" ở dưới
@@ -1522,7 +1522,7 @@ async function search(rawWord, forceAI){
     /* Chỉ dùng bản ghi cục bộ khi nó THẬT SỰ có .data — một bản ghi mồ côi
        (alias hỏng, hoặc lưu dở dang) mà vẫn đem render sẽ ra một trang
        trống trơn không rõ lý do, trông y như "gõ vào không phản ứng gì". */
-    if(local && local.data){ currentWord=word; box.innerHTML=renderEntry(local); maybeLoadYouglish(word); logEvent('search',word); addXP(2); return; }
+    if(local && local.data){ currentWord=word; box.innerHTML=renderEntry(local); maybeLoadYouglish(word); logEvent('search',word); addXP(1); return; }
 
     /* Dạng biến đổi của một từ đã có trong máy: went→go, walked→walk,
        studies→study. Phải đứng TRƯỚC fuzzyLocalSearch, vì fuzzy chấm
@@ -1538,7 +1538,7 @@ async function search(rawWord, forceAI){
         box.innerHTML=renderEntry(shown, null, {form:word, kind:lem.kind, base:lem.rec.word});
         maybeLoadYouglish(word);
         logEvent('search', lem.rec.word);
-        addXP(2);
+        addXP(1);
         lemmaSaveAlias(word, lem.rec, lem.kind);
         return;
       }
@@ -1554,7 +1554,7 @@ async function search(rawWord, forceAI){
       const rec=await idbGet(guess.target);
       if(rec){
         currentWord=rec.word; box.innerHTML=renderEntry(rec); maybeLoadYouglish(rec.word);
-        logEvent('search',rec.word); addXP(2);
+        logEvent('search',rec.word); addXP(1);
         flashPhraseMatch(guess.label);
         return;
       }
@@ -1644,7 +1644,7 @@ async function search(rawWord, forceAI){
       +(nearMiss && nearMiss.target!==canon ? nearMissFooter(nearMiss) : '');
     maybeLoadYouglish(canon);
     logEvent('search',canon);
-    addXP(2);
+    addXP(1);
     refreshStats();
   }catch(err){
     box.innerHTML=errorState(word,err.message||'')+nearMissFooter(nearMiss);
@@ -1798,6 +1798,22 @@ function posLabel(p){ const k=posKey(p); return k==='other' ? String(p||'') : k;
 function posChip(p){ if(!p) return '';
   const k=posKey(p), c=POS_COLOR[k];
   return '<span class="pos-chip pos-'+c+'">'+esc(posLabel(p))+'</span>'; }
+
+/* Which preposition goes with a word is most of what Collocations, Phrasal
+   Verbs and Idioms are teaching, and it was the one part of those rows set
+   in the same weight and colour as everything around it — so the reader had
+   to find it themselves every time.
+
+   Deliberately NOT applied to example sentences. A sentence carries several
+   prepositions that have nothing to do with the entry, and marking them all
+   turns the example into noise instead of pointing at anything.
+
+   Input must already be escaped: this returns HTML, and the only markup in
+   the result is the span it adds itself. */
+const PREP_RE=/\b(about|above|across|after|against|along|among|amongst|apart|around|aside|at|away|back|before|behind|below|beneath|beside|besides|between|beyond|by|despite|down|during|except|for|from|in|inside|into|like|near|of|off|on|onto|out|outside|over|past|round|since|through|throughout|to|together|toward|towards|under|underneath|until|up|upon|via|with|within|without)\b/gi;
+function hlPreps(escaped){
+  return String(escaped==null?'':escaped).replace(PREP_RE,'<span class="prep-hl">$1</span>');
+}
 
 
 /* ============================================================
@@ -2566,13 +2582,10 @@ const YG_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
 function ygLinkBtn(word){
   const url = 'https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
   return '<a class="yg-link-btn" href="'+url+'" target="_blank" rel="noopener">'
-    + '<span class="yg-link-ico">\u2197</span>'
-    /* Vietnamese everywhere else on this button's own row ("Nghe
-       trong câu thật", "Video từ YouGlish"); this was the one
-       label still in English, sitting right between two Vietnamese
-       ones and reading like a leftover rather than a deliberate
-       choice. */
-    + '<span class="yg-link-text"><b>Mở bằng trình duyệt</b></span></a>';
+    + '<span class="yg-link-ico">\u25B6</span>'
+    + '<span class="yg-link-text"><b>Nghe trong c\u00e2u th\u1eadt</b>'
+    +   '<i>Video ng\u01b0\u1eddi b\u1ea3n x\u1ee9 tr\u00ean YouGlish</i></span>'
+    + '<span class="yg-link-go">\u2197</span></a>';
 }
 
 /* Nạp widget thật vào khung. Chỉ được gọi khi người dùng chủ động
@@ -2672,32 +2685,16 @@ function ygMount(word, wrap, seq, idx){
   }).catch(()=>finish(null));
 }
 
+/* The in-page player is gone. It mounted a YouGlish widget that pulled a
+   YouTube player, their ads and a reCAPTCHA into the word page, which was
+   the single heaviest thing a lookup did \u2014 and all to play the same clips
+   the link below opens for free. Offline already took this path; it is now
+   the only path, so there is no branch left on navigator.onLine. */
 function maybeLoadYouglish(word){
   const box = document.getElementById('youglish-box');
   if(!box) return;
-  const seq = ++_ygSeq;
-  const idx = _ygIdx++;
-  _ygDiag = { word: word, online: navigator.onLine, host: location.host };
-
-  if(!navigator.onLine){ box.innerHTML = ygLinkBtn(word); return; }
-
-  box.innerHTML =
-      '<div class="yg-wrap yg-idle" id="yg-wrap">'
-    +   '<button class="yg-start" type="button">'
-    +     '<span class="yg-start-ico">\u25B6</span>'
-    +     '<span class="yg-start-text">Nghe trong c\u00e2u th\u1eadt</span>'
-    +   '</button>'
-    + '</div>'
-    + '<div class="yg-credit">\u{1F3A7} Video t\u1eeb <a href="https://youglish.com" target="_blank" rel="noopener">YouGlish</a></div>'
-    + ygLinkBtn(word);
-
-  const wrap = document.getElementById('yg-wrap');
-  if(YG_LAZY){
-    wrap.querySelector('.yg-start')
-        .addEventListener('click', ()=>ygMount(word, wrap, seq, idx), { once: true });
-  }else{
-    ygMount(word, wrap, seq, idx);
-  }
+  _ygSeq++;                                   // invalidate anything still in flight
+  box.innerHTML = ygLinkBtn(word);
 }
 
 function renderEntry(rec, queriedAs, formNote){
@@ -2838,7 +2835,7 @@ function exprStarBtn(text, vi, example, exampleVi){
   if(Array.isArray(d.expressions)&&d.expressions.length){
     const es=[...d.expressions].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm blue">🔗</span>Common Usage</div>';
-    for(const e of es){ h+='<div class="expr" data-ph="'+esc(norm(e.text||''))+'"><span class="rank">'+rankStar(e.rank)+'</span><span class="t">'+esc(e.text)+'</span>';
+    for(const e of es){ h+='<div class="expr" data-ph="'+esc(norm(e.text||''))+'"><span class="rank">'+rankStar(e.rank)+'</span><span class="t">'+hlPreps(esc(e.text))+'</span>';
       if(e.vi) h+='<span class="ev">'+esc(e.vi)+'</span>'; h+=exprStarBtn(e.text,e.vi,e.example,e.example_vi)+'</div>'; }
     h+='</div>';
   }
@@ -2846,7 +2843,7 @@ function exprStarBtn(text, vi, example, exampleVi){
   if(Array.isArray(d.collocations)&&d.collocations.length){
     const cs=[...d.collocations].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-note-and-pen.webp" alt=""/>Collocations</div>';
-    for(const c of cs){ h+='<div class="expr" data-ph="'+esc(norm(c.text||''))+'"><span class="rank">'+rankStar(c.rank)+'</span><span class="t">'+esc(c.text)+'</span>';
+    for(const c of cs){ h+='<div class="expr" data-ph="'+esc(norm(c.text||''))+'"><span class="rank">'+rankStar(c.rank)+'</span><span class="t">'+hlPreps(esc(c.text))+'</span>';
       if(c.vi) h+='<span class="ev">'+esc(c.vi)+'</span>'; h+=exprStarBtn(c.text,c.vi,c.example,c.example_vi)+'</div>'; }
     h+='</div>';
   }
@@ -2854,7 +2851,7 @@ function exprStarBtn(text, vi, example, exampleVi){
   if(Array.isArray(d.phrasal_verbs)&&d.phrasal_verbs.length){
     const ps=[...d.phrasal_verbs].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><span class="tile tile-sm mint">🧩</span>Phrasal Verbs</div>';
-    for(const p of ps){ h+='<div class="expr" data-ph="'+esc(norm(p.text||''))+'"><span class="rank">'+rankStar(p.rank)+'</span><span class="t">'+esc(p.text)+'</span>';
+    for(const p of ps){ h+='<div class="expr" data-ph="'+esc(norm(p.text||''))+'"><span class="rank">'+rankStar(p.rank)+'</span><span class="t">'+hlPreps(esc(p.text))+'</span>';
       if(p.vi) h+='<span class="ev">'+esc(p.vi)+'</span>'; h+=exprStarBtn(p.text,p.vi,p.example,p.example_vi)+'</div>'; }
     h+='</div>';
   }
@@ -2862,7 +2859,7 @@ function exprStarBtn(text, vi, example, exampleVi){
   if(Array.isArray(d.idioms)&&d.idioms.length){
     const is_=[...d.idioms].sort((a,b)=>(b.rank||0)-(a.rank||0));
     h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-magnifying-glass.webp" alt=""/>Idioms</div>';
-    for(const it of is_){ h+='<div class="expr" data-ph="'+esc(norm(it.text||''))+'"><span class="rank">'+rankStar(it.rank)+'</span><span class="t">'+esc(it.text)+'</span>';
+    for(const it of is_){ h+='<div class="expr" data-ph="'+esc(norm(it.text||''))+'"><span class="rank">'+rankStar(it.rank)+'</span><span class="t">'+hlPreps(esc(it.text))+'</span>';
       if(it.vi) h+='<span class="ev">'+esc(it.vi)+'</span>'; h+=exprStarBtn(it.text,it.vi,it.example,it.example_vi)+'</div>'; }
     h+='</div>';
   }
@@ -2870,7 +2867,7 @@ function exprStarBtn(text, vi, example, exampleVi){
   if(Array.isArray(d.prepositions)&&d.prepositions.length){
     h+='<div class="sec"><div class="sec-h"><img class="sec-ico" src="./decor-map.webp" alt=""/>Prepositions</div>';
     for(const p of d.prepositions){
-      h+='<div class="prep-item"><div class="prep-w">'+esc(d.word||w)+' <b style="color:var(--amber)">'+esc(p.prep)+'</b></div>';
+      h+='<div class="prep-item"><div class="prep-w">'+esc(d.word||w)+' <span class="prep-hl">'+esc(p.prep)+'</span></div>';
       if(p.meaning_vi) h+='<div class="prep-m">'+esc(p.meaning_vi)+'</div>';
       if(p.example){ h+='<div class="ex">"'+esc(p.example)+'"'; if(p.example_vi) h+='<span class="evi">→ '+esc(p.example_vi)+'</span>'; h+='</div>'; }
       h+='</div>';
@@ -4487,7 +4484,7 @@ function renderMatch(){
       dueReviewMode=false;   // qua một lượt sạch — không còn từ nào sai nữa
     }
     if(!matchAwarded && matchRounds.length){
-      matchAwarded=true; addXP(8); questBump('game');
+      matchAwarded=true; questBump('game');
       if(matchHits===matchRounds.length) localStorage.setItem(PERFECT_LS,'1');
       checkAchievements();
     }
@@ -4530,7 +4527,7 @@ async function pickMatch(i){
   r._ok=ok;
   if(!ok && typeof window.jnLogMiss==='function') window.jnLogMiss(r.answer.word,'Word Pairs');
   matchPicked={word:choice.word, ok};
-  if(ok){ matchHits++; addXP(3); }
+  if(ok){ matchHits++; addXP(1); }
   await logEvent(ok?'review_correct':'review_wrong', r.answer.word);
   try{ const rec=await idbGet(r.answer.word);
     if(rec){ rec.reviewCorrect=(rec.reviewCorrect||0)+(ok?1:0); rec.reviewWrong=(rec.reviewWrong||0)+(ok?0:1);
@@ -5388,7 +5385,7 @@ async function submitWrite(){
     writeSavedId=rec.id;
     speakUpScore += (vk==='good'?1:(vk==='close'?0.5:0));
     questBump('game');
-    addXP(5);
+    addXP(2);
     refreshStats();
   }catch(err){
     toast('Could not check that — try again');
@@ -5446,7 +5443,7 @@ function renderReview(){
       dueReviewMode=false;   // qua một lượt sạch — không còn từ nào sai nữa
     }
     if(!revSessionAwarded && revQueue.length){
-      revSessionAwarded=true; addXP(10); questBump('game');
+      revSessionAwarded=true; questBump('game');
       if(revCorrectCount===revQueue.length) localStorage.setItem(PERFECT_LS,'1');
       checkAchievements();
     }
@@ -5511,7 +5508,7 @@ async function checkReview(){
   // right answer would be a scoreboard, and nobody rereads their own.
   if(!correct && typeof window.jnLogMiss==='function') window.jnLogMiss(r.word,'Letter Trail');
   if(correct) revCorrectCount++;
-  addXP(correct?(close?2:3):0);
+  addXP(correct?1:0);
   revState={correct, close}; renderReview();
 }
 async function skipReview(){
