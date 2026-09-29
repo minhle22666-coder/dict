@@ -2826,10 +2826,10 @@ export async function bootFocciWorld(root, opts) {
     character.visible = (m !== 'fpv');
     if (m === 'fpv') { cam.tPhi = 1.45; cam.tRadius = 7; fpvPitch = -0.05; }
     else { cam.tPhi = 1.05; cam.tRadius = 14; }
-    /* Everything looked too close in his eyes because the camera kept the
-       third-person 50-degree lens. A head sees much wider than that; 68
-       pulls the walls back off your face without bending the horizon. */
-    camera.fov = (m === 'fpv') ? 68 : 50;
+    /* 50 (the third-person lens) put the walls on your face; 68 went the
+       other way and shrank everything ahead of him until it was hard to
+       make out. 56 sits between the two. */
+    camera.fov = (m === 'fpv') ? 56 : 50;
     camera.updateProjectionMatrix();
   }
   function toggleCamMode() {

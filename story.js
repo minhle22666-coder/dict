@@ -1871,11 +1871,12 @@ function renderStoryTBC(){
    plus a locked Bonus Scene strip below.
    ============================================================ */
 /* ============================================================
-   STORY INTRO — what the Home CTA actually opens now (it used to
-   call openStory() directly into a hidden tab, which is why tapping
-   it looked like it did nothing). Told narratively on purpose, and
-   deliberately stays away from any real plot detail — this is about
-   how to play, not what happens.
+   BEFORE YOU BEGIN — a how-to-use card, opened from the book icon in
+   the main menu and from the world menu. It used to introduce the
+   story; with the story gone it says what each part of the app does
+   and how to move on the island, one line each. Keep it short: every
+   item here is something a new player would otherwise have to guess.
+   The name stays showStoryIntro because both menus call it by that.
    ============================================================ */
 window.showStoryIntro = function(){
   const ov=document.createElement('div'); ov.className='info-ov';
@@ -1884,13 +1885,14 @@ window.showStoryIntro = function(){
     +'<img src="./mascot-wonder.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<div class="info-t">Before you begin</div>'
     +'<div class="info-b story-intro-b">'
-    +'<p>Somewhere in a field too big for the sky, a fox forgets his own name. What he does next is up to you.</p>'
-    +'<p>The story adapts to <b>your own dictionary</b> — reaching for words you already know, and a few you\'re just growing into.</p>'
-    +'<p>You answer <b>for him</b>: what he notices, what he decides, who he becomes. A few quiet qualities grow with your choices — just choose the way you actually would.</p>'
-    +'<p>Some things won\'t explain themselves right away. <b>Tap them anyway.</b></p>'
-    +'<p>Changed your mind? Step back with <b>‹</b> and answer differently — <b>nothing is scored until the chapter ends</b>.</p>'
+    +'<p><b>🔍 Tra từ</b> — gõ một từ hoặc cụm từ tiếng Anh vào ô tìm kiếm để xem nghĩa, giới từ đi kèm và câu ví dụ. Bấm <b>Nghe trong câu thật</b> để nghe người bản xứ nói.</p>'
+    +'<p><b>☆ Lưu từ</b> — bấm ngôi sao để cất từ vào <b>Saved Words</b>, ôn lại lúc nào cũng được.</p>'
+    +'<p><b>🎮 Mini Games</b> — Letter Trail, Word Pairs, Speak Up và Hot Take luyện lại chính những từ bạn đã tra.</p>'
+    +'<p><b>🌍 Focci Universe</b> — kéo một ngón để đi, vuốt nhanh lên để nhảy, hai ngón để xoay và phóng to. Chạm vào đồ vật hay con vật để tương tác; nhặt chữ cái để ghép thành từ.</p>'
+    +'<p><b>👀 Mẹo</b> — chạm hai lần vào nhà để bước vào; chạm hai lần ra chỗ trống để nhìn bằng mắt Focci.</p>'
+    +'<p><b>⚡ XP</b> — tra từ +1 · lưu từ +1 · trả lời đúng +1 · Speak Up +2 · xong một Hot Take +5.</p>'
     +'</div>'
-    +'<button class="info-action" onclick="this.closest(\'.info-ov\').remove(); showView(\'review\')">▶ Play</button>'
+    +'<button class="info-action" onclick="this.closest(\'.info-ov\').remove()">Bắt đầu thôi!</button>'
     +'</div>';
   document.body.appendChild(ov);
   requestAnimationFrame(()=>ov.classList.add('show'));

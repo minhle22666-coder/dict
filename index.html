@@ -3241,6 +3241,18 @@
   .story-intro-b p{margin:0 0 8px}
   .story-intro-b p:last-child{margin-bottom:0}
   .story-intro-b b{color:var(--text)}
+  /* The how-to card is the one info card that is mostly text, so it does not
+     get the see-through glass: with the home page showing through, and with
+     --text left at the earth palette's dark brown even in the dark scheme,
+     its headings were brown on dark and the body fought the page behind it.
+     Near-solid ground and colours of its own, whatever the theme says. */
+  .info-card.story-intro-card{background:rgba(14,24,36,.95);border-color:rgba(255,255,255,.16)}
+  .story-intro-card .story-intro-b{color:rgba(255,255,255,.86);font-size:13.5px;line-height:1.55}
+  .story-intro-card .story-intro-b b{color:#FFC574}
+  .story-intro-card .story-intro-b p{margin:0 0 10px}
+  [data-scheme="light"] .info-card.story-intro-card{background:rgba(255,255,255,.97);border-color:rgba(20,24,32,.12)}
+  [data-scheme="light"] .story-intro-card .story-intro-b{color:#2E2A24;opacity:1}
+  [data-scheme="light"] .story-intro-card .story-intro-b b{color:#B4530A}
 
   /* ---- territory: locked region strip ---- */
   .region-strip{display:flex;gap:9px;overflow-x:auto;padding:2px 0 10px;margin-bottom:12px;scrollbar-width:none}
@@ -6100,6 +6112,9 @@
       <button class="fw-mi" aria-label="Progress" onclick="openFwPanel('stats')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="9" cy="7" rx="3" ry="4"/><ellipse cx="16" cy="15" rx="3" ry="4"/></svg>
       </button>
+      <button class="fw-mi" aria-label="Before you begin" onclick="showStoryIntro()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.3-3.5-2-6-2v13c2.5 0 4.5.7 6 2 1.5-1.3 3.5-2 6-2V4c-2.5 0-4.5.7-6 2Z"/><path d="M12 6v13"/></svg>
+      </button>
     </div>
     <button class="fw-fab-menu fw-menu-glass" id="fw-menu-toggle" aria-label="Menu" onclick="toggleFwMenu()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg>
@@ -6469,7 +6484,7 @@
       openFwPanel(where === 'saved' ? 'saved' : where);
     }, 240);
   };
-  window.fmGuide = function () { fmClose(); };
+  window.fmGuide = function () { fmClose(); setTimeout(() => showStoryIntro(), 240); };
   window.fmSound = function () {
     if (!worldApi) return;
     const on = worldApi.toggleSound();
