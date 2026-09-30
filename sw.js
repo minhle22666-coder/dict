@@ -3,12 +3,15 @@
    Only small, essential files are precached on install — every image is
    cached automatically the first time it's fetched successfully, which
    happens naturally the first time you open the app online. */
-const CACHE = 'focci-v195';
+const CACHE = 'focci-v196';
 const SHELL = [
   './',
   './index.html',
   './home-island.webp',
   './home-focci.webp',
+  './banner-lettertrail.webp',
+  './banner-wordpairs.webp',
+  './banner-speakup.webp',
   './app.js',
   './residents.js',
   './hottake.js',

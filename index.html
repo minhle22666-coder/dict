@@ -6331,6 +6331,108 @@
   html body .view.fw-panel#v-stats .pj-notes .pg-note-txt b{display:block;font-size:14px;font-weight:600;color:var(--cz-ink)}
   html body .view.fw-panel#v-stats .pj-notes .pg-note-txt span{display:block;margin-top:3px;font-size:12.5px;line-height:1.5;color:var(--cz-soft)}
   html body .view.fw-panel#v-stats .pj-notes .pg-note-txt span b{display:inline;font-size:inherit}
+
+  /* ---------------- the hop, quicker ----------------
+     Up 90px and down again in 0.52s, dust as he leaves the ground and
+     again as he lands, then the page fades. At 150px and 0.72s it looked
+     slow to start and the page was gone before the dust showed. */
+  @keyframes cz-hop{
+    0%{transform:translateY(0) scale(1,1)}
+    10%{transform:translateY(0) scale(1.14,.84)}
+    36%{transform:translateY(-80px) scale(.94,1.07)}
+    52%{transform:translateY(-90px) scale(1,1)}
+    84%{transform:translateY(0) scale(1.12,.86)}
+    100%{transform:translateY(0) scale(1,1)}}
+  @keyframes cz-hop-sh{0%,10%{transform:scale(1);opacity:1}52%{transform:scale(.5);opacity:.4}84%,100%{transform:scale(1.05);opacity:1}}
+  .cz-focci.hop img{animation:cz-hop .52s cubic-bezier(.3,.6,.4,1) forwards}
+  .cz-focci.hop .cz-sh{animation:cz-hop-sh .52s ease-out forwards}
+  .cz-focci.hop .cz-puff b{animation:cz-puff .55s cubic-bezier(.2,.7,.3,1) .02s forwards}
+  .cz-puff b:nth-child(3){animation-delay:.05s !important}
+  .cz-puff b:nth-child(4){animation-delay:.42s !important}
+  .cz-puff b:nth-child(5){animation-delay:.42s !important}
+  .cz-puff b:nth-child(6){animation-delay:.44s !important}
+  #fw-home.cz-leaving{animation:cz-out .24s ease-in .54s forwards}
+
+  /* ---------------- the three game banners ----------------
+     The user's art at its own proportions (397:128), Focci at full size on
+     the right, standing on the art's bottom edge and breaking its top, and
+     the name and welcome under it where they cannot cover the art. */
+  html body .view.fw-panel#v-review .gh{position:relative;margin:8px 0 20px}
+  html body .view.fw-panel#v-review .gh-art{position:relative;aspect-ratio:397/128;border-radius:20px;overflow:hidden;
+    box-shadow:0 10px 24px rgba(46,56,38,.2)}
+  html body .view.fw-panel#v-review .gh-art img{display:block;width:100%;height:100%;object-fit:cover}
+  html body .view.fw-panel#v-review .gh-fox{position:absolute;right:2px;top:-24px;z-index:2;height:138px;width:auto;
+    pointer-events:none;filter:drop-shadow(0 8px 12px rgba(30,40,24,.32))}
+  html body .view.fw-panel#v-review .gh-match .gh-fox{height:128px;top:-16px;right:0}
+  html body .view.fw-panel#v-review .gh-write .gh-fox{height:134px;top:-22px}
+  html body .view.fw-panel#v-review .gh-txt{margin:14px 2px 0}
+  html body .view.fw-panel#v-review .gh-name{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.1;color:var(--cz-ink)}
+  html body .view.fw-panel#v-review .gh-sub{margin-top:5px;font-size:12.5px;line-height:1.5;color:var(--cz-soft)}
+  /* Speak Up is on its dark village */
+  html body .view.fw-panel#v-review:not(.pg-day) .gh-name{color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.35)}
+  html body .view.fw-panel#v-review:not(.pg-day) .gh-sub{color:rgba(255,255,255,.84)}
+  html body .view.fw-panel#v-review .su-hero-img{display:none}
+
+  /* ---------------- the journal, light and short ---------------- */
+  html body .jn-head{align-items:flex-start;padding:calc(env(safe-area-inset-top,0px) + 18px) 20px 6px}
+  html body .jn-ttl2{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+  html body .jn-ttl2 b{font-size:30px;line-height:1.05;font-weight:500;letter-spacing:-.025em;color:var(--cz-ink)}
+  html body .jn-x{display:flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0}
+  html body .jn-x svg{width:16px;height:16px}
+  html body .jn-body{padding:0 20px calc(env(safe-area-inset-bottom,0px) + 28px)}
+  html body .jn-figs{display:grid;grid-template-columns:repeat(3,1fr);margin:16px 0 26px;padding:13px 0;
+    border-top:1px solid var(--cz-line);border-bottom:1px solid var(--cz-line)}
+  html body .jn-figs div{display:flex;flex-direction:column;gap:4px;padding-left:12px}
+  html body .jn-figs div:first-child{padding-left:0}
+  html body .jn-figs div + div{box-shadow:inset 1px 0 0 var(--cz-line)}
+  html body .jn-figs b{font-size:24px;line-height:1;color:var(--cz-ink)}
+  html body .jn-figs span{font-size:8.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--cz-faint)}
+  html body .jn-cap{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 2px 8px}
+  html body .jn-cap > span{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--cz-soft)}
+  html body .jn-cap i{font-style:normal;font-size:11px;color:var(--cz-faint)}
+  html body .jn-rev{margin-bottom:28px}
+  html body .jn-chips{display:flex;flex-wrap:wrap;gap:7px}
+  html body .jn-chip{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 13px;border:0;border-radius:999px;cursor:pointer;
+    font-size:13px;font-weight:600;color:var(--cz-clay);background:var(--cz-clay-bg)}
+  html body .jn-chip .num{font-size:11px;color:var(--cz-clay)}
+  html body .jn-chip:active{transform:scale(.96)}
+  html body .jn-day{margin-bottom:24px}
+  html body .jn-list{display:block;margin:0;padding:2px 0;border:0;border-radius:18px;
+    background:var(--cz-glass);box-shadow:var(--cz-rim),var(--cz-hair),0 4px 14px rgba(60,72,44,.06)}
+  html body .jn-r{display:flex;align-items:center;min-height:46px;padding:0 4px 0 14px;transition:opacity .18s ease}
+  html body .jn-r + .jn-r{box-shadow:inset 0 1px 0 var(--cz-line)}
+  html body .jn-r.gone{opacity:0}
+  html body .jn-go{flex:1;min-width:0;display:flex;align-items:baseline;gap:10px;padding:11px 0;border:0;background:none;
+    text-align:left;cursor:pointer;color:var(--cz-ink)}
+  html body .jn-go b{flex:none;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:14.5px;font-weight:600;color:var(--cz-ink)}
+  html body .jn-go i{flex:1;min-width:0;font-style:normal;font-size:12.5px;color:var(--cz-soft);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html body .jn-r.miss .jn-go b{color:var(--cz-clay)}
+  html body .jn-go .jn-tag{flex:none;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--cz-faint)}
+  html body .jn-del{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;
+    background:none;cursor:pointer;color:var(--cz-faint)}
+  html body .jn-del svg{width:14px;height:14px}
+  html body .jn-del:active{background:var(--cz-sage-bg);color:var(--cz-ink)}
+  html body .jn-empty{padding:60px 18px;text-align:center;font-size:13px;line-height:1.6;color:var(--cz-soft)}
+
+  /* ---------------- the search box's list, in the same daylight ---------------- */
+  html body .sg-drop{padding:6px;border-radius:18px;background:rgba(251,252,244,.98);
+    box-shadow:var(--cz-rim),var(--cz-hair),0 16px 40px rgba(46,56,38,.16);backdrop-filter:none;-webkit-backdrop-filter:none}
+  html body .sg-h{color:var(--cz-faint);font-weight:600}
+  html body .sg-row{display:flex;align-items:center;gap:2px;width:100%;padding:0;border-radius:12px}
+  html body .sg-row + .sg-row{box-shadow:inset 0 1px 0 var(--cz-line)}
+  html body .sg-pick{flex:1;min-width:0;display:block;padding:9px 12px;border:0;border-radius:12px;background:none;
+    text-align:left;cursor:pointer}
+  html body .sg-pick:active{background:var(--cz-sage-bg)}
+  html body .sg-pick b{display:block;font-size:14.5px;font-weight:600;color:var(--cz-ink)}
+  html body .sg-pick i{display:block;margin-top:2px;font-style:normal;font-size:11.5px;color:var(--cz-soft);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html body .sg-x{flex:none;width:36px;height:36px;margin-right:4px;display:flex;align-items:center;justify-content:center;
+    border:0;border-radius:50%;background:none;cursor:pointer;color:var(--cz-faint)}
+  html body .sg-x svg{width:14px;height:14px}
+  html body .sg-x:active{background:var(--cz-sage-bg);color:var(--cz-ink)}
+  html body .sg-empty{color:var(--cz-soft)}
 </style>
 </head>
 <body>
@@ -6844,8 +6946,8 @@
 <div class="fw-hint" id="fw-hint"></div>
 <div class="jn-scrim" id="jn-scrim">
   <div class="jn-head">
-    <b>Focci’s Journal</b>
-    <button class="jn-x" onclick="jnClose()" aria-label="Close">✕</button>
+    <div class="jn-ttl2"><span class="cz-cap">Focci’s Journal</span><b>What you met</b></div>
+    <button class="jn-x" onclick="jnClose()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
   </div>
   <div class="jn-body" id="jn-body"></div>
 </div>
@@ -7580,10 +7682,15 @@
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.documentElement.classList.remove('world-loading');
     if (reduce || !home || !f) { fhShowWorld(); return; }
-    document.querySelector('#fw-overlay').style.display = 'block';
+    /* The hop first, on a quiet page: the island under the still only
+       starts drawing once he is in the air (400ms), so its first frames
+       cannot hold up the start of the jump -- which is what made it look
+       as if the page went straight to the island. He lands at 520ms, the
+       page fades from 540 to 780, and the world takes over at 800. */
     f.classList.remove('hop'); void f.offsetWidth; f.classList.add('hop');
     home.classList.add('cz-leaving');
-    setTimeout(fhShowWorld, 700);
+    setTimeout(() => { document.querySelector('#fw-overlay').style.display = 'block'; }, 400);
+    setTimeout(fhShowWorld, 800);
   }
   window.fhEnterIsland = function () {
     const home = document.getElementById('fw-home');
@@ -7777,11 +7884,18 @@
     document.body.appendChild(drop);
     let host = null, seq = 0;
 
-    function rowsFrom(list, head) {
+    /* Recent rows carry an x: it forgets the word everywhere -- the history,
+       the log and the journal (forgetSearch in app.js). */
+    function rowsFrom(list, head, canForget) {
       return '<div class="sg-h">' + head + '</div>' + list.map(function (e) {
-        return '<button class="sg-row" onmousedown="event.preventDefault()"'
+        return '<div class="sg-row">'
+          + '<button class="sg-pick" onmousedown="event.preventDefault()"'
           + ' onclick="sgPick(this.dataset.w)" data-w="' + esc(e.w) + '">'
-          + '<b>' + esc(e.w) + '</b>' + (e.vi ? '<i>' + esc(e.vi) + '</i>' : '') + '</button>';
+          + '<b>' + esc(e.w) + '</b>' + (e.vi ? '<i>' + esc(e.vi) + '</i>' : '') + '</button>'
+          + (canForget ? '<button class="sg-x" aria-label="Remove from history" onmousedown="event.preventDefault()"'
+            + ' onclick="sgForget(this)" data-w="' + esc(e.w) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+            + ' stroke-width="2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg></button>' : '')
+          + '</div>';
       }).join('');
     }
     function meaningOf(rec) {
@@ -7848,7 +7962,7 @@
         catch (_) { return { w: e.w, vi: '' }; }
       }));
       if (mine !== seq) return;
-      drop.innerHTML = rowsFrom(withMeanings, 'Recent');
+      drop.innerHTML = rowsFrom(withMeanings, 'Recent', true);
     }
 
     function place(input) {
@@ -7858,16 +7972,26 @@
       drop.style.width = r.width + 'px';
       drop.style.top = (r.bottom + 8) + 'px';
     }
-    function show(input) { host = input; place(input); drop.classList.add('on'); build(input.value); }
+    let last = null, hideTimer = 0;
+    function show(input) { clearTimeout(hideTimer); host = input; last = input; place(input); drop.classList.add('on'); build(input.value); }
     function hide() { drop.classList.remove('on'); host = null; }
     window.sgPick = function (w) { hide(); if (window.openDictPage) openDictPage(w); };
+    /* On a phone the tap takes focus off the field first and the list is
+       already on its way out; the x keeps it open and puts the field back. */
+    window.sgForget = async function (btn) {
+      clearTimeout(hideTimer);
+      const row = btn.closest('.sg-row');
+      if (row) row.remove();
+      if (window.forgetSearch) await window.forgetSearch(btn.dataset.w);
+      if (last) { last.focus(); show(last); }
+    };
 
     ['fh-search-input', 'ht-search-input', 'fw-search-input'].forEach(function (id) {
       const el = document.getElementById(id);
       if (!el) return;
       el.addEventListener('focus', function () { show(el); });
       el.addEventListener('input', function () { if (host === el) { place(el); build(el.value); } });
-      el.addEventListener('blur', function () { setTimeout(hide, 170); });
+      el.addEventListener('blur', function () { hideTimer = setTimeout(hide, 170); });
     });
     window.addEventListener('resize', function () { if (host) place(host); });
   })();

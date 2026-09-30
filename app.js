@@ -3383,11 +3383,21 @@ function tapFishMascot(){
 let _statCache={learned:0,avg:0,mins:0,activeDays:0,todayNew:0,bestDay:0};
 
 async function removeFromHistory(word){
-  await logDeleteWord(word);
-  const w=norm(word||'');
-  histSave(histLoad().filter(e=>e && e.w!==w));   // xoá khỏi sổ, không chỉ khỏi log
+  await forgetSearch(word);
   renderHistory();
 }
+/* One way to forget a word that was looked up: out of the history (the
+   search box's Recent list and the Casebook), out of the behaviour log,
+   and out of every day of the journal. The ✕ in the search box, in the
+   Casebook and in the journal all come here, so a word removed in one
+   place does not linger in another. Saved status is untouched. */
+async function forgetSearch(word){
+  const w=norm(word||''); if(!w) return;
+  histSave(histLoad().filter(e=>e && e.w!==w));
+  try{ await logDeleteWord(w); }catch(e){}
+  if(window.jnForget) window.jnForget(w);
+}
+window.forgetSearch=forgetSearch;
 /* Star a word straight from a list without leaving the page. */
 async function toggleSaveFromList(word, btn){
   const rec=await idbGet(word); if(!rec) return;
@@ -4267,11 +4277,21 @@ function dropdownRow(label, note, opts, onChange){
    ============================================================ */
 /* intro: the one line under each game's name, in the voice Hot Take's
    banner uses -- what you do, in the order you do it. */
+/* One banner for all three games: the user's own artwork, Focci standing
+   on its edge at full size, and the name and the welcome line under it.
+   The old box art was a 397px picture with the title and a small fox
+   pasted on top, blown up to the phone's width -- the blur and the
+   off-centre fox. The name sits under the art now, not on it: the art's
+   own figures (the ABC, the cherries, the speech bubbles) fill its left
+   half, and text over them hid both. Speak Up used a baked-in header
+   image of its own; it shares this one. */
 const PG_META = {
-  type:  { art:'box-lettertrail.png', fox:'fox-letter-trail.webp', name:'Letter Trail',
-           intro:'Welcome to Letter Trail! Read the meaning, follow the letter hints and type the English word \u2014 a slip of spelling still counts.' },
-  match: { art:'box-wordpairs.png',   fox:'fox-word-pairs.webp',  name:'Word Pairs',
-           intro:'Welcome to Word Pairs! Read the Vietnamese, pick the English word that matches, then swipe left for the next one.' }
+  write: { banner:'banner-speakup.webp', fox:'fox-speak-up.webp', name:'Speak Up',
+           intro:'Read the scenario, type your best English, and Focci gives you instant feedback with native tips.' },
+  type:  { banner:'banner-lettertrail.webp', art:'box-lettertrail.png', fox:'fox-letter-trail.webp', name:'Letter Trail',
+           intro:'Read the meaning, follow the letter hints and type the English word \u2014 a slip of spelling still counts.' },
+  match: { banner:'banner-wordpairs.webp', art:'box-wordpairs.png', fox:'fox-word-pairs.webp', name:'Word Pairs',
+           intro:'Read the Vietnamese, pick the English word that matches, then swipe left for the next one.' }
 };
 function setQCountIdx(i){ setQCount(QCOUNTS[Math.max(0,Math.min(QCOUNTS.length-1,+i))]); }
 window.setQCountIdx=setQCountIdx;
@@ -4299,16 +4319,17 @@ function pgControls(){
    the home screen -- which is exactly the "back lands on the old page"
    report. Back is a swipe from left to right now, everywhere (fwBack in
    index.html), and from a game it goes where you came from. */
+function gameHead(mode){
+  const m=PG_META[mode]||PG_META.match;
+  return '<div class="gh gh-'+mode+'">'
+    +'<div class="gh-art"><img src="./'+m.banner+'" alt="" onerror="this.style.display=\'none\'"/></div>'
+    +'<img class="gh-fox" src="./'+m.fox+'" alt="" onerror="this.style.display=\'none\'"/>'
+    +'<div class="gh-txt"><div class="gh-name">'+m.name+'</div>'
+    +(m.intro?'<div class="gh-sub">'+m.intro+'</div>':'')+'</div>'
+    +'</div>';
+}
 function gameShell(body){
-  const m=PG_META[practiceMode]||PG_META.match;
-  return '<div class="pg">'
-    +'<div class="pg-head">'
-    +  '<img class="bg" src="./'+m.art+'" alt="" onerror="this.style.display=\'none\'"/>'
-    +  '<div class="txt"><div class="name">'+m.name+'</div>'
-    +  (m.intro?'<div class="sub">'+m.intro+'</div>':'')+'</div>'
-    +  '<img class="fox" src="./'+m.fox+'" alt="" onerror="this.style.display=\'none\'"/>'
-    +'</div>'
-    +pgControls()+body+'</div>';
+  return '<div class="pg">'+gameHead(practiceMode)+pgControls()+body+'</div>';
 }
 
 /* The card the question lives in: mascot breaking the top edge, what the
@@ -4834,7 +4855,7 @@ window.setSpeakUpTotal=function(n){
 /* The header card is the artwork the user supplied (fox, title and
    blurb all baked in) — used as an image rather than rebuilt in CSS,
    which is what finally made it match the mockup exactly. */
-const SU_HERO='<img class="su-hero-img" src="./speakup-header.png" alt="Speak Up" onerror="this.style.display=\'none\'"/>';
+const SU_HERO=gameHead('write');
 /* The three mini-game pills are gone from this screen — they are not in
    the design and were crowding the header card. Nothing replaces them:
    the panel's own .fw-panel-close button is already fixed at

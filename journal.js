@@ -148,39 +148,101 @@
     catch (e) { return k; }
   }
 
-  window.jnOpen = function () {
+  /* The journal screen, rebuilt light and short.
+     It opens on what is worth doing -- the words a game caught you out on
+     in the last fortnight, gathered in one place, where they used to be
+     buried inside whichever day they happened on -- then one line of
+     figures, then the days: each a single ruled list, the word and what it
+     means on one line, a small x to forget it. Days that were only
+     misses still show, marked. */
+  var VISIBLE_DAYS = 60;
+  function row(w, vi, extra, miss) {
+    return '<div class="jn-r' + (miss ? ' miss' : '') + '">'
+      + '<button class="jn-go" data-w="' + esc(w) + '" onclick="jnGo(this.dataset.w)"><b>' + esc(w) + '</b>'
+      + (vi ? '<i>' + esc(vi) + '</i>' : '') + (extra || '') + '</button>'
+      + '<button class="jn-del" aria-label="Forget" data-w="' + esc(w) + '" onclick="jnDel(this,this.dataset.w)">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>'
+      + '</button></div>';
+  }
+  function render() {
     var j = load();
     var keys = Object.keys(j).sort().reverse().filter(function (k) {
       return (j[k].words || []).length || (j[k].misses || []).length;
-    });
+    }).slice(0, VISIBLE_DAYS);
     var host = document.getElementById('jn-body');
+    if (!host) return;
     if (!keys.length) {
       host.innerHTML = '<div class="jn-empty">Nothing written down yet. Look a word up, or play a round, '
         + 'and the day starts filling itself in.</div>';
-    } else {
-      host.innerHTML = keys.map(function (k) {
-        var d = j[k];
-        var h = '<div class="jn-day"><div class="jn-date">' + esc(pretty(k)) + '</div>';
-        if (d.words.length) {
-          h += '<div class="jn-sec">Words met <b class="num">' + d.words.length + '</b></div>';
-          h += '<div class="jn-list">' + d.words.map(function (w) {
-            var ww = String(w.w || '').replace(WHY, '');
-            return '<button class="jn-w" onclick="jnGo(\'' + esc(ww) + '\')"><b>' + esc(ww) + '</b>'
-              + (w.vi ? '<i>' + esc(w.vi) + '</i>' : '') + '</button>';
-          }).join('') + '</div>';
-        }
-        if (d.misses.length) {
-          h += '<div class="jn-sec warn">Worth another look <b class="num">' + d.misses.length + '</b></div>';
-          h += '<div class="jn-list misses">' + d.misses.map(function (w) {
-            return '<button class="jn-w miss" onclick="jnGo(\'' + esc(w.w) + '\')"><b>' + esc(w.w) + '</b>'
-              + (w.vi ? '<i>' + esc(w.vi) + '</i>' : '')
-              + '<span class="jn-tag">' + esc(w.game || 'game') + (w.n > 1 ? ' ×' + w.n : '') + '</span></button>';
-          }).join('') + '</div>';
-        }
-        return h + '</div>';
-      }).join('');
+      return;
     }
+    // the fortnight's figures, and its misses in one place
+    var cut = key(new Date(Date.now() - 13 * DAY)), week = key(new Date(Date.now() - 6 * DAY));
+    var nWeek = 0, nDays = 0, revisit = {};
+    keys.forEach(function (k) {
+      var d = j[k];
+      if (k >= week) nWeek += (d.words || []).length;
+      if (k >= cut) {
+        nDays++;
+        (d.misses || []).forEach(function (m) {
+          var r = revisit[m.w] || (revisit[m.w] = { w: m.w, vi: m.vi, n: 0 });
+          r.n += (m.n || 1); if (!r.vi && m.vi) r.vi = m.vi;
+        });
+      }
+    });
+    var list = Object.keys(revisit).map(function (w) { return revisit[w]; })
+      .sort(function (a, b) { return b.n - a.n; });
+
+    var h = '<div class="jn-figs">'
+      + '<div><b class="num">' + nWeek + '</b><span>words this week</span></div>'
+      + '<div><b class="num">' + nDays + '</b><span>active days</span></div>'
+      + '<div><b class="num">' + list.length + '</b><span>to revisit</span></div>'
+      + '</div>';
+    if (list.length) {
+      h += '<section class="jn-rev"><div class="jn-cap"><span>Worth another look</span><i>from your games</i></div>'
+        + '<div class="jn-chips">' + list.slice(0, 12).map(function (m) {
+          return '<button class="jn-chip" data-w="' + esc(m.w) + '" onclick="jnGo(this.dataset.w)">' + esc(m.w)
+            + (m.n > 1 ? ' <span class="num">×' + m.n + '</span>' : '') + '</button>';
+        }).join('') + '</div></section>';
+    }
+    h += keys.map(function (k) {
+      var d = j[k];
+      var words = (d.words || []).map(function (w) { return String(w.w || '').replace(WHY, ''); });
+      var body = (d.words || []).map(function (w, i) { return row(words[i], w.vi, '', false); }).join('')
+        + (d.misses || []).map(function (m) {
+          return row(m.w, m.vi, '<span class="jn-tag">' + esc(m.game || 'game') + (m.n > 1 ? ' <span class="num">×' + m.n + '</span>' : '') + '</span>', true);
+        }).join('');
+      var n = (d.words || []).length;
+      return '<section class="jn-day"><div class="jn-cap"><span>' + esc(pretty(k)) + '</span>'
+        + '<i>' + (n ? '<span class="num">' + n + '</span> word' + (n === 1 ? '' : 's') : 'games only') + '</i></div>'
+        + '<div class="jn-list">' + body + '</div></section>';
+    }).join('');
+    host.innerHTML = h;
+  }
+  window.jnOpen = function () {
+    render();
+    var b = document.getElementById('jn-body'); if (b) b.scrollTop = 0;
     document.documentElement.classList.add('jn-on');
+  };
+  /* Out of every day, words and misses alike. forgetSearch (app.js) calls
+     this too, so the search box's x reaches the journal as well. */
+  window.jnForget = function (word) {
+    var w = String(word || '').trim().toLowerCase().replace(WHY, '');
+    if (!w) return;
+    var j = load();
+    Object.keys(j).forEach(function (k) {
+      j[k].words = (j[k].words || []).filter(function (x) { return String(x.w || '').replace(WHY, '') !== w; });
+      j[k].misses = (j[k].misses || []).filter(function (x) { return x.w !== w; });
+      if (!j[k].words.length && !j[k].misses.length) delete j[k];
+    });
+    save(j);
+    if (window.jnRenderChart) try { jnRenderChart(); } catch (e) {}
+  };
+  window.jnDel = async function (btn, word) {
+    var r = btn.closest('.jn-r');
+    if (r) r.classList.add('gone');
+    if (window.forgetSearch) await window.forgetSearch(word); else window.jnForget(word);
+    setTimeout(function () { if (document.documentElement.classList.contains('jn-on')) render(); }, 180);
   };
   window.jnClose = function () { document.documentElement.classList.remove('jn-on'); };
   window.jnGo = function (w) { jnClose(); if (window.openDictPage) window.openDictPage(String(w || '').replace(WHY, '')); };

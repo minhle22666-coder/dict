@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v195`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v196`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -405,6 +405,16 @@ the still first, makes Focci hop, fades home at 400ms and calls
 `fhShowWorld()` at 700ms, so a live frame is already there. If the world
 is still loading he bounces in place (`html.world-loading`) and goes in by
 himself when `worldReady`.
+
+**The game banners are `gameHead(mode)` in app.js** (`PG_META`, including
+Speak Up's `write`): the user's own art (`banner-*.webp`, 397x128), the
+mascot on its right edge at full size, the name and welcome UNDER the
+art -- the art's figures fill its left half and text on them hid both.
+
+**Forgetting a looked-up word is `forgetSearch(w)`** (app.js): history,
+behaviour log and every day of the journal (`jnForget` in journal.js).
+The x in the search box's Recent list, the Casebook and the journal all
+call it.
 
 **Progress is a journey, not a trophy case.** The twelve cups are gone;
 `JOURNEY` in app.js is a path of habit milestones (3/7/14/30 days in a
