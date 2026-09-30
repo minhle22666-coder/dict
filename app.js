@@ -289,42 +289,55 @@ function processCelebrateQueue(){
   ov.addEventListener('click',()=>{ clearTimeout(t); dismiss(); });
 }
 
-/* ---------- achievements (rendered with real trophy/medal art) ---------- */
-const ACHIEVEMENTS=[
-  {id:'first_word',img:'cup1',title:'First Word',test:s=>s.totalWords>=1},
-  {id:'ten_words',img:'cup2',title:'10 Words',test:s=>s.totalWords>=10},
-  {id:'hundred_words',img:'cup3',title:'100 Words',test:s=>s.totalWords>=100},
-  {id:'first_save',img:'cup4',title:'First Save',test:s=>s.savedCount>=1},
-  {id:'saver_10',img:'cup5',title:'Collector',test:s=>s.savedCount>=10},
-  {id:'streak_3',img:'cup6',title:'3-Day Streak',test:s=>s.streak>=3},
-  {id:'streak_7',img:'cup7',title:'7-Day Streak',test:s=>s.streak>=7},
-  {id:'streak_30',img:'cup8',title:'30-Day Streak',test:s=>s.streak>=30},
-  {id:'accurate',img:'cup9',title:'Sharp Shooter',test:s=>s.totalReview>=10 && s.accuracy!=null && s.accuracy>=80},
-  {id:'perfect',img:'cup10',title:'Perfect Round',test:()=>localStorage.getItem(PERFECT_LS)==='1'},
-  {id:'level_5',img:'cup11',title:'Level 5',test:()=>levelFromXP(getXP())>=5},
-  {id:'level_10',img:'cup12',title:'Level 10',test:()=>levelFromXP(getXP())>=10},
+/* ---------- the journey ----------
+   Twelve cups for "10 words" and "Level 5" said nothing about how someone
+   was actually learning, so the user asked for them to go. What replaces
+   them is a path of milestones that describe a habit -- days in a row, days
+   that each beat the one before, a month of showing up -- and each one
+   earns a title, which is what the page leads with.
+
+   Streaks are judged on the BEST run ever, so a title once earned stays
+   earned when a streak breaks (and the earned set is stored as well, in
+   case the log is ever trimmed); the progress bar on a milestone not yet
+   reached shows the CURRENT run, because that is the one to keep going. */
+const JOURNEY_LS='sd_journey';
+const JOURNEY=[
+  {id:'first',    title:'Newcomer',        goal:'Look up your first words',                       need:1,   kind:'count', val:s=>s.searchesAll},
+  {id:'three',    title:'Wanderer',        goal:'Learn three days in a row',                      need:3,   kind:'streak'},
+  {id:'rising',   title:'Climber',         goal:'Three days in a row, each busier than the one before', need:3, kind:'rise'},
+  {id:'week',     title:'Week Keeper',     goal:'Seven days in a row',                            need:7,   kind:'streak'},
+  {id:'hundred',  title:'Collector',       goal:'Look up a hundred words',                        need:100, kind:'count', val:s=>s.searchesAll},
+  {id:'sharp',    title:'Sharp Mind',      goal:'Thirty practice answers at 80% or better',       need:30,  kind:'count',
+    val:s=>(s.accuracy!=null && s.accuracy>=80) ? s.totalReview : Math.min(s.totalReview, 29)},
+  {id:'fortnight',title:'Trailblazer',     goal:'Fourteen days in a row',                         need:14,  kind:'streak'},
+  {id:'regular',  title:'Island Regular',  goal:'Twenty active days in four weeks',               need:20,  kind:'count', val:s=>s.activeDays},
+  {id:'month',    title:'Keeper of Words', goal:'Thirty days in a row',                           need:30,  kind:'streak'},
 ];
+function journeyState(s){
+  let stored; try{ stored=new Set(JSON.parse(localStorage.getItem(JOURNEY_LS)||'[]')); }catch(e){ stored=new Set(); }
+  return JOURNEY.map(m=>{
+    const best = m.kind==='streak' ? s.bestStreak : m.kind==='rise' ? s.bestRise : m.val(s);
+    const cur  = m.kind==='streak' ? s.streak     : m.kind==='rise' ? s.curRise  : m.val(s);
+    return Object.assign({}, m, {done: stored.has(m.id) || best>=m.need, cur: Math.min(cur, m.need)});
+  });
+}
+/* Kept under its old name: the games and the lookups already call it after
+   anything that might move a milestone. */
 async function checkAchievements(){
   try{
-    const stats=await computeInsights();
-    let unlocked; try{ unlocked=JSON.parse(localStorage.getItem(ACH_LS)||'[]'); }catch(e){ unlocked=[]; }
-    const set=new Set(unlocked); const newly=[];
-    for(const a of ACHIEVEMENTS){ if(!set.has(a.id) && a.test(stats)){ set.add(a.id); newly.push(a); } }
+    const s=await computeInsights();
+    let stored; try{ stored=JSON.parse(localStorage.getItem(JOURNEY_LS)||'[]'); }catch(e){ stored=[]; }
+    const set=new Set(stored), newly=[];
+    for(const m of journeyState(s)){ if(m.done && !set.has(m.id)){ set.add(m.id); newly.push(m); } }
     if(newly.length){
-      localStorage.setItem(ACH_LS, JSON.stringify([...set]));
-      newly.forEach(a=>celebrate('./'+a.img+'.webp', a.title, '🏅 Achievement unlocked!', 'gold'));
+      localStorage.setItem(JOURNEY_LS, JSON.stringify([...set]));
+      // A first-ever open would otherwise celebrate every milestone of a
+      // long history at once; only the last one is worth a moment.
+      const m=newly[newly.length-1];
+      celebrate('./mascot-thumbsup.webp', m.title, 'New title · '+m.goal, 'gold');
     }
-    return {list:ACHIEVEMENTS, unlocked:set};
-  }catch(e){ return {list:ACHIEVEMENTS, unlocked:new Set()}; }
-}
-function renderBadges(list, unlocked){
-  let h='<div class="sec"><div class="sec-h"><span class="tile tile-sm amber">🏅</span>Achievements</div><div class="badge-grid">';
-  for(const a of list){
-    const on=unlocked.has(a.id);
-    h+='<div class="badge-item '+(on?'unlocked':'locked')+'"><img src="./'+a.img+'.webp" alt=""/><div class="t">'+esc(a.title)+'</div></div>';
-  }
-  h+='</div></div>';
-  return h;
+    return journeyState(s);
+  }catch(e){ return []; }
 }
 
 /* ---------- jar widget (today's accumulated activity) ---------- */
@@ -5629,10 +5642,16 @@ function computeStreak(daySet){
   return {streak, hasToday};
 }
 async function computeInsights(){
-  const [logs, entries] = await Promise.all([logAll(), idbAll()]);
+  /* idbAllCached, not idbAll: this runs after every save and every round
+     (checkAchievements), and a fresh read of the library is 41MB. */
+  const [logs, entries] = await Promise.all([logAll(), idbAllCached()]);
   const today=dayStart(now());
   const daySet=new Set(logs.map(l=>dayStart(l.ts)));
   const {streak, hasToday}=computeStreak(daySet);
+  // the longest run of days in a row, ever
+  const allDays=[...daySet].sort((a,b)=>a-b);
+  let bestStreak=0, run=0, prev=null;
+  for(const d of allDays){ run = (prev!==null && d-prev<=DAY*1.5) ? run+1 : 1; prev=d; if(run>bestStreak) bestStreak=run; }
 
   const hourBuckets=new Array(24).fill(0);
   logs.forEach(l=>hourBuckets[new Date(l.ts).getHours()]++);
@@ -5668,6 +5687,20 @@ async function computeInsights(){
     const d=today-i*DAY;
     days28.push({ts:d, n:byDay.get(d)||0});
   }
+  /* Days that each beat the one before: the longest such run, and the run
+     that ends today (or yesterday, if today has not started yet). */
+  let bestRise=0, curRise=0;
+  if(byDay.size){
+    const first=Math.min(...byDay.keys());
+    let r=0;
+    for(let d=first+DAY; d<=today; d+=DAY){
+      const n=byDay.get(d)||0, p=byDay.get(d-DAY)||0;
+      r = (n>0 && n>p) ? r+1 : 0;
+      if(r>bestRise) bestRise=r;
+      if(d===today || (d===today-DAY && !(byDay.get(today)>0))) curRise=r;
+    }
+  }
+  let searchesAll=0; for(const n of byDay.values()) searchesAll+=n;
   const periodTotal=days28.reduce((t,d)=>t+d.n,0);
   const peakDay=days28.reduce((b,d)=>d.n>b.n?d:b, days28[0]);
   const activeDays=days28.filter(d=>d.n>0).length;
@@ -5675,7 +5708,7 @@ async function computeInsights(){
   return {streak, hasToday, peakRange, peakPct, totalHourEvents,
     accuracy, totalReview, forgetful, thisWeekSearches, lastWeekSearches,
     totalWords:entries.length, savedCount, savedNotReviewed,
-    days28, periodTotal, peakDay, activeDays};
+    days28, periodTotal, peakDay, activeDays, bestStreak, bestRise, curRise, searchesAll};
 }
 /* Một quan sát là MỘT DÒNG có số liệu bên trái, không phải một thẻ bo góc
    kèm tile emoji. Năm thẻ giống hệt nhau xếp dọc thì không có thẻ nào được
@@ -5713,13 +5746,13 @@ function progressChart(s){
   let h='<div class="pg-chart">';
   h+='<div class="pg-chart-head">';
   h+='<div class="pg-chart-sum"><b>'+s.periodTotal.toLocaleString()+'</b>'
-    +'<span>words looked up in 28 days</span></div>';
-  h+='<div class="pg-chart-side">'+s.activeDays+' active days</div>';
+    +'<span>words looked up in <span class="num">28</span> days</span></div>';
+  h+='<div class="pg-chart-side"><span class="num">'+s.activeDays+'</span> active day'+(s.activeDays===1?'':'s')+'</div>';
   h+='</div>';
   h+='<div class="pg-bars">'+bars+'</div>';
   h+='<div class="pg-axis"><span>4 weeks ago</span><span>2 weeks</span><span>today</span></div>';
   if(peakLbl && s.peakDay.n>1)
-    h+='<div class="pg-chart-peak">Busiest day was '+esc(peakLbl)+' with '+s.peakDay.n+' words.</div>';
+    h+='<div class="pg-chart-peak">Busiest day was <span class="num">'+esc(peakLbl)+'</span> with <span class="num">'+s.peakDay.n+'</span> words.</div>';
   h+='</div>';
   return h;
 }
@@ -5731,61 +5764,57 @@ async function renderInsights(){
     area.innerHTML='<div class="empty"><img class="ill" src="./mascot-read_map.webp" alt=""/><h3>Nothing to chart yet</h3><p>Look up a few words and play a round — your habits show up here once there is something to measure.</p></div>';
     return;
   }
-  const lvl=levelFromXP(getXP()), xp=getXP();
-  const xpInLvl=xp%100;
-  const RANKS=[[1,'run','Rookie Explorer'],[3,'explore','Scout'],[5,'read_map','Pathfinder'],
-               [8,'badass','Veteran Explorer'],[12,'champion','Legend of the Map']];
-  let rank=RANKS[0];
-  for(const r of RANKS) if(lvl>=r[0]) rank=r;
+  const lvl=levelFromXP(getXP());
+  const steps=await checkAchievements();
+  const done=steps.filter(m=>m.done);
+  const next=steps.find(m=>!m.done);
+  const title=done.length ? done[done.length-1].title : 'Newcomer';
 
-  let h='';
+  /* Composition, top to bottom: who you are on this island (the title and
+     the one thing to do next), the shape of the last four weeks, the path
+     of milestones, and a few things worth noticing. One idea per block,
+     with air between them -- the old page stacked a stat strip, a rank
+     card, twelve cups and the chart edge to edge. */
+  let h='<div class="pj">';
 
-  /* Reordered into "dashboard" priority instead of "report" priority:
-     quick stat strip first (glanceable, like the Settings status strip),
-     then rank+streak, then the trophy case (achievements are the
-     game-like payoff, not an afterthought at the bottom), and the
-     detailed chart/notes last since they're the "read more" analytics
-     rather than the headline. */
-  h+='<div class="jfigs pg-figs">';
-  h+='<div class="jfig"><span class="jfig-n">'+s.totalWords.toLocaleString()+'</span>'
-    +'<span class="jfig-l">words in library</span></div>';
-  h+='<span class="jfig-rule"></span>';
-  h+='<div class="jfig"><span class="jfig-n">'+s.savedCount+'</span>'
-    +'<span class="jfig-l">saved</span></div>';
-  h+='<span class="jfig-rule"></span>';
-  h+='<div class="jfig"><span class="jfig-n">'+(s.accuracy==null?'—':s.accuracy+'%')+'</span>'
-    +'<span class="jfig-l">practice accuracy</span></div>';
-  h+='</div>';
-
-  /* Rank co lại thành MỘT dòng: nó là phần thưởng, không phải thông tin
-     chính của trang. Vòng tròn XP thay cho thanh ngang để nó không tranh
-     chấp thị giác với biểu đồ cột bên dưới. */
-  h+='<div class="pg-rank">';
-  h+='<div class="pg-ring" style="--p:'+xpInLvl+'">';
-  h+='<img src="./mascot-'+rank[1]+'.webp" alt=""/>';
-  h+='</div>';
-  h+='<div class="pg-rank-txt">';
-  h+='<b>'+esc(rank[2])+'</b>';
-  h+='<span>Level '+lvl+' · '+xpInLvl+'/100 XP to level '+(lvl+1)+'</span>';
-  h+='</div>';
-  h+='<div class="pg-streak'+(s.hasToday?' lit':'')+'">'
-    +'<b>'+s.streak+'</b><span>day'+(s.streak===1?'':'s')+'</span></div>';
-  h+='</div>';
-
-  const {list, unlocked}=await checkAchievements();
-  h+=renderBadges(list, unlocked);
+  h+='<section class="pj-hero">';
+  h+='<div class="cz-cap">Your title</div>';
+  h+='<h2 class="pj-title">'+esc(title)+'</h2>';
+  h+= next
+    ? '<p class="pj-next">Next: <b>'+esc(next.title)+'</b> — '+esc(next.goal).toLowerCase()+'.</p>'
+    : '<p class="pj-next">Every milestone on the path is yours.</p>';
+  h+='<div class="pj-figs">'
+    +'<div><b class="num">'+s.streak+'</b><span>day streak</span></div>'
+    +'<div><b class="num">'+lvl+'</b><span>level</span></div>'
+    +'<div><b class="num">'+s.savedCount+'</b><span>saved</span></div>'
+    +'<div><b class="num">'+(s.accuracy==null?'—':s.accuracy+'%')+'</b><span>accuracy</span></div>'
+    +'</div>';
+  h+='</section>';
 
   h+=progressChart(s);
 
-  /* Tối đa 3 quan sát. Bản cũ có thể đổ ra 5 thẻ một lúc, đọc thành một
-     bức tường. Ưu tiên thứ có thể HÀNH ĐỘNG được trước. */
+  h+='<section class="pj-path">';
+  h+='<div class="pj-cap"><span class="cz-cap">Your journey</span><span class="num">'+done.length+' / '+steps.length+'</span></div>';
+  h+='<ol>';
+  for(const m of steps){
+    const cls = m.done ? 'done' : (m===next ? 'now' : 'later');
+    h+='<li class="pj-step '+cls+'">';
+    h+='<i class="pj-dot">'+(m.done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 12.5 4 4 8-9"/></svg>':'')+'</i>';
+    h+='<div class="pj-txt"><b>'+esc(m.title)+'</b><span>'+esc(m.goal)+'</span>';
+    if(m===next) h+='<div class="pj-bar"><s style="width:'+Math.round(m.cur/m.need*100)+'%"></s></div>';
+    h+='</div>';
+    h+='<em class="num">'+(m.done ? 'Earned' : m.cur+' / '+m.need)+'</em>';
+    h+='</li>';
+  }
+  h+='</ol></section>';
+
   const notes=[];
   if(s.forgetful.length){
     const list2=s.forgetful.map(f=>'<b>'+esc(f.word)+'</b>').join(', ');
     notes.push(insightRow(s.forgetful.length, 'Words that keep slipping', list2+' — worth a round of practice.'));
   }
   if(s.savedNotReviewed>0)
-    notes.push(insightRow(s.savedNotReviewed, 'Saved but never practiced', 'Start your next round with these.'));
+    notes.push(insightRow(s.savedNotReviewed, 'Saved but never practised', 'Start your next round with these.'));
   if(s.lastWeekSearches>0){
     const diff=s.thisWeekSearches-s.lastWeekSearches;
     const pct=Math.round(Math.abs(diff)/s.lastWeekSearches*100);
@@ -5796,14 +5825,12 @@ async function renderInsights(){
   }
   if(s.peakRange && s.peakPct>=20)
     notes.push(insightRow(s.peakPct+'%', 'You work in the '+esc(s.peakRange.name), 'That is when most of your activity lands.'));
-  if(s.totalReview>=5 && s.accuracy!=null)
-    notes.push(insightRow(s.totalReview, 'Answers recorded', 'Accuracy sits at '+s.accuracy+'% so far.'));
-
   if(notes.length){
-    h+='<div class="pg-notes-h">What Focci noticed</div>';
+    h+='<section class="pj-notes"><div class="pj-cap"><span class="cz-cap">What Focci noticed</span></div>';
     h+=notes.slice(0,3).join('');
+    h+='</section>';
   }
-
+  h+='</div>';
   area.innerHTML=h;
 }
 

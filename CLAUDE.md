@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v194`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v195`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -405,6 +405,16 @@ the still first, makes Focci hop, fades home at 400ms and calls
 `fhShowWorld()` at 700ms, so a live frame is already there. If the world
 is still loading he bounces in place (`html.world-loading`) and goes in by
 himself when `worldReady`.
+
+**Progress is a journey, not a trophy case.** The twelve cups are gone;
+`JOURNEY` in app.js is a path of habit milestones (3/7/14/30 days in a
+row, three days each busier than the one before, 100 lookups, 30 answers
+at 80%+, 20 active days in four weeks), each earning a title the page
+leads with. Streak milestones are judged on the best run ever (`bestStreak`,
+`bestRise` from `computeInsights`) and stored in `sd_journey`, so a title
+stays earned; the bar on the next one shows the current run.
+`checkAchievements()` keeps its name (many callers) and now celebrates new
+titles. `computeInsights` reads `idbAllCached()` -- it runs after every save.
 
 **The island runs at half rate when nobody is touching it** (`halfRateSkip`
 in `animate()`), and at a pixel ratio of 1.5 on touch screens. Both are

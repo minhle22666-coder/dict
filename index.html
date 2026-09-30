@@ -6207,6 +6207,130 @@
       linear-gradient(180deg,rgba(4,44,44,.30) 0%,rgba(3,38,38,.40) 58%,rgba(2,30,30,.54) 100%),
       url('./bg-speakup-village.webp') center center/cover no-repeat, #0d4c48;
     backdrop-filter:none;-webkit-backdrop-filter:none}
+
+  /* ---------------- home, third pass ----------------
+     Focci is smaller and stands in the middle of the screen beside the
+     Saved row, turned a little away from us, into the island. The rows
+     narrow to 172px so he has the room; the dot went, the white card
+     already says which row is chosen. The page's own background is cream,
+     not the old teal: that teal showed as a dark band under home on
+     Android, below the fixed backdrop. */
+  html.home-on, html.home-on body{background:var(--cz-cream-2)}
+  .cz-nav{width:172px}
+  .cz-row{padding:0 10px 0 11px;gap:11px}
+  .cz-row b{font-size:13px}
+  .cz-row em{font-size:8px;letter-spacing:.1em}
+  .cz-row .cz-dot{display:none}
+
+  /* the way in has a light running round its edge */
+  .cz-go-row{isolation:isolate}
+  .cz-edge{position:absolute;inset:0;border-radius:12px;padding:2px;overflow:hidden;pointer-events:none;
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+    mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude}
+  .cz-edge::before{content:'';position:absolute;top:50%;left:50%;width:260%;aspect-ratio:1;transform:translate(-50%,-50%);
+    background:conic-gradient(from 0deg,rgba(255,255,255,0) 0 58%,rgba(214,172,78,.45) 72%,#DDB553 83%,#FFF3CF 89%,
+      #DDB553 94%,rgba(255,255,255,0) 100%);
+    animation:cz-spin 3.6s linear infinite}
+  @keyframes cz-spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+  /* a faint rim under the light, so the row reads as a button when it is not the white one */
+  .cz-go-row:not(.on){box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
+
+  .cz-focci{left:157px;right:auto;top:10px;bottom:auto;width:60px;height:96px;z-index:2}
+  .cz-focci img{height:76px;bottom:6px;margin-left:-22px}
+  .cz-sh{width:40px;height:9px;margin-left:-20px;bottom:2px}
+  @keyframes cz-hop{
+    0%{transform:translateY(0) scale(1,1)}
+    14%{transform:translateY(0) scale(1.14,.82)}
+    40%{transform:translateY(-122px) scale(.92,1.1)}
+    60%{transform:translateY(-150px) scale(1,1)}
+    100%{transform:translateY(-142px) scale(1.04,1)}}
+  .cz-focci.hop img{animation:cz-hop .72s cubic-bezier(.3,.7,.35,1) forwards}
+  .cz-focci.hop .cz-sh{animation:cz-hop-sh .72s ease-out forwards}
+  /* the puff: six soft clouds from under his feet as he springs */
+  .cz-puff{position:absolute;left:50%;bottom:4px;width:0;height:0;pointer-events:none}
+  .cz-puff b{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;opacity:0;
+    background:radial-gradient(circle at 40% 38%,rgba(255,255,252,.98),rgba(240,238,222,.85) 55%,rgba(230,228,210,0) 72%)}
+  .cz-focci.hop .cz-puff b{animation:cz-puff .75s cubic-bezier(.2,.7,.3,1) .08s forwards}
+  .cz-puff b:nth-child(1){--dx:-30px;--dy:-10px;--s:1.5}
+  .cz-puff b:nth-child(2){--dx:30px;--dy:-9px;--s:1.45}
+  .cz-puff b:nth-child(3){--dx:-16px;--dy:-24px;--s:1.25;animation-delay:.12s !important}
+  .cz-puff b:nth-child(4){--dx:17px;--dy:-26px;--s:1.3;animation-delay:.12s !important}
+  .cz-puff b:nth-child(5){--dx:-42px;--dy:-2px;--s:1.1;animation-delay:.16s !important}
+  .cz-puff b:nth-child(6){--dx:42px;--dy:-3px;--s:1.1;animation-delay:.16s !important}
+  @keyframes cz-puff{
+    0%{opacity:0;transform:translate(0,0) scale(.35)}
+    18%{opacity:.95}
+    100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(var(--s))}}
+
+  /* the journal, with a small lit star */
+  .cz-star{position:relative;flex:none;width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:#C9A24A}
+  .cz-star::before{content:'';position:absolute;inset:-9px;border-radius:50%;
+    background:radial-gradient(closest-side,rgba(244,222,156,.75),rgba(244,222,156,0));animation:cz-glow 2.6s ease-in-out 4}
+  .cz-star svg{position:relative;width:19px;height:19px;filter:drop-shadow(0 0 4px rgba(233,196,106,.7))}
+  @keyframes cz-glow{0%,100%{opacity:.55;transform:scale(.9)}50%{opacity:1;transform:scale(1.12)}}
+  .cz-foot{box-shadow:var(--cz-rim),var(--cz-hair),0 0 0 1px rgba(233,196,106,.22),0 6px 18px rgba(201,162,74,.12)}
+
+  /* ---------------- panels: nothing slides under the search row ----------------
+     The row floats over every panel, so a page scrolled up went on under
+     it -- the trophies read through the search field. A cream band behind
+     the row on the light pages; Speak Up and the island keep theirs clear. */
+  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day)) #fw-chrome::before,
+  html.dict-open #fw-chrome::before{content:'';position:fixed;left:0;right:0;top:0;
+    height:calc(env(safe-area-inset-top,0px) + 70px);pointer-events:none;
+    background:linear-gradient(180deg,rgba(242,244,228,.97) 0%,rgba(242,244,228,.92) 72%,rgba(242,244,228,0) 100%)}
+
+  /* ---------------- Progress: a journey, not a trophy case ---------------- */
+  html body .view.fw-panel#v-stats .pj{display:flex;flex-direction:column;gap:34px;padding:6px 4px 24px}
+  html body .view.fw-panel#v-stats .pj-title{margin:8px 0 0;font-size:34px;line-height:1.05;font-weight:500;
+    letter-spacing:-.025em;color:var(--cz-ink)}
+  html body .view.fw-panel#v-stats .pj-next{margin:10px 0 0;font-size:13px;line-height:1.55;color:var(--cz-soft)}
+  html body .view.fw-panel#v-stats .pj-next b{font-weight:600;color:var(--cz-ink)}
+  html body .view.fw-panel#v-stats .pj-figs{display:grid;grid-template-columns:repeat(4,1fr);margin-top:22px;padding:14px 0;
+    border-top:1px solid var(--cz-line);border-bottom:1px solid var(--cz-line)}
+  html body .view.fw-panel#v-stats .pj-figs div{display:flex;flex-direction:column;gap:4px;padding-left:12px;min-width:0}
+  html body .view.fw-panel#v-stats .pj-figs div:first-child{padding-left:0}
+  html body .view.fw-panel#v-stats .pj-figs div + div{box-shadow:inset 1px 0 0 var(--cz-line)}
+  html body .view.fw-panel#v-stats .pj-figs b{font-size:25px;line-height:1;color:var(--cz-ink)}
+  html body .view.fw-panel#v-stats .pj-figs span{font-size:8.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--cz-faint);white-space:nowrap}
+
+  html body .view.fw-panel#v-stats .pg-chart{margin:0;padding:18px 18px 16px;border-radius:20px}
+  html body .view.fw-panel#v-stats .pg-chart-sum b{font-size:30px;color:var(--cz-ink)}
+  html body .view.fw-panel#v-stats .pg-chart-sum span{color:var(--cz-soft)}
+  html body .view.fw-panel#v-stats .pg-chart-side{color:var(--cz-sage);background:var(--cz-sage-bg);box-shadow:none;border:0}
+  html body .view.fw-panel#v-stats .pg-chart-peak{color:var(--cz-soft)}
+
+  html body .view.fw-panel#v-stats .pj-cap{display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 6px}
+  html body .view.fw-panel#v-stats .pj-cap .num{font-size:12px;color:var(--cz-faint)}
+  html body .view.fw-panel#v-stats .pj-path ol{position:relative;list-style:none;margin:0;padding:0}
+  html body .view.fw-panel#v-stats .pj-path ol::before{content:'';position:absolute;left:11px;top:24px;bottom:24px;width:2px;
+    border-radius:2px;background:rgba(94,122,72,.16)}
+  html body .view.fw-panel#v-stats .pj-step{position:relative;display:flex;align-items:flex-start;gap:14px;padding:13px 0}
+  html body .view.fw-panel#v-stats .pj-dot{position:relative;z-index:1;flex:none;width:24px;height:24px;margin-top:1px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;background:#FBFCF4;box-shadow:inset 0 0 0 2px rgba(94,122,72,.22)}
+  html body .view.fw-panel#v-stats .pj-dot svg{width:14px;height:14px}
+  html body .view.fw-panel#v-stats .pj-step.done .pj-dot{color:#fff;background:var(--cz-sage);box-shadow:none}
+  html body .view.fw-panel#v-stats .pj-step.now .pj-dot{background:#fff;box-shadow:inset 0 0 0 2px var(--cz-sage),0 0 0 5px rgba(94,122,72,.12)}
+  html body .view.fw-panel#v-stats .pj-txt{flex:1;min-width:0}
+  html body .view.fw-panel#v-stats .pj-txt b{display:block;font-size:14.5px;font-weight:600;letter-spacing:-.005em;color:var(--cz-ink)}
+  html body .view.fw-panel#v-stats .pj-txt span{display:block;margin-top:3px;font-size:12.5px;line-height:1.45;color:var(--cz-soft)}
+  html body .view.fw-panel#v-stats .pj-step.later b{color:var(--cz-soft)}
+  html body .view.fw-panel#v-stats .pj-step.later span{color:var(--cz-faint)}
+  html body .view.fw-panel#v-stats .pj-step em{flex:none;margin-top:3px;font-style:normal;font-size:11.5px;color:var(--cz-faint)}
+  html body .view.fw-panel#v-stats .pj-step.done em{color:var(--cz-sage)}
+  html body .view.fw-panel#v-stats .pj-step.now{margin:4px 0;padding:14px 14px 14px 0;border-radius:16px;
+    background:linear-gradient(90deg,rgba(255,255,252,0) 0,rgba(255,255,252,.85) 12px);box-shadow:none}
+  html body .view.fw-panel#v-stats .pj-step.now em{color:var(--cz-ink)}
+  html body .view.fw-panel#v-stats .pj-bar{margin-top:10px;height:5px;border-radius:99px;overflow:hidden;background:rgba(94,122,72,.12)}
+  html body .view.fw-panel#v-stats .pj-bar s{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#A9C08A,#5E7A48)}
+
+  html body .view.fw-panel#v-stats .pj-notes .pg-note{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:baseline;
+    margin:0;padding:14px 2px;text-align:left;background:none;border:0;border-top:1px solid var(--cz-line)}
+  html body .view.fw-panel#v-stats .pj-notes .pg-note-fig{min-width:0;font-size:22px;color:var(--cz-sage);text-align:left}
+  html body .view.fw-panel#v-stats .pj-notes .pg-note-txt{display:block;text-align:left}
+  html body .view.fw-panel#v-stats .pj-notes .pg-note-txt b{display:block;font-size:14px;font-weight:600;color:var(--cz-ink)}
+  html body .view.fw-panel#v-stats .pj-notes .pg-note-txt span{display:block;margin-top:3px;font-size:12.5px;line-height:1.5;color:var(--cz-soft)}
+  html body .view.fw-panel#v-stats .pj-notes .pg-note-txt span b{display:inline;font-size:inherit}
 </style>
 </head>
 <body>
@@ -6890,18 +7014,18 @@
     <div class="cz-cap">Where to</div>
     <div class="cz-where">
     <nav class="cz-nav" aria-label="Where to">
-      <button class="cz-row on" onclick="fhEnterIsland()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5c2.2 1.4 4.4 1.4 6.6 0s4.4-1.4 6.6 0 3.6 1.4 4.8.6"/><path d="M6.5 15.2 12 5l5.5 10.2"/><path d="M9.6 9.5h4.8"/></svg><span><b>Enter the island</b><em>Walk, hunt, rescue</em></span><i class="cz-dot"></i></button>
+      <button class="cz-row cz-go-row on" onclick="fhEnterIsland()"><i class="cz-edge" aria-hidden="true"></i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5c2.2 1.4 4.4 1.4 6.6 0s4.4-1.4 6.6 0 3.6 1.4 4.8.6"/><path d="M6.5 15.2 12 5l5.5 10.2"/><path d="M9.6 9.5h4.8"/></svg><span><b>Enter the island</b><em>Walk, hunt, rescue</em></span><i class="cz-dot"></i></button>
       <button class="cz-row" onclick="czOpen('saved')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.8L6 20V5a1 1 0 0 1 1-1z"/></svg><span><b>Saved</b><em>Words you kept</em></span><i class="cz-dot"></i></button>
       <button class="cz-row" onclick="czOpen('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-7"/></svg><span><b>Progress</b><em>Streak and XP</em></span><i class="cz-dot"></i></button>
       <button class="cz-row" onclick="czPage('games')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20.5 12 12 20.5 3.5 12z"/><path d="M12 8.5 15.5 12 12 15.5 8.5 12z"/></svg><span><b>Mini games</b><em>Four ways to play</em></span><i class="cz-dot"></i></button>
     </nav>
 
     <button class="cz-focci" id="cz-focci" onclick="fhEnterIsland()" aria-label="Enter the island">
-      <i class="cz-sh"></i><img src="./home-focci.webp" alt="" draggable="false"/>
+      <i class="cz-sh"></i><i class="cz-puff" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b><b></b></i><img src="./home-focci.webp" alt="" draggable="false"/>
     </button>
     </div>
 
-    <button class="cz-foot" onclick="jnOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h11a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6z"/><path d="M6 4v16"/><path d="M10 9h5M10 12.5h5"/></svg><span><b>Focci&rsquo;s Journal</b><em>What you looked up, day by day</em></span><svg class="cz-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+    <button class="cz-foot" onclick="jnOpen()"><i class="cz-star" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5c.5 4.6 2.9 7 7.5 7.5-4.6.5-7 2.9-7.5 7.5-.5-4.6-2.9-7-7.5-7.5 4.6-.5 7-2.9 7.5-7.5z"/><path d="M19 15.5c.2 1.8 1.1 2.7 2.9 2.9-1.8.2-2.7 1.1-2.9 2.9-.2-1.8-1.1-2.7-2.9-2.9 1.8-.2 2.7-1.1 2.9-2.9z" opacity=".7"/></svg></i><span><b>Focci&rsquo;s Journal</b><em>What you looked up, day by day</em></span><svg class="cz-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
   </div>
 
   <div class="cz-games" aria-label="Mini games">
