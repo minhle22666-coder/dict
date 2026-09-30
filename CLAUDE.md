@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v193`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v194`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -374,6 +374,37 @@ A dev-only harness for driving the island lives at
 `.claude/dev-harness.js` (excluded from git in `.git/info/exclude`):
 `(0,eval)(await (await fetch('/.claude/dev-harness.js',{cache:'no-store'})).text())`.
 The pane's localStorage is wiped whenever the preview server restarts.
+
+**The look is COZY GLASS** (Sept 2026): cream and sage from the user's
+reference picture, one `<style id="cozy-glass">` block placed AFTER
+`theme-overrides.css` so it wins on order. The classic look is tag
+`classic-v193` (and branch `classic`) -- `git revert` the cozy commits or
+reset to the tag to go back. Rules of that block:
+- Raleway everywhere via `:where(html body *){font-family:... !important}`
+  (zero specificity), and light Helvetica (300) for every figure: `.num`,
+  every older Helvetica rule restated with `!important`, and a list of
+  counters/dates that had no class. **Put `.num` on any new figure.**
+- The panel tokens (`--primary`, `--surface`, `--text`...) are set once for
+  `.view.fw-panel` and the word page; the purple root set is overridden,
+  not deleted. Speak Up is excluded -- it is see-through and used to show
+  home's old village background, so it now carries `bg-speakup-village`
+  itself.
+- Glass is near-opaque white + a bright rim + a soft lift. No
+  `backdrop-filter` over anything that moves.
+
+**Home is a still, not WebGL.** `home-island.webp` (47KB) was rendered
+from the real scene with an orthographic camera and graded to cream;
+`home-focci.webp` is Focci from the same angle. If the island changes a
+lot, re-render them rather than faking it. Home = four see-through rows
+(Enter the island / Saved / Progress / Mini games; the pressed or hovered
+one is the only white one), Focci standing in the scene, and one slim
+Journal line at the foot. Mini games is home's second page
+(`czPage('games')`, `#fw-home.cz-on-games`) with the mascots; `fwBack()`
+returns from it to the rows. `fhEnterIsland()` shows `#fw-overlay` under
+the still first, makes Focci hop, fades home at 400ms and calls
+`fhShowWorld()` at 700ms, so a live frame is already there. If the world
+is still loading he bounces in place (`html.world-loading`) and goes in by
+himself when `worldReady`.
 
 **The island runs at half rate when nobody is touching it** (`halfRateSkip`
 in `animate()`), and at a pixel ratio of 1.5 on touch screens. Both are

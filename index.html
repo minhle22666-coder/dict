@@ -1430,16 +1430,16 @@
      wherever a divider will do.
      ============================================================ */
   #v-saved{
-    --sv-ink:#0E3B3E; --sv-soft:#4C7E7F; --sv-faint:#7FA8A6;
-    --sv-card:#F2FAF7; --sv-card-2:#E4F3EE; --sv-line:rgba(20,110,110,.16);
-    --sv-teal:#12787D; --sv-teal-2:#2AAFB4; --sv-amber:#C9821A; --sv-amber-bg:rgba(224,166,60,.16);
+    --sv-ink:#2E3826; --sv-soft:#5D6B50; --sv-faint:#737F67;
+    --sv-card:#FBFCF4; --sv-card-2:#EEF1DE; --sv-line:rgba(94,122,72,.16);
+    --sv-teal:#5E7A48; --sv-teal-2:#93AE74; --sv-amber:#C9821A; --sv-amber-bg:rgba(224,166,60,.16);
     font-family:'Raleway Local','Raleway',system-ui,sans-serif;
-    background:linear-gradient(180deg,#E2F3ED 0%,#D5ECE5 46%,#C9E5DD 100%);
+    background:linear-gradient(180deg,#F6F7EA 0%,#F0F2E2 46%,#ECEFDA 100%);
     backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5)}
 
   /* ---- shared chrome: tabs, count, sort ---- */
   #v-saved .sv-tabs{gap:4px;padding:4px;margin-bottom:18px;border:none;border-radius:16px;
-    background:rgba(18,120,125,.09);box-shadow:none}
+    background:rgba(94,122,72,.09);box-shadow:none}
   #v-saved .sv-tab{padding:9px 4px;border-radius:12px;font-size:12.5px;font-weight:700;
     color:var(--sv-soft);background:none;border:none;box-shadow:none}
   #v-saved .sv-tab.on{color:#fff;font-weight:800;background:var(--sv-teal);box-shadow:none}
@@ -1458,7 +1458,7 @@
     background:var(--sv-card);box-shadow:none}
   #v-saved .sv-hero-n{min-width:46px;height:46px;border-radius:15px;font-size:21px;font-weight:800;
     color:#fff;background:var(--sv-teal);box-shadow:none}
-  #v-saved .sv-hero.calm .sv-hero-n{color:var(--sv-teal);background:rgba(18,120,125,.12)}
+  #v-saved .sv-hero.calm .sv-hero-n{color:var(--sv-teal);background:rgba(94,122,72,.12)}
   #v-saved .sv-hero-t b{color:var(--sv-ink);font-weight:800}
   #v-saved .sv-hero-t span{color:var(--sv-soft)}
   #v-saved .sv-hero-go{color:#fff;border:none;font-weight:800;background:var(--sv-teal);box-shadow:none}
@@ -1477,7 +1477,7 @@
     border:none;border-radius:0;background:none;box-shadow:none;
     border-bottom:1px solid var(--sv-line)}
   #v-saved .sv-sec .sv-row:last-child{border-bottom:none}
-  #v-saved .sv-row:active{background:rgba(18,120,125,.05)}
+  #v-saved .sv-row:active{background:rgba(94,122,72,.05)}
   #v-saved .sv-mid{flex:1;min-width:0}
   #v-saved .sv-w{display:block;font-size:16px;font-weight:800;color:var(--sv-ink);letter-spacing:-.01em}
   #v-saved .sv-e{display:block;margin-top:2px;font-size:13px;font-weight:500;color:var(--sv-soft);
@@ -1486,13 +1486,13 @@
   #v-saved .sv-when{font-size:11px;font-weight:700;color:var(--sv-faint)}
   #v-saved .sv-star{color:#E0A63C;background:none;border:none;font-size:19px;line-height:1}
   #v-saved .sv-meter{display:inline-flex;gap:3px}
-  #v-saved .sv-meter i{width:12px;height:3px;border-radius:99px;background:rgba(20,110,110,.16)}
+  #v-saved .sv-meter i{width:12px;height:3px;border-radius:99px;background:rgba(94,122,72,.16)}
   #v-saved .sv-meter i.on{background:var(--sv-teal-2)}
 
   /* ---- tab 2: the casebook (lookup history) ---- */
   #v-saved .hist-item{border:none;border-radius:0;background:none;box-shadow:none;
     padding:13px 2px;border-bottom:1px solid var(--sv-line)}
-  #v-saved .hist-item:active{background:rgba(18,120,125,.05)}
+  #v-saved .hist-item:active{background:rgba(94,122,72,.05)}
   #v-saved .hist-ico,#v-saved .hist-ico-svg{color:var(--sv-teal)}
   #v-saved .hist-top .w{color:var(--sv-ink);font-weight:800}
   #v-saved .hist-mid,#v-saved .hist-sub{color:var(--sv-soft)}
@@ -2436,9 +2436,9 @@
     -webkit-backdrop-filter:blur(30px) saturate(1.7) brightness(1.4);
     --tint:#1FAFB4; --pri-l:#178E93; --pri-d:#67DEE1;
     --p1:#2FBFC3; --p2:#67DEE1; --p3:#9BEDEA; --primary:#1FAFB4;
-    --a1:#67DEE1; --a2:#2AAFB4; --cta-ink:#04333A; --cta-glow:rgba(103,222,225,.5);
+    --a1:#67DEE1; --a2:#93AE74; --cta-ink:#04333A; --cta-glow:rgba(103,222,225,.5);
     --grad-hero:linear-gradient(135deg,#2FBFC3,#67DEE1);
-    --cta:linear-gradient(180deg,#67DEE1 0%,#2AAFB4 100%);
+    --cta:linear-gradient(180deg,#67DEE1 0%,#93AE74 100%);
     /* The blocks were white at two thirds opacity sitting on a sheet that
        is itself white, which is precisely why every one of them showed
        its own rectangle: the fill was invisible and only the EDGE of it
@@ -2463,7 +2463,7 @@
        structure -- it is what separates one collocation from the next --
        rather than the stray artefact it looked like when every block was
        the same flat wash. */
-    --line:rgba(31,175,180,.22);
+    --line:rgba(94,122,72,.22);
     --text:#123C40;
     --muted:#5E8C8E;
     /* .feel's wash and the headword's gradient both read from these. The
@@ -2472,8 +2472,8 @@
        with a stranger's cyan. */
     --cyan:#2FBFC3;
     --cyan-bg:color-mix(in srgb, var(--cyan) 13%, transparent);
-    --grad-text:linear-gradient(135deg,#12787D,#2AAFB4);
-    --shadow:0 4px 16px rgba(18,120,125,.10);
+    --grad-text:linear-gradient(135deg,#5E7A48,#93AE74);
+    --shadow:0 4px 16px rgba(94,122,72,.10);
     /* The last two warm colours on the page. --amber was carrying the
        preposition keywords and the word-family words, which is where the
        orange on a mint sheet was coming from; the saved star still wants
@@ -2481,7 +2481,7 @@
        terracotta against mint reads as a mistake rather than a contrast
        -- a dusty rose says "the opposite of these" just as clearly and
        belongs to the same picture. */
-    --amber:#12787D;
+    --amber:#5E7A48;
     /* #C2657B read fine as an accent but measured 3.2:1 for body text
        against this page's light backgrounds -- under the 4.5:1 normal-text
        floor, on the "don't confuse with" callout and the antonym chips
@@ -2532,14 +2532,14 @@
   html.dict-open #v-home{padding-top:calc(env(safe-area-inset-top,0px) + 80px)}
   html.dict-open .fw-searchbar{
     background:#FFFFFF;
-    border:1px solid rgba(31,175,180,.24);
-    box-shadow:0 6px 20px rgba(18,120,125,.12)}
-  html.dict-open .fw-searchbar input{color:#0C3B3E}
-  html.dict-open .fw-searchbar input::placeholder{color:rgba(12,59,62,.42);font-weight:400}
-  html.dict-open .fw-searchbar svg{color:#12787D;opacity:1;filter:none}
+    border:1px solid rgba(94,122,72,.24);
+    box-shadow:0 6px 20px rgba(94,122,72,.12)}
+  html.dict-open .fw-searchbar input{color:#2E3826}
+  html.dict-open .fw-searchbar input::placeholder{color:rgba(46,56,38,.42);font-weight:400}
+  html.dict-open .fw-searchbar svg{color:#5E7A48;opacity:1;filter:none}
   html.dict-open .fw-gear{
-    background:#FFFFFF;color:#12787D;
-    border:1px solid rgba(31,175,180,.24);box-shadow:0 6px 20px rgba(18,120,125,.12)}
+    background:#FFFFFF;color:#5E7A48;
+    border:1px solid rgba(94,122,72,.24);box-shadow:0 6px 20px rgba(94,122,72,.12)}
   html.dict-open .fw-gear svg{filter:none}
   /* Floating exit, bottom-right: the sticky .topbar already owns the top
      of this page, so the shared .fw-panel-close would have landed on it. */
@@ -5338,16 +5338,16 @@
      ============================================================ */
   /* The strip under the home indicator is the document's own background,
      which is dark teal -- the "dark band at the bottom" of the screen. */
-  html:has(#v-saved.active), html:has(#v-saved.active) body{background:#C9E5DD}
+  html:has(#v-saved.active), html:has(#v-saved.active) body{background:#ECEFDA}
 
   body .view.fw-panel#v-saved{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 110px)}
 
   /* tabs: a quiet segmented control */
   body .view.fw-panel#v-saved .sv-tabs{display:flex;gap:2px;padding:3px;margin:0 0 16px;
-    border:0;border-radius:14px;background:rgba(18,120,125,.09);box-shadow:none}
+    border:0;border-radius:14px;background:rgba(94,122,72,.09);box-shadow:none}
   body .view.fw-panel#v-saved .sv-tab{flex:1;padding:8px 4px;border-radius:11px;border:0;
     font-size:13px;font-weight:700;letter-spacing:0;color:var(--sv-soft);background:none;box-shadow:none}
-  body .view.fw-panel#v-saved .sv-tab.on{color:#fff;background:var(--sv-teal);box-shadow:0 1px 3px rgba(10,70,72,.18)}
+  body .view.fw-panel#v-saved .sv-tab.on{color:#fff;background:var(--sv-teal);box-shadow:0 1px 3px rgba(60,72,44,.18)}
 
   /* the one count, and the sort */
   body .view.fw-panel#v-saved .saved-head{display:flex;align-items:center;justify-content:space-between;
@@ -5400,7 +5400,7 @@
     white-space:nowrap;font-size:13px;font-weight:500;line-height:1.35;color:var(--sv-soft)}
   /* strength: five dots beside the word, quiet until they fill */
   body .view.fw-panel#v-saved .sv-meter{flex:none;display:inline-flex;gap:2px}
-  body .view.fw-panel#v-saved .sv-meter i{width:4px;height:4px;border-radius:50%;background:rgba(20,110,110,.18)}
+  body .view.fw-panel#v-saved .sv-meter i{width:4px;height:4px;border-radius:50%;background:rgba(94,122,72,.18)}
   body .view.fw-panel#v-saved .sv-meter i.on{background:var(--sv-teal-2)}
   body .view.fw-panel#v-saved .sv-when{flex:none;font-size:11.5px;font-weight:600;color:var(--sv-faint)}
   body .view.fw-panel#v-saved .sv-star{flex:none;width:34px;height:34px;display:flex;align-items:center;
@@ -5417,7 +5417,7 @@
   body .view.fw-panel#v-saved .wf-body{padding:0 14px 14px}
   body .view.fw-panel#v-saved .wf-body .wh-item{border:0;box-shadow:none;border-radius:14px;background:var(--sv-card-2);
     margin-bottom:8px}
-  body .view.fw-panel#v-saved .wh-root{border:0;box-shadow:none;border-radius:14px;background:rgba(18,120,125,.08)}
+  body .view.fw-panel#v-saved .wh-root{border:0;box-shadow:none;border-radius:14px;background:rgba(94,122,72,.08)}
   body .view.fw-panel#v-saved .wf-acts button{border:0;box-shadow:none;border-radius:12px;
     color:var(--sv-teal);background:var(--sv-card-2)}
   /* What is inside an opened comparison. These blocks are shared with the
@@ -5433,9 +5433,9 @@
   body .view.fw-panel#v-saved .wh-w-arrow{color:var(--sv-teal-2)}
   body .view.fw-panel#v-saved .wh-vi{color:var(--sv-soft)}
   body .view.fw-panel#v-saved .wh-key{font-size:14.5px;font-weight:700;color:var(--sv-ink);
-    background:rgba(18,120,125,.08);border-left-color:var(--sv-teal-2);box-shadow:none}
+    background:rgba(94,122,72,.08);border-left-color:var(--sv-teal-2);box-shadow:none}
   body .view.fw-panel#v-saved .wh-diff{color:var(--sv-soft)}
-  body .view.fw-panel#v-saved .wh-typ span{color:var(--sv-teal);background:rgba(18,120,125,.1);border:0;box-shadow:none}
+  body .view.fw-panel#v-saved .wh-typ span{color:var(--sv-teal);background:rgba(94,122,72,.1);border:0;box-shadow:none}
   body .view.fw-panel#v-saved .wh-ex{border-left-color:var(--sv-line)}
   body .view.fw-panel#v-saved .wh-ex-en{color:var(--sv-ink)}
   body .view.fw-panel#v-saved .wh-ex-vi{color:var(--sv-faint)}
@@ -5496,13 +5496,13 @@
   html.dict-open .fw-topbar .fw-searchbar, html:has(#v-saved.active) .fw-topbar .fw-searchbar,
   html.dict-open .fw-topbar .fw-gear, html:has(#v-saved.active) .fw-topbar .fw-gear{
     background:rgba(255,255,255,.86);border:0;
-    box-shadow:inset 0 0 0 1px rgba(18,120,125,.18),0 4px 14px rgba(18,120,125,.08)}
+    box-shadow:inset 0 0 0 1px rgba(94,122,72,.18),0 4px 14px rgba(94,122,72,.08)}
   html.dict-open .fw-topbar .fw-searchbar svg, html:has(#v-saved.active) .fw-topbar .fw-searchbar svg,
-  html.dict-open .fw-topbar .fw-gear, html:has(#v-saved.active) .fw-topbar .fw-gear{color:#12787D;filter:none}
+  html.dict-open .fw-topbar .fw-gear, html:has(#v-saved.active) .fw-topbar .fw-gear{color:#5E7A48;filter:none}
   html.dict-open body .fw-topbar .fw-searchbar input, html:has(#v-saved.active) body .fw-topbar .fw-searchbar input{
-    color:#0E3B3E;text-shadow:none}
+    color:#2E3826;text-shadow:none}
   html.dict-open body .fw-topbar .fw-searchbar input::placeholder,
-  html:has(#v-saved.active) body .fw-topbar .fw-searchbar input::placeholder{color:rgba(14,59,62,.46)}
+  html:has(#v-saved.active) body .fw-topbar .fw-searchbar input::placeholder{color:rgba(46,56,38,.46)}
 
   /* Panels start clear of the row: it ends at safe-area + 55px, and the
      content began at + 74 -- a 19px gap on paper, and on a phone the row
@@ -5544,26 +5544,26 @@
      blur of something you cannot see still costs its full price.
      ============================================================ */
   body .view.fw-panel#v-review.pg-day, html body .ht-scrim{
-    --sv-ink:#0E3B3E; --sv-soft:#4C7E7F; --sv-faint:#7FA8A6;
-    --sv-card:#F2FAF7; --sv-card-2:#E4F3EE; --sv-line:rgba(20,110,110,.16);
-    --sv-teal:#12787D; --sv-teal-2:#2AAFB4; --sv-amber:#C9821A; --sv-coral:#C2603A}
-  body .view.fw-panel#v-review.pg-day{background:linear-gradient(180deg,#E2F3ED 0%,#D5ECE5 46%,#C9E5DD 100%);
+    --sv-ink:#2E3826; --sv-soft:#5D6B50; --sv-faint:#737F67;
+    --sv-card:#FBFCF4; --sv-card-2:#EEF1DE; --sv-line:rgba(94,122,72,.16);
+    --sv-teal:#5E7A48; --sv-teal-2:#93AE74; --sv-amber:#C9821A; --sv-coral:#C2603A}
+  body .view.fw-panel#v-review.pg-day{background:linear-gradient(180deg,#F6F7EA 0%,#F0F2E2 46%,#ECEFDA 100%);
     backdrop-filter:none;-webkit-backdrop-filter:none}
-  html:has(#v-review.pg-day.active), html:has(#v-review.pg-day.active) body{background:#C9E5DD}
+  html:has(#v-review.pg-day.active), html:has(#v-review.pg-day.active) body{background:#ECEFDA}
   body .view.fw-panel#v-review.pg-day, body .view.fw-panel#v-review.pg-day *{font-family:'Raleway Local','Raleway',system-ui,sans-serif}
   body .view.fw-panel#v-review.pg-day .num, body .view.fw-panel#v-review.pg-day .pg-val, body .view.fw-panel#v-review.pg-day .rb-count, body .view.fw-panel#v-review.pg-day .rb-count *, body .view.fw-panel#v-review.pg-day .pg-xp,
   body .view.fw-panel#v-review.pg-day .lv-tag, body .view.fw-panel#v-review.pg-day .mh-ch, body .view.fw-panel#v-review.pg-day .mh-count, body .view.fw-panel#v-review.pg-day .rd-score, body .view.fw-panel#v-review.pg-day .rd-score *{
     font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-variant-numeric:lining-nums tabular-nums}
 
   /* the banner: name and the one-line welcome, on the art */
-  body .view.fw-panel#v-review.pg-day .pg-head .bg{box-shadow:0 8px 20px rgba(18,90,95,.18)}
+  body .view.fw-panel#v-review.pg-day .pg-head .bg{box-shadow:0 8px 20px rgba(60,72,44,.18)}
   body .view.fw-panel#v-review.pg-day .pg-head .txt{position:absolute;left:18px;top:0;bottom:0;z-index:2;width:60%;
     display:flex;flex-direction:column;justify-content:center;gap:5px;pointer-events:none}
   body .view.fw-panel#v-review.pg-day .pg-head .name{position:static;max-width:none;display:block;
     font-size:21px;font-weight:800;letter-spacing:-.02em;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.5)}
   body .view.fw-panel#v-review.pg-day .pg-head .sub{font-size:10.5px;font-weight:500;line-height:1.45;color:rgba(255,255,255,.9);
     text-shadow:0 1px 5px rgba(0,0,0,.6)}
-  body .view.fw-panel#v-review.pg-day .pg-head .fox{filter:drop-shadow(0 6px 10px rgba(18,70,72,.3))}
+  body .view.fw-panel#v-review.pg-day .pg-head .fox{filter:drop-shadow(0 6px 10px rgba(60,72,44,.3))}
 
   /* the three settings: one card, three ruled rows, room to breathe */
   body .view.fw-panel#v-review.pg-day .pg-ctl{gap:0;margin:0 0 4px;padding:2px 14px;border-radius:18px;background:var(--sv-card)}
@@ -5571,24 +5571,24 @@
   body .view.fw-panel#v-review.pg-day .pg-row + .pg-row{border-top:1px solid var(--sv-line)}
   body .view.fw-panel#v-review.pg-day .pg-lab{width:44%;font-size:13px;font-weight:600;color:var(--sv-ink)}
   body .view.fw-panel#v-review.pg-day .pg-val{margin-left:6px;font-weight:700;color:var(--sv-teal)}
-  body .view.fw-panel#v-review.pg-day .pg-row input[type=range]::-webkit-slider-runnable-track{background:rgba(18,120,125,.16)}
-  body .view.fw-panel#v-review.pg-day .pg-row input[type=range]::-moz-range-track{background:rgba(18,120,125,.16)}
+  body .view.fw-panel#v-review.pg-day .pg-row input[type=range]::-webkit-slider-runnable-track{background:rgba(94,122,72,.16)}
+  body .view.fw-panel#v-review.pg-day .pg-row input[type=range]::-moz-range-track{background:rgba(94,122,72,.16)}
   body .view.fw-panel#v-review.pg-day .pg-row input[type=range]::-webkit-slider-thumb{background:#fff;
-    box-shadow:0 1px 4px rgba(10,60,62,.3),inset 0 0 0 5px var(--sv-teal)}
+    box-shadow:0 1px 4px rgba(60,72,44,.3),inset 0 0 0 5px var(--sv-teal)}
   body .view.fw-panel#v-review.pg-day .pg-row input[type=range]::-moz-range-thumb{background:#fff;
-    box-shadow:0 1px 4px rgba(10,60,62,.3),inset 0 0 0 5px var(--sv-teal)}
+    box-shadow:0 1px 4px rgba(60,72,44,.3),inset 0 0 0 5px var(--sv-teal)}
   body .view.fw-panel#v-review.pg-day .pg-sel{height:34px;border-radius:999px;font-size:12.5px;font-weight:700;color:var(--sv-ink);
     background-color:#fff;box-shadow:inset 0 0 0 1px var(--sv-line);
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2312787D' stroke-width='2.4' stroke-linecap='round'><path d='m6 9 6 6 6-6'/></svg>")}
-  body .view.fw-panel#v-review.pg-day .pg-sel option{color:#0E3B3E;background:#fff}
+  body .view.fw-panel#v-review.pg-day .pg-sel option{color:#2E3826;background:#fff}
 
   /* progress */
   body .view.fw-panel#v-review.pg-day .round-bar{margin:16px 2px 0}
-  body .view.fw-panel#v-review.pg-day .rev-dot{background:rgba(18,120,125,.14);box-shadow:none}
+  body .view.fw-panel#v-review.pg-day .rev-dot{background:rgba(94,122,72,.14);box-shadow:none}
   body .view.fw-panel#v-review.pg-day .rev-dot.done{background:var(--sv-teal-2);box-shadow:none}
   body .view.fw-panel#v-review.pg-day .rev-dot.wrong{background:var(--sv-coral)}
   body .view.fw-panel#v-review.pg-day .rev-dot.current{background:var(--sv-teal)}
-  body .view.fw-panel#v-review.pg-day .rev-slim{background:rgba(18,120,125,.14)}
+  body .view.fw-panel#v-review.pg-day .rev-slim{background:rgba(94,122,72,.14)}
   body .view.fw-panel#v-review.pg-day .rb-count{font-size:15px;font-weight:700;color:var(--sv-ink)}
   body .view.fw-panel#v-review.pg-day .rb-count span{color:var(--sv-soft)}
   /* the level chip, in inks deep enough for a white card (measured 2.6:1 in
@@ -5598,9 +5598,9 @@
   body .view.fw-panel#v-review.pg-day .lv-tag.lv5,body .view.fw-panel#v-review.pg-day .lv-tag.lv6{color:#A8432A;border-color:#A8432A}
 
   /* the question card */
-  body .view.fw-panel#v-review.pg-day .pg-card{background:#fff;box-shadow:0 8px 24px rgba(18,90,95,.1);
+  body .view.fw-panel#v-review.pg-day .pg-card{background:#fff;box-shadow:0 8px 24px rgba(60,72,44,.1);
     backdrop-filter:none;-webkit-backdrop-filter:none}
-  body .view.fw-panel#v-review.pg-day .pg-mascot{filter:drop-shadow(0 5px 8px rgba(18,70,72,.25))}
+  body .view.fw-panel#v-review.pg-day .pg-mascot{filter:drop-shadow(0 5px 8px rgba(60,72,44,.25))}
   body .view.fw-panel#v-review.pg-day .pg-xp{color:var(--sv-teal);font-weight:700}
   body .view.fw-panel#v-review.pg-day .pg-bub{font-size:12px;font-weight:600;color:var(--sv-soft)}
   body .view.fw-panel#v-review.pg-day .pg-q{font-size:18px;color:var(--sv-ink);text-shadow:none}
@@ -5618,7 +5618,7 @@
     box-shadow:inset 0 0 0 1.5px var(--sv-line)}
   body .view.fw-panel#v-review.pg-day .pg-card .type-input:focus{box-shadow:inset 0 0 0 1.5px var(--sv-teal-2);outline:none}
   body .view.fw-panel#v-review.pg-day .pg-card .type-input::placeholder{color:var(--sv-faint)}
-  body .view.fw-panel#v-review.pg-day .btn{color:#fff;background:var(--sv-teal);border:0;box-shadow:0 4px 12px rgba(18,120,125,.22)}
+  body .view.fw-panel#v-review.pg-day .btn{color:#fff;background:var(--sv-teal);border:0;box-shadow:0 4px 12px rgba(94,122,72,.22)}
   body .view.fw-panel#v-review.pg-day .link-skip{color:var(--sv-soft)}
   body .view.fw-panel#v-review.pg-day .rev-fb{border-top-color:var(--sv-line)}
   body .view.fw-panel#v-review.pg-day .rev-fb.fb-correct{color:#1E8A5E}
@@ -5638,10 +5638,10 @@
   body .view.fw-panel#v-review.pg-day .pg-empty{color:var(--sv-soft)}
 
   /* end of round */
-  body .view.fw-panel#v-review.pg-day .round-done .speech{color:var(--sv-ink);background:#fff;box-shadow:0 4px 14px rgba(18,90,95,.08)}
+  body .view.fw-panel#v-review.pg-day .round-done .speech{color:var(--sv-ink);background:#fff;box-shadow:0 4px 14px rgba(60,72,44,.08)}
   body .view.fw-panel#v-review.pg-day .rd-score{color:var(--sv-ink);-webkit-text-fill-color:var(--sv-ink);background:none}
   body .view.fw-panel#v-review.pg-day .rd-score span{color:var(--sv-soft);-webkit-text-fill-color:var(--sv-soft)}
-  body .view.fw-panel#v-review.pg-day .rd-ring{background:rgba(18,120,125,.14)}
+  body .view.fw-panel#v-review.pg-day .rd-ring{background:rgba(94,122,72,.14)}
   body .view.fw-panel#v-review.pg-day .rd-ring i{background:var(--sv-teal-2)}
   body .view.fw-panel#v-review.pg-day .rd-sub{color:var(--sv-soft)}
 
@@ -5649,27 +5649,27 @@
   html:has(#v-review.pg-day.active) .fw-topbar .fw-searchbar,
   html:has(#v-review.pg-day.active) .fw-topbar .fw-gear{
     background:rgba(255,255,255,.86);border:0;
-    box-shadow:inset 0 0 0 1px rgba(18,120,125,.18),0 4px 14px rgba(18,120,125,.08)}
+    box-shadow:inset 0 0 0 1px rgba(94,122,72,.18),0 4px 14px rgba(94,122,72,.08)}
   html:has(#v-review.pg-day.active) .fw-topbar .fw-searchbar svg,
-  html:has(#v-review.pg-day.active) .fw-topbar .fw-gear{color:#12787D;filter:none}
-  html:has(#v-review.pg-day.active) body .fw-topbar .fw-searchbar input{color:#0E3B3E;text-shadow:none}
-  html:has(#v-review.pg-day.active) body .fw-topbar .fw-searchbar input::placeholder{color:rgba(14,59,62,.46)}
+  html:has(#v-review.pg-day.active) .fw-topbar .fw-gear{color:#5E7A48;filter:none}
+  html:has(#v-review.pg-day.active) body .fw-topbar .fw-searchbar input{color:#2E3826;text-shadow:none}
+  html:has(#v-review.pg-day.active) body .fw-topbar .fw-searchbar input::placeholder{color:rgba(46,56,38,.46)}
 
   /* ---------------- Hot Take ---------------- */
-  html body .ht-scrim{background:linear-gradient(180deg,#E2F3ED 0%,#D5ECE5 46%,#C9E5DD 100%)}
+  html body .ht-scrim{background:linear-gradient(180deg,#F6F7EA 0%,#F0F2E2 46%,#ECEFDA 100%)}
   html body .ht-scrim, html body .ht-scrim *{font-family:'Raleway Local','Raleway',system-ui,sans-serif}
   html body .ht-scrim .num, html body .ht-scrim .ht-lv, html body .ht-scrim .ht-rlv, html body .ht-scrim .ht-ts, html body .ht-scrim .ht-count{
     font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-variant-numeric:lining-nums tabular-nums}
   /* its search row: home's, in daylight -- and no separate back arrow,
      since a swipe from the left edge is back here as everywhere */
   html body .ht-scrim .fh-search, html body .ht-scrim .fh-grid-btn{background:rgba(255,255,255,.86);
-    box-shadow:inset 0 0 0 1px rgba(18,120,125,.18),0 4px 14px rgba(18,120,125,.08);
+    box-shadow:inset 0 0 0 1px rgba(94,122,72,.18),0 4px 14px rgba(94,122,72,.08);
     backdrop-filter:none;-webkit-backdrop-filter:none}
   html body .ht-scrim .fh-search svg, html body .ht-scrim .fh-grid-btn svg{color:var(--sv-teal)}
   html body .ht-scrim .fh-search input{color:var(--sv-ink)}
-  html body .ht-scrim .fh-search input::placeholder{color:rgba(14,59,62,.46)}
+  html body .ht-scrim .fh-search input::placeholder{color:rgba(46,56,38,.46)}
   html body .ht-scrim .ht-x{display:none}
-  html body .ht-scrim .ht-banner img.bg{box-shadow:0 8px 20px rgba(18,90,95,.18)}
+  html body .ht-scrim .ht-banner img.bg{box-shadow:0 8px 20px rgba(60,72,44,.18)}
 
   /* both filter rows: one chip, one look */
   html body .ht-scrim .ht-filters{gap:8px;margin-bottom:16px}
@@ -5678,39 +5678,39 @@
     font-size:12.5px;font-weight:700;letter-spacing:0;color:var(--sv-soft);
     background:rgba(255,255,255,.72);box-shadow:inset 0 0 0 1px var(--sv-line);
     backdrop-filter:none;-webkit-backdrop-filter:none}
-  html body .ht-scrim .ht-chip.on{color:#fff;background:var(--sv-teal);box-shadow:0 3px 10px rgba(18,120,125,.22)}
+  html body .ht-scrim .ht-chip.on{color:#fff;background:var(--sv-teal);box-shadow:0 3px 10px rgba(94,122,72,.22)}
   html body .ht-scrim .ht-chip .num{font-weight:700;letter-spacing:.01em}
   html body .ht-scrim .ht-count{margin:0 2px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--sv-soft)}
 
   /* the shelf's cards keep their photographs; only their frame lightens */
-  html body .ht-scrim .ht-card{background:#DDEFE9;box-shadow:0 6px 18px rgba(18,90,95,.14)}
+  html body .ht-scrim .ht-card{background:#DDEFE9;box-shadow:0 6px 18px rgba(60,72,44,.14)}
   html body .ht-scrim .ht-lv{font-weight:700}
   html body .ht-scrim .ht-empty{color:var(--sv-soft)}
 
   /* the reading room */
-  html body .ht-scrim .ht-reader{background:#F2FAF7}
+  html body .ht-scrim .ht-reader{background:#FBFCF4}
   html body .ht-scrim .ht-rtop{background:linear-gradient(180deg,rgba(242,250,247,.97),rgba(242,250,247,0))}
   html body .ht-scrim .ht-back{color:var(--sv-teal);background:#fff;box-shadow:inset 0 0 0 1px var(--sv-line)}
-  html body .ht-scrim .ht-hero, html body .ht-scrim .ht-embed{box-shadow:0 8px 20px rgba(18,90,95,.16)}
+  html body .ht-scrim .ht-hero, html body .ht-scrim .ht-embed{box-shadow:0 8px 20px rgba(60,72,44,.16)}
   html body .ht-scrim .ht-rsrc{color:var(--sv-teal)}
-  html body .ht-scrim .ht-rlv{color:var(--sv-teal);background:rgba(18,120,125,.1)}
+  html body .ht-scrim .ht-rlv{color:var(--sv-teal);background:rgba(94,122,72,.1)}
   html body .ht-scrim .ht-rtitle{color:var(--sv-ink)}
   html body .ht-scrim .ht-rsub{color:var(--sv-soft)}
   html body .ht-scrim .ht-tnote{color:var(--sv-faint)}
   html body .ht-scrim .ht-line{color:#1D3F41}
   html body .ht-scrim .ht-line::selection, html body .ht-scrim .ht-line *::selection{background:rgba(42,175,180,.28)}
-  html body .ht-scrim .ht-line[data-at]:hover{background:rgba(18,120,125,.05)}
+  html body .ht-scrim .ht-line[data-at]:hover{background:rgba(94,122,72,.05)}
   html body .ht-scrim .ht-line.now{color:var(--sv-ink);background:rgba(42,175,180,.12);box-shadow:inset 2px 0 0 var(--sv-teal)}
   html body .ht-scrim .ht-ts{color:#fff;background:var(--sv-teal)}
   html body .ht-scrim .ht-srclink{color:var(--sv-teal)}
-  html body .ht-scrim .ht-finish{background:#fff;box-shadow:0 6px 18px rgba(18,90,95,.08)}
+  html body .ht-scrim .ht-finish{background:#fff;box-shadow:0 6px 18px rgba(60,72,44,.08)}
   html body .ht-scrim .ht-fh{color:var(--sv-ink)}
   html body .ht-scrim .ht-finish textarea{color:var(--sv-ink);background:var(--sv-card);box-shadow:inset 0 0 0 1.5px var(--sv-line)}
   html body .ht-scrim .ht-finish textarea::placeholder{color:var(--sv-faint)}
   html body .ht-scrim .ht-reply{color:var(--sv-ink);background:rgba(42,175,180,.1);box-shadow:inset 0 0 0 1px rgba(42,175,180,.28)}
   html body .ht-scrim .ht-reply b{color:var(--sv-teal)}
-  html body .ht-scrim .ht-done{color:#fff;background:var(--sv-teal);box-shadow:0 4px 12px rgba(18,120,125,.24)}
-  html.ht-on, html.ht-on body{background:#C9E5DD}
+  html body .ht-scrim .ht-done{color:#fff;background:var(--sv-teal);box-shadow:0 4px 12px rgba(94,122,72,.24)}
+  html.ht-on, html.ht-on body{background:#ECEFDA}
 
   /* ============================================================
      ONE MENU PER SCREEN
@@ -5731,6 +5731,483 @@
   html.panel-open .fw-menu-cluster, html.ht-on .fw-menu-cluster{display:none}
 </style>
 <link rel="stylesheet" href="./theme-overrides.css">
+<style id="cozy-glass">
+  /* ============================================================
+     COZY GLASS
+
+     The whole 2D app in one look, taken from the reference picture:
+     a cozy low-poly island in muted pastels, with frosted panels laid
+     over it as a material rather than as boxes. Colours were measured
+     off that picture, not paraphrased: cream and pale glass (#F7F8EA,
+     #EFF2E1) about 30% of it, grass tiles (#D8E1B2 .. #E1E6C3) 44%,
+     darker grass and shadow #B4C394, water #BDD9BA, leaves and text
+     #6A8354. Sage (#5E7A48, a shade under the leaves so it clears 4.5:1
+     on white) is the one accent; honey and clay only for right/wrong and
+     warnings.
+
+     "Glass" here is near-opaque white with a bright rim and a soft lift,
+     not a live backdrop blur. A blur over the island is recomputed every
+     frame (the heat this app has already had to fix once), and over the
+     still island image there is nothing moving to blur. Panels sit on the
+     same still image under a cream wash, so every screen belongs to the
+     same island.
+
+     This block loads last, after theme-overrides.css, so nothing earlier
+     can put the old look back. The classic look is tag classic-v193.
+
+     Type: Raleway for words, light Helvetica for anything that is a
+     figure -- dates, counts, levels like A1. The rule below forces Raleway
+     with !important at zero specificity (:where), so every Helvetica rule
+     already in the file, restated here with !important and real
+     specificity, still wins -- and is set light.
+     ============================================================ */
+  :root{
+    --cz-font:'Raleway Local','Raleway',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --cz-num:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    --cz-cream:#F6F7EA; --cz-cream-2:#EEF1DE; --cz-grass:#DDE3BA;
+    --cz-glass:rgba(255,255,252,.82); --cz-glass-hi:rgba(255,255,252,.9);
+    --cz-ink:#2E3826; --cz-ink-2:#46523A; --cz-soft:#5D6B50; --cz-faint:#737F67;
+    --cz-line:rgba(88,108,66,.14);
+    --cz-sage:#5E7A48; --cz-sage-2:#93AE74; --cz-sage-bg:rgba(94,122,72,.10);
+    --cz-honey:#8E6A1E; --cz-honey-2:#D8B560; --cz-honey-bg:rgba(214,170,80,.18);
+    --cz-clay:#A45A38; --cz-clay-2:#D3906E; --cz-clay-bg:rgba(200,120,85,.14);
+    --cz-water:#79AFA3; --cz-water-bg:rgba(150,196,186,.22);
+    --cz-rim:inset 0 0 0 1px rgba(255,255,255,.88);
+    --cz-hair:0 0 0 1px rgba(88,108,66,.07);
+    --cz-lift:0 1px 2px rgba(60,72,44,.05),0 10px 26px rgba(60,72,44,.10);
+    --cz-still:url('./home-island.webp')}
+
+  :where(html body, html body *){font-family:var(--cz-font) !important}
+  html body .num,
+  html body .ht-lv,
+  html body .rb-meta,
+  html body .xp-num,
+  html body .xp-m-n,
+  html body .xp-val,
+  html body .ht-cap i,
+  html body .ht-rlv,
+  html body .ht-rsub,
+  html body .ht-count,
+  html body .fh-game .lv,
+  html body .rz-stats b,
+  html body .rz-barlab b,
+  html body .xp-lvl,
+  html body .xp-next b,
+  html body .ht-ts,
+  html body .pg-lv,
+  html body .pg-xp,
+  html body .fx-xp,
+  html body .fw-exp-n,
+  html body .fw-exp-lv,
+  html body .view.fw-panel#v-saved .num,
+  html body .view.fw-panel#v-saved .sv-when,
+  html body .view.fw-panel#v-saved .sv-hero-n,
+  html body .view.fw-panel#v-saved .sy-grade,
+  html body .view.fw-panel#v-saved .sy-meta,
+  html body .view.fw-panel#v-saved .hist-count,
+  html body #v-settings .sx-stat b,
+  html body .jn-ttl span,
+  html body .jn-tag,
+  html body .pg-card .mh-ch,
+  html body .pg-card .mh-count,
+  html body .view.fw-panel#v-review.pg-day .num,
+  html body .view.fw-panel#v-review.pg-day .pg-val,
+  html body .view.fw-panel#v-review.pg-day .rb-count,
+  html body .view.fw-panel#v-review.pg-day .rb-count *,
+  html body .view.fw-panel#v-review.pg-day .pg-xp,
+  html body .view.fw-panel#v-review.pg-day .lv-tag,
+  html body .view.fw-panel#v-review.pg-day .mh-ch,
+  html body .view.fw-panel#v-review.pg-day .mh-count,
+  html body .view.fw-panel#v-review.pg-day .rd-score,
+  html body .view.fw-panel#v-review.pg-day .rd-score *,
+  html body html body .ht-scrim .num,
+  html body html body .ht-scrim .ht-lv,
+  html body html body .ht-scrim .ht-rlv,
+  html body html body .ht-scrim .ht-ts,
+  html body html body .ht-scrim .ht-count,
+  html body .num, html body .num *{font-family:var(--cz-num) !important;font-weight:300 !important;
+    font-variant-numeric:lining-nums tabular-nums}
+
+  .cz-glass{background:var(--cz-glass);border-radius:22px;box-shadow:var(--cz-rim),var(--cz-hair),var(--cz-lift)}
+  .cz-cap{font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--cz-soft)}
+  .cz-cap .num{margin-left:6px;letter-spacing:0;color:var(--cz-faint)}
+
+  /* ---------------- home ----------------
+     Composed after the reference: a small status line, a large quiet
+     title, then four rows that are see-through until chosen -- the chosen
+     one (or the one under a pointer) is the only white thing on the page.
+     Measured off the reference and scaled to a phone: rows about 44% of
+     the width, 50px on a 54px pitch, a 21px line icon, a title and a
+     letter-spaced caption under it. Nothing else is a card except the one
+     slim line at the foot. */
+  html body #fw-home{padding:calc(env(safe-area-inset-top,0px) + 14px) 18px calc(env(safe-area-inset-bottom,0px) + 18px);
+    color:var(--cz-ink)}
+  /* The still, with a wash from the left for the text column and from
+     the top under the title; the right half of the island stays clear. */
+  html body #fw-home::before{background:
+      linear-gradient(90deg,rgba(246,247,234,.8) 0%,rgba(246,247,234,.55) 42%,rgba(246,247,234,0) 72%),
+      linear-gradient(180deg,rgba(246,247,234,.9) 0%,rgba(246,247,234,.45) 30%,rgba(246,247,234,0) 52%,
+        rgba(246,247,234,0) 78%,rgba(246,247,234,.5) 100%),
+      var(--cz-still) center top/cover no-repeat,
+      var(--cz-cream)}
+  html body #fw-home .fh-top{margin-bottom:0}
+  html body #fw-home .fh-search{background:rgba(255,255,252,.7);box-shadow:var(--cz-rim),var(--cz-hair),0 4px 14px rgba(60,72,44,.06);
+    backdrop-filter:none;-webkit-backdrop-filter:none}
+  html body #fw-home .fh-search svg{color:var(--cz-sage)}
+  html body #fw-home .fh-search input{color:var(--cz-ink)}
+  html body #fw-home .fh-search input::placeholder{color:var(--cz-faint);font-weight:400}
+  html body #fw-home .fh-grid-btn{background:rgba(255,255,252,.7);box-shadow:var(--cz-rim),var(--cz-hair),0 4px 14px rgba(60,72,44,.06);
+    backdrop-filter:none;-webkit-backdrop-filter:none}
+  html body #fw-home .fh-grid-btn svg{color:var(--cz-sage)}
+
+  .cz-main{display:flex;flex-direction:column;
+    min-height:calc(100vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 73px);
+    min-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 73px)}
+  .cz-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:22px 2px 0}
+  .cz-mark{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--cz-soft)}
+  .cz-live{display:inline-flex;align-items:center;gap:6px;
+    font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--cz-soft)}
+  .cz-live i{width:5px;height:5px;border-radius:50%;background:var(--cz-honey-2)}
+  .cz-live.ready i{background:var(--cz-sage-2)}
+  .cz-live b{font-weight:600}
+  .cz-live .num{letter-spacing:.04em;font-size:10px}
+  .cz-live .num::before{content:'/';margin-right:6px;color:var(--cz-faint)}
+  .cz-live .num:empty{display:none}
+
+  .cz-title{margin:30px 2px 0;font-size:38px;line-height:1.04;font-weight:500;letter-spacing:-.025em;color:var(--cz-ink)}
+  .cz-sub{margin:12px 2px 0;font-size:13px;line-height:1.55;font-weight:400;color:var(--cz-soft)}
+
+  .cz-main > .cz-cap{margin:40px 2px 10px;font-size:9.5px;letter-spacing:.18em}
+  .cz-where{position:relative}
+  .cz-nav{display:flex;flex-direction:column;gap:4px;width:min(214px,60%)}
+  .cz-row{position:relative;display:flex;align-items:center;gap:12px;width:100%;height:50px;padding:0 12px;
+    border:0;border-radius:12px;background:transparent;box-shadow:none;text-align:left;cursor:pointer;
+    color:var(--cz-ink);-webkit-tap-highlight-color:transparent;
+    transition:background .18s ease,box-shadow .18s ease}
+  .cz-row > svg{flex:none;width:21px;height:21px;color:var(--cz-ink-2)}
+  .cz-row > span{flex:1;min-width:0}
+  .cz-row b{display:block;font-size:13.5px;font-weight:600;letter-spacing:-.005em;color:var(--cz-ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cz-row em{display:block;margin-top:2px;font-style:normal;font-size:8.5px;font-weight:600;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--cz-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cz-dot{flex:none;width:5px;height:5px;border-radius:50%;background:var(--cz-faint);opacity:0;transition:opacity .18s ease}
+  .cz-row.on, .cz-row:active{background:rgba(255,255,252,.8);box-shadow:var(--cz-rim),var(--cz-hair),0 6px 18px rgba(60,72,44,.1)}
+  .cz-row.on .cz-dot{opacity:1}
+  /* With a pointer, the white follows it and the chosen row lets go. */
+  @media (hover:hover){
+    .cz-nav:hover .cz-row.on:not(:hover){background:transparent;box-shadow:none}
+    .cz-nav:hover .cz-row.on:not(:hover) .cz-dot{opacity:0}
+    .cz-row:hover{background:rgba(255,255,252,.8);box-shadow:var(--cz-rim),var(--cz-hair),0 6px 18px rgba(60,72,44,.1)}
+    .cz-row:hover .cz-dot{opacity:1}
+  }
+
+  /* Focci, standing in the scene to the right of the rows */
+  .cz-focci{position:absolute;right:8px;bottom:-8px;width:84px;height:136px;padding:0;border:0;background:none;cursor:pointer;
+    -webkit-tap-highlight-color:transparent}
+  .cz-focci img{position:absolute;left:50%;bottom:7px;height:116px;width:auto;margin-left:-37.5px;
+    transform-origin:50% 100%;filter:drop-shadow(0 3px 4px rgba(60,72,44,.18));pointer-events:none}
+  .cz-sh{position:absolute;left:50%;bottom:1px;width:58px;height:13px;margin-left:-29px;border-radius:50%;
+    background:radial-gradient(closest-side,rgba(60,72,44,.32),rgba(60,72,44,0))}
+  /* the hop: crouch, spring, hang at the top -- the page dissolves while
+     he is up there, into the live island under it */
+  @keyframes cz-hop{
+    0%{transform:translateY(0) scale(1,1)}
+    16%{transform:translateY(0) scale(1.12,.84)}
+    44%{transform:translateY(-92px) scale(.93,1.09)}
+    64%{transform:translateY(-110px) scale(1,1)}
+    100%{transform:translateY(-104px) scale(1.04,1)}}
+  @keyframes cz-hop-sh{0%,16%{transform:scale(1);opacity:1}64%,100%{transform:scale(.42);opacity:.35}}
+  @keyframes cz-wait{0%,100%{transform:translateY(0) scale(1,1)}20%{transform:translateY(0) scale(1.06,.92)}
+    55%{transform:translateY(-16px) scale(.97,1.04)}}
+  @keyframes cz-out{to{opacity:0}}
+  @keyframes cz-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .cz-focci.hop img{animation:cz-hop .7s cubic-bezier(.3,.7,.35,1) forwards}
+  .cz-focci.hop .cz-sh{animation:cz-hop-sh .7s ease-out forwards}
+  html.world-loading .cz-focci:not(.hop) img{animation:cz-wait .9s ease-in-out infinite}
+  #fw-home.cz-leaving{pointer-events:none;animation:cz-out .3s ease-in .4s forwards}
+
+  /* the one line at the foot, like the reference's controls bar */
+  .cz-foot{display:flex;align-items:center;gap:12px;width:100%;margin-top:auto;padding:11px 14px;
+    border:0;border-radius:14px;cursor:pointer;text-align:left;color:var(--cz-ink);
+    background:rgba(255,255,252,.62);box-shadow:var(--cz-rim),var(--cz-hair)}
+  .cz-main .cz-where{margin-bottom:28px}
+  .cz-foot:active{background:rgba(255,255,252,.85)}
+  .cz-foot > svg{flex:none;width:19px;height:19px;color:var(--cz-ink-2)}
+  .cz-foot > span{flex:1;min-width:0}
+  .cz-foot b{display:block;font-size:12.5px;font-weight:600;color:var(--cz-ink)}
+  .cz-foot em{display:block;margin-top:1px;font-style:normal;font-size:8.5px;font-weight:600;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--cz-faint)}
+  .cz-foot .cz-chev{flex:none;width:16px;height:16px;color:var(--cz-faint)}
+
+  /* ---- home's second page: the games, with their mascots ---- */
+  .cz-games{display:none}
+  #fw-home.cz-on-games .cz-main{display:none}
+  #fw-home.cz-on-games .cz-games{display:block;animation:cz-in .28s ease}
+  .cz-crumb{display:flex;align-items:center;gap:8px;margin:22px 2px 0;
+    font-size:9.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--cz-faint)}
+  .cz-crumb button{padding:0;border:0;background:none;cursor:pointer;font:inherit;letter-spacing:inherit;
+    text-transform:inherit;color:var(--cz-sage)}
+  .cz-crumb b{font-weight:600;color:var(--cz-soft)}
+  .cz-title-sm{margin-top:24px;font-size:32px}
+  .cz-games .cz-sub{margin-bottom:24px}
+  html body #fw-home .fh-games{gap:10px;padding:0}
+  html body #fw-home .fh-game{border-radius:18px;aspect-ratio:152/132;
+    background:linear-gradient(165deg,rgba(255,255,252,.9) 20%,var(--g,rgba(221,227,186,.85)));
+    box-shadow:var(--cz-rim),var(--cz-hair),0 6px 18px rgba(60,72,44,.08);backdrop-filter:none;-webkit-backdrop-filter:none}
+  html body #fw-home .fh-game.g1{--g:rgba(214,226,178,.88)}
+  html body #fw-home .fh-game.g2{--g:rgba(194,222,212,.88)}
+  html body #fw-home .fh-game.g3{--g:rgba(238,222,176,.88)}
+  html body #fw-home .fh-game.g4{--g:rgba(236,206,190,.88)}
+  html body #fw-home .fh-game::after{display:none}
+  html body #fw-home .fh-game::before{background:radial-gradient(circle at 50% 55%,rgba(255,255,255,.6),rgba(255,255,255,0) 62%)}
+  html body #fw-home .fh-game:active{box-shadow:var(--cz-rim),var(--cz-hair),0 3px 10px rgba(60,72,44,.1)}
+  html body #fw-home .fh-game span{left:13px;top:12px;bottom:auto;right:10px;font-size:14px;font-weight:600;letter-spacing:-.005em;
+    color:var(--cz-ink);text-shadow:none;text-align:left}
+  html body #fw-home .fh-game span em{display:block;margin-top:3px;font-style:normal;font-size:8.5px;font-weight:600;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--cz-soft)}
+  html body #fw-home .fh-game img{filter:drop-shadow(0 4px 6px rgba(60,72,44,.2))}
+  html body #fw-home .fh-game.g1 img{height:84%;right:-4%}
+  html body #fw-home .fh-game.g2 img{height:72%;right:-6%}
+  html body #fw-home .fh-game.g3 img{height:74%;right:-4%}
+  html body #fw-home .fh-game.g4 img{height:82%;right:-6%;bottom:-10%}
+
+  /* ---------------- the search row, on every page ---------------- */
+  html body .fw-topbar .fw-searchbar, html body .fw-topbar .fw-gear{
+    background:var(--cz-glass-hi);box-shadow:var(--cz-rim),var(--cz-hair),0 4px 14px rgba(46,56,38,.14);
+    backdrop-filter:none;-webkit-backdrop-filter:none}
+  html body .fw-topbar .fw-searchbar svg, html body .fw-topbar .fw-gear{color:var(--cz-sage);filter:none}
+  html body .fw-topbar .fw-searchbar input{color:var(--cz-ink);text-shadow:none}
+  html body .fw-topbar .fw-searchbar input::placeholder{color:var(--cz-faint);font-weight:400}
+
+  /* ---------------- panels: one palette for all of them ----------------
+     Every panel reads these names already (the purple set they replace
+     sat on body .view.fw-panel), so the components change without being
+     touched. Speak Up keeps its village picture; its tokens follow. */
+  html body .view.fw-panel:not(#v-review:not(.pg-day)), html.dict-open body #v-home{
+    --p1:#7D9A63; --p2:#9DB57E; --p3:#C9A24A; --tint:#6F8C56;
+    --primary:#5E7A48; --pri-l:#5E7A48; --pri-d:#93AE74;
+    --a1:#7D9A63; --a2:#5E7A48; --cta-ink:#FFFFFF; --cta-glow:rgba(94,122,72,.22); --on-hero:#FFFFFF;
+    --t1a:#DCE6C4; --t1b:#C3D4A6; --t2a:#F1E2BC; --t2b:#E2C888; --t3a:#D3E6DF; --t3b:#A9CFC4;
+    --surface:rgba(255,255,252,.84); --surface-2:rgba(94,122,72,.07); --surface-3:rgba(94,122,72,.13);
+    --bg-2:rgba(94,122,72,.07); --line:rgba(88,108,66,.14);
+    --text:#2E3826; --muted:#5D6B50; --muted-2:#737F67; --mint:#5E7A48;
+    --shadow:0 1px 2px rgba(60,72,44,.05),0 8px 22px rgba(60,72,44,.09);
+    --glow:0 0 0 rgba(0,0,0,0); --gloss:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0) 54%);
+    --k-t1:linear-gradient(140deg,#E6EDD3,#D2DFB9); --k-t2:linear-gradient(140deg,#F4E9CC,#E9D4A0);
+    --k-t3:linear-gradient(140deg,#DEEDE8,#C3DDD5);
+    --k-hero:linear-gradient(135deg,#E3EBCC,#CCDBB1); --k-night:linear-gradient(160deg,#DDE6C6,#C6D6AA);
+    --scrim:rgba(46,56,38,.3);
+    --k-mint:linear-gradient(140deg,#A9C48C,#7D9A63); --k-pink:linear-gradient(140deg,#E7B9A6,#C98468);
+    --k-gold:linear-gradient(140deg,#E8CB84,#C9A24A); --k-cyan:linear-gradient(140deg,#A9CFC6,#79AFA3);
+    --grad-hero:linear-gradient(135deg,#7D9A63,#5E7A48); --cta:linear-gradient(180deg,#7D9A63 0%,#5E7A48 100%);
+    --grad-text:linear-gradient(135deg,#4F6A3B,#6F8C56);
+    --amber:#8E6A1E; --amber-bg:rgba(214,170,80,.18); --coral:#A45A38; --coral-bg:rgba(200,120,85,.14);
+    --cyan:#5F948A; --cyan-bg:rgba(121,175,163,.16); --primary-bg:rgba(94,122,72,.11);
+    color:var(--cz-ink)}
+  html body .view.fw-panel#v-stats, html body .view.fw-panel#v-settings,
+  html body .view.fw-panel#v-saved, html body .view.fw-panel#v-review.pg-day, html.dict-open body #v-home{
+    background:linear-gradient(180deg,rgba(246,247,234,.9) 0%,rgba(240,242,226,.93) 55%,rgba(236,239,218,.96) 100%),
+      var(--cz-still) center top/cover no-repeat, var(--cz-cream);
+    backdrop-filter:none;-webkit-backdrop-filter:none}
+  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day)),
+  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day)) body,
+  html.dict-open, html.dict-open body{background:var(--cz-cream-2)}
+  html body .view.fw-panel .sb-cta, html body .view.fw-panel .btn:not(.ghost), html body .view.fw-panel .info-action{
+    background:var(--cz-sage);color:#fff;backdrop-filter:none;-webkit-backdrop-filter:none;letter-spacing:0}
+  html body .view.fw-panel .btn.ghost{color:var(--cz-sage);background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line)}
+  html body .view.fw-panel .q-card, html body .view.fw-panel .jfig, html body .view.fw-panel .hist-item,
+  html body .view.fw-panel .sx-card, html body .view.fw-panel .sx-status, html body .view.fw-panel .gm-card{
+    backdrop-filter:none;-webkit-backdrop-filter:none}
+
+  /* ---------------- the menu drawer ---------------- */
+  html body .fm-scrim{background:rgba(46,56,38,.22)}
+  html body .fm-panel{background:rgba(249,250,241,.97);backdrop-filter:none;-webkit-backdrop-filter:none}
+  html.menu-on body .fm-panel{box-shadow:-14px 0 40px rgba(46,56,38,.16),inset 1px 0 0 rgba(255,255,255,.9)}
+  html body .fm-head svg{color:var(--cz-sage)}
+  html body .fm-head b{font-weight:600;color:var(--cz-ink);text-shadow:none}
+  html body .fm-item{font-weight:500;color:var(--cz-ink);text-shadow:none;border-bottom-color:var(--cz-line)}
+  html body .fm-item svg{color:var(--cz-sage)}
+  html body .fm-tray{background:rgba(94,122,72,.07);box-shadow:none}
+  html body .fm-act{color:var(--cz-sage)}
+  html body .fm-act:active{background:var(--cz-sage-bg)}
+  html body .fm-vol svg{color:var(--cz-sage)}
+  html body .fm-vol input{background:rgba(94,122,72,.2)}
+  html body .fm-vol input::-webkit-slider-thumb{background:#fff;box-shadow:0 1px 3px rgba(46,56,38,.3),inset 0 0 0 4px var(--cz-sage)}
+  html body .fm-vol input::-moz-range-thumb{background:#fff;box-shadow:0 1px 3px rgba(46,56,38,.3),inset 0 0 0 4px var(--cz-sage)}
+  html body .fm-track{color:var(--cz-soft);background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line)}
+  html body .fm-foot{color:var(--cz-faint)}
+
+  /* ---------------- full-screen sheets: XP, journal, rescue board ---------------- */
+  html body .xp-scrim, html body .jn-scrim, html body .rb-scrim{
+    background:linear-gradient(180deg,rgba(246,247,234,.9) 0%,rgba(238,241,222,.95) 100%),
+      var(--cz-still) center top/cover no-repeat, var(--cz-cream)}
+  html body .xp-close, html body .jn-x{color:var(--cz-soft);background:#fff;box-shadow:var(--cz-hair),0 2px 8px rgba(60,72,44,.08)}
+
+  html body .xp-ring .trk{stroke:rgba(94,122,72,.12)}
+  html body #xpg stop:nth-child(1){stop-color:#A9C08A}
+  html body #xpg stop:nth-child(2){stop-color:#7D9A63}
+  html body #xpg stop:nth-child(3){stop-color:#C9A24A}
+  html body .xp-num{font-weight:600;color:var(--cz-ink);text-shadow:none}
+  html body .xp-unit, html body .xp-next, html body .xp-lab, html body .xp-h, html body .xp-note{color:var(--cz-soft)}
+  html body .xp-lvl{color:#fff;background:var(--cz-sage)}
+  html body .xp-next b, html body .xp-note b{color:var(--cz-sage)}
+  html body .xp-card{background:var(--cz-glass);box-shadow:var(--cz-rim),var(--cz-hair),var(--cz-lift)}
+  html body .xp-val{color:var(--cz-ink)}
+  html body .xp-bar{background:rgba(94,122,72,.12)}
+  html body .xp-bar i{background:linear-gradient(90deg,#A9C08A,#6F8C56)}
+  html body .xp-bar.done i{background:linear-gradient(90deg,#A9C08A,#D8B560)}
+  html body .xp-mile::before{background:rgba(94,122,72,.16)}
+  html body .xp-m::before{background:#fff;box-shadow:inset 0 0 0 2px rgba(94,122,72,.3)}
+  html body .xp-m.hit::before{background:var(--cz-sage);box-shadow:0 0 0 3px rgba(94,122,72,.16)}
+  html body .xp-m.now::before{background:var(--cz-honey-2);box-shadow:0 0 0 4px rgba(216,181,96,.24);animation:none}
+  html body .xp-m-t, html body .xp-m-s, html body .xp-m-n{color:var(--cz-faint)}
+  html body .xp-m.hit .xp-m-t{color:var(--cz-ink)}
+  html body .xp-m.now .xp-m-t{color:var(--cz-honey)}
+  html body .xp-m.hit .xp-m-n{color:var(--cz-sage)}
+
+  html body .jn-head b{font-weight:600;color:var(--cz-ink)}
+  html body .jn-date{color:var(--cz-sage)}
+  html body .jn-sec{color:var(--cz-soft)}
+  html body .jn-sec.warn{color:var(--cz-clay)}
+  html body .jn-sec b{color:var(--cz-ink)}
+  html body .jn-list{border-left-color:rgba(94,122,72,.25)}
+  html body .jn-w + .jn-w{box-shadow:inset 0 1px 0 var(--cz-line)}
+  html body .jn-w b{font-weight:600;color:var(--cz-ink)}
+  html body .jn-w i{color:var(--cz-soft)}
+  html body .jn-list.misses{border-left-color:rgba(164,90,56,.35)}
+  html body .jn-w.miss b{color:var(--cz-clay)}
+  html body .jn-tag{color:var(--cz-honey)}
+  html body .jn-empty{color:var(--cz-soft)}
+
+  html body .rb-t{font-weight:600;color:var(--cz-ink);text-shadow:none}
+  html body .rb-s{color:var(--cz-soft)}
+  html body .rb-xp{color:var(--cz-sage);background:#fff;box-shadow:var(--cz-hair)}
+  html body .rb-card{background:var(--cz-glass);box-shadow:var(--cz-rim),var(--cz-hair),var(--cz-lift)}
+  html body .rb-card.locked .rb-art img{filter:grayscale(.75) opacity(.55) drop-shadow(0 8px 12px rgba(60,72,44,.2))}
+  html body .rb-art{background:radial-gradient(58% 68% at 50% 56%,rgba(157,181,126,.32),rgba(157,181,126,0) 74%)}
+  html body .rb-art img{filter:drop-shadow(0 8px 12px rgba(60,72,44,.22))}
+  html body .rb-ph{background:rgba(94,122,72,.1)}
+  html body .rb-badge{color:#fff;background:var(--cz-sage)}
+  html body .rb-badge.lock{color:var(--cz-clay);background:var(--cz-clay-bg);box-shadow:none}
+  html body .rb-name{font-weight:600;color:var(--cz-ink)}
+  html body .rb-meta{color:var(--cz-soft)}
+  html body .rb-story{color:var(--cz-ink-2)}
+  html body .rb-fact{background:var(--cz-sage-bg)}
+  html body .rb-fact span{color:var(--cz-ink-2)}
+  html body .rb-go{color:#fff;background:var(--cz-sage);box-shadow:0 4px 12px rgba(94,122,72,.26)}
+  html body .rb-go[disabled]{color:var(--cz-faint);background:rgba(94,122,72,.1);box-shadow:none}
+  html body .rb-dots i{background:rgba(94,122,72,.2)}
+  html body .rb-dots i.on{background:var(--cz-sage)}
+  html body .rb-sail{color:var(--cz-sage);background:#fff;box-shadow:var(--cz-hair)}
+
+  /* ---------------- dialogs over the island ---------------- */
+  html body .fa-scrim, html body .rz-scrim{background:rgba(46,56,38,.24);backdrop-filter:none;-webkit-backdrop-filter:none}
+  html body .fa-card, html body .rz-card{background:rgba(251,252,244,.97);
+    box-shadow:var(--cz-rim),var(--cz-hair),0 18px 44px rgba(46,56,38,.2);backdrop-filter:none;-webkit-backdrop-filter:none}
+  html body .fa-t{font-weight:600;color:var(--cz-ink);text-shadow:none}
+  html body .fa-b{color:var(--cz-soft)}
+  html body .fa-yes{color:#fff;background:var(--cz-sage);box-shadow:none}
+  html body .fa-no{color:var(--cz-ink);background:var(--cz-sage-bg);box-shadow:none}
+
+  html body .rz-pic{background-color:var(--cz-sage-bg);box-shadow:none}
+  html body .rz-name{font-weight:600;color:var(--cz-ink)}
+  html body .rz-species, html body .rz-barlab, html body .rz-likes{color:var(--cz-soft)}
+  html body .rz-barlab b{color:var(--cz-ink)}
+  html body .rz-bar{background:rgba(94,122,72,.12)}
+  html body .rz-l1 i{background:linear-gradient(90deg,#C98468,#D3906E)}
+  html body .rz-l2 i{background:linear-gradient(90deg,#C9A24A,#E0C27A)}
+  html body .rz-l3 i{background:linear-gradient(90deg,#7D9A63,#A9C08A)}
+  html body .rz-stats > div{background:var(--cz-sage-bg)}
+  html body .rz-stats span{color:var(--cz-soft)}
+  html body .rz-stats b{color:var(--cz-ink)}
+  html body .rz-pair{color:#8E4556;background:rgba(200,120,140,.12);box-shadow:none}
+  html body .rz-trait{color:var(--cz-ink-2);background:var(--cz-sage-bg);box-shadow:none}
+  html body .rz-likes b{color:var(--cz-sage)}
+  html body .rz-note{color:var(--cz-ink-2)}
+  html body .rz-feed{color:#fff;background:var(--cz-sage);box-shadow:0 4px 12px rgba(94,122,72,.26)}
+  html body .rz-say{background:rgba(251,252,244,.96);box-shadow:var(--cz-rim),var(--cz-hair),0 10px 26px rgba(46,56,38,.18);
+    backdrop-filter:none;-webkit-backdrop-filter:none}
+  html body .rz-say-t{color:var(--cz-ink)}
+  html body .rz-say-t b{color:var(--cz-sage)}
+  html body .rz-say-i{color:#fff;background:var(--cz-sage)}
+
+  /* ---------------- Progress and Settings: what the tokens did not reach ----------------
+     A contrast scan of both pages on the new cream found 30 lines of text
+     at 1.0-1.2:1 -- white and pale-mint literals written for the purple
+     glass, not tokens. Each is given its ink here. */
+  html body .view.fw-panel#v-stats .jfig{background:var(--cz-glass);box-shadow:var(--cz-rim),var(--cz-hair),var(--cz-lift);border:0}
+  html body .view.fw-panel#v-stats .jfig:nth-of-type(1){background:linear-gradient(160deg,rgba(255,255,252,.9),rgba(214,226,178,.85))}
+  html body .view.fw-panel#v-stats .jfig:nth-of-type(2){background:linear-gradient(160deg,rgba(255,255,252,.9),rgba(238,222,176,.85))}
+  html body .view.fw-panel#v-stats .jfig:nth-of-type(3){background:linear-gradient(160deg,rgba(255,255,252,.9),rgba(194,222,212,.85))}
+  html body .view.fw-panel#v-stats .jfig-n{color:var(--cz-ink);text-shadow:none}
+  html body .view.fw-panel#v-stats .jfig-l{color:var(--cz-soft);text-shadow:none}
+  html body .view.fw-panel#v-stats .pg-rank, html body .view.fw-panel#v-stats .pg-chart{
+    background:var(--cz-glass);box-shadow:var(--cz-rim),var(--cz-hair),var(--cz-lift);border:0}
+  html body .view.fw-panel#v-stats .badge-item{border-color:var(--cz-line)}
+  html body .view.fw-panel#v-stats .badge-item.unlocked{background:linear-gradient(160deg,rgba(255,255,252,.92),rgba(238,222,176,.7));
+    border-color:rgba(201,162,74,.45)}
+  html body .view.fw-panel#v-stats .badge-item.locked{background:rgba(255,255,252,.5)}
+  html body .view.fw-panel#v-stats .tile.amber{color:var(--cz-ink);background:linear-gradient(135deg,#F1E2BC,#E2C888)}
+
+  html body .view.fw-panel#v-settings .sx-status, html body .view.fw-panel#v-settings .sx-card,
+  html body .view.fw-panel#v-settings .acc{background:var(--cz-glass);box-shadow:var(--cz-rim),var(--cz-hair),var(--cz-lift);border:0}
+  html body .view.fw-panel#v-settings .sx-status b{color:var(--cz-ink)}
+  html body .view.fw-panel#v-settings .sx-status i, html body .view.fw-panel#v-settings .sx-hint,
+  html body .view.fw-panel#v-settings .hint, html body .view.fw-panel#v-settings .status,
+  html body .view.fw-panel#v-settings .sx-foot{color:var(--cz-soft)}
+  html body .view.fw-panel#v-settings .sx-vrule, html body .view.fw-panel#v-settings .sx-sep{background:var(--cz-line)}
+  html body .view.fw-panel#v-settings .sx-tabs{background:rgba(94,122,72,.08);box-shadow:none;border:0}
+  html body .view.fw-panel#v-settings .sx-tab{color:var(--cz-soft);background:none;box-shadow:none}
+  html body .view.fw-panel#v-settings .sx-tab.on{color:#fff;background:var(--cz-sage);box-shadow:0 2px 8px rgba(94,122,72,.22)}
+  html body .view.fw-panel#v-settings .sx-lbl{color:var(--cz-soft)}
+  html body .view.fw-panel#v-settings .sx-lbl-danger{color:var(--cz-clay)}
+  html body .view.fw-panel#v-settings .sx-card-danger{background:linear-gradient(160deg,rgba(255,255,252,.9),rgba(236,206,190,.6))}
+  html body .view.fw-panel#v-settings label, html body .view.fw-panel#v-settings .lvl-row-t,
+  html body .view.fw-panel#v-settings .acc-t, html body .view.fw-panel#v-settings .sx-row-txt,
+  html body .view.fw-panel#v-settings .theme-pop-open-btn, html body .view.fw-panel#v-settings .theme-pop-open-btn *{color:var(--cz-ink)}
+  html body .view.fw-panel#v-settings .theme-pop-open-btn{background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line);border:0}
+  html body .view.fw-panel#v-settings .pv{background:linear-gradient(135deg,#A9C08A,#5E7A48)}
+  html body .view.fw-panel#v-settings input:not([type=range]):not([type=checkbox]), html body .view.fw-panel#v-settings select,
+  html body .view.fw-panel#v-settings textarea{color:var(--cz-ink);background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line);border:0}
+  html body .view.fw-panel#v-settings input[type=range]{accent-color:var(--cz-sage)}
+  html body .view.fw-panel#v-settings .lvl-row-v{color:var(--cz-sage);background:var(--cz-sage-bg)}
+  html body .view.fw-panel#v-settings .mnt-bar{background:rgba(94,122,72,.12)}
+  html body .view.fw-panel#v-settings .danger{color:#fff;background:var(--cz-clay)}
+
+  /* Figures that never had a numeric class: counts, streaks, dates, levels. */
+  html body .jfig-n,
+  html body .pg-streak b,
+  html body .sx-status b,
+  html body .lvl-row-v,
+  html body .lvl-ticks span,
+  html body .pg-note-fig,
+  html body .pg-axis span,
+  html body .pg-chart-sum b,
+  html body .xp-val,
+  html body .xp-m-n,
+  html body .rz-stats b,
+  html body .rb-xp,
+  html body .jn-n,
+  html body .jn-d,
+  html body .jn-date,
+  html body .sv-when,
+  html body .sv-due-n,
+  html body .saved-count b,
+  html body .cz-ic,
+  html body .fw-exp-n b,
+  html body .fw-exp-lv i{font-family:var(--cz-num) !important;font-weight:300 !important;font-variant-numeric:lining-nums tabular-nums}
+
+  /* Speak Up is see-through: it never had a picture of its own, it showed
+     the village that used to be home's background (bg-speakup-village,
+     through the panel's glass). Home is the island now, so Speak Up read
+     as faint text over the fox and the rows. It gets that village back as
+     its own ground, and keeps its own dark-glass tokens -- the cozy set
+     above skips it. */
+  html body .view.fw-panel#v-review:not(.pg-day){background:
+      linear-gradient(180deg,rgba(4,44,44,.30) 0%,rgba(3,38,38,.40) 58%,rgba(2,30,30,.54) 100%),
+      url('./bg-speakup-village.webp') center center/cover no-repeat, #0d4c48;
+    backdrop-filter:none;-webkit-backdrop-filter:none}
+</style>
 </head>
 <body>
 
@@ -6395,54 +6872,48 @@
     </button>
   </div>
 
-  <div class="fh-hero">
-    <div class="fh-hero-bg">
-      <img src="./bg-arc1.webp" alt="" onerror="this.style.display='none'"/>
-      <div class="fh-embers" id="fh-embers" aria-hidden="true"></div>
+  <!-- The home page is a still of the island, not the island: one 47KB
+       picture rendered from the real scene, graded towards cream, and no
+       WebGL. The world loads behind it. Four quiet rows are the way on --
+       see-through until one is chosen, which is the white one; Focci stands
+       in the scene, and going in makes him hop while the page dissolves
+       into the live island. The games have a page of their own, so the
+       mascots are not all on home at once. -->
+  <div class="cz-main">
+    <div class="cz-status">
+      <span class="cz-mark">Focci&rsquo;s Little Tales</span>
+      <span class="cz-live" id="cz-live"><i></i><b id="cz-live-t">Island waking</b><span class="num" id="cz-clock"></span></span>
     </div>
-    <div class="fh-hero-shadow"></div>
-    <img class="fh-hero-fox" src="./fox-hero.webp" alt="" onerror="this.style.display='none'"/>
-    <div class="fh-hero-in">
-      <div class="fh-hero-t" id="fh-hero-title">The Nameless Field</div>
-      <div class="fh-hero-s" id="fh-hero-sub">Where Focci woke up owning nothing but a bag and forgot who he was</div>
-      <button class="fh-cta" onclick="fhContinue()">Continue <i>▶</i></button>
-    </div>
-  </div>
+    <h1 class="cz-title">Find your<br/>own words.</h1>
+    <p class="cz-sub">A quiet island to learn on.<br/>Focci is waiting for you.</p>
 
-  <div class="fh-rule"><span></span><b>✦</b><span></span></div>
+    <div class="cz-cap">Where to</div>
+    <div class="cz-where">
+    <nav class="cz-nav" aria-label="Where to">
+      <button class="cz-row on" onclick="fhEnterIsland()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5c2.2 1.4 4.4 1.4 6.6 0s4.4-1.4 6.6 0 3.6 1.4 4.8.6"/><path d="M6.5 15.2 12 5l5.5 10.2"/><path d="M9.6 9.5h4.8"/></svg><span><b>Enter the island</b><em>Walk, hunt, rescue</em></span><i class="cz-dot"></i></button>
+      <button class="cz-row" onclick="czOpen('saved')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.8L6 20V5a1 1 0 0 1 1-1z"/></svg><span><b>Saved</b><em>Words you kept</em></span><i class="cz-dot"></i></button>
+      <button class="cz-row" onclick="czOpen('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-7"/></svg><span><b>Progress</b><em>Streak and XP</em></span><i class="cz-dot"></i></button>
+      <button class="cz-row" onclick="czPage('games')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20.5 12 12 20.5 3.5 12z"/><path d="M12 8.5 15.5 12 12 15.5 8.5 12z"/></svg><span><b>Mini games</b><em>Four ways to play</em></span><i class="cz-dot"></i></button>
+    </nav>
 
-  <button class="fh-learn" onclick="fhLearned()">
-    <i class="fh-edge" aria-hidden="true"></i>
-    <img class="fh-learn-fox" src="./mascot-withflag-3.webp" alt="" onerror="this.style.display='none'"/>
-    <div class="fh-learn-txt">
-      <div class="fh-learn-t">Enter Focci’s Village</div>
-      <div class="fh-learn-s">A living island you can walk. Hunt letters, feed the animals and cross to the blossom isle above</div>
-    </div>
-    <span class="fh-learn-play">▶</span>
-  </button>
-
-  <div class="jn-home">
-    <div class="jn-top">
-      <button class="jn-arw" onclick="jnStep(1)" aria-label="Earlier">‹</button>
-      <div class="jn-ttl"><b id="jn-range">This week</b><span id="jn-sub"></span></div>
-      <button class="jn-arw" id="jn-next" onclick="jnStep(-1)" aria-label="Later">›</button>
-    </div>
-    <div class="jn-chart" id="jn-chart"></div>
-    <button class="jn-btn" onclick="jnOpen()">
-      <i class="jn-edge" aria-hidden="true"></i>
-      ✧ Focci’s Journal
+    <button class="cz-focci" id="cz-focci" onclick="fhEnterIsland()" aria-label="Enter the island">
+      <i class="cz-sh"></i><img src="./home-focci.webp" alt="" draggable="false"/>
     </button>
+    </div>
+
+    <button class="cz-foot" onclick="jnOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h11a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6z"/><path d="M6 4v16"/><path d="M10 9h5M10 12.5h5"/></svg><span><b>Focci&rsquo;s Journal</b><em>What you looked up, day by day</em></span><svg class="cz-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
   </div>
 
-
-  <div class="fh-rule"><span></span><b>✦</b><span></span></div>
-
-  <h2 class="fh-h2">Mini Games</h2>
-  <div class="fh-games">
-    <button class="fh-game g1" onclick="fhGame(this,'type')"><img src="./fox-letter-trail.webp" alt=""/><span>Letter Trail</span></button>
-    <button class="fh-game g2" onclick="fhGame(this,'match')"><img src="./fox-word-pairs.webp" alt=""/><span>Word Pairs</span></button>
-    <button class="fh-game g3" onclick="fhGame(this,'write')"><img src="./fox-speak-up.webp" alt=""/><span>Speak Up</span></button>
-    <button class="fh-game g4" onclick="fhGame(this,'hottake')"><img src="./fox-hot-take.webp" alt=""/><span>Hot Take</span></button>
+  <div class="cz-games" aria-label="Mini games">
+    <div class="cz-crumb"><button onclick="czPage('main')">Home</button><span>/</span><b>Mini games</b></div>
+    <h2 class="cz-title cz-title-sm">Pick a game.</h2>
+    <p class="cz-sub">Short rounds with the words you already have.</p>
+    <div class="fh-games">
+      <button class="fh-game g1" onclick="fhGame(this,'type')"><img src="./fox-letter-trail.webp" alt=""/><span>Letter Trail<em>Spell it back</em></span></button>
+      <button class="fh-game g2" onclick="fhGame(this,'match')"><img src="./fox-word-pairs.webp" alt=""/><span>Word Pairs<em>Match the meanings</em></span></button>
+      <button class="fh-game g3" onclick="fhGame(this,'write')"><img src="./fox-speak-up.webp" alt=""/><span>Speak Up<em>Say it in English</em></span></button>
+      <button class="fh-game g4" onclick="fhGame(this,'hottake')"><img src="./fox-hot-take.webp" alt=""/><span>Hot Take<em>Read the news</em></span></button>
+    </div>
   </div>
 </div>
 <div id="fw-overlay" style="position:fixed;inset:0;z-index:40;background:#000;">
@@ -6672,7 +7143,13 @@
     });
     worldReady = true;
     document.documentElement.classList.remove('world-loading');
-    if (window.__wantWorld) { window.__wantWorld = false; fhShowWorld(); }
+    czLive();
+    if (window.__wantWorld) {
+      window.__wantWorld = false;
+      const land = window.__wantLand; window.__wantLand = null;
+      if (land != null && worldApi.arcRoomKeys[land]) worldApi.enterRoom(worldApi.arcRoomKeys[land]);
+      if (document.documentElement.classList.contains('home-on')) czLeave(); else fhShowWorld();
+    }
   };
 
   /* Home <-> world. The overlay stays display:none until someone actually
@@ -6910,8 +7387,7 @@
       if (where === 'games') {
         // Mini Games is a section of home, not a panel of its own.
         fhShowHome();
-        const g = document.querySelector('.fh-games');
-        if (g) g.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        czPage('games');
         return;
       }
       openFwPanel(where === 'saved' ? 'saved' : where);
@@ -6960,8 +7436,82 @@
   };
   window.fhShowHome = function () {
     document.querySelector('#fw-overlay').style.display = 'none';
+    const home = document.getElementById('fw-home');
+    if (home) home.classList.remove('cz-leaving');
+    const f = document.getElementById('cz-focci');
+    if (f) f.classList.remove('hop');
     document.documentElement.classList.add('home-on');
+    czLive();
   };
+
+  /* ---- the way in: Focci hops, the still dissolves into the island ----
+     The overlay is shown at the START of the hop, under the home page
+     (which is opaque), so the world has the length of the jump to draw its
+     first frame; by the time the page fades there is a live island under
+     it rather than a black canvas. If the world is still loading, he waits
+     on the spot, bouncing, and goes in by himself when it is ready. */
+  function czLeave() {
+    const home = document.getElementById('fw-home');
+    const f = document.getElementById('cz-focci');
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.documentElement.classList.remove('world-loading');
+    if (reduce || !home || !f) { fhShowWorld(); return; }
+    document.querySelector('#fw-overlay').style.display = 'block';
+    f.classList.remove('hop'); void f.offsetWidth; f.classList.add('hop');
+    home.classList.add('cz-leaving');
+    setTimeout(fhShowWorld, 700);
+  }
+  window.fhEnterIsland = function () {
+    const home = document.getElementById('fw-home');
+    if (home && home.classList.contains('cz-leaving')) return;
+    if (!worldReady) {
+      window.__wantWorld = true;
+      document.documentElement.classList.add('world-loading');
+      czLive();
+      return;
+    }
+    czLeave();
+  };
+  /* Straight into one of the four lands. enterRoom builds a land the first
+     time it is asked for (ensureArcRoom), so this is the same door as the
+     gateway diamond, minus the question. */
+  window.fhEnterLand = function (idx) {
+    if (!worldReady) { window.__wantLand = idx; window.fhEnterIsland(); return; }
+    if (worldApi.arcRoomKeys[idx]) worldApi.enterRoom(worldApi.arcRoomKeys[idx]);
+    window.fhEnterIsland();
+  };
+  /* The small status pill: whether the island is ready, and the time. It
+     ticks once a minute and only while home is on screen. */
+  function czLive() {
+    const t = document.getElementById('cz-live-t');
+    const c = document.getElementById('cz-clock');
+    const pill = document.getElementById('cz-live');
+    if (!t || !pill) return;
+    const waiting = document.documentElement.classList.contains('world-loading');
+    pill.classList.toggle('ready', worldReady);
+    t.textContent = worldReady ? 'Live island' : (waiting ? 'Getting ready\u2026' : 'Island waking');
+    if (c) {
+      const d = new Date();
+      c.textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+  }
+  setInterval(() => { if (document.documentElement.classList.contains('home-on') && !document.hidden) czLive(); }, 30000);
+  /* Home's two pages -- the rows, and the games. Back (fwBack) returns
+     from the games to the rows before it ever leaves home. */
+  window.czPage = function (which) {
+    const home = document.getElementById('fw-home');
+    if (!home) return;
+    home.classList.toggle('cz-on-games', which === 'games');
+    home.scrollTop = 0;
+  };
+  window.czOpen = function (where) { openFwPanel(where); };
+  /* The white row follows the finger: whichever row was last pressed is
+     the chosen one until the next press. */
+  document.querySelectorAll('.cz-row').forEach((b) => b.addEventListener('pointerdown', () => {
+    document.querySelectorAll('.cz-row.on').forEach((o) => { if (o !== b) o.classList.remove('on'); });
+    b.classList.add('on');
+  }));
+  czLive();
   /* fhOpenSettings was declared twice — once here going straight to the
      settings panel, once further up opening the menu — and the later one
      won, so the grid button on the home page skipped the menu entirely.
@@ -6990,11 +7540,8 @@
     host.innerHTML = html;
   })();
 
-  /* Deliberately inert. The story this used to continue is gone and the home
-     hero is being redesigned; the button stays on screen so the layout is
-     unchanged, but it does nothing until that redesign lands. */
-  window.fhContinue = function () { };
-  window.fhLearned = function () { fhShowWorld(); };
+  window.fhContinue = function () { window.fhEnterIsland(); };
+  window.fhLearned = function () { window.fhEnterIsland(); };
   window.fhGame = function (btn, mode) {
     // Visible confirmation first — the pop runs whether or not the panel
     // takes a moment to build.
@@ -7372,6 +7919,8 @@
        menu opens the island and there was no way back from it but the
        menu again -- the island takes every one-finger drag as walking, so
        a swipe never reached this. See the edge rule in the gesture below. */
+    const home = document.getElementById('fw-home');
+    if (on('home-on') && home && home.classList.contains('cz-on-games')) { czPage('main'); return true; }
     const ov = document.getElementById('fw-overlay');
     if (!on('home-on') && ov && ov.style.display !== 'none') { fhShowHome(); return true; }
     return false;
