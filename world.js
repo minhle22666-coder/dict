@@ -304,7 +304,59 @@ export async function bootFocciWorld(root, opts) {
      candidate, and requiring every step to also be solid ground with no
      sudden cliff (a big single-step height jump), is a cheap stand-in for
      "is this reachable" without needing real pathfinding or a navmesh. */
+  /* Which cells of the grid Focci can walk to from where he starts,
+     worked out once per room by spreading outwards over the height field.
+
+     The straight-line test below it was the reason every mushroom on Fox
+     Island grew in one corner. It asked for a straight walk from spawn
+     with no step over 2.2, AND no more than 8 units of climb in total --
+     on an island whose ground runs from 6 up to 30, with the tower's
+     plateau standing between spawn and the far side. Measured: all 15
+     mushrooms at radius 10.8-13, all with x < 0 and z < 0.3, i.e. the
+     quarter of the island round spawn at (-6.1, -11.2), while half of the
+     walkable land lies further out than radius 18.
+
+     Spreading over the grid asks the question that was meant: can he get
+     there on foot at all, by any route? A step between neighbouring cells
+     of up to 1.2 counts as walkable ground; water and roofs do not. */
+  function reachMask(room) {
+    const f = room.field;
+    if (!f) return null;
+    const key = room.spawn.x + ',' + room.spawn.z;
+    if (room._reach && room._reachKey === key) return room._reach;
+    const N = f.N, L = f.land || f.ys, FL = f.landFl || f.fl;
+    const gx0 = Math.round((room.spawn.x + f.half) / FIELD_STEP), gz0 = Math.round((room.spawn.z + f.half) / FIELD_STEP);
+    if (gx0 < 0 || gz0 < 0 || gx0 >= N || gz0 >= N) return null;
+    const mask = new Uint8Array(N * N), queue = new Int32Array(N * N);
+    let head = 0, tail = 0;
+    const k0 = gz0 * N + gx0;
+    if (L[k0] === -Infinity) return null;
+    mask[k0] = 1; queue[tail++] = k0;
+    while (head < tail) {
+      const k = queue[head++], x = k % N, z = (k / N) | 0;
+      for (let d = 0; d < 4; d++) {
+        const nx = x + (d === 0 ? 1 : d === 1 ? -1 : 0), nz = z + (d === 2 ? 1 : d === 3 ? -1 : 0);
+        if (nx < 0 || nz < 0 || nx >= N || nz >= N) continue;
+        const n = nz * N + nx;
+        if (mask[n] || L[n] === -Infinity || (FL[n] & 3)) continue;
+        if (L[n] >= GROUND_CEIL || Math.abs(L[n] - L[k]) > 1.2) continue;
+        mask[n] = 1; queue[tail++] = n;
+      }
+    }
+    room._reach = mask; room._reachKey = key;
+    return mask;
+  }
   function isReachableFromSpawn(room, x, z, y) {
+    const m = reachMask(room);
+    if (m) {
+      const f = room.field;
+      const gx = Math.round((x + f.half) / FIELD_STEP), gz = Math.round((z + f.half) / FIELD_STEP);
+      if (gx < 0 || gz < 0 || gx >= f.N || gz >= f.N) return false;
+      return m[gz * f.N + gx] === 1;
+    }
+    return isReachableStraight(room, x, z, y);
+  }
+  function isReachableStraight(room, x, z, y) {
     // 8, not 5: Fox Island's walkable surface spans y 6.1 to 29.7, so a
     // 5-unit cap from spawn rules out most of it before anything else runs.
     const STEPS = 10, MAX_JUMP = 2.2, MAX_TOTAL_DROP = 8;
@@ -337,7 +389,11 @@ export async function bootFocciWorld(root, opts) {
   function findGroundSpot(room, minR, maxR, tries) {
     tries = tries || 40;
     for (let i = 0; i < tries; i++) {
-      const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
+      /* sqrt: even over the AREA of the ring. A plain random radius puts
+         as many points in the thin inner band as in the wide outer one, so
+         things pile up towards the middle. */
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(minR * minR + Math.random() * (maxR * maxR - minR * minR));
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       const surf = groundAt(room, x, z);
       if (surf.hit && !surf.water && !surf.building && isStableGround(room, x, z, surf.y) && isReachableFromSpawn(room, x, z, surf.y)) return { x, z, y: surf.y };
@@ -374,7 +430,7 @@ export async function bootFocciWorld(root, opts) {
      the roots hung out over the drop ("cắm và lòi ra 1 khúc đất"). This
      samples candidates and keeps the one whose ground varies least across a
      ring the size of the prop. */
-  function findFlatGroundSpot(room, rMin, rMax, footprint, tries) {
+  function findFlatGroundSpot(room, rMin, rMax, footprint, tries, keepOff) {
     // Measured on the real hub: sampling 400 random walkable points, the
     // MEDIAN height spread across a 2.2-unit ring is 2.44 units and the
     // flattest point found was 0.45. Genuinely flat ground is rare here, so
@@ -391,9 +447,13 @@ export async function bootFocciWorld(root, opts) {
         lo = Math.min(lo, surf.y); hi = Math.max(hi, surf.y);
       }
       if (!ok) continue;
+      if (keepOff && !keepOff(spot.x, spot.z)) continue;
       const spread = hi - lo;
       if (!best || spread < best.spread) best = { x: spot.x, y: spot.y, z: spot.z, spread: spread, lowest: lo };
-      if (spread < 0.5) break;   // flat enough for this terrain, stop looking
+      /* Good enough, not the best. Taking the flattest of thirty tries
+         sent every animal to the same one or two meadows -- the flattest
+         ground on the island does not move between calls. */
+      if (spread < 1.0) break;
     }
     return best || findGroundSpot(room, rMin, rMax);
   }
@@ -403,9 +463,14 @@ export async function bootFocciWorld(root, opts) {
   const MUSH_TARGET = 0.45;
   function scatterMushrooms(room, rMin, rMax, count) {
     const props = extractPropGroups(mushGlb.scene);
+    /* Not within 3 units of another mushroom -- eight tries for a spot
+       that keeps its distance, then take the last one rather than go
+       without. */
+    const apart = (x, z) => room.mushrooms.every((m) => Math.hypot(m.x - x, m.z - z) >= 3);
     for (let i = 0; i < count; i++) {
       const p = props[i % props.length];
-      const spot = findGroundSpot(room, rMin, rMax);
+      let spot = null;
+      for (let t = 0; t < 8; t++) { spot = findGroundSpot(room, rMin, rMax); if (apart(spot.x, spot.z)) break; }
       const inst = p.clone(true);
       const mBox = new THREE.Box3().setFromObject(inst);
       const mSize = mBox.getSize(new THREE.Vector3());
@@ -1007,7 +1072,36 @@ export async function bootFocciWorld(root, opts) {
     if (gx < 0 || gz < 0 || gx >= w.N || gz >= w.N) return false;
     const k = gz * w.N + gx;
     if (w.hi[k] === -Infinity) return false;
-    return w.hi[k] > feetY + STEP_UP && w.lo[k] < feetY + BODY_H;
+    if (!(w.hi[k] > feetY + STEP_UP && w.lo[k] < feetY + BODY_H)) return false;
+    /* A wall with a roof on top of it is not in the way of someone
+       walking on that roof.
+
+       The mask records every upright face, including the tops of the
+       walls the roof rests on, so the cells along a roof's edge carry a
+       wall whose top is the roof itself. On a pitched roof the top of the
+       wall rises across a 0.6 cell faster than the cell's own sample does:
+       measured on the hut at (-10.4, 14.8), Focci stood on the eave with
+       his feet at 14.07 over a wall topping out at 15.05 -- 0.98 above
+       him against a step of 0.9 -- so the cell he was standing in counted
+       as a wall, every step out of it was refused, and he could walk
+       back up the roof and nowhere else. That is "stuck on the roof".
+
+       So: when his feet are up near the top of the wall, and the surface
+       around that cell reaches as high as the wall does, the wall is
+       under the roof and he walks over it. From the floor, a wall's top is
+       far above his feet and this never applies -- the house still has
+       solid walls from inside and out. */
+    const f = room.field;
+    if (f && f.N === w.N && feetY > w.hi[k] - 1.6) {
+      const L = f.land || f.ys;
+      let top = L[k];
+      if (gx > 0) top = Math.max(top, L[k - 1]);
+      if (gx < w.N - 1) top = Math.max(top, L[k + 1]);
+      if (gz > 0) top = Math.max(top, L[k - w.N]);
+      if (gz < w.N - 1) top = Math.max(top, L[k + w.N]);
+      if (top >= w.hi[k] - 0.25) return false;
+    }
+    return true;
   }
 
   /* The grid's answer, in the shape surfaceYIn gives. */
@@ -1282,7 +1376,8 @@ export async function bootFocciWorld(root, opts) {
     // fixes as scatterClone: measured + normalized scale instead of a flat
     // guess, and findGroundSpot instead of a water-only retry (a miss
     // entirely — off the island's edge — used to fall back to y:0, floating).
-    scatterMushrooms(station, 3, 13, 15);
+    // out to 23: the walkable land's 95th percentile radius, measured
+    scatterMushrooms(station, 3, 23, 15);
 
     // Chests removed on request — they are no longer part of the island.
 
@@ -1919,7 +2014,7 @@ export async function bootFocciWorld(root, opts) {
       // findGroundSpot near the room's own center instead of a blind (0,0,0)
       // — same off-ground risk as everything else if that exact point isn't
       // actually solid on a given arc environment.
-      scatterMushrooms(room, 3, 11, 8);
+      scatterMushrooms(room, 3, 12, 8);
 
       const homeSpot = findGroundSpot(room, 0, 6);
       const homeSpawned = spawnDiamond(room, homeSpot.x, homeSpot.y, homeSpot.z, 'teleport-home');
@@ -2200,7 +2295,8 @@ export async function bootFocciWorld(root, opts) {
     const base = 1 / Math.max(size.x, size.y, size.z, 0.0001);
     const scale = base * (window.resScale ? window.resScale(rec) : 0.8);
     obj.scale.setScalar(scale);
-    const spot = (near && spotNear(room, near)) || findFlatGroundSpot(room, 4, 12, 0.9, 30);
+    const apartR = (x, z) => (room.residents || []).every((b) => Math.hypot(b.homeX - x, b.homeZ - z) >= 3);
+    const spot = (near && spotNear(room, near)) || findFlatGroundSpot(room, 4, 21, 0.9, 30, apartR);
     const footOffset = box.min.y * scale;
     obj.position.set(spot.x, spot.y - footOffset, spot.z);
     obj.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -2488,8 +2584,8 @@ export async function bootFocciWorld(root, opts) {
     b.sailing = 0.5;                     // climbing in
     /* Swing round to the boat's beam so you actually watch him get in,
        instead of the whole thing happening behind his own back. */
-    cam.tTheta = Math.atan2(b.x - b.dockX, b.z - b.dockZ) + Math.PI / 2;
-    cam.tPhi = 1.16; cam.tRadius = 12;
+    cam.tTheta = Math.atan2(b.homeX, b.homeZ) + VOYAGE_CAM_OFF;
+    cam.tPhi = VOYAGE_CAM_PHI; cam.tRadius = 12;
     const sy = room.sea ? room.sea.y : character.position.y;
     spawnSplash(room, charState.x, sy, charState.z, 10, 1.1);
     spawnRipple(room, charState.x, sy, charState.z, 1.6);
@@ -2507,6 +2603,30 @@ export async function bootFocciWorld(root, opts) {
      used to hide him the instant you said yes, so the voyage was a boat
      leaving with nobody in it. */
   const VOYAGE_OUT = 3.0, VOYAGE_DIST = 34;
+  /* Where the camera watches the voyage from: out on the water, a little
+     to one side, following the boat.
+
+     It used to stay on the shore -- orbiting the dock, turned to face the
+     sea -- which puts it on the LAND side of the dock, and at the radius
+     it was given (12 growing to 28) that is inside the village. Rays cast
+     from where the camera actually was to the boat, at five points along
+     the leg: blocked every time, by merged_home_body and merged_roof1 --
+     and trees -- at every angle tried on that side, because the dock has
+     a village behind it. From the sea side, following the boat at 12
+     units, the same test was clear at every point of both legs, and the
+     boat, with Focci on it, stays in the middle of a portrait screen,
+     which a shot of dock and boat together could not do once the boat was
+     any distance out. */
+  const VOYAGE_CAM_OFF = 0.4, VOYAGE_CAM_PHI = 1.05;
+  function voyageCamOn(b, away) {
+    camFocus.on = true;
+    camFocus.tx = b.obj.position.x + b.deckDX;
+    camFocus.ty = b.obj.position.y + b.deckLift;
+    camFocus.tz = b.obj.position.z + b.deckDZ;
+    cam.tTheta = Math.atan2(away.x, away.z) + VOYAGE_CAM_OFF;
+    cam.tPhi = VOYAGE_CAM_PHI;
+    cam.tRadius = 12;
+  }
   function tickBoat(room, dt, t) {
     const b = room.boat; if (!b) return;
     const sy = room.sea ? room.sea.y : b.y;
@@ -2547,9 +2667,7 @@ export async function bootFocciWorld(root, opts) {
       /* The camera hangs back on the shore and watches him go — it stays
          put, but it turns to keep the boat in frame, or the whole voyage
          happens off the left edge of the screen. */
-      cam.tRadius = 12 + k * 16;
-      cam.tTheta = Math.atan2(-away.x, -away.z);
-      cam.tPhi = 1.12;
+      voyageCamOn(b, away);
       const fade = Math.max(0, (k - 0.45) / 0.55);
       b.obj.traverse((o) => { if (o.isMesh && o.material) { o.material.transparent = true; o.material.opacity = 1 - fade; } });
       if (fade > 0.7) character.visible = false;
@@ -2563,9 +2681,7 @@ export async function bootFocciWorld(root, opts) {
       b.obj.traverse((o) => { if (o.isMesh && o.material) o.material.opacity = fade; });
       if (fade > 0.35) character.visible = (camMode !== 'fpv');
       setDeck(); wake();
-      cam.tRadius = 28 - k * 15;
-      cam.tTheta = Math.atan2(-away.x, -away.z);
-      cam.tPhi = 1.12;
+      voyageCamOn(b, away);
       if (k >= 1) {
         b.sailing = 0; b.wakeT = 0;
         b.obj.traverse((o) => { if (o.isMesh && o.material) { o.material.opacity = 1; o.material.transparent = false; } });
@@ -2584,6 +2700,7 @@ export async function bootFocciWorld(root, opts) {
            there is nothing between the lens and the beach. */
         flyTo(room, { x: b.dockX, y: b.dockY, z: b.dockZ }, () => {
           spawnLandingPuff(room, b.dockX, b.dockY, b.dockZ);
+          camFocus.on = false;
           cam.tTheta = Math.atan2(away.x, away.z);
           cam.tRadius = 10; cam.tPhi = 1.1;
         }, { dur: 1.0, lift: 2.4, spin: 0, trail: 'splash' });
@@ -3178,10 +3295,22 @@ export async function bootFocciWorld(root, opts) {
     const ox = cam.radius * sinPhi * Math.sin(cam.theta);
     const oz = cam.radius * sinPhi * Math.cos(cam.theta);
     const oy = cam.radius * Math.cos(cam.phi) + 0.1;
-    const k = camClearance(ox, oy, oz);
-    camera.position.set(charState.x + ox * k, character.position.y + 1.0 + oy * k, charState.z + oz * k);
-    camera.lookAt(charState.x, character.position.y + 1.0, charState.z);
+    /* Following something other than Focci's feet -- the boat, while it
+       sails. blend runs 0 -> 1 as the boat takes over and back to 0 when
+       Focci gets the camera again, so neither hand-over jumps; at 0 the
+       camera is exactly where it always was, on Focci, with no lag. */
+    camFocus.blend += ((camFocus.on ? 1 : 0) - camFocus.blend) * 0.12;
+    if (!camFocus.on && camFocus.blend < 0.002) camFocus.blend = 0;
+    const bl = camFocus.blend;
+    const fx = charState.x + ((camFocus.tx || 0) - charState.x) * bl;
+    const fy = character.position.y + ((camFocus.ty || 0) - character.position.y) * bl;
+    const fz = charState.z + ((camFocus.tz || 0) - charState.z) * bl;
+    // out over the water there is nothing to pull in from
+    const k = bl > 0 ? 1 : camClearance(ox, oy, oz);
+    camera.position.set(fx + ox * k, fy + 1.0 + oy * k, fz + oz * k);
+    camera.lookAt(fx, fy + 1.0, fz);
   }
+  const camFocus = { on: false, blend: 0, tx: 0, ty: 0, tz: 0 };
 
   /* Keeping something between the lens and Focci from swallowing the shot.
 
@@ -3566,11 +3695,34 @@ export async function bootFocciWorld(root, opts) {
      straight back into the middle of the model downloads. Ambience a
      couple of seconds late is not something anyone notices; a loading
      screen a couple of seconds longer is. */
-  function bgmStart() {
-    bgmPlay().catch(function () {
-      var unlock = function () { bgmPlay().catch(function () {}); canvas.removeEventListener('pointerdown', unlock); };
+  /* The island's music belongs to the island.
+
+     It used to start the moment the world finished loading -- and the
+     world loads behind the home page, so the music played over home,
+     over every panel, and on with the app in the background. Now it
+     plays only while the island itself is on screen: syncMusic() runs
+     every frame the loop is awake and whenever the page is hidden or
+     shown, and pauses or resumes to match. Mute (soundOn) still wins.
+
+     A browser can refuse play() until the person has touched the page.
+     When it does, it is not retried every frame -- the next touch on the
+     island starts it. */
+  let musicArmed = false, bgmTrying = false, bgmNeedsTouch = false;
+  function syncMusic() {
+    const want = musicArmed && soundOn && !overlayOpen();
+    if (!want) { if (!bgm.paused) bgm.pause(); return; }
+    if (!bgm.paused || bgmTrying || bgmNeedsTouch) return;
+    bgmTrying = true;
+    bgmPlay().then(() => { bgmTrying = false; }).catch(() => {
+      bgmTrying = false; bgmNeedsTouch = true;
+      const unlock = () => { bgmNeedsTouch = false; canvas.removeEventListener('pointerdown', unlock); syncMusic(); };
       canvas.addEventListener('pointerdown', unlock);
     });
+  }
+  document.addEventListener('visibilitychange', () => syncMusic());
+  function bgmStart() {
+    musicArmed = true;
+    syncMusic();
   }
   /* Hung off the end of the boot sequence rather than a timer -- a timer
      fires on schedule whether or not the island has arrived, so on the
@@ -3579,13 +3731,13 @@ export async function bootFocciWorld(root, opts) {
   window.__fwStartMusic = bgmStart;
   function toggleSound() {
     soundOn = !soundOn;
-    if (soundOn) bgmPlay().catch(() => {}); else bgm.pause();
+    syncMusic();
     return soundOn;
   }
   function nextTrack() {
     trackIdx = (trackIdx + 1) % TRACKS.length;
     bgm.src = AUDIO(TRACKS[trackIdx]);
-    if (soundOn) bgm.play().catch(() => {});   // src just set by hand, so play() directly
+    if (soundOn && !overlayOpen()) bgm.play().catch(() => {});   // src just set by hand, so play() directly
     return TRACKS[trackIdx];
   }
 
@@ -3809,6 +3961,7 @@ export async function bootFocciWorld(root, opts) {
        Park the loop instead: keep the rAF alive so it picks straight
        back up, but skip the work and reset the clock's delta so Focci
        doesn't lurch forward by the whole paused duration on resume. */
+    syncMusic();
     if (overlayOpen()) { releaseGesture(); clock.getDelta(); return; }
     /* Half rate while nobody is doing anything. Standing still, the island
        still has water, birds and a grazing doe to move, but none of it

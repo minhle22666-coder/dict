@@ -49,10 +49,19 @@
     } catch (e) { return ''; }
   }
 
+  /* A comparison is logged under its storage key, "why:general, generic".
+     That key went into the journal as if it were a word -- shown with the
+     "why:" in front, and tapping it opened the word page on the key
+     itself, which search() read as a comparison of "why:general" with
+     "generic", found nothing saved for that, and asked the AI. So the
+     journal keeps the comparison as what was typed and remembers that it
+     is one; days written before this are cleaned the same way on show. */
+  var WHY = /^(why:)+/;
   window.jnLogWord = async function (word) {
-    var w = String(word || '').trim().toLowerCase();
-    if (!w) return;
-    var vi = await meaningOf(w);
+    var raw = String(word || '').trim().toLowerCase();
+    if (!raw) return;
+    var w = raw.replace(WHY, '');
+    var vi = await meaningOf(raw);
     var j = load(), d = dayOf(j, today());
     var hit = d.words.find(function (x) { return x.w === w; });
     if (hit) { if (vi && !hit.vi) hit.vi = vi; }
@@ -155,7 +164,8 @@
         if (d.words.length) {
           h += '<div class="jn-sec">Words met <b class="num">' + d.words.length + '</b></div>';
           h += '<div class="jn-list">' + d.words.map(function (w) {
-            return '<button class="jn-w" onclick="jnGo(\'' + esc(w.w) + '\')"><b>' + esc(w.w) + '</b>'
+            var ww = String(w.w || '').replace(WHY, '');
+            return '<button class="jn-w" onclick="jnGo(\'' + esc(ww) + '\')"><b>' + esc(ww) + '</b>'
               + (w.vi ? '<i>' + esc(w.vi) + '</i>' : '') + '</button>';
           }).join('') + '</div>';
         }
@@ -173,5 +183,5 @@
     document.documentElement.classList.add('jn-on');
   };
   window.jnClose = function () { document.documentElement.classList.remove('jn-on'); };
-  window.jnGo = function (w) { jnClose(); if (window.openDictPage) window.openDictPage(w); };
+  window.jnGo = function (w) { jnClose(); if (window.openDictPage) window.openDictPage(String(w || '').replace(WHY, '')); };
 })();

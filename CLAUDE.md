@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v191`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v192`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -309,6 +309,39 @@ sentence to translate. If you add a search field, wire it to
 by page, in the ONE SEARCH ROW block. Panels start at safe-area + 84px so
 nothing sits pressed under it.
 
+**A wall under a roof does not block someone on that roof.**
+`blockedAt()` skips a wall cell when Focci's feet are near its top and the
+roof around it reaches as high -- without that, standing on an eave over
+a wall line counted as standing in a wall and every step off the roof was
+refused (0 of 8 directions off hut 1; 7 of 8 after). From the floor the
+walls are as solid as before.
+
+**Placement uses `reachMask()`, not a straight line from spawn.** The old
+test also capped the climb from spawn at 8 units on an island 6-30 high,
+so every mushroom grew in one quarter. Mushrooms scatter out to radius 23
+(the land's 95th percentile) 3 apart; animals out to 21, 3 apart, and
+`findFlatGroundSpot` takes the first "flat enough" spot, not the flattest
+-- the flattest ground is always the same meadow.
+
+**During a voyage the camera follows the boat from the sea side**
+(`voyageCamOn`, `camFocus`). On the land side of the dock every angle
+tried was inside the village: rays from the camera to the boat were
+blocked at every point of both legs.
+
+**Music plays only while the island is on screen** (`syncMusic()`, run
+from `animate()` and on visibilitychange). A swipe from the left edge on
+the island is back to home; a drag anywhere else is still walking.
+
+**Journal entries for comparisons are stored without the `why:` key
+prefix.** With it, tapping one ran a nonsense comparison through the AI.
+`search()` and `explainWordsOf()` strip a stray `why:` as well.
+
+**Letter Trail and Word Pairs are daylight pages** (`#v-review.pg-day`,
+set in `setPracticeMode` for everything but Speak Up), and so is Hot Take
+-- see the DAYLIGHT block at the end of the stylesheet. Hot Take's source
+filters are text chips now; the old logo tiles never lit up because
+`chips()` looks for `.ht-chip` and they did not carry it.
+
 **The island runs at half rate when nobody is touching it** (`halfRateSkip`
 in `animate()`), and at a pixel ratio of 1.5 on touch screens. Both are
 for heat, not frame time.
@@ -389,11 +422,11 @@ Everything below is committed and pushed to `main`.
 
 **In flight — I stopped mid-task here:**
 
-1. **Mini games (Word Pairs, Letter Trail) still need the design pass.**
-   - The purple is `.fw-panel`'s backdrop, index.html ~5148. Changing it
-     to green fixes games and every other un-overridden panel at once.
-   - Fonts need the `body .view.fw-panel#id *` treatment described above.
-   - The setup controls at the top of a game are cramped and unstyled.
+1. ~~Mini games design pass.~~ **Done** for Letter Trail and Word Pairs
+   (daylight, Raleway/Helvetica, the settings as one ruled card, an intro
+   line on each banner). `.fw-panel`'s purple backdrop is still the root
+   default for any panel that does not override it -- Progress and
+   Settings still show it.
    - ~~Remove `← Games` and the round's `✕`.~~ **Done.** A right swipe is
      back (home, or Saved for a review started there); a round that has
      been played into asks for a second swipe first. `practiceStage` is

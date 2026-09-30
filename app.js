@@ -630,7 +630,7 @@ function isExplainQuery(s){
   });
 }
 function explainWordsOf(s){
-  return String(s||'').split(',').map(x=>norm(x)).filter(Boolean).slice(0,6);
+  return String(s||'').replace(/^(why:)+/i,'').split(',').map(x=>norm(x)).filter(Boolean).slice(0,6);
 }
 
 async function askExplain(words){
@@ -1457,7 +1457,11 @@ function flashPhraseMatch(text){
   }, 60);
 }
 async function search(rawWord, forceAI){
-  let word=norm(rawWord||'');
+  /* "why:" is how a comparison is keyed in storage, never something a
+     person types. Arriving here with it -- from the journal, the recent
+     list, a suggestion -- it used to be taken as part of the words and
+     sent a nonsense comparison to the AI. */
+  let word=norm(rawWord||'').replace(/^(why:)+/,'');
   if(!word) return;
   const hasSpace = /\s/.test(word.trim());
   const isVN = looksVietnamese(word);
@@ -4188,6 +4192,12 @@ let practiceStage='setup';   // 'setup' | 'playing'
 let dueReviewMode=false;
 function setPracticeMode(m){
   practiceMode=m; practiceStage='setup';
+  /* Letter Trail and Word Pairs are daylight pages now; Speak Up keeps its
+     own village scene. A class on the panel rather than :has(.pg), because
+     the end-of-round screen is drawn without .pg and would have dropped
+     back to the old purple the moment a round finished. */
+  const vr=document.getElementById('v-review');
+  if(vr) vr.classList.toggle('pg-day', m!=='write');
   if(m==='write'){ window.__sayItActive=true; renderSpeakUpIntro(); return; }
   window.__sayItActive=false;
   suPanelOn(false);
@@ -4225,9 +4235,13 @@ function dropdownRow(label, note, opts, onChange){
    against. Here the three dials stay at the top and the question lives
    under them; move a dial and the round simply starts again.
    ============================================================ */
+/* intro: the one line under each game's name, in the voice Hot Take's
+   banner uses -- what you do, in the order you do it. */
 const PG_META = {
-  type:  { art:'box-lettertrail.png', fox:'fox-letter-trail.webp', name:'Letter Trail' },
-  match: { art:'box-wordpairs.png',   fox:'fox-word-pairs.webp',  name:'Word Pairs'  }
+  type:  { art:'box-lettertrail.png', fox:'fox-letter-trail.webp', name:'Letter Trail',
+           intro:'Welcome to Letter Trail! Read the meaning, follow the letter hints and type the English word \u2014 a slip of spelling still counts.' },
+  match: { art:'box-wordpairs.png',   fox:'fox-word-pairs.webp',  name:'Word Pairs',
+           intro:'Welcome to Word Pairs! Read the Vietnamese, pick the English word that matches, then swipe left for the next one.' }
 };
 function setQCountIdx(i){ setQCount(QCOUNTS[Math.max(0,Math.min(QCOUNTS.length-1,+i))]); }
 window.setQCountIdx=setQCountIdx;
@@ -4260,7 +4274,8 @@ function gameShell(body){
   return '<div class="pg">'
     +'<div class="pg-head">'
     +  '<img class="bg" src="./'+m.art+'" alt="" onerror="this.style.display=\'none\'"/>'
-    +  '<div class="name">'+m.name+'</div>'
+    +  '<div class="txt"><div class="name">'+m.name+'</div>'
+    +  (m.intro?'<div class="sub">'+m.intro+'</div>':'')+'</div>'
     +  '<img class="fox" src="./'+m.fox+'" alt="" onerror="this.style.display=\'none\'"/>'
     +'</div>'
     +pgControls()+body+'</div>';
