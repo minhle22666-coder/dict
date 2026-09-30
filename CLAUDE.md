@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v192`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v193`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -341,6 +341,39 @@ set in `setPracticeMode` for everything but Speak Up), and so is Hot Take
 -- see the DAYLIGHT block at the end of the stylesheet. Hot Take's source
 filters are text chips now; the old logo tiles never lit up because
 `chips()` looks for `.ht-chip` and they did not carry it.
+
+**Never call `idbAll()` from anything interactive.** The library is 16k
+records and 41MB; one read is 800ms. A game's dial read it three times
+per turn, and five drags took the heap from 228MB to 557MB -- the white
+screen. Use `idbAllCached()`: it shares the read in flight (without that,
+ten drags during the first read were seventeen reads), and `idbPut` keeps
+it current via `cacheUpsert()`.
+
+**Under a roof near a house, the ground is `groundUnderRoof()`**, not the
+house's floor height: under the eaves by each door the real ground is up
+to 3 above the floor, and Focci sank into it. It keeps two readings per
+cell (down from under the roof, and from the floor band) and takes the
+one nearest his feet, so a two-storey house never lifts him upstairs.
+
+**Hut furniture stands where the room actually is.** `buildHutInterior`
+finds the cell furthest from any wall and scales the layout to the
+largest size at which the bed and table clear every wall (the bed went
+through the wall in 3 of 4 huts before). The lamp's on/off is `h.lampOn`;
+the per-frame easing used to undo every tap.
+
+**Vietnamese and multi-word searches go to the word page**, never to
+`wordPopupForceAI` -- that asks the AI for an English headword, so
+Vietnamese came back "not an English word" and cost a second call.
+
+**One menu per screen:** on the island its own round menu and a
+full-width search; over any panel the grid button, and the island menu
+hidden (ONE MENU PER SCREEN block). In first person a pinch is field of
+view (38-80), not camera distance.
+
+A dev-only harness for driving the island lives at
+`.claude/dev-harness.js` (excluded from git in `.git/info/exclude`):
+`(0,eval)(await (await fetch('/.claude/dev-harness.js',{cache:'no-store'})).text())`.
+The pane's localStorage is wiped whenever the preview server restarts.
 
 **The island runs at half rate when nobody is touching it** (`halfRateSkip`
 in `animate()`), and at a pixel ratio of 1.5 on touch screens. Both are

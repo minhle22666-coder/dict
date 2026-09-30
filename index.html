@@ -5711,6 +5711,24 @@
   html body .ht-scrim .ht-reply b{color:var(--sv-teal)}
   html body .ht-scrim .ht-done{color:#fff;background:var(--sv-teal);box-shadow:0 4px 12px rgba(18,120,125,.24)}
   html.ht-on, html.ht-on body{background:#C9E5DD}
+
+  /* ============================================================
+     ONE MENU PER SCREEN
+
+     The island has its own menu (the round button bottom-left: companion,
+     sound, whole-island view, map, and the panels); every other page has
+     the app's menu (the grid button at the end of the search row). Both
+     showed at once over the games and the other panels, and on the island
+     the grid button sat at the end of the search field and cut it short.
+
+     On the island: its own menu, and the search field runs the full width.
+     Over a panel: the grid button, and the island's menu steps aside --
+     everything in it that matters there (Saved, games, progress) is in the
+     app's menu too, and back is a swipe.
+     ============================================================ */
+  html:not(.home-on):not(.panel-open):not(.dict-open) .fw-topbar .fw-gear{display:none}
+  .fw-topbar{min-height:41px}   /* the row keeps the grid button's height, so the field sits at the same y without it */
+  html.panel-open .fw-menu-cluster, html.ht-on .fw-menu-cluster{display:none}
 </style>
 <link rel="stylesheet" href="./theme-overrides.css">
 </head>
@@ -7012,6 +7030,16 @@
     raw = String(raw || '').trim();
     if (!raw) return;
     if (window.isExplainQuery && isExplainQuery(raw)) { openDictPage(raw); return; }
+    /* Vietnamese, and anything of more than one word, goes to the word page
+       too. The dictionary is keyed by English words, so a Vietnamese query
+       always missed below and fell to wordPopupForceAI -- which asks the
+       AI to define it AS AN ENGLISH WORD. It answered "not an English word
+       Focci knows" with a "did you mean ..." that swapped in some English
+       look-alike (the "auto fix"), and getting the actual translation took
+       a second search on the full page: two AI calls for one question.
+       search() on the word page already does this properly -- the offline
+       reverse lookup first, one AI translation only if that finds nothing. */
+    if ((window.looksVietnamese && looksVietnamese(raw)) || /\s/.test(raw)) { openDictPage(raw); return; }
     /* While a word page is open, a second search replaces the entry on
        it. It used to raise the little word sheet instead, which lands
        UNDER the open page -- from the reader's side, searching again

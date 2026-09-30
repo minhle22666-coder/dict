@@ -83,13 +83,30 @@ function idbPut(obj){
     const d=obj.data;
     if(d.collocations||d.phrasal_verbs||d.idioms||d.prepositions) phraseIndexReset();
   }
-  return tx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.put(obj);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})); }
+  return tx('readwrite').then(s=>new Promise((res,rej)=>{const r=s.put(obj);r.onsuccess=()=>{ cacheUpsert(obj); res(); };r.onerror=()=>rej(r.error)})); }
+/* Keep idbAllCached's copy true to what was just written, rather than
+   either throwing it away (a 41MB re-read the next time anything wants
+   it) or leaving it stale (the games read saved/reviewed state from it). */
+function cacheUpsert(obj){
+  if(!_allRecordsCache || !obj || obj.word==null) return;
+  const i=_allRecordsCache.findIndex(r=>r.word===obj.word);
+  if(i>=0) _allRecordsCache[i]=obj; else _allRecordsCache.push(obj);
+}
 function idbAll(){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})); }
 let _allRecordsCache=null;
+/* The read in flight is shared too, not just its result. A read of the
+   whole library takes 800ms, and everything that asked during it saw an
+   empty cache and started a read of its own: ten quick turns of a game's
+   dial with the cache cold was seventeen full reads at once. */
+let _allRecordsPending=null;
 async function idbAllCached(){
   if(_allRecordsCache) return _allRecordsCache;
-  _allRecordsCache = await idbAll();
-  return _allRecordsCache;
+  if(!_allRecordsPending){
+    _allRecordsPending = idbAll().then(
+      (a)=>{ _allRecordsPending=null; _allRecordsCache=a; return a; },
+      (e)=>{ _allRecordsPending=null; throw e; });
+  }
+  return _allRecordsPending;
 }
 function idbCount(){ return tx('readonly').then(s=>new Promise((res,rej)=>{const r=s.count();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})); }
 function idbPrefix(prefix){
@@ -4291,17 +4308,24 @@ function pgCard(pose, bubble, inner, xp){
     +inner+'</div>';
 }
 
+/* Dragging a dial back and forth fires this several times over, and each
+   run awaits storage. Only the newest one may draw; an older one that
+   finishes late would otherwise replace the round the player is looking
+   at with one built for a setting they have already moved past. */
+let _setupSeq=0;
 async function renderPracticeSetup(){
+  const seq=++_setupSeq;
   practiceStage='setup';
   const area=$('#review-area'); if(!area) return;
   await loadLevels();
   const avail=await availableWords();
+  if(seq!==_setupSeq) return;
   if(!avail.length){
     area.innerHTML=gameShell(pgCard('wonder','Nothing to practise yet',
       '<div class="pg-empty">'+setupEmptyWhy()+'</div>'));
     return;
   }
-  startPractice();          // the dials stay on screen; the round begins under them
+  startPractice(avail);     // the dials stay on screen; the round begins under them
 }
 window.renderPracticeSetup=renderPracticeSetup;
 
@@ -4327,7 +4351,13 @@ async function availableWords(){
   const hasMeaning=(r)=>r.data && (r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi);
   /* Bản ghi Focci Explains cũng có data và cũng được lưu sao, nên phải
      loại trừ tường minh — nếu không sẽ bị đem ra đố như một từ vựng. */
-  let list=(await idbAll()).filter(r=>!r.alias && hasMeaning(r)
+  /* idbAllCached, not idbAll. The library is 16k records and 41MB, and
+     every turn of a dial asked for all of it three times over -- here,
+     again when the round began, and again for Word Pairs' decoys. Five
+     quick drags of the question count: 15 full reads, 800ms each, and the
+     heap went from 228MB to 557MB, which on a phone is the white screen
+     and the tab closing. One copy, kept current by idbPut. */
+  let list=(await idbAllCached()).filter(r=>!r.alias && hasMeaning(r)
             && !(r.data && r.data.explain) && !(r.data && r.data.phrase));
   if(dueReviewMode){
     // Ép đúng bộ từ TỚI HẠN hôm nay — bỏ qua hẳn pool/practiceMode, vì đây
@@ -4348,8 +4378,8 @@ async function availableWords(){
   return list;
 }
 
-async function startPractice(){
-  const avail=await availableWords();
+async function startPractice(preAvail){
+  const avail=Array.isArray(preAvail) ? preAvail : await availableWords();
   if(!avail.length) return;
   wirePracticeSwipe();
   practiceStage='playing';
@@ -4520,7 +4550,7 @@ async function startMatch(preAvail){
   const answers=preAvail||await availableWords();
   // Decoys always come from the whole library, so a small pool still gets
   // six believable options.
-  const all=(await idbAll()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi));
+  const all=(await idbAllCached()).filter(r=>!r.alias && r.data && (r.data.vi_equivalent || ((r.data.senses||[])[0]||{}).vi));
   if(!answers.length || all.length<6){ return renderPracticeSetup(); }
   practiceStage='playing';
   _matchDecoyPool=all;

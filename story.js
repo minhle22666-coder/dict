@@ -720,6 +720,14 @@ window.wordPopupToggleSave = async function(word){
   if(rec) showWordSheet(condensedEntryHTML(rec));
 };
 window.wordPopupForceAI = async function(rawWord){
+  /* This asks for an English headword. Vietnamese sent here was defined
+     as if it were English and came back "not found"; it belongs on the
+     word page, which translates it (see fwRunSearch). */
+  if(typeof looksVietnamese==='function' && looksVietnamese(rawWord||'')){
+    closeWordSheet();
+    if(window.openDictPage) window.openDictPage(String(rawWord).trim());
+    return;
+  }
   const word = norm(normalizeSpelling(rawWord||''));
   if(!word) return;
   showWordSheet(loadingSheetHTML(word));

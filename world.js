@@ -1484,6 +1484,15 @@ export async function bootFocciWorld(root, opts) {
          the bowl and leaves only the rim and its stones showing. */
       const RIM_Y = 0.45;
       pondGlb.scene.position.set(spot.x, spot.y - RIM_Y * pScale, spot.z);
+      /* And flattened. The lawn under the pond is one unbroken surface --
+         there is no hole for the bowl -- so sinking it further only puts
+         the water and the fish under the grass. Measured against the lawn:
+         the green rim stood up to 0.63 above it, the water 0.21, the fish
+         dipped to -0.12. Squashed to 0.45 of its height and dropped 0.1:
+         rim 0.30, water still 0.11 above, fish no lower than -0.01. Seen
+         from Focci's height a pond is a flat thing anyway. */
+      pondGlb.scene.scale.y = pScale * 0.45;
+      pondGlb.scene.position.y -= 0.1;
       pondGlb.scene.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
       station.group.add(pondGlb.scene);
       if (pondGlb.animations && pondGlb.animations.length) {
@@ -1496,7 +1505,13 @@ export async function bootFocciWorld(root, opts) {
 
     /* The cherry blossom is the wisdom tree now — same interactType, so the
        listening moment, the camera swing and the quote all still work. */
-    addInvisibleHitbox(station, sakura.x, sakura.y + SKY_SPAN * 0.09, sakura.z, SKY_SPAN * 0.055, 'vine-tree');
+    /* The size of what you see, not a pea in the middle of it. The target
+       was a 1.9-radius ball floating in the crown, while the tree's pink
+       glow is 6.8 across and its low, spreading canopy wider still -- a tap
+       on the trunk or anywhere off-centre missed, and nothing happened.
+       (A tap dead on the old ball did show a quote; measured.) Now it is a
+       ball the width of the glow, sat lower so the trunk is inside it. */
+    addInvisibleHitbox(station, sakura.x, sakura.y + SKY_SPAN * 0.07, sakura.z, SKY_SPAN * 0.1, 'vine-tree');
     station.vineTree = { obj: skyGlb.scene, x: sakura.x, z: sakura.z };
     const treeGlowColor = 0xFFC7E4;
     const treeLight = sourceLight(treeGlowColor, 0.9, SKY_SPAN * 0.45, 2);
@@ -2364,12 +2379,73 @@ export async function bootFocciWorld(root, opts) {
     const M = hutMats();
     const HUT_WOOD = M.wood, HUT_CLOTH = M.cloth, HUT_RUG = M.rug, HUT_QUILT = M.quilt, HUT_LAMP = M.lamp;
     const g = new THREE.Group();
-    g.position.set(h.cx, h.y, h.cz);
-    /* Written at full size the bed ran out through the wall of a small
-       hut, and looked like doll's furniture in the big house. Everything
-       below is laid out for a room about 2.6 units in radius and then
-       scaled to whatever this building actually measures. */
-    const K = Math.max(0.6, Math.min(2.2, (h.inner || 2.6) / 2.6));
+    /* Where the room actually is, and how much of it there is.
+
+       The furniture used to be laid out around the middle of the house's
+       MESH cluster and scaled by its footprint -- neither of which knows
+       where the walls stand inside. A house that is not symmetrical about
+       that point, or whose footprint overstates the room, put the bed
+       straight through a wall. So: of the cells near that middle, take the
+       one furthest from any wall at floor height (the same test the walls
+       use to stop Focci), stand the furniture there, and scale it to that
+       clearance. The layout below reaches about 2.7 from its own centre. */
+    let ax = h.cx, az = h.cz, clear = h.inner || 2.6;
+    const w = room.walls;
+    if (w) {
+      const N = w.N, half = w.half;
+      const isWall = (k) => w.hi[k] !== -Infinity && w.hi[k] > h.y + 0.9 && w.lo[k] < h.y + 1.7;
+      const walls = [];
+      const gx0 = Math.round((h.cx + half) / FIELD_STEP), gz0 = Math.round((h.cz + half) / FIELD_STEP);
+      const R = 9;   // cells, about 5.4 units
+      for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+        const gx = gx0 + dx, gz = gz0 + dz;
+        if (gx < 0 || gz < 0 || gx >= N || gz >= N) continue;
+        if (isWall(gz * N + gx)) walls.push([gx * FIELD_STEP - half, gz * FIELD_STEP - half]);
+      }
+      if (walls.length) {
+        let best = -1;
+        for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) {
+          const x = h.cx + dx * FIELD_STEP, z = h.cz + dz * FIELD_STEP;
+          let dmin = Infinity;
+          for (const q of walls) { const d = Math.hypot(q[0] - x, q[1] - z); if (d < dmin) dmin = d; }
+          if (dmin > best) { best = dmin; ax = x; az = z; }
+        }
+        // less half a cell: a wall cell's centre is not where its face is
+        clear = Math.max(0.8, best - FIELD_STEP * 0.5);
+      }
+    }
+    h.kitX = ax; h.kitZ = az;
+    g.position.set(ax, h.y, az);
+    /* As large as the room lets it be. Scaling the whole layout to fit a
+       2.7 circle shrank the two small huts' furniture to under half size
+       -- the layout is lopsided (the bed sits 1.5 off-centre), so a circle
+       wastes most of the room. Instead: start big and step down until the
+       bed and the table stand clear of every wall, tested at points over
+       their real footprints with the walls' own rule. */
+    let K = Math.max(0.45, Math.min(2.2, clear / 2.7));
+    if (w) {
+      const N = w.N, half = w.half;
+      const wallAt = (x, z) => {
+        const gx = Math.round((x + half) / FIELD_STEP), gz = Math.round((z + half) / FIELD_STEP);
+        if (gx < 0 || gz < 0 || gx >= N || gz >= N) return false;
+        const k = gz * N + gx;
+        return w.hi[k] !== -Infinity && w.hi[k] > h.y + 0.9 && w.lo[k] < h.y + 1.7;
+      };
+      const fits = (k) => {
+        const c = Math.cos(0.35), sn = Math.sin(0.35);
+        for (let u = -0.95; u <= 0.95; u += 0.19) for (let v = -0.5; v <= 0.5; v += 0.25) {
+          const x = -1.5 + u * c + v * sn, z = 0.4 - u * sn + v * c;
+          if (wallAt(ax + x * k, az + z * k)) return false;
+        }
+        for (let a = 0; a < 8; a++) {
+          if (wallAt(ax + (1.4 + Math.cos(a) * 0.52) * k, az + (-0.5 + Math.sin(a) * 0.52) * k)) return false;
+        }
+        return true;
+      };
+      for (let k = Math.min(2.2, Math.max(K, clear / 1.6)); k >= K; k -= 0.05) {
+        if (fits(k)) { K = k; break; }
+      }
+    }
     g.scale.setScalar(K);
     g.visible = false;
     const put = (mesh, x, y, z, ry) => { mesh.position.set(x, y, z); if (ry) mesh.rotation.y = ry; g.add(mesh); return mesh; };
@@ -2385,7 +2461,8 @@ export async function bootFocciWorld(root, opts) {
     // a table with a lamp on it
     put(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.55, 8), HUT_WOOD), 1.4, 0.3, -0.5);
     put(new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.08, 14), HUT_WOOD), 1.4, 0.6, -0.5);
-    const lamp = put(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.32, 0.24), HUT_LAMP), 1.4, 0.8, -0.5);
+    const lampMat = HUT_LAMP.clone();
+    const lamp = put(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.32, 0.24), lampMat), 1.4, 0.8, -0.5);
     const lampLight = sourceLight(0xFFCE87, 0, 6, 2);
     lampLight.position.set(1.4, 1.0, -0.5); g.add(lampLight);
     // a stool and a shelf of books
@@ -2402,10 +2479,12 @@ export async function bootFocciWorld(root, opts) {
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
     room.group.add(g);
 
-    const bedHit = addInvisibleHitbox(room, h.cx - 1.5 * K, h.y + 0.5 * K, h.cz + 0.4 * K, 1.2 * K, 'hut-bed');
-    const lampHit = addInvisibleHitbox(room, h.cx + 1.4 * K, h.y + 0.9 * K, h.cz - 0.5 * K, 0.6 * K, 'hut-lamp');
+    const bedHit = addInvisibleHitbox(room, ax - 1.5 * K, h.y + 0.5 * K, az + 0.4 * K, 1.2 * K, 'hut-bed');
+    // a generous target: the lamp is small, and a missed tap on it read as
+    // "the lamp does nothing"
+    const lampHit = addInvisibleHitbox(room, ax + 1.4 * K, h.y + 0.9 * K, az - 0.5 * K, Math.max(0.55, 0.75 * K), 'hut-lamp');
     bedHit.visible = false; lampHit.visible = false;
-    h.kit = g; h.kitLight = lampLight; h.kitHits = [bedHit, lampHit];
+    h.kit = g; h.kitLight = lampLight; h.kitHits = [bedHit, lampHit]; h.kitLampMat = lampMat; h.kitScale = K;
   }
 
 
@@ -2821,7 +2900,13 @@ export async function bootFocciWorld(root, opts) {
         if (h.kit) {
           h.kit.visible = isIn;
           if (h.kitHits) h.kitHits.forEach((x) => { x.userData.disabled = !isIn; });
-          h.kitLight.intensity += ((isIn ? 2.6 : 0) - h.kitLight.intensity) * 0.12;
+          /* The switch is his. The tap handler used to set the lamp to 3.4
+             or 0.6, and this line pulled it back to 2.6 every frame, so a
+             tap undid itself in about a third of a second -- the lamp could
+             not be switched off at all. h.lampOn is what he last chose. */
+          const want = isIn ? (h.lampOn === false ? 0.15 : 2.6) : 0;
+          h.kitLight.intensity += (want - h.kitLight.intensity) * 0.12;
+          if (h.kitLampMat) h.kitLampMat.emissiveIntensity = isIn && h.lampOn !== false ? 1 : 0.08;
         }
         h.lamp.intensity += ((isIn ? 2.2 : 0) - h.lamp.intensity) * 0.12;
       }
@@ -3230,6 +3315,13 @@ export async function bootFocciWorld(root, opts) {
      dragging to walk still sends him where the view is pointing. */
   let camMode = 'orbit';
   let fpvPitch = -0.05;      // where his eyes are aimed in first person
+  /* 62 to start (see below); wherever a pinch leaves it, it stays for the
+     next time he looks through his own eyes. */
+  let fpvFov = 62;
+  function setFpvFov(v) {
+    fpvFov = Math.max(38, Math.min(80, v));
+    if (camMode === 'fpv') { camera.fov = fpvFov; camera.updateProjectionMatrix(); }
+  }
   function setCamMode(m) {
     camMode = m;
     inspectMode = false;        // either view is for walking, not inspecting
@@ -3243,7 +3335,7 @@ export async function bootFocciWorld(root, opts) {
        a view through a tube. 62 gives 31 across, which is the "a little
        wider" that was asked for without going back to 68's 37. The
        third-person view keeps 50; it was never the complaint. */
-    camera.fov = m === 'fpv' ? 62 : 50;
+    camera.fov = m === 'fpv' ? fpvFov : 50;
     camera.updateProjectionMatrix();
   }
   function toggleCamMode() {
@@ -3423,7 +3515,12 @@ export async function bootFocciWorld(root, opts) {
       }
       lastOrbitMid = mid;
       const d = pinchDist();
-      if (lastPinch && d) cam.tRadius = Math.min(MAX_ZOOM, Math.max(6, cam.tRadius - (d - lastPinch) * 0.05));
+      /* In his own eyes the camera has no distance to change -- the pinch
+         used to move cam.tRadius, which first person never reads, so it did
+         nothing at all. There, a pinch is a zoom: the field of view, from a
+         close 38 out to a wide 80. */
+      if (lastPinch && d && camMode === 'fpv') setFpvFov(fpvFov - (d - lastPinch) * 0.12);
+      else if (lastPinch && d) cam.tRadius = Math.min(MAX_ZOOM, Math.max(6, cam.tRadius - (d - lastPinch) * 0.05));
       lastPinch = d;
     }
   });
@@ -3445,12 +3542,59 @@ export async function bootFocciWorld(root, opts) {
   }
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.tRadius = Math.min(MAX_ZOOM, Math.max(6, cam.tRadius + e.deltaY * 0.02)); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (camMode === 'fpv') { setFpvFov(fpvFov + e.deltaY * 0.03); return; }
+    cam.tRadius = Math.min(MAX_ZOOM, Math.max(6, cam.tRadius + e.deltaY * 0.02));
+  }, { passive: false });
 
   /* Double-tap a house and he steps inside it, in his own eyes. Double-tap
      again and he is back out on the grass, looking at the place from
      outside. The walls being solid is what makes both ends of that a
      teleport rather than a walk. */
+  /* What is underfoot beneath a roof near a house.
+
+     Under a roof he is not ON, the ground probe used to put him at the
+     house's FLOOR height. That is right indoors and wrong under the eaves
+     outside -- which is exactly where each doorway's ring sits. Measured
+     round the four doors: 12 to 14 cells within 2.4 of each ring have a
+     roof over them, and the real ground under those roofs stands up to
+     2.2, 0.4, 3.0 and 2.8 above the floor. He walked over the ring and
+     sank that far into the ground.
+
+     The ground under the roof is found with a ray that starts below the
+     roof (a little above the floor band) -- once per grid cell, then
+     remembered, so this is not a raycast a frame. Anything that lands
+     outside the floor band is not believed, and the floor is used. */
+  function groundUnderRoof(room, h, x, z, roofY) {
+    const f = room.field;
+    if (!f) return h.y;
+    const k = Math.round((z + f.half) / FIELD_STEP) * f.N + Math.round((x + f.half) / FIELD_STEP);
+    h._under = h._under || new Map();
+    let c = h._under.get(k);
+    if (!c) {
+      /* Two readings per cell, remembered. One from just under the roof,
+         down: the big house is dug into a mound, and under its eave the
+         ground stands higher than floor + 3.5, where a fixed start began
+         inside the hill (one step by that door still sank him 3.95). One
+         from just above the floor band: in a two-storey house the first
+         thing under the roof is the upper floor, and that must not lift
+         someone walking on the ground floor. Either is refused if it drops
+         below the floor band -- that is the underside of the island. */
+      const band = (top) => {
+        const su = surfaceYIn(room, x, z, top);
+        return (su.hit && !su.water && su.y > h.y - 0.6 && su.y < top) ? su.y : null;
+      };
+      c = [roofY !== undefined ? band(roofY - 0.25) : null, band(h.y + 3.5)].filter((v) => v !== null);
+      if (!c.length) c = [h.y];
+      h._under.set(k, c);
+    }
+    // whichever is nearest where his feet already are
+    const feet = charState.lastGroundY !== undefined ? charState.lastGroundY : character.position.y;
+    let best = c[0];
+    for (const v of c) if (Math.abs(v - feet) < Math.abs(best - feet)) best = v;
+    return best;
+  }
   function enterHut(room, h) {
     room._insideHut = h;
     charState.x = h.cx; charState.z = h.cz;
@@ -3651,8 +3795,9 @@ export async function bootFocciWorld(root, opts) {
       spawnPickupBurst(room, obj.position.x, obj.position.y, obj.position.z, 0x8FD8FF);
     } else if (type === 'hut-lamp') {
       const h = room.houses && room.houses.find((x) => x.kitHits && x.kitHits.indexOf(obj) >= 0);
-      if (h) { h.kitLight.intensity = h.kitLight.intensity > 1.4 ? 0.6 : 3.4; }
-      root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: 'The wick catches. Shadows go soft.' } }));
+      if (h) h.lampOn = h.lampOn === false;
+      root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction',
+        message: h && h.lampOn === false ? 'Out it goes. The room settles into the dark.' : 'The wick catches. Shadows go soft.' } }));
     } else if (type === 'vine-tree') {
       // "Focci must focus on the wisdom tree" — turn to actually face it
       // and give its glow a pronounced boost, so this reads as a moment of
@@ -4116,7 +4261,7 @@ export async function bootFocciWorld(root, opts) {
       for (const h of room.houses) {
         if (Math.hypot(h.cx - charState.x, h.cz - charState.z) > h.roomR) continue;
         if (surf.building && surf.y > character.position.y + 1.2 && surf.y > h.y + 0.5) {
-          surf = { y: h.y, water: false, building: false, hit: true };
+          surf = { y: groundUnderRoof(room, h, charState.x, charState.z, surf.y), water: false, building: false, hit: true };
         }
         break;
       }
