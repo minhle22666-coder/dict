@@ -6849,6 +6849,21 @@
   .cz-today b{font-size:12px;color:var(--cz-ink)}
   .cz-today.done{color:var(--cz-sage)}
   .cz-main > .cz-cap{margin-top:30px}
+
+  /* ---------------- home Focci, fourth pass ----------------
+     Smaller and paler than the island's own Focci (this picture only:
+     re-rendered three-quarters toward you and graded towards the page's
+     cream), standing just right of the four rows and walking to the one
+     you point at. */
+  .cz-focci{left:180px;top:0;bottom:auto;width:56px;height:76px;transition:top .45s cubic-bezier(.4,.1,.3,1)}
+  .cz-focci img{height:62px;bottom:6px;margin-left:-22px}
+  .cz-sh{width:36px;height:8px;margin-left:-18px;bottom:2px}
+  @keyframes cz-walk{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-5px) rotate(-4deg)}75%{transform:translateY(-5px) rotate(4deg)}}
+  .cz-focci.walk img{animation:cz-walk .23s ease-in-out 2}
+  @keyframes cz-hop2{0%{transform:translateY(0) scale(1,1)}18%{transform:translateY(0) scale(1.12,.86)}
+    50%{transform:translateY(-38px) scale(.95,1.06)}82%{transform:translateY(0) scale(1.08,.9)}100%{transform:translateY(0) scale(1,1)}}
+  .cz-focci.hop2 img{animation:cz-hop2 .42s cubic-bezier(.3,.6,.4,1)}
+  .cz-focci.hop2 .cz-puff b{animation:cz-puff .45s cubic-bezier(.2,.7,.3,1) .3s forwards}
 </style>
 </head>
 <body>
@@ -7531,10 +7546,10 @@
     <div class="cz-cap">Where to</div>
     <div class="cz-where">
     <nav class="cz-nav" aria-label="Where to">
-      <button class="cz-row cz-go-row on" onclick="fhEnterIsland()"><i class="cz-edge" aria-hidden="true"></i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5c2.2 1.4 4.4 1.4 6.6 0s4.4-1.4 6.6 0 3.6 1.4 4.8.6"/><path d="M6.5 15.2 12 5l5.5 10.2"/><path d="M9.6 9.5h4.8"/></svg><span><b>Enter the island</b><em>Walk, hunt, rescue</em></span><i class="cz-dot"></i></button>
-      <button class="cz-row" onclick="czOpen('saved')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.8L6 20V5a1 1 0 0 1 1-1z"/></svg><span><b>Saved</b><em>Words you kept</em></span><i class="cz-dot"></i></button>
-      <button class="cz-row" onclick="czOpen('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-7"/></svg><span><b>Progress</b><em>Streak and XP</em></span><i class="cz-dot"></i></button>
-      <button class="cz-row" onclick="czPage('games')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20.5 12 12 20.5 3.5 12z"/><path d="M12 8.5 15.5 12 12 15.5 8.5 12z"/></svg><span><b>Mini games</b><em>Four ways to play</em></span><i class="cz-dot"></i></button>
+      <button class="cz-row cz-go-row on" data-go="enter"><i class="cz-edge" aria-hidden="true"></i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5c2.2 1.4 4.4 1.4 6.6 0s4.4-1.4 6.6 0 3.6 1.4 4.8.6"/><path d="M6.5 15.2 12 5l5.5 10.2"/><path d="M9.6 9.5h4.8"/></svg><span><b>Enter the island</b><em>Walk, hunt, rescue</em></span><i class="cz-dot"></i></button>
+      <button class="cz-row" data-go="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.8L6 20V5a1 1 0 0 1 1-1z"/></svg><span><b>Saved</b><em>Words you kept</em></span><i class="cz-dot"></i></button>
+      <button class="cz-row" data-go="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-7"/></svg><span><b>Progress</b><em>Streak and XP</em></span><i class="cz-dot"></i></button>
+      <button class="cz-row" data-go="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20.5 12 12 20.5 3.5 12z"/><path d="M12 8.5 15.5 12 12 15.5 8.5 12z"/></svg><span><b>Mini games</b><em>Four ways to play</em></span><i class="cz-dot"></i></button>
     </nav>
 
     <button class="cz-focci" id="cz-focci" onclick="fhEnterIsland()" aria-label="Enter the island">
@@ -8086,6 +8101,7 @@
     const f = document.getElementById('cz-focci');
     if (f) f.classList.remove('hop');
     document.documentElement.classList.add('home-on');
+    if (window.czFocciPlace) setTimeout(window.czFocciPlace, 0);
     czLive();
   };
 
@@ -8164,12 +8180,53 @@
     home.scrollTop = 0;
   };
   window.czOpen = function (where) { openFwPanel(where); };
-  /* The white row follows the finger: whichever row was last pressed is
-     the chosen one until the next press. */
-  document.querySelectorAll('.cz-row').forEach((b) => b.addEventListener('pointerdown', () => {
-    document.querySelectorAll('.cz-row.on').forEach((o) => { if (o !== b) o.classList.remove('on'); });
-    b.classList.add('on');
-  }));
+  /* Focci walks to the row you point at, and hops when you choose it.
+     With a pointer, hovering is pointing and a click is choosing. On a
+     touch screen there is no hover, so the first tap on a row points (the
+     row turns white and he walks over) and a tap on the row he is already
+     beside chooses it. The row that is white is the one he stands by. */
+  (function () {
+    const rows = Array.from(document.querySelectorAll('.cz-row'));
+    const focci = document.getElementById('cz-focci');
+    if (!rows.length || !focci) return;
+    const hover = () => window.matchMedia && matchMedia('(hover:hover)').matches;
+    const go = { enter: () => fhEnterIsland(), saved: () => czOpen('saved'), stats: () => czOpen('stats'), games: () => czPage('games') };
+    let at = null;
+    function mark(r) { rows.forEach((o) => o.classList.toggle('on', o === r)); }
+    function walkTo(r, instant) {
+      if (at === r) return false;
+      at = r;
+      const top = r.offsetTop + r.offsetHeight - focci.offsetHeight + 4;
+      if (instant) { focci.style.transition = 'none'; focci.style.top = top + 'px'; void focci.offsetWidth; focci.style.transition = ''; return false; }
+      focci.classList.add('walk');
+      focci.style.top = top + 'px';
+      clearTimeout(focci._w);
+      focci._w = setTimeout(() => focci.classList.remove('walk'), 460);
+      return true;
+    }
+    function choose(r) {
+      const moved = walkTo(r);
+      mark(r);
+      const k = r.dataset.go;
+      if (k === 'enter') { setTimeout(go.enter, moved ? 440 : 0); return; }
+      setTimeout(() => {
+        focci.classList.remove('hop2'); void focci.offsetWidth; focci.classList.add('hop2');
+        setTimeout(() => { focci.classList.remove('hop2'); if (go[k]) go[k](); }, 430);
+      }, moved ? 440 : 0);
+    }
+    rows.forEach((r) => {
+      r.addEventListener('mouseenter', () => { if (hover()) walkTo(r); });
+      r.addEventListener('pointerdown', () => { r._armed = (at === r); });
+      r.addEventListener('click', () => {
+        if (!hover() && !r._armed) { walkTo(r); mark(r); return; }
+        choose(r);
+      });
+    });
+    const place = () => { const r = document.querySelector('.cz-row.on') || rows[0]; at = null; walkTo(r, true); };
+    window.addEventListener('resize', place);
+    setTimeout(place, 0);
+    window.czFocciPlace = place;
+  })();
   czLive();
   /* fhOpenSettings was declared twice — once here going straight to the
      settings panel, once further up opening the menu — and the later one

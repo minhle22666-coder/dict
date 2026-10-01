@@ -3931,7 +3931,9 @@ export async function bootFocciWorld(root, opts) {
      island starts it. */
   let musicArmed = false, bgmTrying = false, bgmNeedsTouch = false;
   function syncMusic() {
-    const want = musicArmed && soundOn && !overlayOpen();
+    /* Quiet while a real clip is playing (the YouGlish player, html.ygm-on):
+       the island's music used to play on underneath the speaker. */
+    const want = musicArmed && soundOn && !overlayOpen() && !document.documentElement.classList.contains('ygm-on');
     if (!want) { if (!bgm.paused) bgm.pause(); return; }
     if (!bgm.paused || bgmTrying || bgmNeedsTouch) return;
     bgmTrying = true;
