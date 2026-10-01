@@ -3778,7 +3778,7 @@ function srsWhen(due){
 
 let savedTab='vault';
 window.setSavedTab=function(t){
-  savedTab = t==='why' ? 'why' : (t==='say' ? 'say' : 'vault');
+  savedTab = t==='why' ? 'why' : (t==='say' ? 'say' : (t==='gift' ? 'gift' : 'vault'));
   document.querySelectorAll('.sv-tab').forEach(b=>
     b.classList.toggle('on', b.dataset.tab===savedTab));
   renderSaved();
@@ -3824,7 +3824,9 @@ async function renderSaved(){
   const box=$('#saved-list');
   const head=$('#saved-count');
   if(savedTab==='say'){ await renderSaySaved(box, head, ()=>seq!==_savedSeq); return; }
-  const all=await idbAll();
+  if(savedTab==='gift'){ renderGiftSaved(box, head); return; }
+  // idbAllCached, not idbAll -- see availableWords
+  const all=await idbAllCached();
   if(seq!==_savedSeq) return;
 
   if(savedTab==='why'){
@@ -3998,6 +4000,24 @@ function sayWhen(ts){
   if(days===1) return 'Yesterday';
   if(days<7) return days+' days ago';
   return new Date(ts).toLocaleDateString(undefined,{day:'numeric',month:'short'});
+}
+/* The animals' gifts (pets.js): one row each, newest first, opened in the
+   same reader they arrived in. */
+function renderGiftSaved(box, head){
+  const gifts=(window.giftLoad?window.giftLoad():[]);
+  if(head) head.innerHTML='<b class="num">'+gifts.length+'</b> gift'+(gifts.length===1?'':'s');
+  if(!gifts.length){
+    box.innerHTML='<div class="empty"><img class="ill" src="./mascot-thumbsup.webp" alt=""/><h3>No gifts yet</h3>'
+      +'<p>Pet, feed and talk with the animals on the island. When one is happy enough, it gives you a lesson from the corner of English it knows best.</p></div>';
+    return;
+  }
+  box.innerHTML='<div class="sv-group">'+gifts.map(g=>
+    '<div class="sv-row gift-row" onclick="petShowGift(\''+g.id+'\')">'
+    +'<span class="gift-ic">\u{1F381}</span>'
+    +'<div class="sv-mid"><div class="sv-l1"><span class="sv-w">'+esc(g.title)+'</span></div>'
+    +'<span class="sv-e">From '+esc(g.name)+' \u00b7 '+esc(g.masteryLabel||'')+' \u00b7 <span class="num">'+(g.items||[]).length+'</span> phrases</span></div>'
+    +'<button class="sv-star gift-play" onclick="event.stopPropagation();petListenGift(\''+g.id+'\')" aria-label="Listen">\u25B6</button>'
+    +'</div>').join('')+'</div>';
 }
 async function renderSaySaved(box, head, stale){
   await sayMigrateOnce();

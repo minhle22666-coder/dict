@@ -69,6 +69,14 @@
     save(j);
   };
 
+  /* A gift from an animal (pets.js) is part of the day it arrived. */
+  window.jnLogGift = function (g) {
+    if (!g || !g.id) return;
+    var j = load(), d = dayOf(j, today());
+    d.gifts = d.gifts || [];
+    if (!d.gifts.some(function (x) { return x.id === g.id; })) d.gifts.push({ id: g.id, title: g.title, name: g.name, n: (g.items || []).length });
+    save(j);
+  };
   window.jnLogMiss = async function (word, game) {
     var w = String(word || '').trim().toLowerCase();
     if (!w) return;
@@ -167,7 +175,7 @@
   function render() {
     var j = load();
     var keys = Object.keys(j).sort().reverse().filter(function (k) {
-      return (j[k].words || []).length || (j[k].misses || []).length;
+      return (j[k].words || []).length || (j[k].misses || []).length || (j[k].gifts || []).length;
     }).slice(0, VISIBLE_DAYS);
     var host = document.getElementById('jn-body');
     if (!host) return;
@@ -212,6 +220,10 @@
         + (d.misses || []).map(function (m) {
           return row(m.w, m.vi, '<span class="jn-tag">' + esc(m.game || 'game') + (m.n > 1 ? ' <span class="num">×' + m.n + '</span>' : '') + '</span>', true);
         }).join('');
+      body = (d.gifts || []).map(function (g) {
+        return '<div class="jn-r gift"><button class="jn-go" onclick="petShowGift(\'' + esc(g.id) + '\')"><b>\u{1F381} ' + esc(g.title) + '</b>'
+          + '<i>a gift from ' + esc(g.name) + '</i></button></div>';
+      }).join('') + body;
       var n = (d.words || []).length;
       return '<section class="jn-day"><div class="jn-cap"><span>' + esc(pretty(k)) + '</span>'
         + '<i>' + (n ? '<span class="num">' + n + '</span> word' + (n === 1 ? '' : 's') : 'games only') + '</i></div>'

@@ -6607,6 +6607,161 @@
 
   /* Hot Take's banner shares the parts above; its old pieces step aside */
   html body .ht-scrim .ht-banner{display:none}
+
+  /* ============================================================
+     THE ANIMALS (pets.js): the bubble a tap opens, the chat, the gift
+     reader and the small YouGlish player. Same glass as everything else.
+     ============================================================ */
+  .pt-x{flex:none;width:30px;height:30px;padding:0;border:0;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    font-size:19px;line-height:1;color:var(--cz-soft);background:var(--cz-sage-bg)}
+  .pt-act{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);z-index:61;width:min(360px,92vw);
+    padding:14px 14px 12px;border-radius:24px;background:rgba(251,252,244,.97);box-shadow:var(--cz-rim),var(--cz-hair),0 16px 40px rgba(46,56,38,.2);
+    transform:translate(-50%,16px);opacity:0;pointer-events:none;transition:opacity .2s ease,transform .24s cubic-bezier(.3,1.2,.4,1)}
+  .pt-act.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+  .pt-act-h{display:flex;align-items:flex-start;gap:10px}
+  .pt-act-ttl{flex:1;min-width:0}
+  .pt-act-ttl b{display:block;font-size:17px;font-weight:700;color:var(--cz-ink)}
+  .pt-act-ttl span{display:block;margin-top:1px;font-size:11.5px;color:var(--cz-soft)}
+  .pt-say{margin:8px 0 10px;font-size:13px;line-height:1.45;color:var(--cz-ink-2)}
+  .pt-energy{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .pt-pips{display:inline-flex;gap:3px}
+  .pt-pips i{width:13px;height:8px;border-radius:3px;background:rgba(94,122,72,.16)}
+  .pt-pips.l1 i.on{background:#D3906E}
+  .pt-pips.l2 i.on{background:#D8B560}
+  .pt-pips.l3 i.on{background:#7D9A63}
+  .pt-energy.big .pt-pips i{width:18px;height:10px}
+  .pt-meals{font-size:11.5px;color:var(--cz-soft)}
+  .pt-meals b{color:var(--cz-ink)}
+  .pt-bond{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  .pt-bond > span{font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--cz-faint)}
+  .pt-bond-bar{flex:1;height:6px;border-radius:99px;overflow:hidden;background:rgba(214,170,80,.18)}
+  .pt-bond-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#E9C77E,#C99A3E)}
+  .pt-bond b{font-size:11px;color:var(--cz-honey)}
+  .pt-giftbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;margin:0 0 10px;border:0;border-radius:14px;cursor:pointer;
+    font-size:13.5px;font-weight:700;color:#6B4D12;background:linear-gradient(180deg,#F7E3AE,#EBC873);box-shadow:0 4px 14px rgba(201,154,62,.32);
+    animation:pt-gift 1.6s ease-in-out 3}
+  .pt-giftbtn span{font-size:17px}
+  .pt-giftbtn.in-chat{width:auto;margin:6px auto 0;padding:0 16px}
+  @keyframes pt-gift{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+  .pt-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .pt-btns.in-card{grid-template-columns:repeat(3,1fr);margin-top:14px}
+  .pt-btns button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:58px;border:0;border-radius:15px;cursor:pointer;
+    font-size:12px;font-weight:600;color:var(--cz-ink);background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line)}
+  .pt-btns button:active{transform:scale(.95);background:var(--cz-sage-bg)}
+  .pt-btns i{font-style:normal;font-size:19px;line-height:1}
+  .pt-btns small{font-size:9.5px;color:var(--cz-faint)}
+
+  /* sheets: the chat and the gift */
+  .pt-sheet{position:fixed;inset:0;z-index:89;display:none;align-items:flex-end;justify-content:center;background:rgba(46,56,38,.28)}
+  html.pt-chat-on #pt-chat, html.pt-gift-on #pt-gift{display:flex}
+  #pt-gift{z-index:90}
+  .pt-sheet-in{display:flex;flex-direction:column;width:100%;max-width:480px;max-height:88vh;
+    padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 14px);border-radius:26px 26px 0 0;
+    background:rgba(250,251,243,.99);box-shadow:var(--cz-rim),0 -12px 40px rgba(46,56,38,.18);animation:pt-up .3s cubic-bezier(.2,1,.3,1)}
+  #pt-chat .pt-sheet-in{height:82vh}
+  #pt-gift .pt-sheet-in{overflow-y:auto}
+  @keyframes pt-up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+
+  .pt-ch-h{display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--cz-line)}
+  .pt-ava{flex:none;width:48px;height:48px;border-radius:50%;background:var(--cz-sage-bg) center/86% no-repeat}
+  .pt-ch-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .pt-ch-t b{font-size:17px;font-weight:700;color:var(--cz-ink)}
+  .pt-ch-t span{font-size:11.5px;color:var(--cz-soft)}
+  .pt-ch-t em{align-self:flex-start;margin-top:3px;padding:2px 9px;border-radius:99px;font-style:normal;font-size:10.5px;font-weight:600;
+    color:var(--cz-sage);background:var(--cz-sage-bg)}
+  .pt-msgs{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:14px 2px}
+  .pt-m{max-width:84%;padding:10px 13px;border-radius:18px;font-size:14px;line-height:1.5}
+  .pt-m.pet{align-self:flex-start;color:var(--cz-ink);background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line);border-bottom-left-radius:6px}
+  .pt-m.me{align-self:flex-end;color:#fff;background:var(--cz-sage);border-bottom-right-radius:6px}
+  .pt-m i{font-style:italic;color:var(--cz-soft)}
+  .pt-m.me i{color:rgba(255,255,255,.85)}
+  .pt-hl{font-weight:700;color:var(--cz-sage);cursor:pointer;text-decoration:underline;text-decoration-color:rgba(94,122,72,.4);text-underline-offset:3px}
+  .pt-m.me .pt-hl{color:#fff}
+  .pt-m.typing{display:flex;gap:4px;padding:13px 14px}
+  .pt-m.typing i{width:6px;height:6px;border-radius:50%;background:var(--cz-faint);animation:pt-dot 1s ease-in-out infinite}
+  .pt-m.typing i:nth-child(2){animation-delay:.15s}
+  .pt-m.typing i:nth-child(3){animation-delay:.3s}
+  @keyframes pt-dot{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+  .pt-sugg{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none}
+  .pt-sugg::-webkit-scrollbar{display:none}
+  .pt-sugg button{flex:none;height:32px;padding:0 13px;border:0;border-radius:99px;cursor:pointer;font-size:12.5px;font-weight:600;
+    color:var(--cz-sage);background:var(--cz-sage-bg)}
+  .pt-in{display:flex;gap:8px}
+  .pt-in input{flex:1;min-width:0;height:46px;padding:0 16px;border:0;border-radius:99px;font-size:15px;color:var(--cz-ink);background:#fff;
+    box-shadow:inset 0 0 0 1.5px var(--cz-line)}
+  .pt-in input:focus{outline:none;box-shadow:inset 0 0 0 2px var(--cz-sage)}
+  .pt-in button{flex:none;width:46px;height:46px;border:0;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--cz-sage)}
+  .pt-in button svg{width:19px;height:19px}
+
+  .pt-g-h{display:flex;align-items:flex-start;gap:10px}
+  .pt-g-h > div{flex:1;min-width:0}
+  .pt-g-title{display:block;margin-top:6px;font-size:24px;line-height:1.15;font-weight:600;letter-spacing:-.015em;color:var(--cz-ink)}
+  .pt-g-intro{margin:10px 0 0;font-size:13.5px;line-height:1.55;font-style:italic;color:var(--cz-soft)}
+  .pt-listen{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:46px;margin:14px 0 4px;border:0;border-radius:15px;cursor:pointer;
+    font-size:14px;font-weight:600;color:#fff;background:var(--cz-sage);box-shadow:0 4px 12px rgba(94,122,72,.24)}
+  .pt-items{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .pt-items li{padding:13px 14px;border-radius:18px;background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line)}
+  .pt-it-h{display:flex;align-items:center;gap:8px}
+  .pt-it-h b{flex:1;min-width:0;font-size:16px;font-weight:700;color:var(--cz-ink)}
+  .pt-reg{flex:none;padding:2px 8px;border-radius:99px;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--cz-soft);background:var(--cz-sage-bg)}
+  .pt-reg.casual{color:#8E6A1E;background:var(--cz-honey-bg)}
+  .pt-reg.formal{color:#4E6B83;background:rgba(120,160,190,.16)}
+  .pt-play{flex:none;width:32px;height:32px;border:0;border-radius:50%;cursor:pointer;font-size:12px;color:var(--cz-sage);background:var(--cz-sage-bg)}
+  .pt-it-vi{margin-top:4px;font-size:13px;color:var(--cz-sage)}
+  .pt-it-ex{margin-top:8px;font-size:13.5px;line-height:1.5;font-style:italic;color:var(--cz-ink-2)}
+  .pt-it-ex span{display:block;margin-top:2px;font-style:normal;font-size:12.5px;color:var(--cz-soft)}
+  .pt-it-note{margin-top:8px;padding-top:8px;border-top:1px solid var(--cz-line);font-size:12.5px;line-height:1.5;color:var(--cz-soft)}
+  .pt-g-tip, .pt-g-task{margin-top:10px;padding:12px 14px;border-radius:16px;font-size:13px;line-height:1.5;color:var(--cz-ink-2)}
+  .pt-g-tip{background:var(--cz-sage-bg)}
+  .pt-g-task{background:var(--cz-honey-bg)}
+  .pt-g-tip b, .pt-g-task b{display:block;margin-bottom:3px;font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--cz-soft)}
+  .pt-g-foot{margin:14px 0 4px;text-align:center;font-size:11px;color:var(--cz-faint)}
+  .pt-g-wait{display:flex;flex-direction:column;align-items:center;gap:8px;padding:40px 10px 30px;text-align:center}
+  .pt-g-wait b{font-size:16px;font-weight:700;color:var(--cz-ink)}
+  .pt-g-wait span{font-size:13px;color:var(--cz-soft)}
+  .pt-g-wait .btn{margin-top:12px;width:auto;padding:0 22px;height:44px}
+  .pt-box{font-size:54px;line-height:1;animation:pt-box 1s ease-in-out infinite}
+  @keyframes pt-box{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg) translateY(-4px)}}
+
+  /* the small player */
+  .ygm{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:97;display:none;align-items:center;gap:10px;
+    width:min(390px,94vw);padding:8px;transform:translateX(-50%);border-radius:20px;
+    background:rgba(251,252,244,.98);box-shadow:var(--cz-rim),var(--cz-hair),0 14px 34px rgba(46,56,38,.24)}
+  .ygm.show{display:flex}
+  .ygm-v{flex:none;position:relative;width:128px;height:80px;border-radius:13px;overflow:hidden;background:#111}
+  .ygm-vin{position:absolute;left:0;top:0;width:240px;height:320px;transform:scale(.5333);transform-origin:0 0}
+  .ygm-vin iframe{border:0}
+  .ygm-r{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .ygm-h{display:flex;align-items:baseline;gap:6px}
+  .ygm-h b{flex:1;min-width:0;font-size:13.5px;font-weight:700;color:var(--cz-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ygm-h span{flex:none;font-size:10.5px;color:var(--cz-faint)}
+  .ygm-cap{font-size:11.5px;line-height:1.4;color:var(--cz-soft);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px}
+  .ygm-cap b{font-weight:700;color:var(--cz-sage)}
+  .ygm-c{display:flex;align-items:center;gap:4px}
+  .ygm-c button{width:30px;height:30px;padding:0;border:0;border-radius:50%;cursor:pointer;font-size:13px;color:var(--cz-ink);background:var(--cz-sage-bg)}
+  .ygm-c #ygm-pp{color:#fff;background:var(--cz-sage)}
+  .ygm-src{margin-left:auto;font-size:9.5px;letter-spacing:.08em;color:var(--cz-faint)}
+  .ygm-c .ygm-x{background:none;color:var(--cz-faint);font-size:18px}
+  html.ygm-on .pt-act{bottom:calc(env(safe-area-inset-bottom,0px) + 116px)}
+
+  /* the animal's card */
+  html body .rz-card{position:relative;max-height:86vh;overflow-y:auto}
+  .rz-x{position:absolute;top:12px;right:12px}
+  .pt-persona{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 12px}
+  .pt-persona div{display:flex;flex-direction:column;gap:1px;padding:10px 12px;border-radius:14px;background:var(--cz-sage-bg);text-align:left}
+  .pt-persona span{font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--cz-faint)}
+  .pt-persona b{font-size:13.5px;font-weight:700;color:var(--cz-ink)}
+  .pt-persona i{font-style:normal;font-size:11.5px;color:var(--cz-soft)}
+  .pt-bond-why{margin:-2px 0 12px;font-size:11.5px;line-height:1.45;color:var(--cz-faint);text-align:left}
+  .pt-gifts{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;text-align:left}
+  .pt-gifts .cz-cap{flex-basis:100%;margin-bottom:2px}
+  .pt-gifts button{height:32px;padding:0 12px;border:0;border-radius:99px;cursor:pointer;font-size:12.5px;font-weight:600;color:#6B4D12;background:var(--cz-honey-bg)}
+
+  /* gifts in Saved and the Journal */
+  html body .view.fw-panel#v-saved .gift-row{cursor:pointer}
+  html body .view.fw-panel#v-saved .gift-ic{flex:none;font-size:20px}
+  html body .view.fw-panel#v-saved .gift-play{font-size:12px;color:var(--cz-sage);background:var(--cz-sage-bg);border-radius:50%}
+  html body .jn-r.gift .jn-go b{color:#8E6A1E}
 </style>
 </head>
 <body>
@@ -6822,6 +6977,7 @@
       <button class="sv-tab on" data-tab="vault" onclick="setSavedTab('vault')">The Cache</button>
       <button class="sv-tab" data-tab="why" onclick="setSavedTab('why')">The Casebook</button>
       <button class="sv-tab" data-tab="say" onclick="setSavedTab('say')">Speak Up</button>
+      <button class="sv-tab" data-tab="gift" onclick="setSavedTab('gift')">Gifts</button>
     </div>
     <div class="saved-head">
       <div class="saved-count" id="saved-count">0 words saved</div>
@@ -7429,6 +7585,7 @@
 <script src="./hottake.js"></script>
 <script src="./journal.js"></script>
 <script src="./app.js"></script>
+<script src="./pets.js"></script>
 <script src="./story.js"></script>
 <script src="./dict-system.js"></script>
 
@@ -7539,6 +7696,7 @@
       }
     });
     worldReady = true;
+    window.fwResidentFx = (id, kind) => { if (worldApi && worldApi.residentFx) worldApi.residentFx(id, kind); };
     document.documentElement.classList.remove('world-loading');
     czLive();
     if (window.__wantWorld) {
@@ -7732,6 +7890,8 @@
   document.addEventListener('focci-resident-tap', (e) => {
     const d = e.detail || {};
     rzCurrent = d.id;
+    // the animal's own bubble (pets.js): feed, pet, talk, its gift
+    if (window.petTap) { window.petTap(d.id); return; }
     const recs = window.resLoad ? window.resLoad() : [];
     const rec = recs.find((r) => r.id === d.id);
     if (!rec) return;
@@ -8300,6 +8460,7 @@
     const H = document.documentElement, on = (c) => H.classList.contains(c);
     const active = (id) => { const v = document.getElementById(id); return !!(v && v.classList.contains('active')); };
     if (on('ask-on') && window.fwAnswer) { fwAnswer(false); return true; }
+    if (window.petBack && window.petBack()) return true;
     if (on('rz-on') && window.rzClose) { rzClose(); return true; }
     const sheet = document.getElementById('word-sheet');
     if (sheet && sheet.classList.contains('show') && window.closeWordSheet) { closeWordSheet(); return true; }

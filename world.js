@@ -2189,6 +2189,69 @@ export async function bootFocciWorld(root, opts) {
   /* The little three-pip bar that floats over each head. Drawn once per
      level rather than per frame — it only ever has three states. */
   const barTextures = {};
+  /* The animal's nameplate: its name, and ten bars of energy -- one bar is
+     one meal (FEED_ENERGY in residents.js), so the empty bars are the taps
+     still to give. Redrawn only when the count of full bars changes. */
+  const plateTextures = new Map();
+  function nameplateTexture(name, segs) {
+    const key = name + '|' + segs;
+    if (plateTextures.has(key)) return plateTextures.get(key);
+    const W = 320, H = 104;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = 'rgba(251,252,244,.94)';
+    g.beginPath(); g.roundRect(4, 4, W - 8, H - 8, 26); g.fill();
+    g.strokeStyle = 'rgba(88,108,66,.18)'; g.lineWidth = 2; g.stroke();
+    g.fillStyle = '#2E3826';
+    g.font = '700 34px Raleway, "Segoe UI", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(String(name || '').slice(0, 14), W / 2, 36);
+    const col = segs <= 3 ? '#D3906E' : segs <= 6 ? '#D8B560' : '#7D9A63';
+    const pw = 20, gap = 5, x0 = (W - (10 * pw + 9 * gap)) / 2;
+    for (let i = 0; i < 10; i++) {
+      g.fillStyle = i < segs ? col : 'rgba(94,122,72,.18)';
+      g.beginPath(); g.roundRect(x0 + i * (pw + gap), 66, pw, 16, 5); g.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    if (plateTextures.size > 60) { const k0 = plateTextures.keys().next().value; plateTextures.get(k0).dispose(); plateTextures.delete(k0); }
+    plateTextures.set(key, tex);
+    return tex;
+  }
+  /* Hearts for a pet: no light (a light is a shader change, see the light
+     pool), just a few sprites that rise and fade. */
+  let heartTex = null;
+  function spawnHearts(room, x, y, z) {
+    if (!heartTex) {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d');
+      g.fillStyle = '#F08AA0';
+      g.beginPath(); g.moveTo(32, 54);
+      g.bezierCurveTo(4, 34, 8, 8, 32, 20); g.bezierCurveTo(56, 8, 60, 34, 32, 54); g.fill();
+      heartTex = new THREE.CanvasTexture(c);
+    }
+    const sprites = [];
+    for (let i = 0; i < 5; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: heartTex, transparent: true, depthWrite: false }));
+      sp.scale.setScalar(0.28 + Math.random() * 0.12);
+      sp.position.set(x + (Math.random() - 0.5) * 0.6, y, z + (Math.random() - 0.5) * 0.6);
+      sp.userData.vy = 0.9 + Math.random() * 0.6; sp.userData.d = Math.random() * 0.25;
+      room.group.add(sp); sprites.push(sp);
+    }
+    let age = 0;
+    activeEffects.push((dt) => {
+      age += dt;
+      sprites.forEach((sp) => {
+        if (age < sp.userData.d) return;
+        sp.position.y += sp.userData.vy * dt;
+        sp.material.opacity = Math.max(0, 1 - (age - sp.userData.d) / 1.1);
+      });
+      if (age < 1.4) return true;
+      sprites.forEach((sp) => { room.group.remove(sp); sp.material.dispose(); });
+      return false;
+    });
+  }
   function energyBarTexture(level) {
     if (barTextures[level]) return barTextures[level];
     const c = document.createElement('canvas');
@@ -2321,15 +2384,18 @@ export async function bootFocciWorld(root, opts) {
     if (mixer) mixer.clipAction(gltf.animations[0]).play();
 
     const lvl = window.resLevel ? window.resLevel(rec) : 3;
-    const bar = new THREE.Sprite(new THREE.SpriteMaterial({ map: energyBarTexture(lvl), transparent: true, depthWrite: false, depthTest: false }));
+    const segs = Math.round((rec.energy || 0) / 10);
+    const bar = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameplateTexture(rec.name, segs), transparent: true, depthWrite: false, depthTest: false }));
     const headY = (box.max.y - box.min.y) * scale;
     /* Sized to the animal it belongs to. A fixed 1.15-wide bar floating
        half a unit over a lamb's head was more than twice as wide as the
        lamb and higher above it than the lamb is tall — which is how the
        bar ended up being the only thing anyone could see. */
-    const barW = Math.max(0.5, Math.min(1.15, headY * 1.5));
-    const barLift = headY * 0.34 + 0.16;
-    bar.scale.set(barW, barW * 0.313, 1);
+    /* A nameplate has to be readable from the follow camera, so it no
+       longer shrinks with a small animal the way the bare bar did. */
+    const barW = 1.25;
+    const barLift = headY * 0.3 + 0.3;
+    bar.scale.set(barW, barW * 0.325, 1);
     bar.position.set(spot.x, spot.y + headY + barLift, spot.z);
     room.group.add(bar);
 
@@ -2338,7 +2404,7 @@ export async function bootFocciWorld(root, opts) {
 
     const body = {
       id: rec.id, obj, bar, hit, mixer, footOffset, headY, barLift,
-      homeX: spot.x, homeZ: spot.z, level: lvl,
+      homeX: spot.x, homeZ: spot.z, level: lvl, segs, name: rec.name, hopT: 0,
       target: null, cooldown: 2 + Math.random() * 6
     };
     room.residents.push(body);
@@ -2806,13 +2872,23 @@ export async function bootFocciWorld(root, opts) {
       if (!rec) continue;
       if (b.mixer) b.mixer.update(dt);
 
-      const lvl = window.resLevel ? window.resLevel(rec) : 3;
-      if (lvl !== b.level) { b.level = lvl; b.bar.material.map = energyBarTexture(lvl); b.bar.material.needsUpdate = true; }
+      const segs = Math.round((rec.energy || 0) / 10);
+      if (segs !== b.segs || rec.name !== b.name) {
+        b.segs = segs; b.name = rec.name;
+        b.bar.material.map = nameplateTexture(rec.name, segs); b.bar.material.needsUpdate = true;
+      }
+      // a pet: a little hop on the spot, facing Focci
+      if (b.hopT > 0) {
+        b.hopT = Math.max(0, b.hopT - dt);
+        const k = 1 - b.hopT / 0.5;
+        b.obj.position.y = b.hopBase + Math.sin(k * Math.PI) * 0.32;
+        if (b.hopT === 0) b.obj.position.y = b.hopBase;
+      }
 
       /* Out of energy: it stays put. Not asleep, not dying — just quiet,
          and it picks straight back up the moment it is fed. */
       const lively = rec.energy >= 34;
-      if (lively) {
+      if (lively && !(b.hopT > 0)) {
         if (b.target) {
           const dx = b.target.x - b.obj.position.x, dz = b.target.z - b.obj.position.z;
           const d = Math.hypot(dx, dz);
@@ -3757,13 +3833,14 @@ export async function bootFocciWorld(root, opts) {
     } else if (type === 'resident') {
       // A tap is a handful of food and a word from them. The card with the
       // full story of the animal opens from the speech bubble.
+      /* A tap opens the animal's bubble -- feed, pet, talk -- instead of
+         feeding on contact: with a feed on every tap there was no way to
+         just say hello, and no way to tell how many meals were left. */
       const id = obj.userData.residentId;
-      const res = window.resFeed ? window.resFeed(id) : null;
       const rec = (window.resLoad ? window.resLoad() : []).find((r) => r.id === id);
       if (rec) {
-        spawnPickupBurst(room, obj.position.x, obj.position.y, obj.position.z, res && res.ok ? 0x8CF0B0 : 0xFFC85C);
         root.dispatchEvent(new CustomEvent('focci-resident-tap', {
-          detail: { id: id, name: rec.name, fed: !!(res && res.ok), reason: res ? res.reason : null }
+          detail: { id: id, name: rec.name, fed: false, reason: 'tap' }
         }));
       }
     } else if (type === 'sky-gate') {
@@ -4385,7 +4462,21 @@ export async function bootFocciWorld(root, opts) {
   // island's here — now the ambience can have the connection to itself
   if (window.__fwStartMusic) { const go = window.__fwStartMusic; window.__fwStartMusic = null; go(); }
 
-  return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, get currentRoom() { return currentRoomKey; } };
+  /* What the app's animal bubble asks the island to show. */
+  function residentFx(id, kind) {
+    const room = rooms[currentRoomKey];
+    const b = room && (room.residents || []).find((x) => x.id === id);
+    if (!b) return;
+    const p = b.obj.position, top = p.y + b.headY;
+    if (kind === 'pet') {
+      spawnHearts(room, p.x, top, p.z);
+      if (!(b.hopT > 0)) { b.hopBase = p.y; b.hopT = 0.5; }
+      b.target = null; b.cooldown = 3;
+      b.obj.rotation.y = Math.atan2(character.position.x - p.x, character.position.z - p.z);
+    } else if (kind === 'feed') spawnPickupBurst(room, p.x, top * 0.7 + p.y * 0.3, p.z, 0x8CF0B0);
+    else if (kind === 'gift') spawnPickupBurst(room, p.x, top, p.z, 0xFFD36A);
+  }
+  return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, get currentRoom() { return currentRoomKey; } };
   } catch (err) {
     // Surface the real error on-screen instead of a silent black canvas —
     // this is what to screenshot/read out if boot fails again.

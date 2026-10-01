@@ -167,7 +167,10 @@
     return list;
   }
 
-  var FEED_XP = 2, FEED_ENERGY = 7;
+  /* One meal is one bar of the ten on an animal's nameplate, so "how many
+     taps to fill it" is the number of empty bars. At 7 a meal it was never
+     a whole number and the old three-step bar could not say it at all. */
+  var FEED_XP = 2, FEED_ENERGY = 10;
   function resFeed(id) {
     var list = resTick();
     var r = list.find(function (x) { return x.id === id; });
@@ -470,6 +473,7 @@
   window.resIsAdult = resIsAdult;
   window.resLevel = resLevel;
   window.resMood = resMood;
+  window.resStage = resStage;
   window.resLine = resLine;
   window.resInfoHtml = resInfoHtml;
   window.resBreedCheck = resBreedCheck;
