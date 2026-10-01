@@ -13,7 +13,7 @@ table is shown in the app: **Progress › How XP works** (`xpRulesHtml()` in
   well past the goal without grinding.
 - **A level is 100 XP**: about four to five ordinary days.
 - **The animals never need to cost you XP.** Each one loses about 3.4
-  energy bars a day. Two naps restore 6 bars for free. Feeding (2 XP a
+  energy bars a day. One 3-hour sleep restores 5 bars for free. Feeding (2 XP a
   bar) is the fast way, and it also builds the bond.
 - **Gifts come from looking after an animal over several days**, not from
   one long session of tapping. Bond is capped per action per day. The
@@ -63,14 +63,17 @@ slowly follows energy.
 | Pet | +4 happiness, hearts | +1 | 5 | — |
 | Talk | +2 happiness per message | +1 | 6 | needs a Gemini key |
 | Bath | clean again, +6 happiness | +2 | 1 | only when no longer "fresh" |
-| Sleep | 15 min in the nearest house, then +3 energy bars and +8 happiness | +1 | 2 | once every 6 h after waking |
+| Sleep | 3 h in the nearest house, then +5 energy bars and +8 happiness | +1 | 2 | 4 h after waking |
 | Play together | +5 happiness for each animal you brought | +3 each | 2 | needs 3 or more animals awake |
 
 Actions past the daily count still work. They give +1 happiness but no
 bond.
 
-**Gifts.** An animal gives a gift at bond 6, 16, 30, 48, 70, 96, 126 and
-160, then every 40 more, but only if its happiness is at least 45. A gift
+**Gifts.** Gifts come back from a long sleep. Bond has to reach 6, 16,
+30, 48, 70, 96, 126 or 160 (then every 40 more) and happiness has to be at
+least 50. Then the animal is sent to sleep. It wakes three hours later
+with a gift. Each animal gives at most one gift a day. On its own, tapping
+pet and feed only fills the bond. Every gift also takes time and a sleep. A gift
 holds five real expressions from the animal's field, each with its
 meaning, an example and a tip. Gifts are kept in Saved › Gifts and in that
 day's Journal, and they play as real YouGlish clips.

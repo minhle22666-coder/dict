@@ -127,7 +127,14 @@
     return n < GIFT_AT.length ? GIFT_AT[n] : GIFT_AT[GIFT_AT.length - 1] + 40 * (n - GIFT_AT.length + 1);
   }
   function prevGiftAt(r) { var n = r.giftsGiven || 0; return n === 0 ? 0 : (n - 1 < GIFT_AT.length ? GIFT_AT[n - 1] : nextGiftAt({ giftsGiven: n - 1 })); }
-  function giftReady(r) { return (r.bond || 0) >= nextGiftAt(r) && (r.happiness || 0) >= 45; }
+  /* A gift is brought back from a long sleep. Reaching the bond mark is not
+     enough on its own any more -- the user found that tapping pet and feed
+     a few dozen times produced a gift on the spot, and a reward that comes
+     on demand is no reward. Now: reach the mark, keep the animal happy,
+     send it to sleep, and it wakes three hours later with something for you.
+     At most one gift a day per animal. */
+  function bondReached(r) { return (r.bond || 0) >= nextGiftAt(r); }
+  function giftReady(r) { return !!r.giftWaiting; }
   function dayCount(r, key) { var c = r[key]; return (c && c.d === today()) ? c.n : 0; }
   function bump(r, key) { var n = dayCount(r, key) + 1; r[key] = { d: today(), n: n }; return n; }
   function withRecord(id, fn) {
@@ -159,22 +166,27 @@
   /* Sleep: fifteen minutes in a house restores three bars and a good mood,
      free -- the other way to keep an animal going besides spending XP on
      food. Once every six hours. */
-  var SLEEP_MS = 15 * 60000, SLEEP_GAP = 6 * HOUR;
+  var SLEEP_MS = 3 * HOUR, SLEEP_GAP = 4 * HOUR;
   function settleSleep(r) {
     if (!r.sleepUntil || Date.now() < r.sleepUntil) return false;
+    var gift = false;
     withRecord(r.id, function (x) {
       if (!x.sleepUntil || Date.now() < x.sleepUntil) return;
-      x.energy = Math.min(100, (x.energy || 0) + 30);
+      x.energy = Math.min(100, (x.energy || 0) + 50);
       x.sleepUntil = 0; x.wokeAt = Date.now();
+      if (!x.giftWaiting && bondReached(x) && (x.happiness || 0) >= 50 && x.lastGiftDay !== today()) { x.giftWaiting = true; gift = true; }
     });
     care(r.id, 'sleep');
-    return true;
+    return gift ? 'gift' : true;
   }
   function asleep(r) { return !!(r.sleepUntil && Date.now() < r.sleepUntil); }
   function settleAll() { (window.resLoad ? window.resLoad() : []).forEach(settleSleep); }
   document.addEventListener('focci-resident-woke', function (e) {
     var id = (e.detail || {}).id, r = id && find(id);
-    if (r) { settleSleep(r); if (window.fwToast) window.fwToast(r.name + ' woke up rested — +3 energy bars'); }
+    if (r) {
+      var got = settleSleep(r);
+      if (window.fwToast) window.fwToast(got === 'gift' ? r.name + ' woke up with a gift for you \u{1F381}' : r.name + ' woke up rested \u2014 +5 energy bars');
+    }
   });
   setInterval(settleAll, 60000);
 
@@ -190,9 +202,12 @@
       + 'On the island you are known as ' + m.brief + '. '
       + 'You are chatting with a Vietnamese person who is practising English (around B1). '
       + 'How you talk: sound human -- contractions, little reactions ("oh", "hmm", "honestly"), your own opinions and tiny stories from island life. '
-      + 'No lists, no headings, never "As an AI", never "Great question". '
-      + 'Keep it short: one to three sentences, under 45 words -- it appears in a speech bubble over your head. '
-      + 'Answer from your expertise when you can; if they ask about something else, still help sensibly, from your own angle. '
+      + 'No lists, no headings, never "As an AI". Never open by praising the question ("smart question", "great question", "good one") -- just answer. '
+      + 'Answer EXACTLY what they asked, with concrete, specific help a real expert would give: actual steps, the real names of tools, places or signs to look for. '
+      + 'Example: asked "how can I know if my photo is used in a deepfake?", say to run a reverse image search (Google Lens, TinEye, PimEyes), set alerts for their name, and what to do if they find one -- not how to spot fakes in general. '
+      + 'Your words appear in speech bubbles over your head, so: two to six short sentences in total, split into one to three bubble-sized parts, '
+      + 'each part under 35 words, with " || " between parts (no "||" if one part is enough). '
+      + 'Answer from your expertise when you can; if they ask about something else, still help properly, from your own angle. '
       + 'When it fits naturally (not every time), use one useful English expression and wrap it in **double asterisks**. '
       + 'If their English has a mistake, echo the right version once, casually, the way a friend would. '
       + 'If they write in Vietnamese, reply in simple English and put the Vietnamese of your key phrase in brackets. '
@@ -203,12 +218,18 @@
     var key = window.getKey && window.getKey();
     if (!key) throw new Error('NO_KEY');
     if (!navigator.onLine) throw new Error('OFFLINE');
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + window.getModel() + ':generateContent?key=' + encodeURIComponent(key);
-    var contents = history.slice(-12).map(function (m) { return { role: m.who === 'me' ? 'user' : 'model', parts: [{ text: m.t }] }; });
+    var model = window.getModel();
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(key);
+    var contents = history.slice(-14).map(function (m) { return { role: m.who === 'me' ? 'user' : 'model', parts: [{ text: m.t }] }; });
     contents.push({ role: 'user', parts: [{ text: userText }] });
-    var body = { systemInstruction: { parts: [{ text: systemFor(r) }] }, contents: contents,
-      generationConfig: { temperature: 0.9, maxOutputTokens: 400 } };
-    var res = await window.geminiPost(url, body);
+    /* 2.5 models think before they answer, and the thinking counts against
+       maxOutputTokens: at 400 a considered question could come back empty,
+       or after ten seconds. A chat bubble needs no thinking. */
+    var gen = { temperature: 0.85, maxOutputTokens: 800 };
+    if (/2\.5/.test(model)) gen.thinkingConfig = { thinkingBudget: 0 };
+    var body = { systemInstruction: { parts: [{ text: systemFor(r) }] }, contents: contents, generationConfig: gen };
+    var res = await Promise.race([window.geminiPost(url, body),
+      new Promise(function (_, rej) { setTimeout(function () { rej(new Error('SLOW')); }, 25000); })]);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var t = window.geminiText(await res.json()).txt.trim();
     if (!t) throw new Error('EMPTY');
@@ -244,7 +265,7 @@
     var gift = { id: 'g' + Date.now().toString(36), rid: r.id, name: r.name, species: r.species, mastery: m.id,
       masteryLabel: m.label, title: g.title, intro: g.intro, items: g.items.slice(0, 6), tip: g.tip_vi || '', task: g.try || '', at: Date.now() };
     var list = giftLoad(); list.unshift(gift); giftSave(list);
-    withRecord(r.id, function (x) { x.giftsGiven = (x.giftsGiven || 0) + 1; });
+    withRecord(r.id, function (x) { x.giftsGiven = (x.giftsGiven || 0) + 1; x.giftWaiting = false; x.lastGiftDay = today(); });
     if (window.jnLogGift) window.jnLogGift(gift);
     return gift;
   }
@@ -260,8 +281,11 @@
   function bondBar(r) {
     var lo = prevGiftAt(r), hi = nextGiftAt(r), b = r.bond || 0;
     var pct = Math.max(0, Math.min(100, Math.round((b - lo) / Math.max(1, hi - lo) * 100)));
+    var note = r.giftWaiting ? '' : bondReached(r)
+      ? '<div class="pt-bond-note">\u{1F319} Bond is high enough \u2014 after a long sleep, ' + esc(r.name) + ' will bring you a gift' + ((r.happiness || 0) < 50 ? ' (cheer them up first)' : '') + '</div>'
+      : '';
     return '<div class="pt-bond"><span>Bond</span><div class="pt-bond-bar"><i style="width:' + pct + '%"></i></div>'
-      + '<b class="num">' + Math.min(b, hi) + ' / ' + hi + '</b></div>';
+      + '<b class="num">' + Math.min(b, hi) + ' / ' + hi + '</b></div>' + note;
   }
   function ensureDom() {
     if ($('pt-act')) return;
@@ -310,6 +334,11 @@
     clearTimeout(hideT);
     hideT = setTimeout(petHide, 15000);
   }
+  /* A tap anywhere on the island that is not an animal puts the bubble
+     away -- the X was the only way out, and on a phone it was easy to miss. */
+  document.addEventListener('pointerdown', function (e) {
+    if (e.target && e.target.id === 'fw-canvas') { var a = $('pt-act'); if (a && a.classList.contains('show')) petHide(); }
+  }, true);
   window.petTap = function (id) {
     var r = find(id); if (r) settleSleep(r);
     if (H) { huntTap(id); return; }
@@ -353,7 +382,7 @@
     withRecord(id, function (x) { x.sleepUntil = Date.now() + SLEEP_MS; });
     var walked = W() && W().residentSleep ? W().residentSleep(id) : false;
     petHide();
-    if (window.fwToast) window.fwToast(r.name + (walked ? ' is off to bed in the nearest house' : ' curls up for a nap') + ' — back in 15 min with +3 energy bars');
+    if (window.fwToast) window.fwToast(r.name + (walked ? ' is off to bed in the nearest house' : ' curls up to sleep') + ' \u2014 back in 3 hours with +5 energy' + (bondReached(r) ? ', and maybe a gift' : ''));
   };
 
   /* ---------------- talking: bubbles over their heads ----------------
@@ -437,18 +466,46 @@
   window.petSuggest = function (b) {
     var i = $('pt-input'); if (!i) return;
     var t = b.textContent;
-    if (/:\s*$/.test(t)) { i.value = t; i.focus(); return; }
+    if (/:\s*$/.test(t)) { i.value = t; i.focus(); try { i.setSelectionRange(t.length, t.length); } catch (e) {} return; }
     i.value = t; petSend();
+    // the field is free again straight away for something of your own
+    setTimeout(function () { try { i.focus(); } catch (e) {} }, 0);
   };
+  /* A long answer is shown a bubble at a time: ‹ 1/3 › inside the bubble. */
+  function showReply(text) {
+    var parts = String(text).split(/\s*\|\|\s*/).map(function (x) { return x.trim(); }).filter(Boolean);
+    if (!parts.length) parts = [String(text)];
+    T.parts = parts; T.page = 0;
+    renderPage();
+  }
+  function renderPage() {
+    var el = $('pt-bpet'); if (!el || !T.parts) return;
+    var n = T.parts.length, i = T.page;
+    say(el, fmtMsg(T.parts[i]) + (n > 1
+      ? '<div class="pt-pg"><button aria-label="Back" onclick="petPage(-1)"' + (i === 0 ? ' disabled' : '') + '>‹</button>'
+        + '<span class="num">' + (i + 1) + ' / ' + n + '</span>'
+        + '<button aria-label="More" onclick="petPage(1)"' + (i === n - 1 ? ' disabled' : '') + '>›</button></div>' : ''));
+  }
+  window.petPage = function (d) {
+    if (!T.parts) return;
+    T.page = Math.max(0, Math.min(T.parts.length - 1, T.page + d));
+    renderPage();
+  };
+  /* Sending while an answer is still on its way used to be dropped without
+     a word -- which is the "stuck after a suggestion" report: a suggestion
+     sends at once, and anything typed before its answer came back went
+     nowhere. Now it waits its turn and goes the moment the answer lands. */
   window.petSend = async function () {
-    var i = $('pt-input'); if (!i || chatBusy || !T.id) return;
+    var i = $('pt-input'); if (!i || !T.id) return;
     var t = i.value.trim(); if (!t) return;
-    var r = find(T.id); if (!r) return;
     i.value = '';
+    if (chatBusy) { T.queue = t; say($('pt-bme'), esc(t) + ' <span class="pt-wait">…</span>'); return; }
+    var r = find(T.id); if (!r) return;
     var msgs = chatLoad(r.id); msgs.push({ who: 'me', t: t }); chatSave(r.id, msgs);
     clearTimeout(T.fadeT);
     say($('pt-bme'), esc(t));
     fx(r.id, 'nod');
+    T.parts = null;
     say($('pt-bpet'), '<span class="pt-dots"><i></i><i></i><i></i></span>');
     chatBusy = true;
     var reply;
@@ -456,18 +513,20 @@
     catch (e) {
       reply = e.message === 'NO_KEY' ? '*tilts head* I can only really talk once a Gemini key is set in Settings.'
         : e.message === 'OFFLINE' ? '*yawns* The wind is too quiet today — you seem to be offline.'
+        : e.message === 'SLOW' ? '*scratches ear* That took too long to think through. Ask me again?'
         : '*looks puzzled* Sorry, say that again? Something got lost on the way.';
     }
     chatBusy = false;
     if (!T.id) return;
-    msgs = chatLoad(r.id); msgs.push({ who: 'pet', t: reply }); chatSave(r.id, msgs);
-    say($('pt-bpet'), fmtMsg(reply));
+    msgs = chatLoad(r.id); msgs.push({ who: 'pet', t: reply.replace(/\s*\|\|\s*/g, ' ') }); chatSave(r.id, msgs);
+    showReply(reply);
     fx(r.id, 'say');
-    T.fadeT = setTimeout(function () { var e = $('pt-bme'); if (e) e.classList.remove('show'); }, 3500);
     var fresh = find(r.id);
     if (fresh && giftReady(fresh)) {
       $('pt-bpet').insertAdjacentHTML('beforeend', '<button class="pt-giftbtn in-bub" onclick="petCloseChat();petOpenGift(\'' + r.id + '\')"><span>\u{1F381}</span>I have something for you</button>');
     }
+    if (T.queue) { var q = T.queue; T.queue = null; i.value = q; setTimeout(window.petSend, 400); return; }
+    T.fadeT = setTimeout(function () { var e = $('pt-bme'); if (e) e.classList.remove('show'); }, 3500);
   };
   window.petPhrase = function (el) { ygmPlay([el.textContent], 'From ' + ((find(cur) || {}).name || '')); };
 
@@ -548,7 +607,7 @@
     el.innerHTML = '<div class="pt-hunt-t"><b>\u{1F9E9} Paragraph hunt</b><span>Find the <b class="num">' + H.k + '</b> parts of one story. Tap an animal to read its part.</span></div>'
       + '<div class="pt-hunt-a"><span class="num">' + H.gathered.length + ' / ' + H.k + '</span>'
       + '<button class="pt-hunt-go"' + (H.gathered.length === H.k ? '' : ' disabled') + ' onclick="huntCheck()">Check</button>'
-      + '<button class="pt-x" aria-label="Stop" onclick="huntQuit()">×</button></div>';
+      + '<button class="pt-hunt-leave" onclick="huntQuit()">Leave game</button></div>';
     el.classList.add('show');
   }
   window.petPlay = async function () {
@@ -783,7 +842,7 @@
       + '<div><span>Personality</span><b>' + esc(v.label) + '</b><i>' + esc(v.vi) + '</i></div></div>';
     h += '<div class="pt-energy big">' + pips(r) + '<span class="pt-meals">' + (meals ? '<b class="num">' + meals + '</b> meal' + (meals === 1 ? '' : 's') + ' to full · each meal one bar' : 'Full of energy') + '</span></div>';
     h += bondBar(r);
-    h += '<div class="pt-bond-why">Petting, feeding, talking, baths and playing together grow the bond. At each mark, a happy ' + esc(sp.label.toLowerCase()) + ' gives you a lesson from its mastery.</div>';
+    h += '<div class="pt-bond-why">Petting, feeding, talking, baths and playing together grow the bond. Once it reaches the mark, a happy animal brings a gift back from a long sleep (three hours) \u2014 one a day. At each mark, a happy ' + esc(sp.label.toLowerCase()) + ' gives you a lesson from its mastery.</div>';
     if (giftReady(r)) h += '<button class="pt-giftbtn" onclick="rzClose();petOpenGift(\'' + r.id + '\')"><span>\u{1F381}</span>A gift is ready</button>';
     if (gifts.length) h += '<div class="pt-gifts"><span class="cz-cap">Gifts from ' + esc(r.name) + '</span>' + gifts.map(function (g) {
       return '<button onclick="rzClose();petShowGift(\'' + g.id + '\')">\u{1F381} ' + esc(g.title) + '</button>'; }).join('') + '</div>';
@@ -914,8 +973,8 @@
           ['Feed one energy bar', '\u22122'], ['Rescue rabbit \u00b7 duck \u00b7 sheep', '60 \u00b7 80 \u00b7 120'], ['Rescue cat \u00b7 wolf', '160 \u00b7 240']]) + '</table>'
       + '<div class="xr-h">Caring for an animal \u00b7 bond (counted per day)</div><table class="xr">' + rows([
           ['Feed \u00b7 +1 bar', '+1 \u00b7 4'], ['Pet \u00b7 +4 happiness', '+1 \u00b7 5'], ['Talk \u00b7 per message', '+1 \u00b7 6'],
-          ['Bath \u00b7 when not fresh', '+2 \u00b7 1'], ['Sleep \u00b7 15 min, +3 bars, every 6 h', '+1 \u00b7 2'], ['Play together \u00b7 each animal brought', '+3 \u00b7 2']]) + '</table>'
-      + '<p class="pt-g-intro">Gifts at bond 6, 16, 30, 48, 70, 96, 126, 160, if the animal is happy (45%+). Energy drops about 3.4 bars a day, cleanliness a quarter a day. A level is 100 XP.</p>';
+          ['Bath \u00b7 when not fresh', '+2 \u00b7 1'], ['Sleep \u00b7 3 h in a house, +5 bars, 4 h apart', '+1 \u00b7 2'], ['Play together \u00b7 each animal brought', '+3 \u00b7 2']]) + '</table>'
+      + '<p class="pt-g-intro">Gifts: reach bond 6, 16, 30, 48, 70, 96, 126, 160, keep the animal happy (50%+), and send it to sleep \u2014 it wakes three hours later with a gift. One a day per animal. Energy drops about 3.4 bars a day, cleanliness a quarter a day. A level is 100 XP.</p>';
     $('pt-gift-in').innerHTML = h;
     document.documentElement.classList.add('pt-gift-on');
   };

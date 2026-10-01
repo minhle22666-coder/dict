@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v201`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v202`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -309,6 +309,15 @@ sentence to translate. If you add a search field, wire it to
 by page, in the ONE SEARCH ROW block. Panels start at safe-area + 84px so
 nothing sits pressed under it.
 
+**Focci can never be trapped by a wall.** A scan (`.claude/trapscan.js`,
+dev-only: set him down at ~2,500 points around every house, let the frame
+settle his feet, try eight directions) found no walk-in pocket but dozens
+of points INSIDE a wall cell for the feet height he settles at -- reached
+by eave ground drops, hops, jumps off roofs. Inside a wall every step is
+into a wall: "stuck at the house". The step code now ignores walls when
+the spot he stands on is itself blocked, or when no direction is open; and
+on a roof, pushing against the edge for half a second hops him down.
+
 **A wall under a roof does not block someone on that roof.**
 `blockedAt()` skips a wall cell when Focci's feet are near its top and the
 roof around it reaches as high -- without that, standing on an eave over
@@ -436,12 +445,21 @@ chat prompt asks for a friend's voice, short enough for a bubble.
 each other, the camera goes side-on (with clearance kept -- camFocus used
 to switch it off, and a hill filled the screen). pets.js places
 `#pt-bme`/`#pt-bpet` over the two heads every frame from `talkAnchors()`.
-Walking more than 6.5 away ends it (`focci-talk-end`). `window.fwWorld` is
+Walking more than 6.5 away ends it (`focci-talk-end`). Replies come in up
+to three parts split on `||`, paged in the bubble (`petPage`); a message
+sent while an answer is pending is queued, not dropped (that was "stuck
+after a suggestion"); 2.5 models get `thinkingBudget: 0` and a 25s cap.
+Nameplates have depthTest on and fade out past 12 units. `window.fwWorld` is
 the world API, set when the island is ready.
+
+**Gifts come back from a long sleep** (pets.js): bond at the mark +
+happiness 50+ + a 3-hour sleep sets `giftWaiting` on waking, one a day per
+animal. Tapping care alone only fills the bond -- the user found gifts on
+demand worthless.
 
 **Sleep, bath, follow** (world.js `residentSleep/Bath/Follow`): a sleeping
 animal walks to the nearest house door and is hidden until its record's
-`sleepUntil`; pets.js `settleSleep` grants +30 energy on waking. Animals
+`sleepUntil` (3 h); pets.js `settleSleep` grants +50 energy on waking. Animals
 with `b.busy`/`b.follow`/`b.talking` do not wander. The paragraph hunt
 (`petPlay`) deals one paragraph per awake animal; gathered animals follow
 Focci.

@@ -2385,7 +2385,10 @@ export async function bootFocciWorld(root, opts) {
 
     const lvl = window.resLevel ? window.resLevel(rec) : 3;
     const segs = Math.round((rec.energy || 0) / 10);
-    const bar = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameplateTexture(rec.name, segs), transparent: true, depthWrite: false, depthTest: false }));
+    /* depthTest on: a nameplate behind a house is behind the house. With
+       it off every plate on the island drew over everything, from any
+       distance -- see also the distance fade in tickResidents. */
+    const bar = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameplateTexture(rec.name, segs), transparent: true, depthWrite: false, depthTest: true }));
     const headY = (box.max.y - box.min.y) * scale;
     /* Sized to the animal it belongs to. A fixed 1.15-wide bar floating
        half a unit over a lamb's head was more than twice as wide as the
@@ -2883,6 +2886,10 @@ export async function bootFocciWorld(root, opts) {
         b.segs = segs; b.name = label;
         b.bar.material.map = nameplateTexture(label, segs); b.bar.material.needsUpdate = true;
       }
+      // only the plates near Focci: from across the island they were noise
+      const pd = Math.hypot((b.asleep && b.door ? b.door.x : b.obj.position.x) - charState.x, (b.asleep && b.door ? b.door.z : b.obj.position.z) - charState.z);
+      b.bar.visible = pd < 12;
+      if (b.bar.visible) b.bar.material.opacity = Math.min(1, (12 - pd) / 3);
       if (b.busy) { tickBusy(room, b, rec, dt, t); continue; }
       if (b.follow) { tickFollow(room, b, dt); }
       // a pet: a little hop on the spot, facing Focci
@@ -3448,7 +3455,8 @@ export async function bootFocciWorld(root, opts) {
      next time he looks through his own eyes. */
   let fpvFov = 62;
   function setFpvFov(v) {
-    fpvFov = Math.max(38, Math.min(80, v));
+    // out to 110: at 80 the widest view was still a narrow tube
+    fpvFov = Math.max(38, Math.min(110, v));
     if (camMode === 'fpv') { camera.fov = fpvFov; camera.updateProjectionMatrix(); }
   }
   function setCamMode(m) {
@@ -3584,6 +3592,12 @@ export async function bootFocciWorld(root, opts) {
     var ov = document.getElementById('fw-overlay');
     if (ov && ov.style.display === 'none') return true;     // world not on screen at all
     if (document.documentElement.classList.contains('dict-open')) return true; // word entry
+    /* Full-screen sheets over the island: the rescue board, XP, the journal,
+       a gift. The island went on drawing at full rate under the opaque
+       rescue board while it rendered five portraits -- the lag on "Sail
+       home alone". */
+    { const c = document.documentElement.classList;
+      if (c.contains('rb-on') || c.contains('xp-on') || c.contains('jn-on') || c.contains('pt-gift-on')) return true; }
     return !!document.querySelector('.view.fw-panel.active'); // Games/Saved/Progress/Settings
   }
   function releaseGesture() {
@@ -4313,10 +4327,52 @@ export async function bootFocciWorld(root, opts) {
          eaves on the way past. */
       const feet = charState.lastGroundY !== undefined ? charState.lastGroundY : character.position.y;
       const nx = charState.x + stepX, nz = charState.z + stepZ;
-      const stops = (x, z) => blockedAt(room, x, z, feet) || hullStops(room, x, z);
+      /* Never trapped. A scan of every house (Focci set down at ~2,500
+         points around them, the frame left to settle his feet, then all
+         eight directions tried) found no pocket he could walk into and not
+         out of -- but 31 + 29 + 8 points that are INSIDE a wall cell for
+         the height his feet settle at: under an eave his ground drops to
+         groundUnderRoof, a hop or a jump off a roof lands on the wall line,
+         a talk hop sets him down beside one. Inside a wall, every step is
+         into a wall, and that is "stuck at the house, can't even turn
+         round". So if the spot he is standing on is itself blocked, or no
+         direction at all is open, the wall does not hold him. */
+      const stops0 = (x, z) => blockedAt(room, x, z, feet) || hullStops(room, x, z);
+      let free = blockedAt(room, charState.x, charState.z, feet);
+      if (!free && stops0(nx, nz) && stops0(nx, charState.z) && stops0(charState.x, nz)) {
+        let open = 0;
+        for (let d = 0; d < 8 && !open; d++) {
+          const a = d * Math.PI / 4;
+          if (!stops0(charState.x + Math.sin(a) * 0.3, charState.z + Math.cos(a) * 0.3)) open++;
+        }
+        free = !open;
+      }
+      const stops = free ? (() => false) : stops0;
+      const moved0x = charState.x, moved0z = charState.z;
       if (!stops(nx, nz)) { charState.x = nx; charState.z = nz; }
       else if (!stops(nx, charState.z)) charState.x = nx;
       else if (!stops(charState.x, nz)) charState.z = nz;
+      /* Off a roof. Up there, pushing against the edge and not moving for
+         half a second hops him down to the ground in that direction --
+         "went up on the roof by mistake and could not get off". */
+      const moved = Math.hypot(charState.x - moved0x, charState.z - moved0z) > 1e-4;
+      const onRoof = room.houses && !room._insideHut && room.houses.some((h) =>
+        Math.hypot(h.cx - charState.x, h.cz - charState.z) <= h.roomR + 1 && feet > h.y + 2.2);
+      if (onRoof && !moved && !flight) {
+        charState.edgeT = (charState.edgeT || 0) + dt;
+        if (charState.edgeT > 0.5) {
+          charState.edgeT = 0;
+          const m = Math.hypot(moveX, moveZ) || 1, ux = moveX / m, uz = moveZ / m;
+          for (let r = 1.6; r <= 6; r += 0.6) {
+            const tx = charState.x + ux * r, tz = charState.z + uz * r;
+            const g = groundSmooth(room, tx, tz, true);
+            if (g.hit && !g.water && !g.building && g.y < feet - 1 && !blockedAt(room, tx, tz, g.y)) {
+              flyTo(room, { x: tx, y: g.y, z: tz }, null, { dur: 0.6, lift: 0.8, spin: 0 });
+              break;
+            }
+          }
+        }
+      } else charState.edgeT = 0;
       charState.angle = Math.atan2(moveX, moveZ);
       charState.walkT += dt * (charState.inWater ? 4.5 : 8.5);
     } else charState.walkT += dt * 2;
@@ -4415,8 +4471,11 @@ export async function bootFocciWorld(root, opts) {
     const swing = (walking && !surf.water) ? Math.sin(charState.walkT) * 0.55 : 0;
     // Biped gait: each arm swings opposite the leg on its own side.
     // scaled for the model's short limbs: a full 0.55 rad read as flailing
-    legL.rotation.x = swing * 0.75; legR.rotation.x = -swing * 0.75;
-    armL.rotation.x = -swing * 0.7; armR.rotation.x = swing * 0.7;
+    /* Smaller than it was (0.75 / 0.7): at full swing the arms passed
+       through the shirt and the orange showed through the green -- the
+       colour "bleeding" into other parts while he walked. */
+    legL.rotation.x = swing * 0.55; legR.rotation.x = -swing * 0.55;
+    armL.rotation.x = -swing * 0.4; armR.rotation.x = swing * 0.4;
     tailPivot.rotation.y = walking ? Math.sin(charState.walkT) * 0.18 : Math.sin(t * 1.3) * 0.08;
     const bob = surf.water ? Math.sin(t * 3) * 0.05 - 0.32 : (walking ? Math.abs(Math.sin(charState.walkT)) * 0.07 : Math.sin(t * 1.6) * 0.02);
     // Jump arc rides on top of whatever the terrain is doing underneath, so
@@ -4514,7 +4573,7 @@ export async function bootFocciWorld(root, opts) {
     boot: BOOT_MARKS,
     get room() { return rooms[currentRoomKey]; },
     get state() { return { pending: !!pendingTravel, flight: !!flight, declined: Array.from(declined), camMode, inspectMode }; },
-    animalModel, toggleCamMode, setCamMode,
+    animalModel, toggleCamMode, setCamMode, blockedAt, groundSmooth, groundUnderRoof,
     jump() { startJump(rooms[currentRoomKey]); } };
 
   // island's here — now the ambience can have the connection to itself
@@ -4595,7 +4654,9 @@ export async function bootFocciWorld(root, opts) {
       if (Math.random() < dt * 14) soapBubble(room, p.x, p.y + b.headY * 0.4, p.z);
       if (b.busyT <= 0) { b.busy = null; spawnPickupBurst(room, p.x, p.y + b.headY, p.z, 0xBFEAF0); }
     } else if (b.busy === 'sleep') {
-      if (!b.asleep) {
+      // the sleep was called off (or ran out) before it got to the door
+      if (!b.asleep && (!rec.sleepUntil || Date.now() >= rec.sleepUntil)) { b.busy = null; }
+      else if (!b.asleep) {
         if (stepToward(room, b, b.door.x, b.door.z, dt, 1.9)) {
           b.asleep = true; setResidentVisible(b, false);
           spawnPickupBurst(room, b.door.x, p.y + 0.6, b.door.z, 0xC9D8FF);
@@ -4674,8 +4735,21 @@ export async function bootFocciWorld(root, opts) {
     // side-on: the lens looks across the line between them
     const ux = dx / d, uz = dz / d;
     const a1 = Math.atan2(-uz, ux), a2 = a1 + Math.PI;
+    /* Of the two side-on angles, the one with a clear line to the lens --
+       an animal standing by a house had the camera put inside its wall. Ties
+       go to the one nearer the current view. */
     const near = (a) => Math.abs(Math.atan2(Math.sin(a - cam.theta), Math.cos(a - cam.theta)));
-    cam.tTheta = near(a1) < near(a2) ? a1 : a2;
+    const mx = (charState.x + p.x) / 2, mz = (charState.z + p.z) / 2, my = (character.position.y + p.y) / 2 + 1.0;
+    const clear = (a) => {
+      const R = 7.5, sp = Math.sin(cam.tPhi || 1.1), ox = R * sp * Math.sin(a), oz = R * sp * Math.cos(a), oy = R * Math.cos(cam.tPhi || 1.1);
+      for (let i = 1; i <= 16; i++) {
+        const k = i / 16, g = groundAt(room, mx + ox * k, mz + oz * k);
+        if (g.hit && g.y + 0.4 > my + oy * k) return k;
+      }
+      return 1;
+    };
+    const c1 = clear(a1), c2 = clear(a2);
+    cam.tTheta = Math.abs(c1 - c2) > 0.1 ? (c1 > c2 ? a1 : a2) : (near(a1) < near(a2) ? a1 : a2);
     cam.tRadius = Math.min(cam.tRadius, 7.5);
     camFocus.on = true;
     return true;
