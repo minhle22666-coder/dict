@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v196`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v199`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -386,9 +386,8 @@ reset to the tag to go back. Rules of that block:
   counters/dates that had no class. **Put `.num` on any new figure.**
 - The panel tokens (`--primary`, `--surface`, `--text`...) are set once for
   `.view.fw-panel` and the word page; the purple root set is overridden,
-  not deleted. Speak Up is excluded -- it is see-through and used to show
-  home's old village background, so it now carries `bg-speakup-village`
-  itself.
+  not deleted. All four games are daylight now (`setPracticeMode` always
+  adds `.pg-day`; `.su-active` still marks Speak Up's own layout).
 - Glass is near-opaque white + a bright rim + a soft lift. No
   `backdrop-filter` over anything that moves.
 
@@ -402,14 +401,42 @@ Journal line at the foot. Mini games is home's second page
 (`czPage('games')`, `#fw-home.cz-on-games`) with the mascots; `fwBack()`
 returns from it to the rows. `fhEnterIsland()` shows `#fw-overlay` under
 the still first, makes Focci hop, fades home at 400ms and calls
-`fhShowWorld()` at 700ms, so a live frame is already there. If the world
+`fhShowWorld()` at 800ms; the overlay is only shown at 400ms, once he is
+in the air, so the island's first frames cannot hold up the jump. If the world
 is still loading he bounces in place (`html.world-loading`) and goes in by
 himself when `worldReady`.
 
 **The game banners are `gameHead(mode)` in app.js** (`PG_META`, including
-Speak Up's `write`): the user's own art (`banner-*.webp`, 397x128), the
-mascot on its right edge at full size, the name and welcome UNDER the
-art -- the art's figures fill its left half and text on them hid both.
+Speak Up's `write`; Hot Take has the same `.gh` markup in index.html): the
+user's art as the ground (`banner-*.webp`, flattened onto deep green and
+cropped past the art's translucent edge -- that edge was the "white rim"),
+name and welcome on the left over a shade, the mascot seated INSIDE the
+128px frame. Games share `.pg-opts` pickers, the `.pq` card and `.rd`.
+
+**The animals have minds: `pets.js`.** Each resident gets a voice and a
+mastery (`persona`, assigned on first meeting, masteries unique while any
+are free). A tap on an animal opens its bubble (`petTap`) -- it no longer
+feeds on contact. Feed/pet/talk add to `bond` (capped per day); at
+`GIFT_AT` thresholds a happy animal gives a gift (Gemini JSON: five
+expressions from its mastery), kept in `fc_gifts`, shown in Saved > Gifts
+and the Journal. One meal is one of ten bars (FEED_ENERGY 10), drawn on the
+animal's nameplate sprite in world.js (`nameplateTexture`); `residentFx`
+draws hearts/bursts. `petBack()` is first in `fwBack()`.
+
+**The small YouGlish player is `ygmPlay(phrases)` in pets.js.** YG.Widget
+with `components: 2` puts the video at the top of its page, which is
+cropped to it. The widget never fires `onCaptionConsumed` for the clip's
+own caption (measured), so a clip is done when the NEXT caption starts
+(`clipDone`); clips run 4-7s. Two clips a phrase, then the next phrase;
+back only on the back button. `window.__ygm` is its state, for debugging.
+
+**The daily nudge is `petNudge()` in pets.js**: at most twice a day, only
+short of the goal, from a hungry animal if there is one. The 8pm system
+notification can only fire while the app is alive (no push server).
+Progress leads with today's ring, the four daily quests (`QUESTS`, now
+with "look after an animal" from `petCareToday`), then title, level and
+this week against last. `renderQuests` draws into `#pj-qlist` as well as
+the hidden old dashboard's `#q-list` -- the same id twice drew nothing.
 
 **Forgetting a looked-up word is `forgetSearch(w)`** (app.js): history,
 behaviour log and every day of the journal (`jnForget` in journal.js).

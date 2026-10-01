@@ -3573,6 +3573,8 @@ const QUESTS=[
    ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>'},
   {id:'save',   hue:'2', t:'Save a word', target:1, xp:10,
    ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m12 3.5 2.5 5.3 5.8.7-4.3 4 1.1 5.7L12 16.3 6.9 19.2 8 13.5l-4.3-4 5.8-.7L12 3.5Z"/></svg>'},
+  {id:'care',   hue:'2', t:'Look after an animal', target:1, xp:10,
+   ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>'},
   {id:'game',   hue:'3', t:'Play a game', target:1, xp:15,
    ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="11" rx="5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r=".9" fill="currentColor"/><circle cx="17.5" cy="13.5" r=".9" fill="currentColor"/></svg>'}
 ];
@@ -3594,10 +3596,14 @@ async function questProgress(){
   const today=logs.filter(l=>l.ts>=d0);
   return { search: today.filter(l=>l.type==='search').length,
            save:   today.filter(l=>l.type==='save').length,
-           game:   questState().games||0 };
+           game:   questState().games||0,
+           care:   window.petCareToday ? window.petCareToday() : 0 };
 }
 async function renderQuests(){
-  const box=$('#q-list'); if(!box) return;
+  /* Drawn into Progress (#pj-qlist) as well as the old dashboard's #q-list,
+     which still exists hidden -- the same id twice is why the plan came out
+     empty the first time. */
+  const boxes=document.querySelectorAll('#q-list,#pj-qlist'); if(!boxes.length) return;
   const prog=await questProgress(), st=questState();
   let done=0, h='';
   for(const q of QUESTS){
@@ -3616,8 +3622,8 @@ async function renderQuests(){
         : '<span class="q-rw"><i class="coin"></i>+'+q.xp+'</span>')
       +'</div></div></div>';
   }
-  box.innerHTML=h;
-  const c=$('#q-count'); if(c) c.textContent=done+'/'+QUESTS.length;
+  boxes.forEach(b=>{ b.innerHTML=h; });
+  document.querySelectorAll('#q-count,#pj-qcount').forEach(c=>{ c.textContent=done+'/'+QUESTS.length; });
 }
 window.claimQuest=async function(id){
   const q=QUESTS.find(x=>x.id===id); if(!q) return;
@@ -3628,6 +3634,7 @@ window.claimQuest=async function(id){
   if(row && typeof confettiBurst==='function') confettiBurst(row, 22);
   addXP(q.xp);
   renderQuests();
+  if(document.getElementById('v-stats') && document.getElementById('v-stats').classList.contains('active')) renderInsights();
 };
 
 /* Banner truyện ở Home: nền = phong cảnh của vùng đang chơi, kèm tiến độ. */
@@ -5741,6 +5748,11 @@ async function computeInsights(){
   const thisWeekSearches=logs.filter(l=>l.type==='search'&&dayStart(l.ts)>=weekAgo).length;
   const lastWeekSearches=logs.filter(l=>l.type==='search'&&dayStart(l.ts)>=twoWeeksAgo&&dayStart(l.ts)<weekAgo).length;
 
+  const inWeek=(l,from,to)=>{ const d=dayStart(l.ts); return d>=from && d<to; };
+  const correctThisWeek=logs.filter(l=>l.type==='review_correct'&&inWeek(l,weekAgo,today+DAY)).length;
+  const correctLastWeek=logs.filter(l=>l.type==='review_correct'&&inWeek(l,twoWeeksAgo,weekAgo)).length;
+  const activeThisWeek=new Set(logs.filter(l=>inWeek(l,weekAgo,today+DAY)).map(l=>dayStart(l.ts))).size;
+  const activeLastWeek=new Set(logs.filter(l=>inWeek(l,twoWeeksAgo,weekAgo)).map(l=>dayStart(l.ts))).size;
   const savedCount=entries.filter(e=>e.saved).length;
   const savedNotReviewed=entries.filter(e=>e.saved&&!e.lastReviewedAt).length;
 
@@ -5778,7 +5790,8 @@ async function computeInsights(){
   return {streak, hasToday, peakRange, peakPct, totalHourEvents,
     accuracy, totalReview, forgetful, thisWeekSearches, lastWeekSearches,
     totalWords:entries.length, savedCount, savedNotReviewed,
-    days28, periodTotal, peakDay, activeDays, bestStreak, bestRise, curRise, searchesAll};
+    days28, periodTotal, peakDay, activeDays, bestStreak, bestRise, curRise, searchesAll,
+    correctThisWeek, correctLastWeek, activeThisWeek, activeLastWeek};
 }
 /* Một quan sát là MỘT DÒNG có số liệu bên trái, không phải một thẻ bo góc
    kèm tile emoji. Năm thẻ giống hệt nhau xếp dọc thì không có thẻ nào được
@@ -5838,7 +5851,7 @@ async function renderInsights(){
   const steps=await checkAchievements();
   const done=steps.filter(m=>m.done);
   const next=steps.find(m=>!m.done);
-  const title=done.length ? done[done.length-1].title : 'Newcomer';
+  const title=done.length ? done[done.length-1].title : 'Just arrived';
 
   /* Composition, top to bottom: who you are on this island (the title and
      the one thing to do next), the shape of the last four weeks, the path
@@ -5847,18 +5860,46 @@ async function renderInsights(){
      card, twelve cups and the chart edge to edge. */
   let h='<div class="pj">';
 
+  /* Today first. The page used to open on totals -- a title, four
+     counters -- which say where you are but not what to do; the user asked
+     for a page that feels like growing and pulls you back in. So: today's
+     goal as a ring with one sentence of what would finish it, today's four
+     small quests (claimable), then this week against the last. */
+  const goal=getDailyGoal(), dxp=getDailyXP();
+  const gpct=Math.min(100, Math.round(dxp/goal*100));
+  const R=40, C=2*Math.PI*R;
+  h+='<section class="pj-today">';
+  h+='<div class="pj-ring"><svg viewBox="0 0 100 100"><circle class="trk" cx="50" cy="50" r="'+R+'"/>'
+    +'<circle class="val" cx="50" cy="50" r="'+R+'" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-gpct/100)).toFixed(1)+'"/></svg>'
+    +'<div class="pj-ring-in"><b class="num">'+dxp+'</b><span class="num">/ '+goal+' XP</span></div></div>';
+  h+='<div class="pj-today-t"><div class="cz-cap">Today</div>'
+    +'<b>'+esc(encourageLine(s, dxp, goal))+'</b>'
+    +'<div class="pj-streak"><span class="flame'+(s.hasToday?' lit':'')+'">\u{1F525}</span><b class="num">'+s.streak+'</b> day streak'
+    +'<i>best <span class="num">'+s.bestStreak+'</span></i></div></div>';
+  h+='</section>';
+
+  h+='<section class="pj-quests"><div class="pj-cap"><span class="cz-cap">Today’s plan</span><span class="num" id="pj-qcount"></span></div>'
+    +'<div id="pj-qlist" class="pj-qlist"></div></section>';
+
   h+='<section class="pj-hero">';
   h+='<div class="cz-cap">Your title</div>';
   h+='<h2 class="pj-title">'+esc(title)+'</h2>';
   h+= next
     ? '<p class="pj-next">Next: <b>'+esc(next.title)+'</b> — '+esc(next.goal).toLowerCase()+'.</p>'
     : '<p class="pj-next">Every milestone on the path is yours.</p>';
-  h+='<div class="pj-figs">'
-    +'<div><b class="num">'+s.streak+'</b><span>day streak</span></div>'
-    +'<div><b class="num">'+lvl+'</b><span>level</span></div>'
-    +'<div><b class="num">'+s.savedCount+'</b><span>saved</span></div>'
-    +'<div><b class="num">'+(s.accuracy==null?'—':s.accuracy+'%')+'</b><span>accuracy</span></div>'
-    +'</div>';
+  const xp=getXP(), into=xp%100;
+  h+='<div class="pj-lvl"><span>Level <b class="num">'+lvl+'</b></span><div class="pj-lvl-bar"><i style="width:'+into+'%"></i></div>'
+    +'<span class="num">'+(100-into)+' XP to '+(lvl+1)+'</span></div>';
+  const cmp=(label, a, b)=>{
+    const d=a-b, up=d>0, same=d===0;
+    return '<div class="pj-cmp '+(same?'same':up?'up':'down')+'"><b class="num">'+a+'</b><span>'+label+'</span>'
+      +'<i class="num">'+(same?'same as last week':(up?'↑ '+d:'↓ '+(-d))+' vs last week')+'</i></div>';
+  };
+  h+='<div class="pj-week"><div class="cz-cap">This week</div><div class="pj-cmps">'
+    +cmp('words looked up', s.thisWeekSearches, s.lastWeekSearches)
+    +cmp('right answers', s.correctThisWeek, s.correctLastWeek)
+    +cmp('active days', s.activeThisWeek, s.activeLastWeek)
+    +'</div></div>';
   h+='</section>';
 
   h+=progressChart(s);
@@ -5902,7 +5943,18 @@ async function renderInsights(){
   }
   h+='</div>';
   area.innerHTML=h;
+  renderQuests();
 }
+/* One sentence for the ring: what is left and the easiest way to it. */
+function encourageLine(s, dxp, goal){
+  const left=Math.max(0, goal-dxp);
+  if(!left) return 'Goal reached. Anything more today is a bonus.';
+  if(!s.hasToday && s.streak>0) return 'Your '+s.streak+'-day streak is waiting — one word keeps it alive.';
+  if(left<=5) return 'Only '+left+' XP to go. One Word Pairs round does it.';
+  if(dxp===0) return left+' XP to today’s goal. A first round is the hardest one.';
+  return left+' XP to go — about '+Math.ceil(left/5)+' Word Pairs rounds.';
+}
+window.encourageLine=encourageLine;
 
 /* ---------- greeting hero ---------- */
 function timeOfDay(){

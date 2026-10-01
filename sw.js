@@ -3,7 +3,7 @@
    Only small, essential files are precached on install — every image is
    cached automatically the first time it's fetched successfully, which
    happens naturally the first time you open the app online. */
-const CACHE = 'focci-v198';
+const CACHE = 'focci-v199';
 const SHELL = [
   './',
   './index.html',
@@ -53,6 +53,12 @@ const SHELL = [
   // someone opens the 3D world, without bloating initial install.
 ];
 
+// The daily-target reminder (pets.js) opens the app when tapped.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) =>
+    cs.length ? cs[0].focus() : self.clients.openWindow('./')));
+});
 self.addEventListener('install', (e) => {
   /* One file at a time, each failure swallowed, instead of addAll().
      addAll() is atomic: one 404 anywhere in SHELL and the whole install

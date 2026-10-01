@@ -265,7 +265,7 @@
     var res = window.resFeed ? window.resFeed(id) : null;
     var r = find(id); if (!r) return;
     var said;
-    if (res && res.ok) { care(id, 'feed'); fx(id, 'feed'); said = 'Mm. Thank you.'; }
+    if (res && res.ok) { care(id, 'feed'); fx(id, 'feed'); said = 'Mm. Thank you.'; if (window.renderQuests) try { window.renderQuests(); } catch (e) {} }
     else if (res && res.reason === 'full') said = 'I could not eat another thing. Thank you though.';
     else if (res && res.reason === 'no-xp') said = 'You have nothing spare today. Sit with me instead?';
     showAct(id, said);
@@ -515,6 +515,102 @@
       + '<button onclick="rzClose();petTalk(\'' + r.id + '\')"><i>\u{1F4AC}</i>Talk</button></div>';
     return h;
   };
+
+
+  /* ---------------- the daily nudge ----------------
+     The user asked for the app to bring people back: a reminder of the
+     day's target. It is the island asking, not a banner: if an animal is
+     hungry, it is that animal; otherwise Focci. At most twice a day -- once
+     whenever the app is opened short of the goal, and once more after 6pm
+     if the first was earlier -- and never once the goal is met.
+
+     A system notification is offered too ("Remind me at 8pm"). There is no
+     push server, so it can only fire while the app is still alive in the
+     background; the in-app nudge on the next open covers the rest. */
+  var NUDGE_LS = 'fc_nudge', REMIND_LS = 'fc_remind';
+  function dxp() { return typeof getDailyXP === 'function' ? getDailyXP() : 0; }
+  function dgoal() { return typeof getDailyGoal === 'function' ? getDailyGoal() : 20; }
+  function nudgeDue() {
+    if (dxp() >= dgoal()) return false;
+    var st = readJSON(NUDGE_LS, {}), t = today(), h = new Date().getHours();
+    var shown = st.d === t ? (st.n || 0) : 0;
+    if (shown >= 2) return false;
+    if (shown === 1 && (h < 18 || (st.h || 0) >= 18)) return false;
+    return true;
+  }
+  function hungry() {
+    var list = window.resTick ? window.resTick() : [];
+    return list.filter(function (r) { return (r.energy || 0) < 34; }).sort(function (a, b) { return a.energy - b.energy; })[0] || null;
+  }
+  window.petNudge = async function (force) {
+    if (!force && !nudgeDue()) return;
+    var H = document.documentElement;
+    var ob = document.getElementById('onboarding');
+    if (ob && getComputedStyle(ob).display !== 'none') return;
+    if (!force && (!H.classList.contains('home-on') || H.classList.contains('panel-open') || H.classList.contains('menu-on'))) return;
+    ensureDom();
+    var st = readJSON(NUDGE_LS, {}), t = today();
+    writeJSON(NUDGE_LS, { d: t, n: (st.d === t ? (st.n || 0) : 0) + 1, h: new Date().getHours() });
+    var x = dxp(), g = dgoal(), left = Math.max(0, g - x), pct = Math.min(100, Math.round(x / g * 100));
+    var who = hungry();
+    var prog = {}; try { prog = window.questProgress ? await window.questProgress() : {}; } catch (e) {}
+    var qs = (typeof QUESTS !== 'undefined' ? QUESTS : []).filter(function (q) { return (prog[q.id] || 0) < q.target; }).slice(0, 3);
+    var remind = readJSON(REMIND_LS, null);
+    var h = '<div class="pt-g-h"><div><span class="cz-cap">Today’s target</span>'
+      + '<b class="pt-g-title">' + (who ? esc(who.name) + ' is hungry and missing you' : (x ? 'You are on your way' : 'Your island is waiting')) + '</b></div>'
+      + '<button class="pt-x" aria-label="Close" onclick="petCloseNudge()">×</button></div>'
+      + '<div class="nd-art"><img src="./' + (who ? 'mascot-wonder.webp' : (x ? 'mascot-jump.webp' : 'mascot-avatar.webp')) + '" alt=""/></div>'
+      + '<div class="nd-prog"><div class="nd-bar"><i style="width:' + pct + '%"></i></div><b class="num">' + x + ' / ' + g + ' XP</b></div>'
+      + '<p class="nd-line">' + (left <= 5 ? 'Only <b class="num">' + left + '</b> XP to go — one Word Pairs round does it.'
+          : '<b class="num">' + left + '</b> XP to today’s goal. Ten minutes is enough.') + '</p>';
+    if (qs.length) h += '<ul class="nd-qs">' + qs.map(function (q) { return '<li>' + esc(q.t) + '<span class="num">' + (prog[q.id] || 0) + '/' + q.target + '</span></li>'; }).join('') + '</ul>';
+    h += '<div class="nd-acts">'
+      + '<button class="btn" onclick="petCloseNudge();fhGame(null,\'match\')">Play Word Pairs</button>'
+      + '<button class="btn ghost" onclick="petCloseNudge();' + (who ? 'fhEnterIsland()' : 'czOpen(\'stats\')') + '">' + (who ? 'Feed ' + esc(who.name) : 'See today’s plan') + '</button></div>';
+    h += '<label class="nd-remind"><input type="checkbox" ' + (remind && remind.on ? 'checked' : '') + ' onchange="petRemind(this.checked)"/>'
+      + '<span>Remind me at 8pm if I have not reached it</span></label>';
+    $('pt-gift-in').innerHTML = h;
+    document.documentElement.classList.add('pt-gift-on');
+  };
+  window.petCloseNudge = function () { petCloseGift(); };
+  window.petRemind = async function (on) {
+    if (on && 'Notification' in window && Notification.permission !== 'granted') {
+      try { await Notification.requestPermission(); } catch (e) {}
+    }
+    var ok = on && 'Notification' in window && Notification.permission === 'granted';
+    writeJSON(REMIND_LS, { on: !!ok, hour: 20 });
+    if (on && !ok && window.fwToast) window.fwToast('Notifications are blocked — the reminder will show when you open the app');
+    scheduleRemind();
+  };
+  var remindT = 0;
+  function scheduleRemind() {
+    clearTimeout(remindT);
+    var r = readJSON(REMIND_LS, null);
+    if (!r || !r.on) return;
+    var now = new Date(), at = new Date(now); at.setHours(r.hour || 20, 0, 0, 0);
+    if (at <= now) at.setDate(at.getDate() + 1);
+    remindT = setTimeout(function () {
+      var sent = readJSON(REMIND_LS, {});
+      if (dxp() < dgoal() && sent.sent !== today()) {
+        sent.sent = today(); writeJSON(REMIND_LS, sent);
+        var who = hungry();
+        var body = who ? who.name + ' is hungry. ' + Math.max(0, dgoal() - dxp()) + ' XP to today’s goal.'
+          : Math.max(0, dgoal() - dxp()) + ' XP to today’s goal — a quick round keeps your streak.';
+        try {
+          navigator.serviceWorker.ready.then(function (reg) { reg.showNotification('Focci’s island', { body: body, icon: './icon-192.png', tag: 'daily-target' }); });
+        } catch (e) {}
+      }
+      scheduleRemind();
+    }, Math.min(at - now, 2147483000));
+  }
+  /* How many animals were looked after today -- the fourth daily quest. */
+  window.petCareToday = function () {
+    var list = window.resLoad ? window.resLoad() : [];
+    return list.filter(function (r) { return dayCount(r, 'petDay') || dayCount(r, 'feedDay') || dayCount(r, 'talkDay'); }).length;
+  };
+  setTimeout(scheduleRemind, 1500);
+  setTimeout(function () { window.petNudge(); }, 4500);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) setTimeout(function () { window.petNudge(); }, 1200); });
 
   /* ---------------- back ---------------- */
   window.petBack = function () {
