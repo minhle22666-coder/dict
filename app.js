@@ -4237,7 +4237,9 @@ function setPracticeMode(m){
      the end-of-round screen is drawn without .pg and would have dropped
      back to the old purple the moment a round finished. */
   const vr=document.getElementById('v-review');
-  if(vr) vr.classList.toggle('pg-day', m!=='write');
+  /* All four games are daylight now, Speak Up included; .su-active still
+     marks Speak Up for its own layout. */
+  if(vr) vr.classList.add('pg-day');
   if(m==='write'){ window.__sayItActive=true; renderSpeakUpIntro(); return; }
   window.__sayItActive=false;
   suPanelOn(false);
@@ -4297,20 +4299,25 @@ function setQCountIdx(i){ setQCount(QCOUNTS[Math.max(0,Math.min(QCOUNTS.length-1
 window.setQCountIdx=setQCountIdx;
 
 function pgControls(){
+  /* Three small pickers on one line instead of a ruled card of sliders.
+     They are set once and then left alone, and as a card they were the
+     heaviest thing between the banner and the question. Selects, not
+     sliders: a drag fired a rebuild per step (the crash this game once
+     had); a pick fires one. Letter Trail always draws from saved words, so
+     it shows that as a fact rather than a picker that does nothing. */
   const n=getQCount(), lv=getLevel(), pool=getPool();
-  const qi=Math.max(0,QCOUNTS.indexOf(n));
-  const lvLabel = lv===0 ? 'Any' : LEVEL_NAMES[lv];
-  let h='<div class="pg-ctl">';
-  h+='<div class="pg-row"><div class="pg-lab">Number of questions<span class="pg-val num">'+n+'</span></div>'
-    +'<input type="range" min="0" max="'+(QCOUNTS.length-1)+'" step="1" value="'+qi
-    +'" aria-label="Number of questions" onchange="setQCountIdx(this.value)"/></div>';
-  h+='<div class="pg-row"><div class="pg-lab">Choose your level<span class="pg-val num">'+lvLabel+'</span></div>'
-    +'<input type="range" min="0" max="6" step="1" value="'+lv
-    +'" aria-label="Choose your level" onchange="setLevel(+this.value)"/></div>';
-  h+='<div class="pg-row"><div class="pg-lab">In Your Library</div>'
-    +'<select class="pg-sel" aria-label="In Your Library" onchange="setPool(this.value)">'
-    +POOLS.map(p=>'<option value="'+p[0]+'"'+(p[0]===pool?' selected':'')+'>'+esc(p[1])+'</option>').join('')
-    +'</select></div>';
+  const opt=(v,label,on)=>'<option value="'+v+'"'+(on?' selected':'')+'>'+label+'</option>';
+  let h='<div class="pg-opts">';
+  h+='<label class="pg-opt"><span>Questions</span><select aria-label="Number of questions" onchange="setQCount(+this.value)">'
+    +QCOUNTS.map(q=>opt(q, q, q===n)).join('')+'</select></label>';
+  h+='<label class="pg-opt"><span>Level</span><select aria-label="Level" onchange="setLevel(+this.value)">'
+    +opt(0,'Any',lv===0)+[1,2,3,4,5,6].map(l=>opt(l, LEVEL_NAMES[l], l===lv)).join('')+'</select></label>';
+  if(practiceMode==='match'){
+    h+='<label class="pg-opt wide"><span>Words from</span><select aria-label="Words from" onchange="setPool(this.value)">'
+      +POOLS.map(x=>opt(x[0], esc(x[1].replace('The Whole Dictionary','Everything').replace('Words I searched','Searched').replace('My saved words','Saved')), x[0]===pool)).join('')+'</select></label>';
+  } else {
+    h+='<div class="pg-opt wide fixed"><span>Words from</span><b>Saved</b></div>';
+  }
   return h+'</div>';
 }
 
@@ -4320,13 +4327,18 @@ function pgControls(){
    report. Back is a swipe from left to right now, everywhere (fwBack in
    index.html), and from a game it goes where you came from. */
 function gameHead(mode){
+  /* The banner, the same for all four games (Hot Take's is the same markup
+     in index.html): the user's art as the ground, the name and welcome on
+     its left over a soft shade, and the game's Focci seated inside the
+     frame on the right -- not hanging out of it, and big enough to be the
+     game's face. The art files were flattened and cropped past their soft
+     translucent edge, which on a cream page showed as a white rim. */
   const m=PG_META[mode]||PG_META.match;
-  return '<div class="gh gh-'+mode+'">'
-    +'<div class="gh-art"><img src="./'+m.banner+'" alt="" onerror="this.style.display=\'none\'"/></div>'
-    +'<img class="gh-fox" src="./'+m.fox+'" alt="" onerror="this.style.display=\'none\'"/>'
+  return '<div class="gh gh-'+mode+'"><div class="gh-card" style="--bg:url(./'+m.banner+')">'
     +'<div class="gh-txt"><div class="gh-name">'+m.name+'</div>'
     +(m.intro?'<div class="gh-sub">'+m.intro+'</div>':'')+'</div>'
-    +'</div>';
+    +'<img class="gh-fox" src="./'+m.fox+'" alt="" onerror="this.style.display=\'none\'"/>'
+    +'</div></div>';
 }
 function gameShell(body){
   return '<div class="pg">'+gameHead(practiceMode)+pgControls()+body+'</div>';
@@ -4335,11 +4347,13 @@ function gameShell(body){
 /* The card the question lives in: mascot breaking the top edge, what the
    round is worth in the corner. */
 function pgCard(pose, bubble, inner, xp){
-  return '<div class="pg-card">'
-    +'<img class="pg-mascot" src="./mascot-'+pose+'.webp" alt="" onerror="this.style.display=\'none\'"/>'
-    +(xp?'<div class="pg-xp num">+'+xp+'XP</div>':'')
-    +(bubble?'<div class="pg-bub">'+esc(bubble)+'</div>':'')
-    +inner+'</div>';
+  /* Focci beside his line, not breaking out of the card's top edge: the
+     old mascot-over-the-rim took 50px of height to say a few words. */
+  return '<div class="pq">'
+    +'<div class="pq-top"><img class="pq-fox" src="./mascot-'+pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+    +'<div class="pq-bub">'+esc(bubble||'')+'</div>'
+    +(xp?'<div class="pq-xp num">+'+xp+' XP</div>':'')+'</div>'
+    +'<div class="pq-body">'+inner+'</div></div>';
 }
 
 /* Dragging a dial back and forth fires this several times over, and each
@@ -4440,9 +4454,11 @@ async function startReview(){
    cross that led it is gone, as asked; leaving a round is a swipe to the
    right (twice, so a stray one doesn't throw the round away -- fwBack). */
 function roundBar(idx,total,states){
+  const right=states.filter(c=>c==='done').length;
   return '<div class="round-bar">'
     +'<div class="rb-mid">'+practiceProgress(states)+'</div>'
-    +'<div class="rb-count">'+(idx+1)+'<span>/'+total+'</span></div></div>';
+    +'<div class="rb-count num">'+(idx+1)+'<span>/'+total+'</span></div>'
+    +'<div class="rb-right num" title="Right so far">✓ '+right+'</div></div>';
 }
 function quitRound(){
   revQueue=[]; matchRounds=[]; revState=null; matchPicked=null;
@@ -4551,13 +4567,18 @@ function roundDone(score,total,againFn){
   const say=perfect?'A flawless expedition! Every single one.'
     :(score>=total/2?'Good haul! The map is filling in.':'Every explorer stumbles. Tomorrow we go again.');
   const pct=total?Math.round(score/total*100):0;
-  return '<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt=""/>'
-    +'<div class="speech big">'+esc(say)+'</div>'
-    +'<div class="rd-score">'+score+' <span>/ '+total+'</span></div>'
-    +'<div class="rd-ring"><i style="width:'+pct+'%"></i></div>'
-    +'<div class="rd-sub">'+pct+'% correct</div></div>'
-    +'<button class="btn" onclick="'+againFn+'">Play again</button>'
-    +'<button class="btn ghost" onclick="quitRound()">Change settings</button>';
+  const missed=total-score;
+  return '<div class="rd">'
+    +'<img class="rd-fox" src="./mascot-'+pose+'.webp" alt=""/>'
+    +'<div class="cz-cap">Round complete</div>'
+    +'<div class="rd-big num">'+score+'<span>/'+total+'</span></div>'
+    +'<div class="rd-say">'+esc(say)+'</div>'
+    +'<div class="rd-bar"><i style="width:'+pct+'%"></i></div>'
+    +'<div class="rd-meta"><span><b class="num">'+pct+'%</b> right</span>'
+    +(missed?'<span><b class="num">'+missed+'</b> waiting in your Journal</span>':'<span>Nothing to revisit</span>')+'</div>'
+    +'<div class="rd-acts"><button class="btn" onclick="'+againFn+'">Play again</button>'
+    +'<button class="btn ghost" onclick="quitRound()">New settings</button></div>'
+    +'</div>';
 }
 
 /* ============================================================
@@ -4875,14 +4896,13 @@ window.suPanelOn=function(on){
    slider before the round starts, a progress track during it. */
 function speakUpQRow(interactive){
   if(interactive){
-    return '<div class="su-qrow"><span class="su-qrow-l">Number of questions</span>'
-      +'<b class="su-qrow-n" id="su-total-label">'+speakUpTotal+'</b>'
-      +'<input class="su-slider" type="range" min="5" max="30" step="1" value="'+speakUpTotal
-      +'" oninput="setSpeakUpTotal(this.value)"/></div>';
+    return '<div class="su-qrow"><span class="su-qrow-l">Questions</span><div class="su-chips">'
+      +[5,10,15,20].map(n=>'<button class="su-chip num'+(n===speakUpTotal?' on':'')+'" onclick="setSpeakUpTotal('+n+');renderSpeakUpIntro()">'+n+'</button>').join('')
+      +'</div></div>';
   }
   const pct=speakUpTotal?Math.round(speakUpIndex/speakUpTotal*100):0;
   return '<div class="su-qrow"><span class="su-qrow-l">Question</span>'
-    +'<b class="su-qrow-n">'+speakUpIndex+' / '+speakUpTotal+'</b>'
+    +'<b class="su-qrow-n num">'+speakUpIndex+' / '+speakUpTotal+'</b>'
     +'<span class="su-track"><i style="width:'+pct+'%"></i></span></div>';
 }
 function renderSpeakUpIntro(){
@@ -4894,6 +4914,11 @@ function renderSpeakUpIntro(){
      and the three mini-game pills were fighting it for attention. */
   let h='<div class="su-page su-intro">';
   h+=SU_HERO;
+  /* What a round is, in three steps, so the first one is not a guess. */
+  h+='<ol class="su-steps">'
+    +'<li><b class="num">1</b><span>Read the scene and the Vietnamese line</span></li>'
+    +'<li><b class="num">2</b><span>Say it your way, in English</span></li>'
+    +'<li><b class="num">3</b><span>Focci marks it and shows a native version</span></li></ol>';
   h+=speakUpQRow(true);
   h+='<button class="btn" onclick="startSpeakUpRound()">Start</button>';
   h+='</div>';
@@ -4912,12 +4937,16 @@ function speakUpRoundDoneHtml(){
   const say=perfect?'A flawless round! Every single one.'
     :(score>=total/2?'Good round! Keep it up.':"Every explorer stumbles. Let's go again.");
   const pct=total?Math.round(score/total*100):0;
-  return '<div class="round-done"><img class="ill" src="./mascot-'+pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
-    +'<div class="speech big">'+esc(say)+'</div>'
-    +'<div class="rd-score">'+score+' <span>/ '+total+'</span></div>'
-    +'<div class="rd-ring"><i style="width:'+pct+'%"></i></div>'
-    +'<div class="rd-sub">'+pct+'% strong answers</div></div>'
-    +'<button class="btn" onclick="renderSpeakUpIntro()">Play again</button>';
+  return '<div class="rd">'
+    +'<img class="rd-fox" src="./mascot-'+pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+    +'<div class="cz-cap">Round complete</div>'
+    +'<div class="rd-big num">'+score+'<span>/'+total+'</span></div>'
+    +'<div class="rd-say">'+esc(say)+'</div>'
+    +'<div class="rd-bar"><i style="width:'+pct+'%"></i></div>'
+    +'<div class="rd-meta"><span><b class="num">'+pct+'%</b> strong answers</span><span>Saved under Speak Up</span></div>'
+    +'<div class="rd-acts"><button class="btn" onclick="renderSpeakUpIntro()">Play again</button>'
+    +'<button class="btn ghost" onclick="openSaySaved()">See my answers</button></div>'
+    +'</div>';
 }
 window.finishSpeakUpRound=function(){
   speakUpStage='done';
