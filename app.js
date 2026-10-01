@@ -5941,6 +5941,7 @@ async function renderInsights(){
     h+=notes.slice(0,3).join('');
     h+='</section>';
   }
+  h+='<button class="pj-rules" onclick="openXpRules()">How XP and rewards work \u203A</button>';
   h+='</div>';
   area.innerHTML=h;
   renderQuests();

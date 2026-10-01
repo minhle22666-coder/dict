@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v199`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v201`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -422,6 +422,36 @@ expressions from its mastery), kept in `fc_gifts`, shown in Saved > Gifts
 and the Journal. One meal is one of ten bars (FEED_ENERGY 10), drawn on the
 animal's nameplate sprite in world.js (`nameplateTexture`); `residentFx`
 draws hearts/bursts. `petBack()` is first in `fwBack()`.
+
+**Every number the games award lives in `XP-RULES.md`** (and in the app,
+Progress > How XP works, `openXpRules` in pets.js). Change both together.
+
+**Animals are life experts now, not grammar topics** (`MASTERIES` in
+pets.js, 24 of them: healer, love, tarot, survival, office...). Old
+records with a grammar mastery are reassigned by `ensurePersonas`. The
+chat prompt asks for a friend's voice, short enough for a bubble.
+
+**Talking happens in the world, not a sheet.** `petTalk` calls
+`fwWorld.talkStart(id)` (world.js): Focci hops to 1.9 units, both face
+each other, the camera goes side-on (with clearance kept -- camFocus used
+to switch it off, and a hill filled the screen). pets.js places
+`#pt-bme`/`#pt-bpet` over the two heads every frame from `talkAnchors()`.
+Walking more than 6.5 away ends it (`focci-talk-end`). `window.fwWorld` is
+the world API, set when the island is ready.
+
+**Sleep, bath, follow** (world.js `residentSleep/Bath/Follow`): a sleeping
+animal walks to the nearest house door and is hidden until its record's
+`sleepUntil`; pets.js `settleSleep` grants +30 energy on waking. Animals
+with `b.busy`/`b.follow`/`b.talking` do not wander. The paragraph hunt
+(`petPlay`) deals one paragraph per awake animal; gathered animals follow
+Focci.
+
+**Hints by proximity** (`tickHints` in world.js): near a house, an animal,
+a gateway, a mushroom or a letter, with a cooldown per kind -- the
+once-a-session `hintNear` remains for the tutorial lines.
+
+**Music pauses while the clip player is open** (`syncMusic` checks
+`html.ygm-on`).
 
 **The small YouGlish player is `ygmPlay(phrases)` in pets.js.** YG.Widget
 with `components: 2` puts the video at the top of its page, which is

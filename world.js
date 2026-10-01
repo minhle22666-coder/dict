@@ -2408,6 +2408,10 @@ export async function bootFocciWorld(root, opts) {
       target: null, cooldown: 2 + Math.random() * 6
     };
     room.residents.push(body);
+    if (rec.sleepUntil && rec.sleepUntil > Date.now()) {
+      const h = nearestDoor(room, spot.x, spot.z);
+      if (h) { body.busy = 'sleep'; body.asleep = true; body.door = { x: h.x, z: h.z, cx: h.cx, cz: h.cz, y: h.y }; setResidentVisible(body, false); }
+    }
     return body;
   }
 
@@ -2863,6 +2867,7 @@ export async function bootFocciWorld(root, opts) {
   }
 
   function tickResidents(room, dt, t) {
+    tickTalk(dt);
     if (!room.residents || !room.residents.length) return;
     const recs = window.resLoad ? window.resLoad() : [];
     const byId = {};
@@ -2873,10 +2878,13 @@ export async function bootFocciWorld(root, opts) {
       if (b.mixer) b.mixer.update(dt);
 
       const segs = Math.round((rec.energy || 0) / 10);
-      if (segs !== b.segs || rec.name !== b.name) {
-        b.segs = segs; b.name = rec.name;
-        b.bar.material.map = nameplateTexture(rec.name, segs); b.bar.material.needsUpdate = true;
+      const label = (b.asleep ? '\u{1F4A4} ' : '') + rec.name;
+      if (segs !== b.segs || label !== b.name) {
+        b.segs = segs; b.name = label;
+        b.bar.material.map = nameplateTexture(label, segs); b.bar.material.needsUpdate = true;
       }
+      if (b.busy) { tickBusy(room, b, rec, dt, t); continue; }
+      if (b.follow) { tickFollow(room, b, dt); }
       // a pet: a little hop on the spot, facing Focci
       if (b.hopT > 0) {
         b.hopT = Math.max(0, b.hopT - dt);
@@ -2888,7 +2896,7 @@ export async function bootFocciWorld(root, opts) {
       /* Out of energy: it stays put. Not asleep, not dying — just quiet,
          and it picks straight back up the moment it is fed. */
       const lively = rec.energy >= 34;
-      if (lively && !(b.hopT > 0)) {
+      if (lively && !(b.hopT > 0) && !b.talking && !b.busy && !b.follow) {
         if (b.target) {
           const dx = b.target.x - b.obj.position.x, dz = b.target.z - b.obj.position.z;
           const d = Math.hypot(dx, dz);
@@ -3313,6 +3321,51 @@ export async function bootFocciWorld(root, opts) {
     root.dispatchEvent(new CustomEvent('focci-hint', { detail: { key, text }, bubbles: true }));
   }
 
+  /* Showing what can be done, where it can be done. hintNear above is the
+     once-a-session tutorial line; these come back after a rest, because the
+     user found that walking up to a house or an animal said nothing about
+     what to do with it. Checked a few times a second, from the height-field
+     positions already in hand -- no raycast. */
+  const hintAt = {};
+  function hintCD(key, text, gap) {
+    const now = performance.now();
+    if (hintAt[key] && now - hintAt[key] < gap) return;
+    hintAt[key] = now;
+    root.dispatchEvent(new CustomEvent('focci-hint', { detail: { key, text }, bubbles: true }));
+  }
+  let hintClock = 0;
+  function tickHints(room, dt) {
+    hintClock += dt;
+    if (hintClock < 0.4) return;
+    hintClock = 0;
+    if (!room || room._insideHut || flight || talk) return;
+    const cx = charState.x, cz = charState.z;
+    for (const h of room.houses || []) {
+      if (Math.hypot(h.x - cx, h.z - cz) < 3.2) { hintCD('house', 'Double-tap the house to step inside \u00b7 jump to climb onto its roof', 90000); return; }
+    }
+    for (const b of room.residents || []) {
+      if (b.asleep) continue;
+      const p = b.obj.position;
+      if (Math.hypot(p.x - cx, p.z - cz) < 3) { hintCD('res-' + b.id, 'Tap ' + b.name + ' to feed, pet, talk or play together', 120000); return; }
+    }
+    for (const o of room.interactive || []) {
+      const ty = o.userData && o.userData.interactType;
+      if (ty !== 'teleport' && ty !== 'teleport-home') continue;
+      if (Math.hypot(o.position.x - cx, o.position.z - cz) < 4) {
+        hintCD('gate', ty === 'teleport' ? 'Tap the glowing gateway to travel to another land' : 'Tap the gateway to go back to Fox Island', 90000);
+        return;
+      }
+    }
+    for (const m of room.mushrooms || []) {
+      if (m.found) continue;
+      if (Math.hypot(m.x - cx, m.z - cz) < 3.5) { hintCD('mush', 'Walk over a mushroom to pick it up \u2014 +1 XP each', 300000); return; }
+    }
+    for (const l of wordHunt.letters) {
+      if (l.found || !l.obj || !l.obj.visible) continue;
+      const lp = l.obj.position;
+      if (Math.hypot(lp.x - cx, lp.z - cz) < 4) { hintCD('letter', 'Collect the floating letters \u2014 together they spell a word', 300000); return; }
+    }
+  }
   function activeRoom() { return rooms[currentRoomKey]; }
   /* Async only for a land that has not been built yet. An async function
      runs its body synchronously up to the first await, so enterRoom('station')
@@ -3474,7 +3527,9 @@ export async function bootFocciWorld(root, opts) {
     const fy = character.position.y + ((camFocus.ty || 0) - character.position.y) * bl;
     const fz = charState.z + ((camFocus.tz || 0) - charState.z) * bl;
     // out over the water there is nothing to pull in from
-    const k = bl > 0 ? 1 : camClearance(ox, oy, oz);
+    /* Talking keeps the clearance: the side-on shot of two friends is on
+       land, where a hill behind the lens filled the screen with grass. */
+    const k = (bl > 0 && !talk) ? 1 : camClearance(ox, oy, oz);
     camera.position.set(fx + ox * k, fy + 1.0 + oy * k, fz + oz * k);
     camera.lookAt(fx, fy + 1.0, fz);
   }
@@ -4387,6 +4442,7 @@ export async function bootFocciWorld(root, opts) {
     if (room.sea) room.sea.uTime.value = t;
     tickBoat(room, dt, t);
     tickResidents(room, dt, t);
+    tickHints(room, dt);
     checkWalkOverPickups(room);
     if (room.doe) tickDoe(room, room.doe, dt, t);
     if (room.pondMixer) room.pondMixer.update(dt);
@@ -4464,6 +4520,208 @@ export async function bootFocciWorld(root, opts) {
   // island's here — now the ambience can have the connection to itself
   if (window.__fwStartMusic) { const go = window.__fwStartMusic; window.__fwStartMusic = null; go(); }
 
+  /* ---------------- sleeping, bathing, following ----------------
+     Asked for by pets.js. Sleep: the animal walks to the nearest house
+     door and goes in -- hidden, its nameplate left by the door with a
+     sleeping mark -- until the record's sleepUntil has passed, then comes
+     back out. pets.js grants what a sleep restores. Bath: three seconds of
+     soap bubbles and a slow turn on the spot. Follow: it trots after Focci
+     (the paragraph hunt gathers animals this way). */
+  const _tv = new THREE.Vector3();
+  function nearestDoor(room, x, z) {
+    let best = null, bd = Infinity;
+    (room.houses || []).forEach((h) => { const d = Math.hypot(h.x - x, h.z - z); if (d < bd) { bd = d; best = h; } });
+    return best;
+  }
+  function setResidentVisible(b, on) {
+    b.obj.visible = on;
+    if (b.hit) b.hit.visible = on;
+  }
+  function stepToward(room, b, tx, tz, dt, speed) {
+    const p = b.obj.position, dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
+    if (d < 0.3) return true;
+    const st = Math.min(d, speed * dt);
+    p.x += (dx / d) * st; p.z += (dz / d) * st;
+    b.obj.rotation.y = Math.atan2(dx, dz);
+    const surf = groundSmooth(room, p.x, p.z);
+    if (surf.hit && !surf.building) p.y = surf.y - b.footOffset;
+    if (b.mixer) b.mixer.update(dt * 0.6);
+    return false;
+  }
+  function residentSleep(id) {
+    const room = activeRoom();
+    const b = room && (room.residents || []).find((x) => x.id === id);
+    if (!b) return false;
+    const h = nearestDoor(room, b.obj.position.x, b.obj.position.z);
+    if (!h) return false;
+    b.busy = 'sleep'; b.asleep = false; b.target = null; b.follow = false;
+    b.door = { x: h.x, z: h.z, cx: h.cx, cz: h.cz, y: h.y };
+    return true;
+  }
+  function residentBath(id) {
+    const room = activeRoom();
+    const b = room && (room.residents || []).find((x) => x.id === id);
+    if (!b || b.busy) return false;
+    b.busy = 'bath'; b.busyT = 3; b.target = null;
+    return true;
+  }
+  let bubbleTex = null;
+  function soapBubble(room, x, y, z) {
+    if (!bubbleTex) {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d');
+      const gr = g.createRadialGradient(26, 24, 2, 32, 32, 30);
+      gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(0.55, 'rgba(210,236,240,.35)'); gr.addColorStop(1, 'rgba(160,210,220,.6)');
+      g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 29, 0, Math.PI * 2); g.fill();
+      bubbleTex = new THREE.CanvasTexture(c);
+    }
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex, transparent: true, depthWrite: false }));
+    const sz = 0.12 + Math.random() * 0.16;
+    sp.scale.setScalar(sz);
+    sp.position.set(x + (Math.random() - 0.5) * 0.8, y + Math.random() * 0.4, z + (Math.random() - 0.5) * 0.8);
+    room.group.add(sp);
+    let age = 0; const vy = 0.5 + Math.random() * 0.5, life = 1 + Math.random() * 0.6;
+    activeEffects.push((dt) => {
+      age += dt; sp.position.y += vy * dt; sp.material.opacity = Math.max(0, 1 - age / life);
+      if (age < life) return true;
+      room.group.remove(sp); sp.material.dispose(); return false;
+    });
+  }
+  function tickBusy(room, b, rec, dt, t) {
+    const p = b.obj.position;
+    if (b.busy === 'bath') {
+      b.busyT -= dt;
+      b.obj.rotation.y += dt * 3.2;
+      if (Math.random() < dt * 14) soapBubble(room, p.x, p.y + b.headY * 0.4, p.z);
+      if (b.busyT <= 0) { b.busy = null; spawnPickupBurst(room, p.x, p.y + b.headY, p.z, 0xBFEAF0); }
+    } else if (b.busy === 'sleep') {
+      if (!b.asleep) {
+        if (stepToward(room, b, b.door.x, b.door.z, dt, 1.9)) {
+          b.asleep = true; setResidentVisible(b, false);
+          spawnPickupBurst(room, b.door.x, p.y + 0.6, b.door.z, 0xC9D8FF);
+        }
+      } else if (!rec.sleepUntil || Date.now() >= rec.sleepUntil) {
+        // out through the door, a step onto the grass
+        const dx = b.door.x - b.door.cx, dz = b.door.z - b.door.cz, d = Math.hypot(dx, dz) || 1;
+        const ox = b.door.x + (dx / d) * 1.2, oz = b.door.z + (dz / d) * 1.2;
+        const g = groundSmooth(room, ox, oz);
+        p.set(ox, (g.hit ? g.y : b.door.y) - b.footOffset, oz);
+        b.homeX = ox; b.homeZ = oz;
+        b.asleep = false; b.busy = null; setResidentVisible(b, true);
+        spawnHearts(room, ox, p.y + b.headY, oz);
+        root.dispatchEvent(new CustomEvent('focci-resident-woke', { detail: { id: b.id }, bubbles: true }));
+      }
+    }
+    const bx = b.asleep ? b.door.x : p.x, bz = b.asleep ? b.door.z : p.z;
+    const by = b.asleep ? (b.door.y + 1.4) : (p.y + b.headY + (b.barLift || 0.5));
+    b.bar.position.set(bx, by, bz);
+    if (b.hit) b.hit.position.set(p.x, p.y + b.headY * 0.5, p.z);
+  }
+  function tickFollow(room, b, dt) {
+    const i = b.followIdx || 0;
+    const a = charState.angle + Math.PI + (i - 1) * 0.7;
+    const tx = charState.x + Math.sin(a) * (1.6 + 0.4 * (i % 2)), tz = charState.z + Math.cos(a) * (1.6 + 0.4 * (i % 2));
+    if (Math.hypot(tx - b.obj.position.x, tz - b.obj.position.z) > 0.6) stepToward(room, b, tx, tz, dt, 3.4);
+    b.target = null;
+  }
+  function residentFollow(id, on, idx) {
+    const room = activeRoom();
+    const b = room && (room.residents || []).find((x) => x.id === id);
+    if (!b) return false;
+    b.follow = !!on; b.followIdx = idx || 0; b.target = null;
+    return true;
+  }
+  /* Where an animal's head is on screen, for a bubble over it. */
+  function anchorOf(id) {
+    const room = activeRoom();
+    const b = room && (room.residents || []).find((x) => x.id === id);
+    if (!b || b.asleep) return null;
+    const p = b.obj.position;
+    _tv.set(p.x, p.y + b.headY + (b.barLift || 0.5) + 0.55, p.z).project(camera);
+    return { x: (_tv.x * 0.5 + 0.5) * window.innerWidth, y: (-_tv.y * 0.5 + 0.5) * window.innerHeight, on: _tv.z < 1 };
+  }
+  function residentsHere() {
+    const room = activeRoom();
+    return (room && room.residents || []).filter((b) => !b.asleep && b.busy !== 'sleep').map((b) => b.id);
+  }
+  function celebrateAt(ids) {
+    const room = activeRoom();
+    (room.residents || []).forEach((b) => { if (ids.indexOf(b.id) >= 0) { const p = b.obj.position; spawnPickupBurst(room, p.x, p.y + b.headY, p.z, 0xFFD36A); spawnHearts(room, p.x, p.y + b.headY, p.z); } });
+    spawnPickupBurst(room, charState.x, character.position.y + 1.2, charState.z, 0xFFE9A8);
+  }
+
+  /* ---------------- talking with an animal ----------------
+     The chat is not a sheet over the island: Focci and the animal face each
+     other, the camera swings round to see them side by side, and the words
+     appear in bubbles over their heads (pets.js places those, reading
+     talkAnchors() every frame). Walking away ends it. */
+  let talk = null;
+  function talkStart(id) {
+    const room = activeRoom();
+    const b = room && (room.residents || []).find((x) => x.id === id);
+    if (!b) return false;
+    talk = { id, b, radius: cam.tRadius };
+    b.target = null; b.talking = true;
+    const p = b.obj.position;
+    let dx = charState.x - p.x, dz = charState.z - p.z, d = Math.hypot(dx, dz) || 1;
+    if (d > 2.8 || d < 1.1) {
+      // a short hop to a comfortable talking distance
+      const tx = p.x + (dx / d) * 1.9, tz = p.z + (dz / d) * 1.9;
+      const g = groundSmooth(room, tx, tz);
+      if (g.hit && !g.water) flyTo(room, { x: tx, y: g.y, z: tz }, null, { dur: 0.55, lift: 0.7, spin: 0 });
+      dx = tx - p.x; dz = tz - p.z; d = Math.hypot(dx, dz) || 1;
+    }
+    // side-on: the lens looks across the line between them
+    const ux = dx / d, uz = dz / d;
+    const a1 = Math.atan2(-uz, ux), a2 = a1 + Math.PI;
+    const near = (a) => Math.abs(Math.atan2(Math.sin(a - cam.theta), Math.cos(a - cam.theta)));
+    cam.tTheta = near(a1) < near(a2) ? a1 : a2;
+    cam.tRadius = Math.min(cam.tRadius, 7.5);
+    camFocus.on = true;
+    return true;
+  }
+  function talkEnd() {
+    if (!talk) return;
+    if (talk.b) talk.b.talking = false;
+    cam.tRadius = talk.radius || cam.tRadius;
+    talk = null; camFocus.on = false;
+  }
+  function tickTalk(dt) {
+    if (!talk) return;
+    const b = talk.b, p = b.obj.position;
+    const d = Math.hypot(charState.x - p.x, charState.z - p.z);
+    if (d > 6.5) { talkEnd(); root.dispatchEvent(new CustomEvent('focci-talk-end', { bubbles: true })); return; }
+    if (!flight) charState.angle = Math.atan2(p.x - charState.x, p.z - charState.z);
+    b.obj.rotation.y = lerpAngle(b.obj.rotation.y, Math.atan2(charState.x - p.x, charState.z - p.z), 0.15);
+    camFocus.tx = (charState.x + p.x) / 2;
+    camFocus.ty = (character.position.y + p.y) / 2;
+    camFocus.tz = (charState.z + p.z) / 2;
+  }
+  function talkAnchors() {
+    if (!talk) return null;
+    const proj = (x, y, z) => {
+      _tv.set(x, y, z).project(camera);
+      return { x: (_tv.x * 0.5 + 0.5) * window.innerWidth, y: (-_tv.y * 0.5 + 0.5) * window.innerHeight, on: _tv.z < 1 };
+    };
+    const b = talk.b, p = b.obj.position;
+    return {
+      me: proj(character.position.x, character.position.y + 1.95, character.position.z),
+      pet: proj(p.x, p.y + b.headY + (b.barLift || 0.5) + 0.55, p.z)
+    };
+  }
+  /* A nod from Focci when he speaks: a quick squash, no jump. */
+  function focciNod() {
+    let t = 0;
+    activeEffects.push((dt) => {
+      t += dt;
+      const k = Math.min(1, t / 0.32);
+      const sq = Math.sin(k * Math.PI) * 0.08;
+      character.scale.set(1 * (1 + sq * 0.6), 1 * (1 - sq), 1 * (1 + sq * 0.6));
+      if (k < 1) return true;
+      character.scale.setScalar(1);
+      return false;
+    });
+  }
   /* What the app's animal bubble asks the island to show. */
   function residentFx(id, kind) {
     const room = rooms[currentRoomKey];
@@ -4475,10 +4733,14 @@ export async function bootFocciWorld(root, opts) {
       if (!(b.hopT > 0)) { b.hopBase = p.y; b.hopT = 0.5; }
       b.target = null; b.cooldown = 3;
       b.obj.rotation.y = Math.atan2(character.position.x - p.x, character.position.z - p.z);
-    } else if (kind === 'feed') spawnPickupBurst(room, p.x, top * 0.7 + p.y * 0.3, p.z, 0x8CF0B0);
+    } else if (kind === 'say') {
+      if (!(b.hopT > 0)) { b.hopBase = p.y; b.hopT = 0.35; }
+    } else if (kind === 'nod') focciNod();
+    else if (kind === 'feed') spawnPickupBurst(room, p.x, top * 0.7 + p.y * 0.3, p.z, 0x8CF0B0);
     else if (kind === 'gift') spawnPickupBurst(room, p.x, top, p.z, 0xFFD36A);
   }
-  return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, get currentRoom() { return currentRoomKey; } };
+  return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
+    residentSleep, residentBath, residentFollow, anchorOf, residentsHere, celebrateAt, get currentRoom() { return currentRoomKey; } };
   } catch (err) {
     // Surface the real error on-screen instead of a silent black canvas —
     // this is what to screenshot/read out if boot fails again.

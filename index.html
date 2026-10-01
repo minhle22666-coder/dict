@@ -6864,6 +6864,91 @@
     50%{transform:translateY(-38px) scale(.95,1.06)}82%{transform:translateY(0) scale(1.08,.9)}100%{transform:translateY(0) scale(1,1)}}
   .cz-focci.hop2 img{animation:cz-hop2 .42s cubic-bezier(.3,.6,.4,1)}
   .cz-focci.hop2 .cz-puff b{animation:cz-puff .45s cubic-bezier(.2,.7,.3,1) .3s forwards}
+
+  /* ---------------- talking in the world, bath/sleep, the hunt ---------------- */
+  .pt-btns.six{grid-template-columns:repeat(3,1fr)}
+  .pt-btns.six button{height:54px}
+  .pt-about{display:block;width:100%;margin-top:8px;padding:4px 0 0;border:0;background:none;cursor:pointer;
+    font-size:12px;font-weight:600;color:var(--cz-sage);text-align:center}
+  .pt-clean{margin-left:auto;font-size:11px;color:var(--cz-soft)}
+  .pt-clean.c1{color:var(--cz-clay)}
+  .pt-status{display:flex;justify-content:space-between;gap:8px;margin:2px 0 4px;font-size:12px;color:var(--cz-soft)}
+
+  /* the line you type into: slim, at the foot, the island stays in view */
+  .pt-talk{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:62;display:none;
+    flex-direction:column;gap:6px}
+  html.pt-talk-on .pt-talk{display:flex}
+  html.pt-talk-on .fw-menu-cluster, html.pt-talk-on #fw-word-progress{visibility:hidden}
+  .pt-talk-sugg{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:0 2px}
+  .pt-talk-sugg::-webkit-scrollbar{display:none}
+  .pt-talk-sugg button, .pt-talk-tag{flex:none;height:28px;padding:0 11px;border:0;border-radius:99px;display:inline-flex;align-items:center;
+    font-size:11.5px;font-weight:600;color:var(--cz-sage);background:rgba(251,252,244,.92);box-shadow:var(--cz-rim),0 3px 10px rgba(46,56,38,.12);cursor:pointer}
+  .pt-talk-tag{color:#fff;background:var(--cz-sage);cursor:default}
+  .pt-talk-in{display:flex;align-items:center;gap:6px;padding:5px;border-radius:99px;
+    background:rgba(251,252,244,.97);box-shadow:var(--cz-rim),var(--cz-hair),0 10px 28px rgba(46,56,38,.2)}
+  .pt-talk-who{flex:none;max-width:78px;padding:0 4px 0 10px;font-size:12px;font-weight:700;color:var(--cz-sage);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pt-talk-in input{flex:1;min-width:0;height:38px;padding:0 10px;border:0;border-radius:99px;font-size:15px;color:var(--cz-ink);background:#fff;
+    box-shadow:inset 0 0 0 1px var(--cz-line)}
+  .pt-talk-in input:focus{outline:none;box-shadow:inset 0 0 0 1.5px var(--cz-sage)}
+  .pt-send{flex:none;width:38px;height:38px;border:0;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;
+    color:#fff;background:var(--cz-sage)}
+  .pt-send svg{width:17px;height:17px}
+
+  /* the bubbles over their heads */
+  .pt-bub{position:fixed;left:0;top:0;z-index:61;max-width:min(62vw,250px);max-height:42vh;overflow-y:auto;padding:10px 13px;
+    border-radius:18px;font-size:13.5px;line-height:1.45;color:var(--cz-ink);background:rgba(255,255,253,.97);
+    box-shadow:var(--cz-rim),var(--cz-hair),0 8px 22px rgba(46,56,38,.2);opacity:0;pointer-events:none;
+    transition:opacity .2s ease;will-change:transform}
+  .pt-bub.show{opacity:1;pointer-events:auto;animation:pt-pop .28s cubic-bezier(.3,1.4,.4,1)}
+  @keyframes pt-pop{from{scale:.85}to{scale:1}}
+  .pt-bub::after{content:'';position:absolute;left:var(--tail,50%);bottom:-7px;width:14px;height:14px;margin-left:-7px;
+    background:inherit;transform:rotate(45deg);border-radius:0 0 4px 0;box-shadow:3px 3px 6px rgba(46,56,38,.08)}
+  .pt-bub.me{color:#fff;background:var(--cz-sage)}
+  .pt-bub.me::after{background:var(--cz-sage)}
+  .pt-bub i{font-style:italic;color:var(--cz-soft)}
+  .pt-bub .pt-hl{color:var(--cz-sage)}
+  .pt-dots{display:inline-flex;gap:4px;padding:4px 2px}
+  .pt-dots i{width:6px;height:6px;border-radius:50%;background:var(--cz-faint);animation:pt-dot 1s ease-in-out infinite}
+  .pt-dots i:nth-child(2){animation-delay:.15s}
+  .pt-dots i:nth-child(3){animation-delay:.3s}
+  .pt-giftbtn.in-bub{width:100%;height:36px;margin:8px 0 0;font-size:12.5px}
+
+  /* the paragraph hunt */
+  .pt-hunt{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:62;display:none;
+    align-items:center;gap:10px;padding:10px 10px 10px 14px;border-radius:20px;
+    background:rgba(251,252,244,.97);box-shadow:var(--cz-rim),var(--cz-hair),0 10px 28px rgba(46,56,38,.2)}
+  .pt-hunt.show{display:flex}
+  html.pt-hunt-on .fw-menu-cluster{visibility:hidden}
+  .pt-hunt-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .pt-hunt-t b{font-size:13.5px;color:var(--cz-ink)}
+  .pt-hunt-t span{font-size:11.5px;line-height:1.35;color:var(--cz-soft)}
+  .pt-hunt-a{flex:none;display:flex;align-items:center;gap:6px}
+  .pt-hunt-a > span{font-size:14px;color:var(--cz-ink)}
+  .pt-hunt-go{height:36px;padding:0 14px;border:0;border-radius:99px;cursor:pointer;font-size:13px;font-weight:700;color:#fff;background:var(--cz-sage)}
+  .pt-hunt-go[disabled]{opacity:.4;cursor:default}
+  .pt-bub.hunt{max-width:min(78vw,300px)}
+  .pt-hb-who{margin-bottom:4px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--cz-faint)}
+  .pt-bub.hunt p{margin:0;font-size:13.5px;line-height:1.5}
+  .pt-hb-acts{display:flex;gap:6px;margin-top:10px}
+  .pt-hb-acts button{flex:1;height:34px;border:0;border-radius:99px;cursor:pointer;font-size:12.5px;font-weight:700;color:#fff;background:var(--cz-sage)}
+  .pt-hb-acts button.ghost{color:var(--cz-sage);background:var(--cz-sage-bg)}
+  .hunt-xp{align-self:flex-start;margin:10px 0 2px;display:inline-block;padding:4px 12px;border-radius:99px;font-size:14px;color:#6B4D12;background:var(--cz-honey-bg)}
+  .hunt-story{margin:10px 0 0;padding:0 0 0 20px;display:flex;flex-direction:column;gap:10px}
+  .hunt-story li{font-size:14px;line-height:1.55;color:var(--cz-ink-2)}
+
+  /* how XP works */
+  html body .view.fw-panel#v-stats .pj-rules{align-self:center;padding:10px 16px;border:0;border-radius:99px;cursor:pointer;
+    font-size:13px;font-weight:600;color:var(--cz-sage);background:var(--cz-sage-bg)}
+  .xr-h{margin:16px 0 6px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--cz-soft)}
+  .xr{width:100%;border-collapse:collapse;border-radius:14px;overflow:hidden;background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line)}
+  .xr td{padding:9px 12px;font-size:13px;color:var(--cz-ink);border-top:1px solid var(--cz-line)}
+  .xr tr:first-child td{border-top:0}
+  .xr td.num{text-align:right;white-space:nowrap;color:var(--cz-sage)}
+
+  /* the island's hints, in the same daylight glass */
+  html body .fw-hint{color:var(--cz-ink);font-weight:600;background:rgba(251,252,244,.96);
+    box-shadow:var(--cz-rim),var(--cz-hair),0 8px 22px rgba(46,56,38,.18);backdrop-filter:none;-webkit-backdrop-filter:none}
 </style>
 </head>
 <body>
@@ -7151,7 +7236,7 @@
       <div class="sx-field">
         <label for="goal">Daily XP goal</label>
         <input id="goal" type="number" min="5" step="5" placeholder="20"/>
-        <p class="sx-hint">Search +1 · save +1 · correct answer +1 · Speak Up +2 · Hot Take +5.</p>
+        <p class="sx-hint">Search +1 · save +1 · right answer +1 · Speak Up +2 · Hot Take +5 · quests +10–15. The full table is in Progress › How XP works.</p>
       </div>
       <div class="sx-sep"></div>
       <div class="sx-field">
@@ -7800,6 +7885,7 @@
     });
     worldReady = true;
     window.fwResidentFx = (id, kind) => { if (worldApi && worldApi.residentFx) worldApi.residentFx(id, kind); };
+    window.fwWorld = worldApi;   // pets.js: talk, sleep, bath, follow, the hunt
     document.documentElement.classList.remove('world-loading');
     czLive();
     if (window.__wantWorld) {
