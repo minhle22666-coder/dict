@@ -2224,6 +2224,10 @@ export async function bootFocciWorld(root, opts) {
      separate squares "ugly and unclear": at follow-camera distance the
      squares merged into a dotted line and the name sat in a flat panel. */
   function nameplateTexture(name, segs) {
+    /* No card behind the name any more -- the user asked for the white
+       pill and its rim to go and the name to stand out on its own: heavy
+       letters with a dark outline and a soft shadow, readable on sand,
+       grass or sky, and one slim bar under them on a dark track. */
     const key = name + '|' + segs;
     if (plateTextures.has(key)) return plateTextures.get(key);
     const W = 360, H = 128;
@@ -2231,41 +2235,28 @@ export async function bootFocciWorld(root, opts) {
     c.width = W; c.height = H;
     const g = c.getContext('2d');
     const asleep = /^\u{1F4A4}/u.test(name);
-    const label = String(name || '').replace(/^\u{1F4A4}\s*/u, '').slice(0, 14);
-    const col = segs <= 3 ? '#D3906E' : segs <= 6 ? '#D8B560' : '#7D9A63';
-    g.font = '700 30px Raleway, "Segoe UI", sans-serif';
-    const tw = Math.min(W - 90, g.measureText(label).width);
-    const pw = tw + 66, px = (W - pw) / 2, py = 8, ph = 52;
+    const label = (asleep ? '☾ ' : '') + String(name || '').replace(/^\u{1F4A4}\s*/u, '').slice(0, 14);
+    const col = segs <= 3 ? '#F2A27E' : segs <= 6 ? '#F4D06F' : '#A9D98A';
+    g.font = '800 40px Raleway, "Segoe UI", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineJoin = 'round';
     g.save();
-    g.shadowColor = 'rgba(38,48,30,.30)'; g.shadowBlur = 12; g.shadowOffsetY = 3;
-    g.fillStyle = 'rgba(255,255,250,.97)';
-    g.beginPath(); g.roundRect(px, py, pw, ph, 26); g.fill();
+    g.shadowColor = 'rgba(20,26,14,.55)'; g.shadowBlur = 10; g.shadowOffsetY = 3;
+    g.lineWidth = 9; g.strokeStyle = 'rgba(34,42,26,.85)';
+    g.strokeText(label, W / 2, 40, W - 20);
     g.restore();
-    if (asleep) {
-      g.fillStyle = '#8FA7D8'; g.beginPath(); g.arc(px + 27, py + 26, 9.5, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#FFFFFA'; g.beginPath(); g.arc(px + 31.5, py + 22, 8.5, 0, Math.PI * 2); g.fill();
-    } else {
-      g.fillStyle = col; g.beginPath(); g.arc(px + 27, py + 26, 7.5, 0, Math.PI * 2); g.fill();
-    }
-    g.fillStyle = '#2E3826'; g.textAlign = 'left'; g.textBaseline = 'middle';
-    g.fillText(label, px + 44, py + 27, tw);
+    g.fillStyle = asleep ? '#DDE6FF' : '#FFFFFA';
+    g.fillText(label, W / 2, 40, W - 20);
     // the energy: one bar, ten notches -- a notch is a meal
-    const bw = 168, bx = (W - bw) / 2, by = 80, bh = 14;
-    g.save();
-    g.shadowColor = 'rgba(38,48,30,.22)'; g.shadowBlur = 6; g.shadowOffsetY = 2;
-    g.fillStyle = 'rgba(255,255,250,.95)';
-    g.beginPath(); g.roundRect(bx - 4, by - 4, bw + 8, bh + 8, 11); g.fill();
-    g.restore();
-    g.fillStyle = 'rgba(94,122,72,.16)';
-    g.beginPath(); g.roundRect(bx, by, bw, bh, 7); g.fill();
+    const bw = 150, bx = (W - bw) / 2, by = 84, bh = 12;
+    g.fillStyle = 'rgba(34,42,26,.55)';
+    g.beginPath(); g.roundRect(bx - 2, by - 2, bw + 4, bh + 4, 8); g.fill();
     if (segs > 0) {
-      const gr = g.createLinearGradient(bx, 0, bx + bw, 0);
-      gr.addColorStop(0, col); gr.addColorStop(1, segs >= 7 ? '#93AE74' : col);
-      g.fillStyle = gr;
-      g.beginPath(); g.roundRect(bx, by, Math.max(bh, bw * segs / 10), bh, 7); g.fill();
+      g.fillStyle = col;
+      g.beginPath(); g.roundRect(bx, by, Math.max(bh, bw * segs / 10), bh, 6); g.fill();
     }
-    g.fillStyle = 'rgba(255,255,250,.8)';
-    for (let i = 1; i < 10; i++) g.fillRect(Math.round(bx + bw * i / 10) - 1, by + 3, 2, bh - 6);
+    g.fillStyle = 'rgba(34,42,26,.45)';
+    for (let i = 1; i < 10; i++) g.fillRect(Math.round(bx + bw * i / 10) - 1, by + 2, 2, bh - 4);
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
     if (plateTextures.size > 60) { const k0 = plateTextures.keys().next().value; plateTextures.get(k0).dispose(); plateTextures.delete(k0); }
@@ -2455,8 +2446,13 @@ export async function bootFocciWorld(root, opts) {
     bar.position.set(spot.x, spot.y + headY + barLift, spot.z);
     room.group.add(bar);
 
-    const hit = addInvisibleHitbox(room, spot.x, spot.y + headY * 0.5, spot.z, Math.max(0.6, headY * 0.6), 'resident');
+    /* Easy to hit: the ball covers the whole animal with room to spare,
+       and the nameplate over it is a target too -- a tap that had to find
+       a small animal's middle was the "hard to press" report. */
+    const hit = addInvisibleHitbox(room, spot.x, spot.y + headY * 0.5, spot.z, Math.max(0.8, headY * 0.9), 'resident');
     hit.userData.residentId = rec.id;
+    bar.userData.interactType = 'resident'; bar.userData.residentId = rec.id;
+    room.interactive.push(bar);
 
     const body = {
       id: rec.id, obj, bar, hit, mixer, footOffset, headY, barLift,
@@ -3721,7 +3717,7 @@ export async function bootFocciWorld(root, opts) {
         holdAt = null;
         releaseGesture();
         root.dispatchEvent(new CustomEvent('focci-hold', { bubbles: true }));
-      }, 1500);
+      }, 1000);   // the user: a second and a half was too long to discover
     }
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -3915,7 +3911,8 @@ export async function bootFocciWorld(root, opts) {
     ndcVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(ndcVec, camera);
     const room = activeRoom();
-    const hits = raycaster.intersectObjects(room.interactive, true);
+    // a nameplate hidden for distance is not there to be tapped
+    const hits = raycaster.intersectObjects(room.interactive, true).filter((h) => h.object.visible || !h.object.isSprite);
     // No early return on an empty ray. That `if (!hits.length) return;` sat
     // ABOVE the double-tap branch below, so tapping open ground or sky —
     // the only place you would ever double-tap — bailed out before the

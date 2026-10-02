@@ -7421,6 +7421,56 @@ document.documentElement.classList.add('home-on');</script>
   .fa-cc button.on{color:#fff;background:#3F5E9C;box-shadow:none}
   .fa-yt{position:relative;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000}
   .fa-yt iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+  /* ---------------- ROUND ACTIONS, as glass (the animals' ring and Focci's) ----------------
+     The user's icons on a pane of glass: a translucent white face with a
+     light blur of the island behind it, a bright rim, a sheen across the
+     top and a soft coloured glow from the icon's own tint. Seven or four
+     56px discs, not a full-screen layer, so the blur is cheap. */
+  html body .pr-b{width:72px}
+  html body .pr-c{width:58px;height:58px;color:inherit;
+    background:linear-gradient(160deg,rgba(255,255,255,.55),rgba(255,255,255,.16) 55%,rgba(255,255,255,.28));
+    -webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.95),inset 0 0 0 1px rgba(255,255,255,.55),inset 0 -8px 16px rgba(255,255,255,.12),
+      0 8px 22px rgba(30,40,20,.22),0 2px 6px rgba(30,40,20,.12)}
+  html body .pr-c img{width:34px;height:34px;display:block;filter:drop-shadow(0 2px 3px rgba(30,40,20,.18));pointer-events:none}
+  html body .pr-c::before{content:'';position:absolute;left:10px;right:10px;top:4px;height:40%;border-radius:50% 50% 45% 45%;
+    background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,0));pointer-events:none}
+  html body .pr-c{position:relative}
+  html body .pr-b.down .pr-c,html body .pr-b:active .pr-c{transform:scale(.9) !important;background:linear-gradient(160deg,rgba(255,255,255,.75),rgba(255,255,255,.35))}
+  html body .pr-t{margin-top:2px;font-size:11px;letter-spacing:.01em}
+  /* the bond note in the animal's card wrapped onto lines far apart */
+  .pt-bond-note{margin:-6px 0 12px;font-size:11.5px;line-height:1.4;color:var(--cz-honey)}
+  .rz-card .pr-note,.rz-card .pt-bond-note{line-height:1.4}
+  /* the hold: a second now */
+  .fa-hold.on i{animation-duration:.85s !important}
+  /* a nudge to discover the hold */
+  .fa-tip{position:fixed;z-index:60;left:0;top:0;display:flex;align-items:center;gap:7px;padding:7px 12px 7px 9px;border-radius:99px;pointer-events:none;
+    font-size:12px;font-weight:700;color:var(--cz-ink);background:rgba(255,255,250,.9);box-shadow:var(--cz-rim),0 8px 20px rgba(30,40,20,.22);
+    opacity:0;transition:opacity .35s ease}
+  .fa-tip.on{opacity:1}
+  .fa-tip i{position:relative;width:18px;height:18px;border-radius:50%;background:var(--cz-sage-bg)}
+  .fa-tip i::after{content:'';position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 2px var(--cz-sage);animation:fa-tipring 1.6s ease-out infinite}
+  .fa-tip i::before{content:'';position:absolute;left:5px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--cz-sage)}
+  @keyframes fa-tipring{0%{transform:scale(.6);opacity:1}80%,100%{transform:scale(1.7);opacity:0}}
+
+  /* ---------------- KEYBOARD (see the script before pets.js) ---------------- */
+  html.kb-on .pt-talk{bottom:calc(var(--kb) + 8px)}
+  html.kb-on .oc,html.kb-on .fa-story,html.kb-on .pt-sheet{top:var(--vvt);bottom:auto;height:var(--vvh)}
+  html.kb-on .oc-in{max-height:calc(var(--vvh) - 8px)}
+  html.kb-on .pq2,html.kb-on .fa-bar{bottom:calc(var(--kb) + 10px)}
+  html.kb-on .view.fw-panel.active{padding-bottom:var(--kb)}
+
+  .ls-revopen{display:block;width:100%;margin:-6px 0 12px;padding:10px 14px;border:0;border-radius:14px;cursor:pointer;text-align:left;
+    font-size:12.5px;font-weight:600;color:var(--cz-honey);background:var(--cz-honey-bg)}
+  .ls-revopen b{font-size:14px;margin-right:2px}
+  html body .view.fw-panel#v-review .ls-revbar{grid-template-columns:1.6fr 1fr}
+  html body .view.fw-panel#v-review .ls-revbtn{border:0;cursor:pointer;text-align:left}
+  html body .view.fw-panel#v-review .ls-revbtn b{font-size:13px;font-weight:600;color:var(--cz-sage)}
+
+  .pr-say.pop{animation:pr-saypop .55s cubic-bezier(.3,1.5,.4,1);color:var(--cz-ink);font-weight:600}
+  @keyframes pr-saypop{0%{transform:scale(.9);background:rgba(214,170,80,.0)}40%{transform:scale(1.04);background:rgba(214,170,80,.22)}100%{transform:none;background:rgba(214,170,80,.0)}}
+  .pr-say{border-radius:10px;padding:2px 4px;margin-left:-4px;margin-right:-4px}
 </style>
 </head>
 <body>
@@ -8123,7 +8173,7 @@ document.documentElement.classList.add('home-on');</script>
     <p class="cz-sub">Short rounds with the words you already have.</p>
     <div class="fh-games">
       <button class="fh-game g1" onclick="fhGame(this,'type')"><img src="./fox-letter-trail.webp" alt=""/><span>Letter Trail<em>Spell it back</em></span></button>
-      <button class="fh-game g2" onclick="fhGame(this,'listen')"><img src="./mascot-take_note.webp" alt=""/><span>Listening<em>Hear it, write it</em></span></button>
+      <button class="fh-game g2" onclick="fhGame(this,'listen')"><img src="./fox-word-pairs.webp" alt=""/><span>Echo Catch<em>Hear it, write it</em></span></button>
       <button class="fh-game g3" onclick="fhGame(this,'write')"><img src="./fox-speak-up.webp" alt=""/><span>Speak Up<em>Say it in English</em></span></button>
       <button class="fh-game g4" onclick="fhGame(this,'hottake')"><img src="./fox-hot-take.webp" alt=""/><span>Hot Take<em>Read the news</em></span></button>
     </div>
@@ -8235,6 +8285,47 @@ document.documentElement.classList.add('home-on');</script>
 <script src="./hottake.js"></script>
 <script src="./journal.js"></script>
 <script src="./app.js"></script>
+<script>
+/* ============================================================
+   THE KEYBOARD (iPhone)
+
+   Typing in the oracle's question, a game's answer or an animal's chat
+   pushed the screen up and hid both the text and the keyboard. The cause:
+   on iOS the keyboard shrinks the VISUAL viewport and scrolls it, while
+   position:fixed layers stay pinned to the LAYOUT viewport -- so a bar at
+   bottom:10px sits behind the keyboard and a full-screen sheet is shifted
+   by the scroll. visualViewport says exactly which part of the layout is
+   still on screen; --kb (the keyboard's height over the layout), --vvh and
+   --vvt (the visible height and its top) let the CSS keep fixed layers in
+   that part (the KEYBOARD block at the end of the stylesheet). A field
+   inside a scrolling panel is scrolled to the middle of what is left.
+   ============================================================ */
+(function () {
+  var vv = window.visualViewport, D = document.documentElement;
+  if (!vv) return;
+  function upd() {
+    var kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    D.style.setProperty('--kb', kb + 'px');
+    D.style.setProperty('--vvh', Math.round(vv.height) + 'px');
+    D.style.setProperty('--vvt', Math.round(vv.offsetTop) + 'px');
+    D.classList.toggle('kb-on', kb > 80);
+  }
+  vv.addEventListener('resize', upd);
+  vv.addEventListener('scroll', upd);
+  upd();
+  document.addEventListener('focusin', function (e) {
+    var el = e.target;
+    if (!el || !el.matches || !el.matches('input:not([type=checkbox]):not([type=range]),textarea')) return;
+    setTimeout(function () {
+      upd();
+      // the page itself never scrolls in this app: put it back where it was
+      if (window.scrollY) window.scrollTo(0, 0);
+      try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) {}
+    }, 320);
+  });
+  document.addEventListener('focusout', function () { setTimeout(upd, 120); });
+})();
+</script>
 <script src="./pets.js"></script>
 <script src="./oracle.js"></script>
 <script src="./focci-acts.js"></script>

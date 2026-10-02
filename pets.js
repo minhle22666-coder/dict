@@ -324,6 +324,9 @@
     drop: '<path d="M12 4c2.6 3.4 5 6.4 5 9a5 5 0 0 1-10 0c0-2.6 2.4-5.6 5-9z"/>'
   };
   function ic(k) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + SVG[k] + '</svg>'; }
+  // the user's own icons for the actions (assets/icons); the line icons stay for the meters
+  var PNG = { feed: 'feed', pet: 'pet', talk: 'talk', quiz: 'puzzle', play: 'ball', bath: 'bath', sleep: 'sleep' };
+  function png(k) { return '<img src="./assets/icons/' + PNG[k] + '.png" alt="" draggable="false"/>'; }
   var ACTS = [
     { k: 'feed', t: 'Feed', fn: 'petFeed', sub: '2 XP' },
     { k: 'pet', t: 'Pet', fn: 'petPet' },
@@ -340,6 +343,7 @@
     d.innerHTML = '<div class="pr" id="pr"><div class="pr-stat" id="pr-stat"></div><div class="pr-ring" id="pr-ring"></div></div>'
       + '<div class="pq2" id="pq2"></div>';
     while (d.firstChild) document.body.appendChild(d.firstChild);
+    ringPress($('pr-ring'), function (fn, id) { if (typeof window[fn] === 'function') window[fn](id || undefined); });
   }
   function meter(k, pct, txt, cls) {
     return '<div class="pr-m ' + (cls || '') + '"><i>' + ic(k) + '</i><div class="pr-bar"><b style="width:' + Math.max(0, Math.min(100, pct)) + '%"></b></div>'
@@ -369,13 +373,19 @@
     $('pr-stat').innerHTML = h;
     var ring = $('pr-ring');
     ring.innerHTML = sleeping ? '' : ACTS.map(function (a, i) {
-      return '<button class="pr-b pr-' + a.k + '" style="--i:' + i + '" onclick="' + a.fn + '(' + (a.k === 'play' ? '' : '\'' + r.id + '\'') + ')">'
-        + '<span class="pr-c">' + ic(a.k) + '</span><span class="pr-t">' + a.t + (a.sub ? '<small class="num">' + a.sub + '</small>' : '') + '</span></button>';
+      return '<button class="pr-b pr-' + a.k + '" style="--i:' + i + '" data-act="' + a.fn + '" data-id="' + (a.k === 'play' ? '' : r.id) + '">'
+        + '<span class="pr-c">' + png(a.k) + '</span><span class="pr-t">' + a.t + (a.sub ? '<small class="num">' + a.sub + '</small>' : '') + '</span></button>';
     }).join('');
   }
   var _place = { w: 0 };
   function placeRing() {
     var el = $('pr'); if (!el || !RG.id) return;
+    /* While a finger is down on the ring nothing moves under it. The
+       ring follows the animal every frame and the camera is still easing
+       in for the first half second, so a button could slide out from
+       under a tap before it lifted -- the "Bath does nothing, the buttons
+       feel offset" report. */
+    if (RG.press) return;
     var a = W() && W().focusAnchor ? W().focusAnchor() : null;
     if (!a || !a.c.on || a.id !== RG.id) { el.classList.add('off'); return; }
     el.classList.remove('off');
@@ -388,7 +398,8 @@
     if (!n) return;
     /* An arc under and around the animal, from just above its left side,
        through below it, to just above its right: the card has the top. */
-    var R = Math.max(108, Math.min(150, a.r + 58));
+    // 72px buttons: under 126 the top pairs (Feed/Pet, Sleep/Bath) overlapped
+    var R = Math.max(126, Math.min(165, a.r + 70));
     // the highest buttons sit level with the middle, so the middle goes below the card
     var cy = Math.max(a.c.y, sy + sh + 44 + R * 0.17);
     for (var i = 0; i < n; i++) {
@@ -396,8 +407,31 @@
       var x = a.c.x + Math.cos(th) * R, y = cy + Math.sin(th) * R;
       x = Math.max(34, Math.min(VW - 34, x));
       y = Math.max(sy + sh + 30, Math.min(VH - 58, y));
-      bs[i].style.transform = 'translate(' + Math.round(x - 32) + 'px,' + Math.round(y - 27) + 'px)';
+      var tx = 'translate(' + Math.round(x - 32) + 'px,' + Math.round(y - 27) + 'px)';
+      if (bs[i]._tx !== tx) { bs[i].style.transform = tx; bs[i]._tx = tx; }
     }
+  }
+  /* One handler for the whole ring, on the finger lifting over the same
+     button it went down on -- not onclick, which WebKit drops when the
+     element moved between touchstart and touchend. */
+  function ringPress(root, onAct) {
+    var down = null;
+    root.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest && e.target.closest('[data-act]'); if (!b) return;
+      down = b; RG.press = true; b.classList.add('down');
+    });
+    var end = function (e) {
+      var b = down; down = null; RG.press = false;
+      if (!b) return;
+      b.classList.remove('down');
+      if (e.type !== 'pointerup') return;
+      var r = b.getBoundingClientRect();
+      // lifted anywhere over that button (with a little slack) counts
+      if (e.clientX < r.left - 14 || e.clientX > r.right + 14 || e.clientY < r.top - 14 || e.clientY > r.bottom + 14) return;
+      onAct(b.dataset.act, b.dataset.id);
+    };
+    root.addEventListener('pointerup', end);
+    root.addEventListener('pointercancel', end);
   }
   function ringLoop() {
     cancelAnimationFrame(RG.raf);
@@ -410,6 +444,14 @@
     var fresh = RG.id !== id;
     cur = id; RG.id = id;
     renderAct(r, said);
+    /* An answer has to be seen: Bath on a clean animal only swapped one
+       line of small italic text, and it read as "the button does
+       nothing". The line pops and the phone ticks. */
+    if (said) {
+      var sl = document.querySelector('#pr-stat .pr-say');
+      if (sl) { sl.classList.remove('pop'); void sl.offsetWidth; sl.classList.add('pop'); }
+      if (navigator.vibrate) try { navigator.vibrate(12); } catch (e) {}
+    }
     var el = $('pr');
     if (fresh) {
       el.classList.remove('on'); void el.offsetWidth;
@@ -1016,8 +1058,8 @@
     h += '<div class="rz-pic" data-species="' + esc(r.species) + '"></div>';
     h += '<div class="rz-head"><div class="rz-name">' + esc(r.name) + '</div>'
       + '<div class="rz-species">' + esc(sp.label) + ' · ' + (window.resStage ? window.resStage(r) : '') + ' · <span class="num">' + age + '</span> day' + (age === 1 ? '' : 's') + ' old</div></div>';
-    h += '<div class="pt-persona"><div><span>Master of</span><b>' + esc(m.label) + '</b><i>' + esc(m.vi) + '</i></div>'
-      + '<div><span>Personality</span><b>' + esc(v.label) + '</b><i>' + esc(v.vi) + '</i></div></div>';
+    h += '<div class="pt-persona"><div><span>Master of</span><b>' + esc(m.label) + '</b></div>'
+      + '<div><span>Personality</span><b>' + esc(v.label) + '</b></div></div>';
     h += '<div class="pt-energy big">' + pips(r) + '<span class="pt-meals">' + (meals ? '<b class="num">' + meals + '</b> meal' + (meals === 1 ? '' : 's') + ' to full · each meal one bar' : 'Full of energy') + '</span></div>';
     h += bondBar(r);
     h += '<div class="pt-bond-why">Petting, feeding, talking, baths and playing together grow the bond. Once it reaches the mark, a happy animal brings a gift back from a long sleep (three hours) \u2014 one a day. At each mark, a happy ' + esc(sp.label.toLowerCase()) + ' gives you a lesson from its mastery.</div>';
@@ -1028,13 +1070,7 @@
     if (r.likes) h += '<div class="rz-likes">Loves <b>' + esc(r.likes) + '</b>' + (r.found ? ' · found ' + esc(r.found) : '') + '</div>';
     var cl = cleanOf(r);
     h += '<div class="pt-status"><span>\u{1FAE7} ' + cleanWord(cl) + '</span><span>' + (asleep(r) ? '\u{1F4A4} asleep' : (r.wokeAt && Date.now() - r.wokeAt < SLEEP_GAP ? '\u{1F319} rested' : '\u{1F319} could nap')) + '</span></div>';
-    h += '<div class="pt-btns in-card">'
-      + '<button onclick="rzClose();petFeed(\'' + r.id + '\')"><i>\u{1F34E}</i>Feed<small class="num">2 XP</small></button>'
-      + '<button onclick="rzClose();petPet(\'' + r.id + '\')"><i>\u{1F43E}</i>Pet</button>'
-      + '<button onclick="rzClose();petTalk(\'' + r.id + '\')"><i>\u{1F4AC}</i>Talk</button>'
-      + '<button onclick="rzClose();petBath(\'' + r.id + '\')"><i>\u{1F6C1}</i>Bath</button>'
-      + '<button onclick="rzClose();petSleep(\'' + r.id + '\')"><i>\u{1F319}</i>Sleep</button>'
-      + '<button onclick="rzClose();petPlay()"><i>\u{1F9E9}</i>Play</button></div>';
+    // only the animal's story here: the actions live in the ring round it on the island
     return h;
   };
 
@@ -1143,7 +1179,7 @@
       + '<button class="pt-x" aria-label="Close" onclick="petCloseGift()">\u00d7</button></div>'
       + '<p class="pt-g-intro">A good day is ten to fifteen minutes: one game round, a few lookups and one quest clear the daily goal. The animals never have to cost you XP \u2014 two naps a day keep them going; food is the fast way and builds the bond.</p>'
       + '<div class="xr-h">Earn</div><table class="xr">' + rows([
-          ['Look up or save a word', '+1'], ['A word found \u00b7 Letter Trail', '+1'], ['Listening \u00b7 80% / 50%+', '+2 / +1'], ['Word Pairs with an animal \u00b7 right answer', '+1'], ['Speak Up answer', '+2'],
+          ['Look up or save a word', '+1'], ['A word found \u00b7 Letter Trail', '+1'], ['Echo Catch \u00b7 80% / 50%+', '+2 / +1'], ['Word Pairs with an animal \u00b7 right answer', '+1'], ['Speak Up answer', '+2'],
           ['Finish a Hot Take article', '+5'], ['Island letter \u00b7 mushroom', '+1'], ['Complete the hidden word', '+3'], ['Open the treasure', '+6'],
           ['Paragraph hunt \u00b7 1st / 2nd / later check', '+12 / +9 / +6'], ['3rd hunt of the day and after', '+3'],
           ['Quests \u00b7 5 lookups, a save, an animal', '+10 each'], ['Quest \u00b7 play a game', '+15']]) + '</table>'
@@ -1170,6 +1206,7 @@
   };
 
   window.petEnsure = ensurePersonas;
+  window.ringPress = ringPress;
   window.giftLoad = giftLoad;
   window.petMasteries = MASTERIES;
   setTimeout(ensurePersonas, 0);

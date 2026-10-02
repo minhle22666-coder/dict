@@ -46,6 +46,7 @@
     { k: 'relax', t: 'Relax', fn: 'faRelax' },
     { k: 'stories', t: 'Stories', fn: 'faStories' }
   ];
+  var ICON = { guitar: 'guitar', jog: 'jog', relax: 'relax', stories: 'castle' };
   function dom() {
     if ($('fa-hold')) return;
     var d = document.createElement('div');
@@ -55,6 +56,9 @@
       + '<div class="fa-relax" id="fa-relax"></div>'
       + '<div class="fa-story" id="fa-story"></div>';
     while (d.firstChild) document.body.appendChild(d.firstChild);
+    // the same press-and-lift handling as the animals' ring (pets.js)
+    if (window.ringPress) window.ringPress($('fa-btns'), function (fn) { if (typeof window[fn] === 'function') window[fn](); });
+    else $('fa-btns').addEventListener('click', function (e) { var b = e.target.closest('[data-act]'); if (b && window[b.dataset.act]) window[b.dataset.act](); });
   }
 
   /* ---------------- the hold, and the ring ---------------- */
@@ -65,7 +69,7 @@
     h.style.left = p.x + 'px'; h.style.top = p.y + 'px';
     clearTimeout(holdShowT);
     // a quick tap on him is still a tap: the ring only appears for a real hold
-    holdShowT = setTimeout(function () { h.classList.remove('on'); void h.offsetWidth; h.classList.add('on'); }, 250);
+    holdShowT = setTimeout(function () { h.classList.remove('on'); void h.offsetWidth; h.classList.add('on'); }, 150);
   });
   document.addEventListener('focci-hold-cancel', function () { clearTimeout(holdShowT); var h = $('fa-hold'); if (h) h.classList.remove('on'); });
   var R = { raf: 0, open: false };
@@ -79,7 +83,7 @@
     dom();
     if (window.petHide) try { window.petHide(); } catch (e) {}
     $('fa-btns').innerHTML = ACTS.map(function (a, i) {
-      return '<button class="pr-b fa-k-' + a.k + '" style="--i:' + i + '" onclick="' + a.fn + '()"><span class="pr-c">' + ic(a.k) + '</span><span class="pr-t">' + a.t + '</span></button>';
+      return '<button class="pr-b fa-k-' + a.k + '" style="--i:' + i + '" data-act="' + a.fn + '"><span class="pr-c"><img src="./assets/icons/' + ICON[a.k] + '.png" alt="" draggable="false"/></span><span class="pr-t">' + a.t + '</span></button>';
     }).join('');
     var el = $('fa-ring'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
     R.open = true;
@@ -453,6 +457,41 @@
     n.classList.add('on');
   }
   window.faPP = function () { if (!AU) return; if (AU.paused) AU.play().catch(function () {}); else AU.pause(); };
+
+  /* ---------------- telling people the hold exists ----------------
+     Nothing on screen said Focci could be held, so nobody found it. Until
+     the first real hold, a small "Hold me" chip with a pulsing ring sits
+     over his head now and then: when the island is on screen, nothing is
+     open, and he has been standing still for a few seconds. Twice a
+     session at most, five seconds each. */
+  var TIP = { shown: 0, until: 0, still: 0, last: null, raf: 0 };
+  function tipEl() {
+    var t = $('fa-tip');
+    if (!t) { t = document.createElement('div'); t.className = 'fa-tip'; t.id = 'fa-tip'; t.innerHTML = '<i></i>Hold me'; document.body.appendChild(t); }
+    return t;
+  }
+  function held() { try { return localStorage.getItem('fc_held') === '1'; } catch (e) { return false; } }
+  document.addEventListener('focci-hold', function () { try { localStorage.setItem('fc_held', '1'); } catch (e) {} var t = $('fa-tip'); if (t) t.classList.remove('on'); });
+  setInterval(function () {
+    if (held() || TIP.shown >= 2 || CUR || R.open) return;
+    var w = W(); if (!w || !w.focciAnchor) return;
+    var ov = document.getElementById('fw-overlay');
+    if (!ov || ov.style.display === 'none' || D.classList.contains('panel-open') || D.classList.contains('home-on') || D.classList.contains('pr-open')) { TIP.still = 0; return; }
+    var a = w.focciAnchor(); if (!a || !a.top.on) return;
+    var k = Math.round(a.c.x) + ',' + Math.round(a.c.y);
+    TIP.still = (k === TIP.last) ? TIP.still + 1 : 0; TIP.last = k;
+    if (TIP.still < 3 || Date.now() < TIP.until) return;   // three still seconds
+    TIP.shown++; TIP.until = Date.now() + 60000;
+    var t = tipEl(); t.classList.add('on');
+    var end = Date.now() + 5000;
+    var step = function () {
+      var b = w.focciAnchor();
+      if (!b || Date.now() > end || CUR || R.open) { t.classList.remove('on'); return; }
+      t.style.transform = 'translate(' + Math.round(b.top.x - t.offsetWidth / 2) + 'px,' + Math.round(b.top.y - 44) + 'px)';
+      TIP.raf = requestAnimationFrame(step);
+    };
+    step();
+  }, 1000);
 
   window.faDebug = function () { return { CUR: CUR, G: G, AMB: AMB && AMB.k, ST: ST }; };
 })();

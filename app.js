@@ -4321,8 +4321,8 @@ const PG_META = {
            intro:'Read the scenario, type your best English, and Focci gives you instant feedback with native tips.' },
   type:  { banner:'banner-lettertrail.webp', art:'box-lettertrail.png', fox:'fox-letter-trail.webp', name:'Letter Trail',
            intro:'Five words hide in the letters. Read the Vietnamese clue, then drag across the letters to join each one.' },
-  listen:{ banner:'banner-listen.webp', fox:'mascot-take_note.webp', name:'Listening',
-           intro:'Real voices read one to five sentences. Write what you hear \u2014 small slips are pointed out, not punished.' },
+  listen:{ banner:'banner-listen.webp', fox:'fox-word-pairs.webp', name:'Echo Catch',
+           intro:'Real voices say one to five sentences. Catch every word you hear \u2014 small slips are pointed out, never punished.' },
   match: { banner:'banner-wordpairs.webp', art:'box-wordpairs.png', fox:'fox-word-pairs.webp', name:'Word Pairs',
            intro:'Read the Vietnamese, pick the English word that matches, then swipe left for the next one.' }
 };
@@ -6086,8 +6086,24 @@ function lsGrade(ref, typed){
 window.lsGrade=lsGrade;
 
 /* ---------- the page ---------- */
+/* Sentences caught at under 90% go on a pile to try again (fc_echo_review,
+   newest first, 40 at most); catching one at 90% or more takes it off. */
+const LS_REV_LS='fc_echo_review';
+function lsRevLoad(){ try{ return JSON.parse(localStorage.getItem(LS_REV_LS)||'[]'); }catch(e){ return []; } }
+function lsRevSave(l){ try{ localStorage.setItem(LS_REV_LS, JSON.stringify(l.slice(0,40))); }catch(e){} }
+function lsRevKey(item){ return item.parts.map(p=>p.text).join(' '); }
+let lsRevQ=null;
+window.lsReview=function(){
+  const l=lsRevLoad(); if(!l.length) return;
+  lsRevQ=l.map(x=>x.item);
+  renderListen(true);
+};
+window.lsReviewEnd=function(){ lsRevQ=null; renderListen(true); };
 function lsOpts(){
   const n=lsN(), lv=lsLv(), src=lsSrc();
+  const rev=lsRevLoad().length;
+  if(lsRevQ) return '<div class="pg-opts ls-opts ls-revbar"><div class="pg-opt wide fixed"><span>Second chances</span><b><i class="num">'+lsRevQ.length+'</i> left to catch again</b></div>'
+    +'<button class="pg-opt ls-revbtn" onclick="lsReviewEnd()"><span>Done</span><b>New sentences</b></button></div>';
   const opt=(v,l,on)=>'<option value="'+v+'"'+(on?' selected':'')+'>'+l+'</option>';
   return '<div class="pg-opts ls-opts">'
     +'<label class="pg-opt"><span>Sentences</span><select aria-label="Sentences" onchange="lsSet(\'n\',+this.value)">'
@@ -6096,7 +6112,8 @@ function lsOpts(){
       +Object.keys(LS_LEVELS).map(k=>opt(k,LS_LEVELS[k].label,k===lv)).join('')+'</select></label>'
     +'<label class="pg-opt wide"><span>Voices</span><select aria-label="Voices" onchange="lsSet(\'src\',this.value)">'
       +opt('real','Real people',src==='real')+opt('ai','AI podcast'+(getKey()?'':' (key)'),src==='ai')+'</select></label>'
-    +'</div>';
+    +'</div>'
+    +(rev?'<button class="ls-revopen" onclick="lsReview()"><b class="num">'+rev+'</b> sentence'+(rev===1?'':'s')+' under 90% \u2014 catch '+(rev===1?'it':'them')+' again</button>':'');
 }
 async function renderListen(fresh){
   const area=$('#review-area'); if(!area) return;
@@ -6107,8 +6124,10 @@ async function renderListen(fresh){
   if(!ls.item){
     $('#ls-card').innerHTML='<div class="ls-load"><span class="ls-wave"><i></i><i></i><i></i><i></i><i></i></span>Finding something to listen to…</div>';
     const n=lsN(), lv=lsLv();
-    let item=lsSrc()==='ai' ? await lsAiScript(n, lv) : null;
+    if(lsRevQ && !lsRevQ.length) lsRevQ=null;
+    let item=lsRevQ ? lsRevQ.shift() : (lsSrc()==='ai' ? await lsAiScript(n, lv) : null);
     if(!item) item=await lsTatoeba(n, lv);
+    if(item && item.kind==='ai') delete item.tts;
     if(seq!==ls.seq) return;
     if(!item){
       $('#ls-card').innerHTML='<div class="pq-body"><div class="pg-empty">Could not reach the sentence library. Check the connection and try again.</div>'
@@ -6170,6 +6189,11 @@ window.lsCheck=function(){
   if(!t){ i.classList.add('shake'); setTimeout(()=>i.classList.remove('shake'),400); return; }
   lsStop(); ls.busy=false;
   ls.result=lsGrade(ls.item.parts.map(x=>x.text).join(' '), t);
+  { // the pile of second chances
+    const key=lsRevKey(ls.item); let l=lsRevLoad().filter(x=>x.key!==key);
+    if(ls.result.score<90) l.unshift({key, item:{kind:ls.item.kind, topic:ls.item.topic, parts:ls.item.parts}, score:ls.result.score, at:Date.now()});
+    lsRevSave(l);
+  }
   const xp=ls.result.score>=80?2:ls.result.score>=50?1:0;
   if(xp) addXP(xp);
   questBump('game');
