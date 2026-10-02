@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v218`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v231`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -567,11 +567,20 @@ are not tappable); only a miss shows "Ask Focci" (`askFocciSheetHTML`). The
 word sheet is z-index 110: Hot Take (90), the journal (91) and the oracle
 (92) all open it from inside.
 
-**Story night is a radio, not a list** (focci-acts.js `RS`, world.js
-`buildRadio/storyRadio/storyPick/storyAnchor`). The radio is procedural:
-the user's `digital_radio_clock.glb` never arrived on disk. Knob drags tune
-(Radio Browser, https streams only) or change country; positions resume
-from `fc_story_pos`; favourites `fc_fm_favs` sort first.
+**Story night is a world with a radio in it** (focci-acts.js `RS`,
+world.js `buildRadio/storyOn/renderStory/storyOrbit/storyRadio/storyPick`).
+The Little Prince's book is 7.7 long; its long side is z, the pop-up (the
+purple planet with the rose) on one half, a flat page on the other, where
+the user's `radio-clock.glb` stands (height found by a ray down with the
+opening animation wound to its end). Two orbits: round the book, and --
+after a tap on the radio -- round the radio (`forb`). The radio model is
+one mesh; its controls are overlays in the model's own coordinates
+(front panel x = 0.80, keys at z 0.80/0.475/0.225, knobs at
+-0.12/-0.365/-0.605 on the top, y 0.318), each with an invisible hit box.
+Control names are PRINTED on the radio (`drawLabels`); HTML pills over the
+keys were taken for the buttons. Swipe-back is off while `fa-storying`.
+LED and strip show the station's own local time (`TZ`). Lists are a
+three-row paper scroll (`openList`). `fc_story_last`, `fc_fm_favs`.
 
 **Trees drop apples** (world.js `treeIndex/treeTap/dropApple`, three taps
 on a trunk); the word on the apple is from the recent searches, skipping
@@ -583,9 +592,32 @@ Open clip); the card is `giftHtml` in pets.js.
 under 90 goes to `fc_echo_review`, replayed from the setup's review button.
 
 **Guitar tracks:** `SONGS` in focci-acts.js wants four files in
-`assets/audio/`; only `guitar-gentle-touch.mp3` exists. Missing ones are
-skipped. The user still has to drop in `guitar-lowden.mp3`,
-`guitar-sunset-strings.mp3`, `guitar-star.mp3`.
+`assets/audio/`; only `guitar-gentle-touch.mp3` exists (the others were
+never on disk). HEAD requests find the real ones; the arrows hide with one.
+ONE audio element (`gAudio`) is reused for every song -- a new Audio made
+outside a tap is silent on iOS. The paws are solved to sit in front of the
+guitar's face (`GUITAR_ARMS` comment); notes rise from the soundhole.
+
+**Relax sounds** are the user's files by kind with versions (`SOUNDS`,
+tap again for the next), one element through a Web Audio gain (iOS ignores
+element volume). Closed eyes swap the black mesh for a copy without the eye
+triangles (`focciEyeSwap`). The butterfly is ticked at the END of
+`applyFocciPose` -- at the top Focci has just been stood up for the frame.
+
+**The wisdom tree** (oracle.js): Ask (with the three steps explained) ->
+Toss -> "hexagram made" -> Message, a steps bar on all. The user's
+`coin.glb` is tossed on its own small WebGL canvas (`coins3d`, three.js
+from `fwWorld.kit()`); +z up is 正 (3). Its two faces are the same gold,
+so the face is written under each coin. No shake on iOS (it is Undo
+Typing there). `html.oc-on` hides the island behind it.
+
+**Sleep timer** (menu): `fcSleepOpen` in focci-acts.js, `fc_sleep_at`,
+`html.fc-asleep` parks the island and its music; `window.close()` then a
+Goodnight screen where the browser refuses.
+
+**`node --check world.js` does not parse it as a module and missed a
+syntax error.** Copy it to a `.mjs` first: `cp world.js $TEMP/w.mjs &&
+node --check $TEMP/w.mjs`.
 
 **Dead CSS sweep:** 579 rules went in Oct 2026 (index.html 664KB -> 597KB).
 A class counts as live if any script or markup names it, OR any string
