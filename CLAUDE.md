@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v202`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v210`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -507,6 +507,32 @@ for heat, not frame time.
 
 ---
 
+**Name new CSS classes with a fresh prefix and grep first.** Three times in
+one round a new class collided with an old global rule: `.empty` (padding
+34px, from the dictionary) made hexagram rows 68px tall, `.mp-card` (the
+mascot picker) put a dark card behind the map, and the Relax button
+`.fa-relax` was `display:none` because the relax overlay used the same
+name. The symptom is always "my CSS is right but the box is wrong" --
+read the computed padding/display before anything else.
+
+**The Write tool turns `\u00b7` into a real `·`.** A file written with
+Write has glyphs, not escapes, so a later patch that searches for the
+escape fails its assertion. Match both (decode `\uXXXX` and retry).
+
+**`raycaster.camera` must be set before raycasting a group with sprites**
+(the nameplates): `Sprite.raycast` reads `raycaster.camera.matrixWorld` and
+throws on null. It only worked before because a tap had set it.
+
+**A `const` used by something that runs at boot must be declared before
+that point in the file.** `layDown()` runs from `buildResident()` for an
+animal already asleep; its spot table as a file-level const further down
+killed the whole boot (TDZ). Keep such tables inside the function.
+
+**Camera bearings for close shots: `pickCamAngle()`** (world.js) casts five
+rays per candidate -- to the lens and four points round it, half a unit
+past -- once, when the shot starts. The height field has no trees or
+fences, and one centre ray came back clear while a crown filled the frame.
+
 ## File map
 
 | File | What's in it |
@@ -521,6 +547,9 @@ for heat, not frame time.
 | `journal.js` | The learning journal + its chart. |
 | `dict-system.js` | Dictionary seeding helpers. |
 | `sw.js` | Service worker. **Bump `CACHE` on every change.** |
+| `oracle.js` / `hexagrams.json` | The I Ching reading (Zen Island gate/tree). 64 hexagrams: Zhouyi from zh.wikisource, Legge 1882 for 1-31 (+32 judgment) from en.wikisource, app layer in Vietnamese. ctext.org disallows AI crawlers -- do not scrape it. |
+| `focci-acts.js` | Hold Focci 1.5s: guitar (Karplus-Strong synth), jog, relax (lock, breathing, ambient synth), stories (LibriVox via archive.org, Radio Browser FM, YouTube playlist). Body in world.js (`focciDo`). |
+| `map-*.webp` | Map cards: stills of each island rendered from the scene (orthographic, `.claude/still.js`). Re-render if an island changes. |
 | `dict-00*.json` | ~45MB of dictionary seed shards. Not fetched at boot. |
 | `assets/glb/` | 22 models, 13MB after quantization. |
 | `vendor/three/` | three.js r149 + GLTFLoader, both minified. |
@@ -578,6 +607,20 @@ Everything below is committed and pushed to `main`.
   Casebook's opened entries were near-white on mint (old purple theme)
   and are readable now. The menu drawer no longer throws a grey shadow
   down the right edge of every screen.
+
+**Round of Oct 2026 (all pushed):** Progress is a month calendar;
+Letter Trail is a connect board; **Listening** replaced Word Pairs on the
+games page (Tatoeba sentences with native recordings, CORS-open; the API's
+own download_url is a 404, use `/v1/audios/ID/file`; AI-podcast mode with
+Gemini TTS); **Word Pairs is asked by the animals** (the ring's quiz).
+A tap on an animal is a camera move plus a ring of round actions and a
+status card (`focusStart/focusAnchor`); animals sleep lying down inside a
+house (`layDown`, rays check the floor -- one hut has a raised bench);
+Focci sleeps in the bed (`focciPose`, eyelids built from the eye vertices).
+The island menu is one labelled card; the map is a swipe carousel with
+`travelTo('zen')`. Phases from the user's list that are done: all of
+A-G. Not done / worth knowing: Legge has no 33-64 in any open source
+reachable here; the guitar music is synthesised, not recorded.
 
 **In flight — I stopped mid-task here:**
 
