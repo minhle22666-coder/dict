@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<script>/* Home is the first state, from the first paint: the module that used
+   to set this runs last, after every script, and until then the island's
+   search row and XP pill showed for a moment over a blank page. */
+document.documentElement.classList.add('home-on');</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
 <title>Focci&rsquo;s Little Tales</title>
 
@@ -6977,6 +6981,40 @@
   .pt-pg button[disabled]{opacity:.3;cursor:default}
   .pt-pg span{font-size:11px;color:var(--cz-faint)}
   .pt-bub.me .pt-wait{opacity:.7}
+
+  /* ---------------- Progress: the month calendar ---------------- */
+  html body .view.fw-panel#v-stats .pj-cal{padding:16px 14px 14px;border-radius:22px;background:var(--cz-glass-hi);
+    box-shadow:var(--cz-rim),var(--cz-hair),var(--cz-lift)}
+  .pc-head{display:flex;align-items:center;justify-content:space-between;margin:0 2px 12px}
+  .pc-head b{font-size:17px;font-weight:600;color:var(--cz-ink)}
+  .pc-nav{width:34px;height:34px;border:0;border-radius:50%;cursor:pointer;font-size:20px;line-height:1;color:var(--cz-sage);background:var(--cz-sage-bg)}
+  .pc-nav[disabled]{opacity:.3;cursor:default}
+  .pc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .pc-wd{text-align:center;font-size:9.5px;font-weight:700;letter-spacing:.1em;color:var(--cz-faint);padding-bottom:2px}
+  .pc-c{position:relative;aspect-ratio:1;border-radius:9px;background:rgba(94,122,72,.06);display:flex;align-items:center;justify-content:center}
+  .pc-c.blank{background:none}
+  .pc-c i{position:absolute;left:5px;top:3px;font-style:normal;font-size:9px;color:var(--cz-faint)}
+  .pc-c b{margin-top:6px;font-size:14px;color:var(--cz-ink)}
+  .pc-c.lv1{background:#E3EBCF} .pc-c.lv2{background:#C9DAA8} .pc-c.lv3{background:#A5C07D}
+  .pc-c.lv4{background:#7D9A63} .pc-c.lv4 b, .pc-c.lv4 i{color:#fff}
+  .pc-c.today{box-shadow:inset 0 0 0 2px var(--cz-honey-2)}
+  .pc-c.future{opacity:.45}
+  .pc-legend{display:flex;align-items:center;gap:4px;margin:10px 2px 0;font-size:9.5px;color:var(--cz-faint)}
+  .pc-legend i{width:12px;height:12px;border-radius:3px}
+  .pc-legend i.lv1{background:#E3EBCF} .pc-legend i.lv2{background:#C9DAA8} .pc-legend i.lv3{background:#A5C07D} .pc-legend i.lv4{background:#7D9A63}
+  .pc-figs{display:grid;grid-template-columns:repeat(4,1fr);margin-top:14px;padding:12px 0;border-top:1px solid var(--cz-line);border-bottom:1px solid var(--cz-line)}
+  .pc-figs div{display:flex;flex-direction:column;gap:3px;padding-left:10px}
+  .pc-figs div:first-child{padding-left:0}
+  .pc-figs div + div{box-shadow:inset 1px 0 0 var(--cz-line)}
+  .pc-figs b{font-size:20px;line-height:1;color:var(--cz-ink)}
+  .pc-figs span{font-size:8.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--cz-faint)}
+  .pc-notes{margin-top:14px}
+  html body .view.fw-panel#v-stats .pc-notes .pg-note{display:grid;grid-template-columns:62px 1fr;gap:12px;align-items:baseline;
+    margin:0;padding:12px 2px;text-align:left;background:none;border:0;border-top:1px solid var(--cz-line)}
+  html body .view.fw-panel#v-stats .pc-notes .pg-note-fig{min-width:0;font-size:18px;color:var(--cz-sage);text-align:left}
+  html body .view.fw-panel#v-stats .pc-notes .pg-note-txt{display:block;text-align:left}
+  html body .view.fw-panel#v-stats .pc-notes .pg-note-txt b{display:block;font-size:13.5px;font-weight:600;color:var(--cz-ink)}
+  html body .view.fw-panel#v-stats .pc-notes .pg-note-txt span{display:block;margin-top:2px;font-size:12px;line-height:1.5;color:var(--cz-soft)}
 </style>
 </head>
 <body>
@@ -7685,7 +7723,7 @@
     </div>
   </div>
 </div>
-<div id="fw-overlay" style="position:fixed;inset:0;z-index:40;background:#000;">
+<div id="fw-overlay" style="position:fixed;inset:0;z-index:40;background:#000;display:none;">
   <canvas id="fw-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;-webkit-user-select:none;user-select:none;"></canvas>
   <div id="fw-word-progress" class="fw-word-progress"></div>
 </div>

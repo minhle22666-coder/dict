@@ -3545,7 +3545,7 @@ window.statInsight=statInsight;
 function xpPop(n){
   try{
     document.querySelectorAll('.xp-pop').forEach(e=>e.remove());
-    const d=document.createElement('div'); d.className='xp-pop'; d.textContent='\u26A1 +'+n+' XP';
+    const d=document.createElement('div'); d.className='xp-pop'; d.textContent='+'+n+' XP';   // the bolt is drawn by .xp-pop::before; it was in the text as well
     document.body.appendChild(d); setTimeout(()=>d.remove(),1300);
   }catch(e){}
 }
@@ -5783,6 +5783,17 @@ async function computeInsights(){
     }
   }
   let searchesAll=0; for(const n of byDay.values()) searchesAll+=n;
+  /* Per day, for the month calendar: lookups, practice answers (right and
+     wrong), saves, and the hours they happened in. */
+  const byDayAll={};
+  for(const l of logs){
+    const d=dayStart(l.ts), e=byDayAll[d]||(byDayAll[d]={s:0,p:0,ok:0,sv:0,h:{}});
+    if(l.type==='search') e.s++;
+    else if(l.type==='review_correct'){ e.p++; e.ok++; }
+    else if(l.type==='review_wrong') e.p++;
+    else if(l.type==='save') e.sv++;
+    const hr=new Date(l.ts).getHours(); e.h[hr]=(e.h[hr]||0)+1;
+  }
   const periodTotal=days28.reduce((t,d)=>t+d.n,0);
   const peakDay=days28.reduce((b,d)=>d.n>b.n?d:b, days28[0]);
   const activeDays=days28.filter(d=>d.n>0).length;
@@ -5791,7 +5802,7 @@ async function computeInsights(){
     accuracy, totalReview, forgetful, thisWeekSearches, lastWeekSearches,
     totalWords:entries.length, savedCount, savedNotReviewed,
     days28, periodTotal, peakDay, activeDays, bestStreak, bestRise, curRise, searchesAll,
-    correctThisWeek, correctLastWeek, activeThisWeek, activeLastWeek};
+    correctThisWeek, correctLastWeek, activeThisWeek, activeLastWeek, byDayAll};
 }
 /* Một quan sát là MỘT DÒNG có số liệu bên trái, không phải một thẻ bo góc
    kèm tile emoji. Năm thẻ giống hệt nhau xếp dọc thì không có thẻ nào được
@@ -5902,7 +5913,8 @@ async function renderInsights(){
     +'</div></div>';
   h+='</section>';
 
-  h+=progressChart(s);
+  window.__pjS=s; window.__pjOff=0;
+  h+='<section class="pj-cal" id="pj-cal">'+monthCalendar(s,0)+'</section>';
 
   h+='<section class="pj-path">';
   h+='<div class="pj-cap"><span class="cz-cap">Your journey</span><span class="num">'+done.length+' / '+steps.length+'</span></div>';
@@ -5946,6 +5958,92 @@ async function renderInsights(){
   area.innerHTML=h;
   renderQuests();
 }
+/* The month, as a calendar.
+
+   The user asked for the chart to show its numbers and to go back month by
+   month like a calendar. Each day is a cell with its date and how many
+   words were looked up that day, shaded by how busy it was; under it, the
+   month in four figures and what the month says about how you learn --
+   which weekday, which part of the day, how steady, how much practice for
+   the words met -- against the month before where that means something. */
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const WEEKDAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+function monthStats(s, y, mo){
+  const days=new Date(y,mo+1,0).getDate();
+  const out={days, words:0, prac:0, ok:0, saves:0, active:0, best:null, wd:[0,0,0,0,0,0,0], hours:new Array(24).fill(0), run:0, runBest:0, per:[]};
+  for(let d=1; d<=days; d++){
+    const e=s.byDayAll[dayStart(new Date(y,mo,d).getTime())];
+    const n=e?e.s:0;
+    out.per.push(e||null);
+    if(e && (e.s||e.p||e.sv)){
+      out.active++; out.run++; if(out.run>out.runBest) out.runBest=out.run;
+      out.words+=e.s; out.prac+=e.p; out.ok+=e.ok; out.saves+=e.sv;
+      out.wd[(new Date(y,mo,d).getDay()+6)%7]+=e.s+e.p;
+      for(const k in e.h) out.hours[+k]+=e.h[k];
+      if(!out.best || n>out.best.n) out.best={d, n};
+    } else out.run=0;
+  }
+  return out;
+}
+function monthCalendar(s, off){
+  const now=new Date(), m=new Date(now.getFullYear(), now.getMonth()+off, 1);
+  const y=m.getFullYear(), mo=m.getMonth();
+  const st=monthStats(s, y, mo), pm=new Date(y, mo-1, 1), prev=monthStats(s, pm.getFullYear(), pm.getMonth());
+  const first=(new Date(y,mo,1).getDay()+6)%7, today=dayStart(Date.now());
+  const max=Math.max(1, ...st.per.map(e=>e?e.s+e.p:0));
+  let h='<div class="pc-head"><button class="pc-nav" onclick="pjMonth(-1)" aria-label="Previous month">‹</button>'
+    +'<b>'+MONTHS[mo]+' <span class="num">'+y+'</span></b>'
+    +'<button class="pc-nav" onclick="pjMonth(1)" aria-label="Next month"'+(off>=0?' disabled':'')+'>›</button></div>';
+  h+='<div class="pc-grid">'+['M','T','W','T','F','S','S'].map(d=>'<span class="pc-wd">'+d+'</span>').join('');
+  for(let i=0;i<first;i++) h+='<span class="pc-c blank"></span>';
+  for(let d=1; d<=st.days; d++){
+    const ts=dayStart(new Date(y,mo,d).getTime()), e=st.per[d-1], n=e?e.s+e.p:0;
+    const lv=n?Math.min(4, 1+Math.floor(n/max*3.99)):0;
+    const cls='pc-c lv'+lv+(ts===today?' today':'')+(ts>today?' future':'');
+    const tip=e?(e.s+' looked up · '+e.p+' practised'+(e.sv?' · '+e.sv+' saved':'')):'';
+    h+='<span class="'+cls+'" title="'+tip+'"><i class="num">'+d+'</i>'+(n?'<b class="num">'+n+'</b>':'')+'</span>';
+  }
+  h+='</div>';
+  h+='<div class="pc-legend"><span>less</span><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i><span>more · words looked up + practised</span></div>';
+  h+='<div class="pc-figs">'
+    +'<div><b class="num">'+st.words+'</b><span>looked up</span></div>'
+    +'<div><b class="num">'+st.prac+'</b><span>practised</span></div>'
+    +'<div><b class="num">'+st.active+'</b><span>active days</span></div>'
+    +'<div><b class="num">'+st.runBest+'</b><span>best run</span></div></div>';
+  // what the month says
+  const notes=[];
+  const elapsed = off===0 ? now.getDate() : st.days;
+  if(st.active){
+    const steady=Math.round(st.active/elapsed*100);
+    notes.push(insightRow(steady+'%', steady>=70?'A steady month':steady>=40?'Comes and goes':'Mostly quiet',
+      'You learned on '+st.active+' of '+elapsed+' days'+(off===0?' so far':'')+'.'));
+    const wdMax=Math.max(...st.wd);
+    if(wdMax>0){ const wi=st.wd.indexOf(wdMax);
+      notes.push(insightRow(WEEKDAYS[wi].slice(0,3), 'Your strongest day is '+WEEKDAYS[wi], 'That is when most of your words and answers land this month.')); }
+    let hb=0; for(let i=1;i<24;i++) if(st.hours[i]>st.hours[hb]) hb=i;
+    if(st.hours[hb]>0){ const slot=hb<5?'late at night':hb<11?'in the morning':hb<14?'around midday':hb<18?'in the afternoon':hb<22?'in the evening':'late at night';
+      notes.push(insightRow(String(hb).padStart(2,'0')+':00', 'You learn best '+slot, 'Your busiest hour this month starts at '+hb+':00. A reminder near then will land well.')); }
+    if(st.words){ const per=Math.round(st.prac/st.words*10);
+      notes.push(insightRow(per+'/10', per>=10?'You practise more than you meet':'Practice for every 10 words met',
+        per>=10?'Plenty of review — try meeting a few new words too.':'A round of Word Pairs on the words you looked up would lift this.')); }
+    if(st.prac){ notes.push(insightRow(Math.round(st.ok/st.prac*100)+'%', 'Right in practice', st.ok+' of '+st.prac+' answers this month.')); }
+    if(prev.words || prev.prac){
+      const a=st.words+st.prac, b=prev.words+prev.prac, d=a-b;
+      notes.push(insightRow((d>=0?'+':'−')+Math.abs(d), d>=0?'More than '+MONTHS[pm.getMonth()]:'Less than '+MONTHS[pm.getMonth()],
+        a+' words and answers, against '+b+' the month before'+(off===0?' (this month is not over yet)':'')+'.'));
+    }
+    if(st.best && st.best.n) notes.push(insightRow(String(st.best.n), 'Busiest day: '+st.best.d+' '+MONTHS[mo].slice(0,3), 'Your most words looked up in a single day.'));
+  } else {
+    notes.push(insightRow('—', 'Nothing yet this month', off===0?'Look up a word or play one round and the calendar starts filling in.':'No learning was recorded in this month.'));
+  }
+  h+='<div class="pc-notes"><div class="pj-cap"><span class="cz-cap">What this month says</span></div>'+notes.slice(0,6).join('')+'</div>';
+  return h;
+}
+window.pjMonth=function(d){
+  const s=window.__pjS; if(!s) return;
+  window.__pjOff=Math.min(0,(window.__pjOff||0)+d);
+  const el=document.getElementById('pj-cal'); if(el) el.innerHTML=monthCalendar(s, window.__pjOff);
+};
 /* One sentence for the ring: what is left and the easiest way to it. */
 function encourageLine(s, dxp, goal){
   const left=Math.max(0, goal-dxp);

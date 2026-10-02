@@ -1932,8 +1932,18 @@ export async function bootFocciWorld(root, opts) {
       }
     }
 
-      // The gate up top is the way back down.
-      addInvisibleHitbox(station, gate.x, gate.y + SKY_SPAN * 0.045, gate.z, SKY_SPAN * 0.04, 'sky-gate');
+      /* The sword stuck in the ground under the torii is the way back down;
+         the red gate itself, and the tree over the middle of the island,
+         are the wisdom. Measured off the model: Espada-Metal is 0.8 tall at
+         the gate's very centre, and the tree's crown (Arbol, 14 across) is
+         centred there too -- so the old gate ball sat inside the tree and
+         a tap on "the tree by the red gate" asked to go home, or nothing.
+         The sword's ball is small and wins whenever the ray touches it
+         (see the tap handler); the rest of the gate and tree answer with
+         the wisdom. */
+      addInvisibleHitbox(station, gate.x, gate.y + 0.35, gate.z, 0.55, 'sky-gate');
+      addInvisibleHitbox(station, gate.x, gate.y + 1.7, gate.z, 1.5, 'vine-tree');
+      addInvisibleHitbox(station, gate.x - 0.4, gate.y + 3.0, gate.z + 0.3, 3.4, 'vine-tree');
     }
 
     const doeMixer = new THREE.AnimationMixer(doeGlb.scene);
@@ -2124,6 +2134,19 @@ export async function bootFocciWorld(root, opts) {
     }
   }
 
+  function moveLettersTo(room) {
+    if (!room || !wordHunt.letters.length) return;
+    wordHunt.letters.forEach((slot, i) => {
+      if (!slot || slot.found || slot.roomKey === room.key) return;
+      if (slot.obj && slot.room) {
+        slot.room.group.remove(slot.obj);
+        const k = slot.room.interactive.indexOf(slot.obj);
+        if (k >= 0) slot.room.interactive.splice(k, 1);
+      }
+      slot.obj = null; slot.roomKey = room.key;
+      placeLetter(room, slot, i);
+    });
+  }
   async function startNewWordHunt() {
     const word = String((await getNextTargetWord()) || 'focci').toLowerCase().replace(/[^a-z]/g, '') || 'focci';
     clearWordHunt();
@@ -2140,13 +2163,15 @@ export async function bootFocciWorld(root, opts) {
        slot (progressMask() counts by position, so the slots have to stay
        in order) and is placed by flushPendingLetters() the moment that
        land is built. */
-    const hostKeys = ['station'].concat(arcRoomKeys);
+    /* One word, one island: every letter goes on the island Focci is on.
+       Spreading them over all five (above) meant Fox Island only ever held
+       one or two letters of a five-letter word and the rest sat on lands
+       the player had not visited -- "the hub never has all the letters".
+       If he crosses to another land before finishing, the letters still
+       to find follow him there (moveLettersTo, from enterRoom). */
+    const here = rooms[currentRoomKey] ? currentRoomKey : 'station';
     const keys = [];
-    for (let i = 0; i < word.length; i++) {
-      keys.push(i < hostKeys.length ? hostKeys[i] : hostKeys[Math.floor(Math.random() * hostKeys.length)]);
-    }
-    // shuffle, so the first letters are not always on the same island
-    for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = keys[i]; keys[i] = keys[j]; keys[j] = tmp; }
+    for (let i = 0; i < word.length; i++) keys.push(here);
     for (let i = 0; i < word.length; i++) {
       const slot = { obj: null, letter: word[i], found: false, phase: Math.random() * Math.PI * 2, room: null, roomKey: keys[i] };
       wordHunt.letters.push(slot);
@@ -3401,6 +3426,7 @@ export async function bootFocciWorld(root, opts) {
     if (!r) return;
     Object.values(rooms).forEach((rr) => { rr.group.visible = false; });
     currentRoomKey = key;
+    moveLettersTo(r);
     r.group.visible = true;
     const sp = spawnOverride || r.spawn;
     charState.x = sp.x; charState.z = sp.z;
@@ -3807,6 +3833,10 @@ export async function bootFocciWorld(root, opts) {
     // the only place you would ever double-tap — bailed out before the
     // camera toggle could ever be reached. It never once fired.
     let root3d = hits.length ? hits[0].object : null;
+    // the sword under the torii sits inside the tree's ball: if the ray
+    // touches it at all, it is what was meant
+    const swordHit = hits.find((h) => h.object.userData && h.object.userData.interactType === 'sky-gate');
+    if (swordHit) root3d = swordHit.object;
     while (root3d && !root3d.userData.interactType && root3d.parent) root3d = root3d.parent;
     // furniture inside a hut he is not in should not answer a tap through the wall
     if (root3d && root3d.userData.disabled) root3d = null;
