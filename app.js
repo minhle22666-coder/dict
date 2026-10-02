@@ -395,7 +395,7 @@ return `You are a bilingual English→Vietnamese lexicographer building a rich, 
       : '"corrected/canonical form — fix typos, complete a partial idiom, or normalize slang spelling"'},
   "query_note": ${exact
       ? '"always an empty string in this mode"'
-      : `"if you corrected/completed the input, one short Vietnamese phrase like 'Ý bạn là: rain cats and dogs'; else empty string"`},
+      : `"if you corrected/completed the input, one short English phrase like 'Did you mean: rain cats and dogs'; else empty string"`},
   "not_found": ${exact
       ? 'true only if the input is genuinely NOT a real English word/phrase; otherwise false'
       : 'always false'},
@@ -540,22 +540,22 @@ function viResultsState(query, words){
   if(!words.length) return viNotFoundState(query);
   const safeQ=esc(query).replace(/'/g,"\\'");
   let h='<div class="tr-card">';
-  h+='<div class="tr-dir">Ti\u1ebfng Vi\u1ec7t → English</div>';
+  h+='<div class="tr-dir">Vietnamese → English</div>';
   h+='<div class="tr-src">'+esc(query)+'</div>';
   h+='<div class="tr-opts">';
   words.forEach((w,i)=>{
     const safe=esc(w).replace(/'/g,"\\'");
     h+='<div class="tr-row'+(i===0?' tr-row-best':'')+'">';
     h+='<div class="tr-row-top">';
-    if(i===0) h+='<span class="tr-check">\u2713 S\u00e1t nh\u1ea5t</span>';
+    if(i===0) h+='<span class="tr-check">✓ Closest</span>';
     h+='<button class="tr-copy" onclick="trCopy(this,\''+safe+'\')" aria-label="Copy">⧉</button>';
     h+='</div>';
     h+='<div class="tr-row-text">'+esc(w)+'</div>';
-    h+='<button class="tr-lookup" onclick="jump(\''+safe+'\')">Tra t\u1eeb n\u00e0y \u2192</button>';
+    h+='<button class="tr-lookup" onclick="jump(\''+safe+'\')">Look it up →</button>';
     h+='</div>';
   });
   h+='</div>';
-  h+='<button class="tr-ai-btn" onclick="forceViTranslate(\''+safeQ+'\')">D\u1ecbch \u0111\u1ea7y \u0111\u1ee7 b\u1eb1ng AI</button>';
+  h+='<button class="tr-ai-btn" onclick="forceViTranslate(\''+safeQ+'\')">Full translation with AI</button>';
   h+='</div>';
   return h;
 }
@@ -937,8 +937,8 @@ async function runExplain(query){
        dung, không phải sửa từng renderer. */
     const sh0=data.shared||{};
     data.vi_equivalent = data.contrast
-      || (sh0.form ? (sh0.kind==='prefix'?'tiền tố ':'gốc ')+sh0.form
-            +(sh0.gloss?' — '+sh0.gloss:'') : 'lời giải thích của Focci');
+      || (sh0.form ? (sh0.kind==='prefix'?'prefix ':'root ')+sh0.form
+            +(sh0.gloss?' — '+sh0.gloss:'') : 'Focci explains');
     await idbPut({ word:key, data, source:'explain',
                    firstSeen:now(), saved:0, savedAt:0 });
     currentWord=null;
@@ -1119,14 +1119,14 @@ const PHRASE_FIELD_LABEL={collocations:'collocation', phrasal_verbs:'phrasal ver
 function phraseMatchState(query, hits){
   const safeQ=esc(query).replace(/'/g,"\\'");
   let h='<div class="tr-card">';
-  h+='<div class="tr-dir">English → Ti\u1ebfng Vi\u1ec7t</div>';
+  h+='<div class="tr-dir">English → Vietnamese</div>';
   h+='<div class="tr-src">'+esc(query)+'</div>';
   h+='<div class="tr-opts">';
   hits.forEach((o,i)=>{
     const safeOwner=esc(o.owner).replace(/'/g,"\\'");
     h+='<div class="tr-row'+(i===0?' tr-row-best':'')+'">';
     h+='<div class="tr-row-top">';
-    if(i===0) h+='<span class="tr-check">\u2713 S\u00e1t nh\u1ea5t</span>';
+    if(i===0) h+='<span class="tr-check">✓ Closest</span>';
     h+='<span class="tr-reg">'+esc(PHRASE_FIELD_LABEL[o.field]||o.field)+'</span>';
     h+='<button class="tr-copy" onclick="trCopy(this,\''+esc(o.vi).replace(/'/g,"\\'")+'\')" aria-label="Copy">⧉</button>';
     h+='</div>';
@@ -1136,7 +1136,7 @@ function phraseMatchState(query, hits){
     h+='</div>';
   });
   h+='</div>';
-  h+='<button class="tr-ai-btn" onclick="forceTranslate(\''+safeQ+'\')">D\u1ecbch \u0111\u1ea7y \u0111\u1ee7 b\u1eb1ng AI</button>';
+  h+='<button class="tr-ai-btn" onclick="forceTranslate(\''+safeQ+'\')">Full translation with AI</button>';
   h+='</div>';
   return h;
 }
@@ -1240,17 +1240,17 @@ async function translatePhrase(text){
    primary is flagged explicitly and every option carries its register. */
 function phraseResultState(original, result){
   const toEN = result.source_lang==='vi';
-  const dirLbl = toEN ? 'Tiếng Việt → English' : 'English → Tiếng Việt';
+  const dirLbl = toEN ? 'Vietnamese → English' : 'English → Vietnamese';
   const primary = result.primary || { text: result.translation || '' };
   const alts = (result.alternatives||[]).filter(a=>a && a.text && a.text!==primary.text).slice(0,3);
-  const regLbl = (r)=>({neutral:'trung tính',formal:'trang trọng',casual:'thân mật',
-                        literal:'dịch sát chữ',idiomatic:'nói kiểu bản ngữ',regional:'vùng miền'})[r]||r||'';
+  const regLbl = (r)=>({neutral:'neutral',formal:'formal',casual:'casual',
+                        literal:'word for word',idiomatic:'how natives say it',regional:'regional'})[r]||r||'';
 
   const optRow = (o, isPrimary)=>{
     const safe = (o.text||'').replace(/'/g,"\\'");
     let r='<div class="tr-row'+(isPrimary?' tr-row-best':'')+'">';
     r+='<div class="tr-row-top">';
-    if(isPrimary) r+='<span class="tr-check">\u2713 S\u00e1t nh\u1ea5t</span>';
+    if(isPrimary) r+='<span class="tr-check">✓ Closest</span>';
     if(o.register) r+='<span class="tr-reg">'+esc(regLbl(o.register))+'</span>';
     r+='<button class="tr-copy" onclick="trCopy(this,\''+safe+'\')" aria-label="Copy">⧉</button>';
     r+='</div>';
@@ -1258,7 +1258,7 @@ function phraseResultState(original, result){
     if(o.why) r+='<div class="tr-row-why">'+esc(o.why)+'</div>';
     // Translating INTO English → every option is a lookup target.
     if(toEN && o.text && o.text.split(/\s+/).length<=4)
-      r+='<button class="tr-lookup" onclick="jump(\''+safe+'\')">Tra từ này →</button>';
+      r+='<button class="tr-lookup" onclick="jump(\''+safe+'\')">Look it up →</button>';
     r+='</div>';
     return r;
   };
@@ -1273,7 +1273,7 @@ function phraseResultState(original, result){
   if(result.source_lang==='en' && ic && ic.natural===false){
     const better=(ic.better||[]).filter(Boolean).slice(0,3);
     h+='<div class="tr-unnat">';
-    h+='<div class="tr-unnat-h">\u26a0 C\u00e1ch n\u00f3i n\u00e0y nghe kh\u00f4ng t\u1ef1 nhi\u00ean v\u1edbi ng\u01b0\u1eddi b\u1ea3n ng\u1eef</div>';
+    h+='<div class="tr-unnat-h">⚠ This does not sound natural to a native speaker</div>';
     if(ic.issue) h+='<div class="tr-unnat-why">'+esc(ic.issue)+'</div>';
     if(better.length){
       h+='<div class="tr-unnat-list">';
@@ -1290,7 +1290,7 @@ function phraseResultState(original, result){
 
   const gloss=(result.gloss||[]).filter(g=>g&&g.src&&g.dst).slice(0,6);
   if(gloss.length){
-    h+='<div class="tr-gloss"><div class="tr-gloss-h">Từng phần</div>';
+    h+='<div class="tr-gloss"><div class="tr-gloss-h">Piece by piece</div>';
     for(const g of gloss){
       const safeG=String(toEN?g.dst:g.src).replace(/'/g,"\\'");
       h+='<div class="tr-gloss-row" onclick="jump(\''+safeG+'\')">'
@@ -2563,7 +2563,7 @@ function ygLoadScript(){
     const s = document.createElement('script');
     s.src = YG_SCRIPT; s.charset = 'utf-8';
     s.onerror = ()=>{ _ygDiag.script='không tải được widget.js';
-                      reject(new Error('widget.js bị chặn')); };
+                      reject(new Error('widget.js was blocked')); };
     document.body.appendChild(s);
     let n = 0;
     const poll = setInterval(()=>{
@@ -2574,7 +2574,7 @@ function ygLoadScript(){
       }else if(++n > 40){
         clearInterval(poll);
         _ygDiag.script = 'hết 12s vẫn không có YG.Widget';
-        reject(new Error('không thấy YG.Widget'));
+        reject(new Error('YG.Widget never appeared'));
       }
     }, 300);
   });
@@ -2641,8 +2641,8 @@ function ygLinkBtn(word){
   const url = 'https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
   return '<a class="yg-link-btn" href="'+url+'" target="_blank" rel="noopener">'
     + '<span class="yg-link-ico">\u25B6</span>'
-    + '<span class="yg-link-text"><b>Nghe trong c\u00e2u th\u1eadt</b>'
-    +   '<i>Video ng\u01b0\u1eddi b\u1ea3n x\u1ee9 tr\u00ean YouGlish</i></span>'
+    + '<span class="yg-link-text"><b>Hear it in real speech</b>'
+    +   '<i>Native speakers on YouGlish</i></span>'
     + '<span class="yg-link-go">\u2197</span></a>';
 }
 
@@ -2652,8 +2652,8 @@ function ygMount(word, wrap, seq, idx){
   wrap.className = 'yg-wrap yg-loading';
   wrap.innerHTML =
       '<div class="yg-stage" id="yg-stage"><div class="yg-inner"></div><div class="yg-fade"></div></div>'
-    + '<button class="yg-peek" type="button" aria-label="Xem to\u00e0n b\u1ed9 khung">'+YG_CHEVRON+'</button>'
-    + '<div class="yg-veil"><span class="yg-dot"></span>\u0110ang m\u1edf video\u2026</div>';
+    + '<button class="yg-peek" type="button" aria-label="Show the whole frame">'+YG_CHEVRON+'</button>'
+    + '<div class="yg-veil"><span class="yg-dot"></span>Opening the video…</div>';
 
   const stage = wrap.querySelector('.yg-stage');
   const inner = wrap.querySelector('.yg-inner');
@@ -2687,7 +2687,7 @@ function ygMount(word, wrap, seq, idx){
       if(YG_DEBUG){
         let rows = ''; for(const k in _ygDiag) rows += k + ': ' + _ygDiag[k] + '\n';
         wrap.className = 'yg-wrap yg-diag';
-        wrap.innerHTML = '<b>YouGlish ch\u01b0a d\u1ee5ng \u0111\u01b0\u1ee3c video</b><pre>'+esc(rows)+'</pre>';
+        wrap.innerHTML = '<b>YouGlish could not play a video</b><pre>'+esc(rows)+'</pre>';
       }else{
         wrap.className = 'yg-wrap yg-failed';
       }
@@ -2774,9 +2774,9 @@ function renderEntry(rec, queriedAs, formNote){
     h+='<div class="inflect">'
       +'<b>'+esc(formNote.form)+'</b> · '+esc(EN_FORM_NOTE[formNote.kind]||'form')
       +' of <b>'+esc(baseW)+'</b>'
-      +'<span>Nghĩa suy từ từ gốc trong máy — không gọi AI. '
-      +'Ví dụ và cụm từ bên dưới thuộc dạng gốc <b>'+esc(baseW)+'</b>.</span>'
-      +'<button class="inflect-go" onclick="jump(\''+esc(baseW).replace(/'/g,"\\'")+'\')">Xem từ gốc</button>'
+      +'<span>Worked out from the base word on your device — no AI call. '
+      +'The examples and phrases below belong to <b>'+esc(baseW)+'</b>.</span>'
+      +'<button class="inflect-go" onclick="jump(\''+esc(baseW).replace(/'/g,"\\'")+'\')">See the base word</button>'
       +'</div>';
   } else if(queriedAs){
     h+='<div class="corrected">Corrected from “'+esc(queriedAs)+'”'+(d.query_note?' · '+esc(d.query_note):'')+'</div>';
@@ -2797,7 +2797,7 @@ function renderEntry(rec, queriedAs, formNote){
   // Icon-only actions, no boxes: save, and refresh the Vietnamese meaning.
   h+='<div class="head-acts">';
   h+='<button class="icon-act star '+(rec.saved?'on':'')+'" onclick="toggleSave(\''+safeW+'\')" aria-label="Save word">'+(rec.saved?'★':'☆')+'</button>';
-  h+='<button class="icon-act sparkle" onclick="runExplain(\''+safeW+'\')" aria-label="Why this word" title="Vì sao lại là từ này">'
+  h+='<button class="icon-act sparkle" onclick="runExplain(\''+safeW+'\')" aria-label="Why this word" title="Why this word">'
     +'<svg viewBox="0 0 24 24" fill="currentColor">'
     +'<path d="M12 2c.45 3.68 1.05 6.28 2.34 7.66C15.72 11 18.32 11.55 22 12c-3.68.45-6.28 1.05-7.66 2.34C13 15.72 12.45 18.32 12 22c-.45-3.68-1.05-6.28-2.34-7.66C8.28 13 5.68 12.45 2 12c3.68-.45 6.28-1.05 7.66-2.34C11 5.68 11.55 3.05 12 2Z"/>'
     +'</svg></button>';
@@ -2826,10 +2826,10 @@ function renderEntry(rec, queriedAs, formNote){
       +(d.register?'<span class="reg">'+esc(d.register)+'</span>':'')+'</div>';
     h+='<div class="feel-eq">'
       +(d.vi_equivalent?esc(d.vi_equivalent)
-        :'<i class="no-eq">không có từ tiếng Việt tương đương</i>')+'</div>';
+        :'<i class="no-eq">no Vietnamese word quite matches</i>')+'</div>';
     if(d.vi_note) h+='<div class="feel-note">'+esc(d.vi_note)+'</div>';
-    if(d.vi_feel) h+='<div class="feel-scene"><span class="fs-lbl">Hình dung</span>'+esc(d.vi_feel)+'</div>';
-    if(d.vi_not)  h+='<div class="feel-warn"><span class="fw-lbl">Đừng nhầm với</span>'+esc(d.vi_not)+'</div>';
+    if(d.vi_feel) h+='<div class="feel-scene"><span class="fs-lbl">Picture it</span>'+esc(d.vi_feel)+'</div>';
+    if(d.vi_not)  h+='<div class="feel-warn"><span class="fw-lbl">Not the same as</span>'+esc(d.vi_not)+'</div>';
     h+='</div>';
   }
 
@@ -3280,11 +3280,11 @@ async function renderHistory(){
   if(slot){
     const left=totalAll-slice.length;
     if(left>0){
-      slot.innerHTML='<button class="hist-more" onclick="histMore()">Xem th\u00eam '
-        +Math.min(left,HIST_PAGE)+' m\u1ee5c \u00b7 c\u00f2n '+left.toLocaleString()+'</button>';
+      slot.innerHTML='<button class="hist-more" onclick="histMore()">Show '
+        +Math.min(left,HIST_PAGE)+' more · '+left.toLocaleString()+' left</button>';
     }else if(totalAll>12){
       slot.innerHTML='<div class="hist-count">'+totalAll.toLocaleString()
-        +' t\u1eeb \u0111\u00e3 tra \u00b7 \u0111\u00e3 hi\u1ec7n h\u1ebft</div>';
+        +' words looked up · all shown</div>';
     }else{
       slot.innerHTML='';
     }
@@ -4054,7 +4054,7 @@ async function renderSaySaved(box, head, stale){
     h+='<li><span class="sy-grade sy-grade-'+b.g.toLowerCase()+'">'+b.g+'</span>'
       +'<b>'+b.min+'\u2013'+hi+'</b> '+esc(b.note)+'</li>';
   });
-  h+='</ul><p>\u0110i\u1ec3m ch\u1ea5m \u0111\u1ed9 T\u1ef0 NHI\u00caN khi nghe, kh\u00f4ng ph\u1ea3i ch\u1ea5m ng\u1eef ph\u00e1p.</p></details>';
+  h+='</ul><p>The score is for how NATURAL it sounds, not for grammar.</p></details>';
   for(const a of list){
     const v=SAY_VERDICT[a.verdict]?a.verdict:'';
     const vm=v?SAY_VERDICT[v]:null;
@@ -4218,7 +4218,7 @@ function levelTag(word, data){
   if(lv) return '<span class="lv-tag lv'+lv+'">'+LEVEL_NAMES[lv]+'</span>';
   const c=data && data.cefr ? String(data.cefr).trim().toUpperCase() : '';
   const guess=CEFR_TO_LV[c];
-  if(guess) return '<span class="lv-tag lv'+guess+' lv-guess" title="Do AI phán đoán">'
+  if(guess) return '<span class="lv-tag lv'+guess+' lv-guess" title="Guessed by AI">'
     +LEVEL_NAMES[guess]+'</span>';
   return '';
 }
@@ -5139,7 +5139,7 @@ function speakUpSegmentsHtml(segments){
 function speakUpMissingHtml(missing){
   const list=(Array.isArray(missing)?missing:[]).map(x=>String(x||'').trim()).filter(Boolean);
   if(!list.length) return '';
-  let h='<div class="su-missing"><div class="su-missing-h">Chưa nói tới</div><ul>';
+  let h='<div class="su-missing"><div class="su-missing-h">Not said yet</div><ul>';
   list.forEach(m=>{ h+='<li>'+esc(m)+'</li>'; });
   return h+'</ul></div>';
 }
@@ -5266,11 +5266,11 @@ function renderWrite(){
     h+=speakUpSegmentsHtml(writeResult.segments);
     h+=speakUpMistakesHtml(writeResult.mistakes);
     h+='<button class="su-ans-lbl" onclick="pickSpeakUpAnswer(\'fixed\')">'
-      +'<span class="ic">⭐</span>Nếu theo câu của bạn thì sẽ nên là:</button>'
+      +'<span class="ic">⭐</span>Your sentence, put right</button>'
       +'<div class="su-ans-box'+(writeLiked==='fixed'?' picked':'')+'">'
       +'<div class="su-tappable su-ans-text">'+speakUpAnswerHtml(writeResult.fixed_sentence)+'</div></div>';
     h+='<button class="su-ans-lbl moon" onclick="pickSpeakUpAnswer(\'natural\')">'
-      +'<span class="ic">\u{1F319}</span>Nếu bạn thích tự nhiên hơn</button>'
+      +'<span class="ic">\u{1F319}</span>A more natural way</button>'
       +'<div class="su-ans-box'+(writeLiked==='natural'?' picked':'')+'">'
       +'<div class="su-tappable su-ans-text">'+speakUpAnswerHtml(writeResult.natural_sample)+'</div></div>';
     h+='</div>';
@@ -5437,10 +5437,10 @@ async function askGradeSpeakUp(promptObj, userAnswer){
    fall back to the middle of the band its verdict implies rather than
    showing a confident-looking 0. */
 const SPEAKUP_BANDS=[
-  {g:'A', min:90, label:'Natural',     note:'Di\u1ec5n \u0111\u1ea1t t\u1ed1t, t\u1ef1 nhi\u00ean, kh\u00f4ng sai ng\u1eef ph\u00e1p \u2014 ng\u01b0\u1eddi b\u1ea3n x\u1ee9 hi\u1ec3u tr\u1ecdn v\u1eb9n.'},
-  {g:'B', min:70, label:'Good',        note:'Di\u1ec5n \u0111\u1ea1t t\u1ed1t, ng\u01b0\u1eddi b\u1ea3n x\u1ee9 hi\u1ec3u h\u1ebft, ch\u1ec9 h\u01a1i thi\u1ebfu t\u1ef1 nhi\u00ean v\u00e0i ch\u1ed7.'},
-  {g:'C', min:40, label:'Gets across', note:'Truy\u1ec1n \u0111\u1ea1t \u0111\u01b0\u1ee3c \u00fd nh\u01b0ng nhi\u1ec1u ch\u1ed7 ch\u01b0a t\u1ef1 nhi\u00ean ho\u1eb7c h\u01a1i sai ng\u1eef ph\u00e1p.'},
-  {g:'D', min:0,  label:'Unclear',     note:'Kh\u00f3 hi\u1ec3u \u2014 sai ng\u1eef ph\u00e1p qu\u00e1 nhi\u1ec1u ho\u1eb7c l\u1ec7ch h\u1eb3n so v\u1edbi c\u00e2u g\u1ed1c.'}
+  {g:'A', min:90, label:'Natural',     note:'Clear, natural, no grammar slips: a native speaker gets all of it.'},
+  {g:'B', min:70, label:'Good',        note:'Clear and fully understood, just a little unnatural in places.'},
+  {g:'C', min:40, label:'Gets across', note:'The idea gets across, but much of it is unnatural or a little off in grammar.'},
+  {g:'D', min:0,  label:'Unclear',     note:'Hard to follow: too many grammar slips, or far from the original.'}
 ];
 function normSpeakUpScore(raw, verdict){
   let n=Number(raw);

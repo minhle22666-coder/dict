@@ -693,8 +693,8 @@ window.openFullEntry = function(word){
 function notFoundSheetHTML(w, suggestion){
   const safeS=(suggestion||'').replace(/'/g,"\\'");
   let h='<div class="ws-word">'+esc(w)+'</div>'
-    +'<div class="ws-loading">Không phải từ tiếng Anh mà Focci biết. Không có chữ nào bị tự sửa.</div>';
-  if(suggestion) h+='<button class="ws-full" onclick="openWordPopup(\''+safeS+'\')">Có phải bạn muốn tra “'+esc(suggestion)+'”?</button>';
+    +'<div class="ws-loading">Focci does not know this as an English word. Nothing was auto-corrected.</div>';
+  if(suggestion) h+='<button class="ws-full" onclick="openWordPopup(\''+safeS+'\')">Did you mean “'+esc(suggestion)+'”?</button>';
   return h;
 }
 
@@ -1018,7 +1018,7 @@ function phraseSheetHTML(text, result, saved){
   }
   if(result && result.note) h+='<div class="ws-colloc">'+esc(result.note)+'</div>';
   h+='<div class="ws-actions">';
-  h+='<button class="ws-full" onclick="openFullEntry(\''+safeT+'\')">Xem đầy đủ →</button>';
+  h+='<button class="ws-full" onclick="openFullEntry(\''+safeT+'\')">See full entry →</button>';
   h+='</div>';
   return h;
 }
@@ -1029,7 +1029,7 @@ window.phrasePopupSave = async function(text){
   if(rec && rec.saved){ await toggleSave(norm(text)); showWordSheet(phraseSheetHTML(text, _phraseCache[text], false)); return; }
   const r = _phraseCache[text] || {};
   await savePhraseRecord(text, (r.primary&&r.primary.text)||'', r.primary);
-  if(typeof toast==='function') toast('Đã lưu cụm từ');
+  if(typeof toast==='function') toast('Phrase saved');
   showWordSheet(phraseSheetHTML(text, r, true));
 };
 
@@ -1923,14 +1923,14 @@ window.showStoryIntro = function(){
     +'<img src="./mascot-wonder.webp" alt="" onerror="this.style.display=\'none\'"/>'
     +'<div class="info-t">Before you begin</div>'
     +'<div class="info-b story-intro-b">'
-    +'<p><b>🔍 Tra từ</b> — gõ một từ hoặc cụm từ tiếng Anh vào ô tìm kiếm để xem nghĩa, giới từ đi kèm và câu ví dụ. Bấm <b>Nghe trong câu thật</b> để nghe người bản xứ nói.</p>'
-    +'<p><b>☆ Lưu từ</b> — bấm ngôi sao để cất từ vào <b>Saved Words</b>, ôn lại lúc nào cũng được.</p>'
-    +'<p><b>🎮 Mini Games</b> — Letter Trail, Word Pairs, Speak Up và Hot Take luyện lại chính những từ bạn đã tra.</p>'
-    +'<p><b>🌍 Focci Universe</b> — kéo một ngón để đi, vuốt nhanh lên để nhảy, hai ngón để xoay và phóng to. Chạm vào đồ vật hay con vật để tương tác; nhặt chữ cái để ghép thành từ.</p>'
-    +'<p><b>👀 Mẹo</b> — chạm hai lần vào nhà để bước vào; chạm hai lần ra chỗ trống để nhìn bằng mắt Focci.</p>'
-    +'<p><b>⚡ XP</b> — tra từ +1 · lưu từ +1 · trả lời đúng +1 · Speak Up +2 · xong một Hot Take +5.</p>'
+    +'<p><b>🔍 Look up</b> — type an English word or phrase in the search box to see its meaning, the prepositions it takes and real examples. Tap <b>Hear it in real speech</b> for clips of people saying it.</p>'
+    +'<p><b>☆ Save</b> — tap the star to keep a word in <b>Saved Words</b> and review it any time.</p>'
+    +'<p><b>🎮 Mini games</b> — Letter Trail, Echo Catch, Speak Up and Hot Take practise the very words you looked up.</p>'
+    +'<p><b>🌍 The island</b> — drag one finger to walk, flick up to jump, two fingers to turn and zoom. Tap things and animals to play with them; hold Focci for a second for more.</p>'
+    +'<p><b>👀 Tip</b> — double-tap a house to step inside; double-tap open ground to look through Focci’s eyes.</p>'
+    +'<p><b>⚡ XP</b> — look up +1 · save +1 · right answer +1 · Speak Up +2 · finish a Hot Take +5.</p>'
     +'</div>'
-    +'<button class="info-action" onclick="this.closest(\'.info-ov\').remove()">Bắt đầu thôi!</button>'
+    +'<button class="info-action" onclick="this.closest(\'.info-ov\').remove()">Let’s go!</button>'
     +'</div>';
   document.body.appendChild(ov);
   requestAnimationFrame(()=>ov.classList.add('show'));
