@@ -6960,6 +6960,41 @@ document.documentElement.classList.add('home-on');</script>
 
   /* the radio's words in Helvetica: the list, the country card, the strip, the help line */
   html body .rs-list,html body .rs-list *,html body .rs-pop,html body .rs-pop *,html body .rs-player .rs-tt,html body .rs-player .rs-tt *,html body .rs-help,html body .rs-resume,html body .rs-resume *{font-family:var(--cz-num) !important}
+
+  /* ---- CLOUD SAVE (cloud.js) ---- */
+  .cz-cloud{display:inline-flex;align-items:center;gap:8px;margin:10px 0 0;padding:7px 12px 7px 10px;border:0;border-radius:99px;cursor:pointer;
+    font-size:12px;color:var(--cz-ink-2);background:rgba(255,255,252,.55);box-shadow:var(--cz-rim)}
+  .cz-cloud svg{width:17px;height:17px;color:var(--cz-sage)}
+  .cz-cloud b{color:var(--cz-sage);font-weight:700}
+  html.cl-signed .cz-cloud{display:none}
+  .cl-scrim{position:fixed;inset:0;z-index:125;display:none;align-items:flex-end;justify-content:center;background:rgba(30,36,26,.4)}
+  .cl-scrim.on{display:flex}
+  html.kb-on .cl-scrim{top:var(--vvt);bottom:auto;height:var(--vvh)}
+  .cl-sheet{position:relative;width:100%;max-width:440px;box-sizing:border-box;padding:26px 22px calc(env(safe-area-inset-bottom,0px) + 20px);border-radius:28px 28px 0 0;
+    text-align:center;color:var(--cz-ink);background:#FBFAF4;box-shadow:0 -12px 40px rgba(30,36,26,.25);animation:zz-up .3s cubic-bezier(.3,1.2,.5,1)}
+  .cl-x{position:absolute;right:14px;top:12px;width:34px;height:34px;border:0;border-radius:50%;cursor:pointer;font-size:20px;color:var(--cz-ink-2);background:rgba(60,74,40,.07)}
+  .cl-ic{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 10px;border-radius:20px;color:#fff;background:linear-gradient(160deg,#9DBA86,#6E9A5A);box-shadow:0 8px 20px rgba(80,110,60,.3)}
+  .cl-ic svg{width:30px;height:30px}
+  .cl-sheet h3{margin:0 0 6px;font-size:20px;font-weight:700}
+  .cl-sheet p{margin:0 auto 16px;max-width:340px;font-size:13.5px;line-height:1.55;color:var(--cz-ink-2)}
+  .cl-sheet p b{color:var(--cz-ink)}
+  .cl-sheet small{display:block;margin-top:12px;font-size:11.5px;line-height:1.5;color:var(--cz-faint,#8B9180)}
+  .cl-in{display:block;width:100%;height:50px;box-sizing:border-box;padding:0 16px;border:0;border-radius:16px;font-size:16px;color:var(--cz-ink);
+    background:#fff;box-shadow:inset 0 0 0 1.5px rgba(60,74,40,.16);outline:none}
+  .cl-in:focus{box-shadow:inset 0 0 0 2px var(--cz-sage)}
+  .cl-code{text-align:center;font-size:26px !important;letter-spacing:.5em;padding-left:.5em}
+  .cl-err{margin:8px 0 0;font-size:12.5px;color:#B5503C}
+  .cl-go{display:block;width:100%;height:50px;margin-top:12px;border:0;border-radius:16px;cursor:pointer;font-size:15px;font-weight:700;color:#fff;background:var(--cz-sage)}
+  .cl-go[disabled]{opacity:.6}
+  .cl-ghost{display:block;width:100%;height:46px;margin-top:8px;border:0;border-radius:16px;cursor:pointer;font-size:14px;font-weight:600;color:var(--cz-ink-2);background:rgba(60,74,40,.07)}
+  .cl-row{display:flex;justify-content:space-between;margin-top:10px}
+  .cl-link{border:0;background:none;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--cz-sage)}
+  .cl-stat{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:14px;background:rgba(60,74,40,.06);font-size:13px;color:var(--cz-ink-2)}
+  .cl-stat b{font-size:14px;color:var(--cz-ink)}
+  .cl-pick{display:block;width:100%;margin-top:10px;padding:13px 16px;border:0;border-radius:16px;cursor:pointer;text-align:left;background:#fff;box-shadow:inset 0 0 0 1.5px rgba(60,74,40,.14)}
+  .cl-pick.on{box-shadow:inset 0 0 0 2px var(--cz-sage)}
+  .cl-pick b{display:block;font-size:14.5px;color:var(--cz-ink)}
+  .cl-pick span{display:block;margin-top:2px;font-size:12px;color:var(--cz-ink-2)}
 </style>
 </head>
 <body>
@@ -7596,6 +7631,7 @@ document.documentElement.classList.add('home-on');</script>
     <button class="fm-item" onclick="fmGo('games')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="16" cy="11.6" r="1"/><circle cx="18" cy="14" r="1"/></svg>Mini Games</button>
     <button class="fm-item" onclick="fmClose();xpOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/></svg>Your XP</button>
     <button class="fm-item" onclick="fmGo('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 5l9 4.5-9 4.5-9-4.5Z"/><path d="M7 11.6V16c0 1.4 2.2 2.6 5 2.6s5-1.2 5-2.6v-4.4"/></svg>Progress</button>
+    <button class="fm-item" onclick="fmClose();fcCloudOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5H7Z"/><path d="m9.5 13 2 2 3.5-4"/></svg>Account &amp; backup</button>
     <button class="fm-item" onclick="fmClose();fcSleepOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>Sleep timer</button>
     <button class="fm-item" onclick="fmGo('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.7 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9.1A1.7 1.7 0 0 0 10.1 3V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9.1a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1.37Z"/></svg>Settings</button>
   </nav>
@@ -7639,6 +7675,7 @@ document.documentElement.classList.add('home-on');</script>
     <h1 class="cz-title">A Little World<br/>of Words</h1>
     <p class="cz-sub">A quiet island to learn on.<br/>Focci is waiting for you.</p>
     <button class="cz-today" id="cz-today" onclick="czOpen('stats')"><span class="cz-today-bar"><i id="cz-today-i"></i></span><b class="num" id="cz-today-n">0 / 20 XP</b><span id="cz-today-s">today</span></button>
+    <button class="cz-cloud" onclick="fcCloudOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5H7Z"/><path d="m9.5 13 2 2 3.5-4"/></svg><span>Keep your progress safe · <b>Sign in</b></span></button>
 
     <div class="cz-cap">Where to</div>
     <div class="cz-where">
@@ -7760,7 +7797,8 @@ document.documentElement.classList.add('home-on');</script>
       <button class="wm-row" style="--i:5" onclick="fmGo('games')"><i class="wm-ic games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r="1"/><circle cx="18" cy="14" r="1"/></svg></i><span>Mini games</span></button>
       <button class="wm-row" style="--i:6" onclick="openFwPanel('stats')"><i class="wm-ic prog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M7 16v-4M12 16V8M17 16v-6"/></svg></i><span>Progress</span></button>
       <button class="wm-row" style="--i:7" onclick="showStoryIntro()"><i class="wm-ic guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.3-3.5-2-6-2v13c2.5 0 4.5.7 6 2 1.5-1.3 3.5-2 6-2V4c-2.5 0-4.5.7-6 2Z"/><path d="M12 6v13"/></svg></i><span>Guide</span></button>
-      <button class="wm-row" style="--i:8" onclick="toggleFwMenu();fcSleepOpen()"><i class="wm-ic guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg></i><span>Sleep timer</span></button>
+      <button class="wm-row" style="--i:8" onclick="toggleFwMenu();fcCloudOpen()"><i class="wm-ic guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5H7Z"/><path d="m9.5 13 2 2 3.5-4"/></svg></i><span>Account &amp; backup</span></button>
+      <button class="wm-row" style="--i:9" onclick="toggleFwMenu();fcSleepOpen()"><i class="wm-ic guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg></i><span>Sleep timer</span></button>
     </div>
     <button class="wm-fab" id="fw-menu-toggle" aria-label="Menu" onclick="toggleFwMenu()">
       <svg viewBox="0 0 24 24"><g class="wm-dots" fill="currentColor"><circle cx="7.5" cy="7.5" r="2.6"/><circle cx="16.5" cy="7.5" r="2.6"/><circle cx="7.5" cy="16.5" r="2.6"/><circle cx="16.5" cy="16.5" r="2.6"/></g>
@@ -7820,6 +7858,8 @@ document.documentElement.classList.add('home-on');</script>
 <script src="./pets.js"></script>
 <script src="./oracle.js"></script>
 <script src="./focci-acts.js"></script>
+<script src="./cloud-config.js"></script>
+<script src="./cloud.js"></script>
 <script src="./story.js"></script>
 <script src="./dict-system.js"></script>
 
@@ -8748,6 +8788,7 @@ document.documentElement.classList.add('home-on');</script>
     const H = document.documentElement, on = (c) => H.classList.contains(c);
     const active = (id) => { const v = document.getElementById(id); return !!(v && v.classList.contains('active')); };
     if (window.zzBack && window.zzBack()) return true;
+    if (window.fcCloudBack && window.fcCloudBack()) return true;
     if (on('ask-on') && window.fwAnswer) { fwAnswer(false); return true; }
     if (window.oracleBack && window.oracleBack()) return true;
     if (window.faBack && window.faBack()) return true;
