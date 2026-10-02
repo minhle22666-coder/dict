@@ -74,6 +74,11 @@
         var j = await r.json();
         (j.keys || []).forEach(function (k) { ST[k.n] = { ok: k.ok, code: k.code, at: Date.now() }; });
         N = (j.keys || []).length || N;
+        /* The function is there but has no keys: GEMINI_KEYS missing, or
+           added after the last deploy (Vercel only gives a variable to the
+           deploys made after it). Measured on focci.vercel.app: 503 with
+           "No shared keys set up". Said as such, not "Online app only". */
+        if (!j.keys && r.status === 503) for (var q = 1; q <= N; q++) ST[q] = { ok: false, code: -2, at: Date.now() };
       } else { for (var i = 1; i <= N; i++) ST[i] = { ok: false, code: -1, at: Date.now() }; }
     } catch (e) {}
     var own = ownKey();
@@ -107,6 +112,7 @@
     if (!s) return id === 'own' ? '' : 'Not checked';
     if (s.ok) return 'Working';
     if (s.code === -1) return 'Online app only';
+    if (s.code === -2) return 'Not set up yet';
     if (s.code === 429) return 'Out of quota for now';
     if (s.code === 400 || s.code === 401 || s.code === 403) return 'Not accepted';
     return 'Not answering';
