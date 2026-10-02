@@ -4155,9 +4155,12 @@ export async function bootFocciWorld(root, opts) {
     if (P.kind === 'guitar') {
       // the right arm strums on every strum the music makes; the left holds the neck
       strumKick = Math.max(0, strumKick - dt * 5);
-      // GUITAR_ARMS: right paw on the soundhole, left paw on the neck (see guitarOn)
-      armL.rotation.set(-0.68 + strumDir * 0.16 * strumKick, 0, 0.56);
-      armR.rotation.set(-1.21 + chordShift * 0.05, 0, 0.23);
+      /* GUITAR_ARMS, solved for paws in front of the guitar's face: the
+         right one over the soundhole at (-0.06, 0.25, 0.26), the left on the
+         neck at (0.28, 0.36, 0.37) -- 0.31 and 0.32 from the shoulders. The
+         strum is a real sweep across the strings now, down and up. */
+      armL.rotation.set(-0.83 + strumDir * 0.3 * strumKick, 0, 0.53 + strumDir * 0.08 * strumKick);
+      armR.rotation.set(-1.34 + chordShift * 0.06, 0, 0.2);
       legL.rotation.x = legR.rotation.x = 0;
       tailPivot.rotation.y = Math.sin(t * 2.2) * 0.12;
       character.rotation.y = charState.angle + Math.sin(t * 1.1) * 0.05;
@@ -4337,7 +4340,11 @@ export async function bootFocciWorld(root, opts) {
        face turned forward, and its centre 0.14 up the axis from S, which is
        where a soundhole sits on a guitar 0.68 long. GUITAR_ARMS holds the
        arm angles solved for the same two points. */
-    const gS = new THREE.Vector3(-0.06, 0.25, 0.22), gN = new THREE.Vector3(0.28, 0.36, 0.33);
+    /* Then: "his hands are behind the guitar, you cannot see him play". The
+       paws were placed AT the soundhole and the neck, so the guitar's own
+       face covered them. The guitar now lies 0.07 further back than the
+       paws (GUITAR_PAW_S/N below), so both paws sit on its face. */
+    const gS = new THREE.Vector3(-0.06, 0.24, 0.19), gN = new THREE.Vector3(0.28, 0.35, 0.30);
     const gy = gN.clone().sub(gS).normalize();
     const gz = new THREE.Vector3(0, 0, 1).addScaledVector(gy, -gy.z).normalize();
     const gx = new THREE.Vector3().crossVectors(gy, gz);
@@ -4356,7 +4363,41 @@ export async function bootFocciWorld(root, opts) {
     focciPose = { kind: 'guitar', wakeOnTouch: false, t: 0, x: charState.x, z: charState.z, base };
     return true;
   }
-  function strum(dir, shift) { strumKick = 1; strumDir = dir || -strumDir; if (shift !== undefined) chordShift = shift; }
+  function strum(dir, shift) {
+    strumKick = 1; strumDir = dir || -strumDir; if (shift !== undefined) chordShift = shift;
+    if (guitarRig && guitarRig.parent && Math.random() < 0.6) spawnNote();
+  }
+  /* A note rises from the soundhole on a strum ("you cannot see him play
+     any notes"): a sprite, no light, gone in a second and a half. */
+  let noteTex = null;
+  function spawnNote() {
+    if (!noteTex) {
+      noteTex = ['♪', '♫', '♩'].map((ch, i) => {
+        const c = document.createElement('canvas'); c.width = c.height = 64;
+        const g = c.getContext('2d');
+        g.font = '700 50px "Segoe UI Symbol", "Apple Symbols", serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.lineWidth = 6; g.strokeStyle = 'rgba(255,255,255,.9)'; g.strokeText(ch, 32, 34);
+        g.fillStyle = ['#E0563C', '#3E7BD8', '#7A4FC4'][i]; g.fillText(ch, 32, 34);
+        return new THREE.CanvasTexture(c);
+      });
+    }
+    const room = activeRoom();
+    rig.updateMatrixWorld(true);
+    const at = rig.localToWorld(new THREE.Vector3(-0.04, 0.27, 0.27));
+    if (room.group.parent) room.group.worldToLocal(at);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: noteTex[Math.floor(Math.random() * 3)], transparent: true, depthWrite: false, opacity: 0 }));
+    sp.scale.setScalar(0.26);
+    sp.position.copy(at);
+    room.group.add(sp);
+    let age = 0; const life = 1.5, dx = (Math.random() - 0.5) * 0.5, dz = (Math.random() - 0.5) * 0.5;
+    activeEffects.push((dt) => {
+      age += dt; const k = age / life;
+      sp.position.set(at.x + dx * k + Math.sin(age * 6) * 0.04, at.y + k * 0.95, at.z + dz * k);
+      sp.material.opacity = Math.min(1, age * 5) * (1 - k);
+      if (age < life) return true;
+      room.group.remove(sp); sp.material.dispose(); return false;
+    });
+  }
 
   /* ---------- lying in the grass ---------- */
   let grass = null, flies = [];
