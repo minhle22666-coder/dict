@@ -29,8 +29,10 @@ table is shown in the app: **Progress › How XP works** (`xpRulesHtml()` in
 |---|---|---|
 | Look up a word | +1 | every lookup |
 | Save a word | +1 | |
-| Letter Trail: right answer | +1 | a one-letter slip still counts |
-| Word Pairs: right answer | +1 | |
+| Letter Trail: find a word on the board | +1 | five words a board |
+| Listening: a round at 80% or more | +2 | small slips (I've / I have, a plural -s, a/an/the, words that sound alike) count as right |
+| Listening: a round at 50% or more | +1 | |
+| Word Pairs: right answer | +1 | asked by an animal on the island |
 | Speak Up: a graded answer | +2 | |
 | Hot Take: finish an article | +5 | |
 | Island: pick up a letter | +1 | |

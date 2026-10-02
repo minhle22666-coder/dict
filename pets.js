@@ -905,11 +905,11 @@
       + '<button class="pt-x" aria-label="Close" onclick="petCloseNudge()">×</button></div>'
       + '<div class="nd-art"><img src="./' + (who ? 'mascot-wonder.webp' : (x ? 'mascot-jump.webp' : 'mascot-avatar.webp')) + '" alt=""/></div>'
       + '<div class="nd-prog"><div class="nd-bar"><i style="width:' + pct + '%"></i></div><b class="num">' + x + ' / ' + g + ' XP</b></div>'
-      + '<p class="nd-line">' + (left <= 5 ? 'Only <b class="num">' + left + '</b> XP to go — one Word Pairs round does it.'
+      + '<p class="nd-line">' + (left <= 5 ? 'Only <b class="num">' + left + '</b> XP to go — one Letter Trail board does it.'
           : '<b class="num">' + left + '</b> XP to today’s goal. Ten minutes is enough.') + '</p>';
     if (qs.length) h += '<ul class="nd-qs">' + qs.map(function (q) { return '<li>' + esc(q.t) + '<span class="num">' + (prog[q.id] || 0) + '/' + q.target + '</span></li>'; }).join('') + '</ul>';
     h += '<div class="nd-acts">'
-      + '<button class="btn" onclick="petCloseNudge();fhGame(null,\'match\')">Play Word Pairs</button>'
+      + '<button class="btn" onclick="petCloseNudge();fhGame(null,\'type\')">Play Letter Trail</button>'
       + '<button class="btn ghost" onclick="petCloseNudge();' + (who ? 'fhEnterIsland()' : 'czOpen(\'stats\')') + '">' + (who ? 'Feed ' + esc(who.name) : 'See today’s plan') + '</button></div>';
     h += '<label class="nd-remind"><input type="checkbox" ' + (remind && remind.on ? 'checked' : '') + ' onchange="petRemind(this.checked)"/>'
       + '<span>Remind me at 8pm if I have not reached it</span></label>';
@@ -965,7 +965,7 @@
       + '<button class="pt-x" aria-label="Close" onclick="petCloseGift()">\u00d7</button></div>'
       + '<p class="pt-g-intro">A good day is ten to fifteen minutes: one game round, a few lookups and one quest clear the daily goal. The animals never have to cost you XP \u2014 two naps a day keep them going; food is the fast way and builds the bond.</p>'
       + '<div class="xr-h">Earn</div><table class="xr">' + rows([
-          ['Look up or save a word', '+1'], ['Right answer \u00b7 Letter Trail, Word Pairs', '+1'], ['Speak Up answer', '+2'],
+          ['Look up or save a word', '+1'], ['A word found \u00b7 Letter Trail', '+1'], ['Listening \u00b7 80% / 50%+', '+2 / +1'], ['Word Pairs with an animal \u00b7 right answer', '+1'], ['Speak Up answer', '+2'],
           ['Finish a Hot Take article', '+5'], ['Island letter \u00b7 mushroom', '+1'], ['Complete the hidden word', '+3'], ['Open the treasure', '+6'],
           ['Paragraph hunt \u00b7 1st / 2nd / later check', '+12 / +9 / +6'], ['3rd hunt of the day and after', '+3'],
           ['Quests \u00b7 5 lookups, a save, an animal', '+10 each'], ['Quest \u00b7 play a game', '+15']]) + '</table>'

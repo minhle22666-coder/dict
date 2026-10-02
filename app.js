@@ -4267,8 +4267,10 @@ function setPracticeMode(m){
   /* All four games are daylight now, Speak Up included; .su-active still
      marks Speak Up for its own layout. */
   if(vr) vr.classList.add('pg-day');
+  if(typeof lsStop==='function') lsStop();
   if(m==='write'){ window.__sayItActive=true; renderSpeakUpIntro(); return; }
   window.__sayItActive=false;
+  if(m==='listen'){ suPanelOn(false); wirePracticeSwipe(); renderListen(true); return; }
   suPanelOn(false);
   renderPracticeSetup();
 }
@@ -4319,6 +4321,8 @@ const PG_META = {
            intro:'Read the scenario, type your best English, and Focci gives you instant feedback with native tips.' },
   type:  { banner:'banner-lettertrail.webp', art:'box-lettertrail.png', fox:'fox-letter-trail.webp', name:'Letter Trail',
            intro:'Five words hide in the letters. Read the Vietnamese clue, then drag across the letters to join each one.' },
+  listen:{ banner:'banner-listen.webp', fox:'mascot-take_note.webp', name:'Listening',
+           intro:'Real voices read one to five sentences. Write what you hear \u2014 small slips are pointed out, not punished.' },
   match: { banner:'banner-wordpairs.webp', art:'box-wordpairs.png', fox:'fox-word-pairs.webp', name:'Word Pairs',
            intro:'Read the Vietnamese, pick the English word that matches, then swipe left for the next one.' }
 };
@@ -4369,7 +4373,8 @@ function gameHead(mode){
     +'</div></div>';
 }
 function gameShell(body){
-  return '<div class="pg">'+gameHead(practiceMode)+pgControls()+body+'</div>';
+  // Listening draws its own pickers (sentences, level, voices) into body
+  return '<div class="pg">'+gameHead(practiceMode)+(practiceMode==='listen'?'':pgControls())+body+'</div>';
 }
 
 /* The card the question lives in: mascot breaking the top edge, what the
@@ -4509,6 +4514,7 @@ function practiceAnswered(){ return practiceMode==='match' ? !!matchPicked : !!r
 function practiceHasProgress(){
   if(practiceMode==='match') return matchIdx>0 || !!matchPicked;
   if(practiceMode==='type') return revIdx>0 || !!revState || !!(wc && !wc.done && wcFoundCount()>0);
+  if(practiceMode==='listen'){ const i=document.getElementById('ls-in'); return !!(ls && !ls.result && i && i.value.trim()); }
   return false;
 }
 window.practiceHasProgress=practiceHasProgress;
@@ -5797,6 +5803,381 @@ window.wcGiveUp=async function(){
   renderConnect();
 };
 window.startConnect=startConnect;
+
+/* ============================================================
+   LISTENING — hear it, write it
+
+   Takes Word Pairs' place among the games (Word Pairs went to the island:
+   the animals ask it now). One to five sentences are played; you write
+   what you heard; the transcript comes back marked word by word.
+
+   Two sources:
+   - Real voices (default, no key): Tatoeba's open API. Sentences recorded
+     by native speakers, each with a Vietnamese translation, filtered by
+     word count for the level. Measured from this app's origin: the API and
+     the audio both answer with Access-Control-Allow-Origin *. The
+     download_url the API returns ("/v1/audio/ID/file") is a 404 -- the
+     real path is "/v1/audios/ID/file", so it is built from the id.
+     Recordings are CC BY-NC-ND: the speaker is credited under the answer.
+   - AI podcast (needs the Gemini key): Gemini writes a short podcast-host
+     passage at the level, and Gemini's text-to-speech reads it. If either
+     step fails the device's own voice reads the text instead.
+   Hot Take's articles were the first idea and were dropped: ninety items,
+   most of them written news rather than speech. Podcast feeds were tried
+   too: of 25 learner podcasts found through iTunes, 15 feeds load from the
+   browser and one carries a transcript tag.
+
+   Marking is kind about what a listener cannot hear: a contraction written
+   out or squeezed (I've / I have), a dropped 've or 'll, a plural s, a/an/
+   the, a one-letter spelling slip, a missing -ed. Those show in honey with
+   a short note and count as right. Missed words are clay with what you
+   wrote under them; extra words are listed apart.
+
+   XP (XP-RULES.md): +2 for a round at 80% or more, +1 at 50% or more.
+   ============================================================ */
+let ls=null, _lsSeq=0;
+const LS_N_LS='fc_listen_n', LS_LV_LS='fc_listen_lv', LS_SRC_LS='fc_listen_src', LS_SP_LS='fc_listen_slow';
+const LS_LEVELS={ easy:{label:'Easy', wc:'4-7', cefr:'A2'}, mid:{label:'Medium', wc:'8-12', cefr:'B1'}, hard:{label:'Hard', wc:'13-20', cefr:'B2-C1'} };
+const LS_SILENT='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+function lsN(){ const n=+localStorage.getItem(LS_N_LS); return n>=1&&n<=5?n:1; }
+function lsLv(){ const v=localStorage.getItem(LS_LV_LS); return LS_LEVELS[v]?v:'mid'; }
+function lsSrc(){ return localStorage.getItem(LS_SRC_LS)==='ai' && getKey() ? 'ai' : 'real'; }
+function lsSlow(){ return localStorage.getItem(LS_SP_LS)==='1'; }
+window.lsSet=function(k,v){
+  if(k==='n') localStorage.setItem(LS_N_LS,String(v));
+  if(k==='lv') localStorage.setItem(LS_LV_LS,v);
+  if(k==='src'){ if(v==='ai' && !getKey()){ toast('AI podcast needs your Gemini key (Settings)'); renderListen(); return; } localStorage.setItem(LS_SRC_LS,v); }
+  if(k==='slow'){ localStorage.setItem(LS_SP_LS,v?'1':'0'); return; }
+  renderListen(true);
+};
+
+/* ---------- getting the sentences ---------- */
+async function lsTatoeba(n, lv){
+  const u='https://api.tatoeba.org/v1/sentences?lang=eng&has_audio=yes&is_unapproved=no&sort=random'
+    +'&trans:lang=vie&showtrans:lang=vie&include=audios&word_count='+LS_LEVELS[lv].wc+'&limit='+Math.min(10,n+3);
+  const c=new AbortController(); const t=setTimeout(()=>c.abort(),12000);
+  try{
+    const d=await (await fetch(u,{signal:c.signal})).json();
+    const got=(d.data||[]).filter(x=>x.audios&&x.audios.length && /^[\x20-\x7E’]+$/.test(x.text)).slice(0,n);
+    if(got.length<n) return null;
+    return { kind:'real', parts: got.map(x=>({ text:x.text, vi:((x.translations||[])[0]||{}).text||'',
+      audio:'https://api.tatoeba.org/v1/audios/'+x.audios[0].id+'/file', voice:x.audios[0].author||'' })) };
+  }catch(e){ return null; } finally{ clearTimeout(t); }
+}
+const LS_TOPICS=['morning routines','a trip that went wrong','learning to cook','city noise','a favourite café','working from home',
+  'saving money','sleep','an old friend','rainy days','street food','a first job','phones at dinner','walking more','a small kindness',
+  'moving house','music while studying','weekend plans','a lost wallet','growing plants'];
+async function lsAiScript(n, lv){
+  const key=getKey(); if(!key || !navigator.onLine) return null;
+  const topic=LS_TOPICS[Math.floor(Math.random()*LS_TOPICS.length)];
+  const prompt='You are the host of a friendly English podcast for learners. Say exactly '+n+' sentence'+(n>1?'s':'')
+    +' about "'+topic+'" in natural spoken English at CEFR '+LS_LEVELS[lv].cefr+' (each sentence '+LS_LEVELS[lv].wc+' words). '
+    +'Sound like real speech: contractions, everyday words, no lists, no names of real people. '
+    +'Return JSON only: {"sentences":["..."],"vi":["natural Vietnamese translation of each sentence"]}';
+  try{
+    const url='https://generativelanguage.googleapis.com/v1beta/models/'+getModel()+':generateContent?key='+encodeURIComponent(key);
+    const gc={temperature:0.9,maxOutputTokens:700,responseMimeType:'application/json'};
+    if(/2\.5/.test(getModel())) gc.thinkingConfig={thinkingBudget:0};
+    const res=await geminiPost(url,{contents:[{parts:[{text:prompt}]}],generationConfig:gc});
+    if(!res.ok) return null;
+    const txt=geminiText(await res.json()).txt.replace(/```json|```/g,'');
+    const j=JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}')+1));
+    const ss=(j.sentences||[]).map(String).filter(Boolean).slice(0,n);
+    if(!ss.length) return null;
+    return { kind:'ai', topic, parts: ss.map((s,i)=>({ text:s.trim(), vi:String((j.vi||[])[i]||'') })) };
+  }catch(e){ return null; }
+}
+/* Gemini's speech comes back as 24kHz 16-bit mono PCM; a WAV header makes
+   it something an <audio> element plays anywhere. */
+function lsWav(b64, rate){
+  const pcm=Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+  const buf=new ArrayBuffer(44+pcm.length), v=new DataView(buf);
+  const w=(o,str)=>{ for(let i=0;i<str.length;i++) v.setUint8(o+i,str.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4,36+pcm.length,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true);
+  v.setUint16(20,1,true); v.setUint16(22,1,true); v.setUint32(24,rate,true); v.setUint32(28,rate*2,true);
+  v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,pcm.length,true);
+  new Uint8Array(buf,44).set(pcm);
+  return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));
+}
+async function lsTTS(text){
+  const key=getKey(); if(!key || !navigator.onLine) return null;
+  for(const model of ['gemini-2.5-flash-preview-tts','gemini-2.5-flash-tts']){
+    try{
+      const url='https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+encodeURIComponent(key);
+      const res=await geminiPost(url,{contents:[{parts:[{text:'Say warmly, like a podcast host talking to a friend: '+text}]}],
+        generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:'Kore'}}}}});
+      if(res.status===404) continue;
+      if(!res.ok) return null;
+      const d=await res.json();
+      const inl=((((d.candidates||[])[0]||{}).content||{}).parts||[]).find(p=>p.inlineData);
+      if(!inl) return null;
+      const m=/rate=(\d+)/.exec(inl.inlineData.mimeType||'');
+      return lsWav(inl.inlineData.data, m?+m[1]:24000);
+    }catch(e){ return null; }
+  }
+  return null;
+}
+function lsDeviceSay(text){
+  return new Promise((res)=>{
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);
+      const vs=speechSynthesis.getVoices().filter(v=>/^en[-_](US|GB|AU)/i.test(v.lang));
+      u.voice=vs.find(v=>/natural|google|samantha|daniel|serena|aria|jenny/i.test(v.name))||vs[0]||null;
+      u.lang=(u.voice&&u.voice.lang)||'en-US'; u.rate=lsSlow()?0.75:0.95;
+      u.onend=res; u.onerror=res; speechSynthesis.speak(u);
+    }catch(e){ res(); }
+  });
+}
+
+/* ---------- playing ---------- */
+function lsEl(){ return ls.el||(ls.el=new Audio()); }
+function lsPlayUrl(url){
+  return new Promise((res)=>{
+    const a=lsEl(); a.onended=()=>res(true); a.onerror=()=>res(false);
+    a.src=url; a.playbackRate=lsSlow()?0.8:1;
+    try{ a.preservesPitch=true; }catch(e){}
+    const p=a.play(); if(p&&p.catch) p.catch(()=>res(false));
+  });
+}
+window.lsPlay=async function(only){
+  if(!ls || !ls.item || ls.busy) return;
+  const seq=ls.seq;
+  // iOS lets an <audio> play later only if it was started inside the tap
+  const a=lsEl(); a.src=LS_SILENT; const p=a.play(); if(p&&p.catch) p.catch(()=>{});
+  ls.busy=true; ls.plays++; ls.now=only==null?0:only; renderListenPlay();
+  try{
+    if(ls.item.kind==='ai'){
+      if(ls.tts===undefined) ls.tts=lsTTS(ls.item.parts.map(x=>x.text).join(' '));
+      const url=await ls.tts;
+      if(seq!==ls.seq) return;
+      if(!(url && await lsPlayUrl(url))) await lsDeviceSay(ls.item.parts.map(x=>x.text).join(' '));
+    } else {
+      const list=only==null ? ls.item.parts.map((_,i)=>i) : [only];
+      for(const i of list){
+        if(seq!==ls.seq) return;
+        ls.now=i; renderListenPlay();
+        const ok=await lsPlayUrl(ls.item.parts[i].audio);
+        if(!ok) await lsDeviceSay(ls.item.parts[i].text);
+        if(list.length>1) await new Promise(r=>setTimeout(r,650));
+      }
+    }
+  } finally {
+    if(seq===ls.seq){ ls.busy=false; ls.now=-1; renderListenPlay(); }
+  }
+};
+function lsStop(){ try{ if(ls && ls.el){ ls.el.pause(); } speechSynthesis.cancel(); }catch(e){} }
+window.lsStop=lsStop;
+
+/* ---------- marking ---------- */
+const LS_EXPAND={"i'm":"i am","i've":"i have","i'll":"i will","i'd":"i would","you're":"you are","you've":"you have","you'll":"you will","you'd":"you would",
+  "he's":"he is","she's":"she is","it's":"it is","we're":"we are","we've":"we have","we'll":"we will","we'd":"we would","they're":"they are","they've":"they have",
+  "they'll":"they will","they'd":"they would","that's":"that is","there's":"there is","here's":"here is","what's":"what is","who's":"who is","let's":"let us",
+  "he'll":"he will","she'll":"she will","it'll":"it will","he'd":"he would","she'd":"she would","that'll":"that will","where's":"where is",
+  "don't":"do not","doesn't":"does not","didn't":"did not","can't":"can not","cannot":"can not","won't":"will not","isn't":"is not","aren't":"are not",
+  "wasn't":"was not","weren't":"were not","haven't":"have not","hasn't":"has not","hadn't":"had not","couldn't":"could not","wouldn't":"would not","shouldn't":"should not",
+  "gonna":"going to","wanna":"want to","gotta":"got to"};
+const LS_NUM={zero:'0',one:'1',two:'2',three:'3',four:'4',five:'5',six:'6',seven:'7',eight:'8',nine:'9',ten:'10',eleven:'11',twelve:'12',twenty:'20',hundred:'100'};
+const LS_ART=['a','an','the'];
+function lsWords(s){ return String(s).replace(/[‘’ʼ]/g,"'").split(/\s+/).filter(Boolean); }
+function lsTok(s){
+  const out=[];
+  lsWords(s).forEach((wd,wi)=>{
+    wd.toLowerCase().replace(/[^a-z0-9'\s-]/g,' ').replace(/-/g,' ').split(/\s+/).filter(Boolean).forEach(w=>{
+      w=w.replace(/^'+|'+$/g,''); if(!w) return;
+      const ex=LS_EXPAND[w];
+      if(ex){ ex.split(' ').forEach((e,k)=>out.push({w:e, raw:w, wi, c:true, tail:k>0})); return; }
+      const poss=/'s$/.test(w); w=w.replace(/'s$/,'').replace(/'/g,'');
+      out.push({w:LS_NUM[w]||w, raw:w, wi, c:false, poss});
+    });
+  });
+  return out;
+}
+function lsLev(a,b){
+  const m=[]; for(let i=0;i<=a.length;i++) m[i]=[i]; for(let j=1;j<=b.length;j++) m[0][j]=j;
+  for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) m[i][j]=Math.min(m[i-1][j]+1,m[i][j-1]+1,m[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return m[a.length][b.length];
+}
+/* Words that sound the same. A listener cannot tell them apart, so
+   writing one for the other is a slip; the contracted forms are in the
+   groups because "they're" is heard exactly like "their". */
+const LS_HOMO=(()=>{ const m={}; [["their","there","they're"],["your","you're"],["its","it's"],["whose","who's"],["to","too"],
+  ["weather","whether"],["hear","here"],["know","no"],["knew","new"],["write","right"],["by","buy","bye"],["for","four"],["one","won"],
+  ["see","sea"],["week","weak"],["wear","where"],["peace","piece"],["whole","hole"],["would","wood"],["ate","eight"],["meet","meat"],
+  ["road","rode"],["son","sun"],["tail","tale"],["wait","weight"],["which","witch"],["allowed","aloud"],["break","brake"],["passed","past"],
+  ["flower","flour"],["principal","principle"],["aren't","aunt"],["we'll","wheel"],["i'll","aisle","isle"]].forEach((g,i)=>g.forEach(w=>m[w]=i)); return m; })();
+// a swap of one word for another that only a teacher would mind
+function lsSlip(rt,ut){
+  const r=rt.w, u=ut.w;
+  if(r===u) return null;
+  if(LS_HOMO[rt.raw]!==undefined && LS_HOMO[rt.raw]===LS_HOMO[ut.raw]) return 'sounds alike';
+  const pl=(a,b)=>b===a+'s'||b===a+'es'||(/y$/.test(a)&&b===a.slice(0,-1)+'ies')||(/fe?$/.test(a)&&b===a.replace(/fe?$/,'ves'));
+  if(pl(r,u)||pl(u,r)) return '-s ending';
+  if(r.replace(/e?d$/,'')===u.replace(/e?d$/,'')) return 'ending -ed';
+  if(LS_ART.includes(r)&&LS_ART.includes(u)) return 'a / an / the';
+  if(r.length>=4 && lsLev(r,u)<=(r.length>=8?2:1)) return 'spelling';
+  return null;
+}
+// leaving out the 've of I've, or an article, is a slip, not a miss
+function lsSoftDrop(t){ return t.tail ? "'"+(t.raw.split("'")[1]||'') : (LS_ART.includes(t.w) ? 'a / an / the' : null); }
+function lsGrade(ref, typed){
+  const R=lsTok(ref), U=lsTok(typed), n=R.length, m=U.length;
+  /* Weighted edit distance: a slip costs less than a miss, so the
+     alignment reads a near-word as that word rather than as a miss plus
+     an extra. */
+  const del=i=>lsSoftDrop(R[i])?0.35:1;
+  const D=[], B=[];
+  for(let i=0;i<=n;i++){ D[i]=new Array(m+1); B[i]=new Array(m+1); }
+  D[0][0]=0;
+  for(let i=1;i<=n;i++){ D[i][0]=D[i-1][0]+del(i-1); B[i][0]='d'; }
+  // the 's of a typed "it's" for a spoken "its" is part of that slip, not an extra word
+  const ins=j=>U[j].tail?0.35:1;
+  for(let j=1;j<=m;j++){ D[0][j]=D[0][j-1]+ins(j-1); B[0][j]='i'; }
+  for(let i=1;i<=n;i++) for(let j=1;j<=m;j++){
+    const r=R[i-1].w, u=U[j-1].w;
+    let best=D[i-1][j-1]+(r===u?0:(lsSlip(R[i-1],U[j-1])?0.4:1.6)), b='s';
+    if(D[i-1][j]+del(i-1)<best){ best=D[i-1][j]+del(i-1); b='d'; }
+    if(D[i][j-1]+ins(j-1)<best){ best=D[i][j-1]+ins(j-1); b='i'; }
+    D[i][j]=best; B[i][j]=b;
+  }
+  const st=new Array(n), extra=[];
+  let i=n, j=m;
+  while(i>0||j>0){
+    const b=B[i][j];
+    if(b==='s'){
+      const r=R[i-1], u=U[j-1];
+      if(r.w===u.w){
+        // "I've" written for a spoken "I have" is marked here; the other
+        // way round is judged per word below, once every part is known
+        const note = (!r.c && u.c) ? 'contraction' : (!!r.poss!==!!u.poss ? "'s" : '');
+        st[i-1]={k:note?'slip':'ok', note, u:u.raw, out:r.c && !u.c};
+      } else {
+        const sl=lsSlip(r,u);
+        st[i-1]=sl?{k:'slip', note:sl, u:u.raw}:{k:'miss', u:u.raw};
+      }
+      i--; j--;
+    } else if(b==='d'){
+      const sd=lsSoftDrop(R[i-1]);
+      st[i-1]=sd?{k:'slip', note:sd}:{k:'miss'};
+      i--;
+    } else { if(!U[j-1].tail) extra.unshift(U[j-1].raw); j--; }
+  }
+  // a contraction written out in full -- every part heard, just spelled long
+  const parts={};
+  R.forEach((t,k)=>{ if(t.c) (parts[t.wi]=parts[t.wi]||[]).push(k); });
+  Object.values(parts).forEach(ks=>{
+    if(ks.every(k=>st[k].k==='ok') && ks.some(k=>st[k].out)) st[ks[0]]={k:'slip', note:'contraction'};
+  });
+  const ok=st.filter(x=>x.k==='ok').length, slip=st.filter(x=>x.k==='slip').length;
+  // words that were never said cost half a word each
+  const score=n?Math.round((ok+slip)/(n+extra.length*0.5)*100):0;
+  // back onto the passage's own words: a word is as bad as its worst part
+  const rank={ok:0,slip:1,miss:2}, perWord={};
+  R.forEach((t,k)=>{ const cur=perWord[t.wi]; if(!cur||rank[st[k].k]>rank[cur.k]) perWord[t.wi]=st[k]; });
+  const html=lsWords(ref).map((wd,wi)=>{
+    const s=perWord[wi]||{k:'ok'};
+    if(s.k==='ok') return '<span class="ls-w ok">'+esc(wd)+'</span>';
+    if(s.k==='slip') return '<span class="ls-w slip">'+esc(wd)+'<em>'+esc(s.note||'')+'</em></span>';
+    return '<span class="ls-w miss">'+esc(wd)+(s.u?'<em>'+esc(s.u)+'</em>':'')+'</span>';
+  }).join(' ');
+  const notes=[...new Set(st.filter(x=>x.k==='slip').map(x=>x.note).filter(Boolean))];
+  return {score, ok, slip, miss:n-ok-slip, total:n, extra, html, notes};
+}
+window.lsGrade=lsGrade;
+
+/* ---------- the page ---------- */
+function lsOpts(){
+  const n=lsN(), lv=lsLv(), src=lsSrc();
+  const opt=(v,l,on)=>'<option value="'+v+'"'+(on?' selected':'')+'>'+l+'</option>';
+  return '<div class="pg-opts ls-opts">'
+    +'<label class="pg-opt"><span>Sentences</span><select aria-label="Sentences" onchange="lsSet(\'n\',+this.value)">'
+      +[1,2,3,4,5].map(k=>opt(k,k,k===n)).join('')+'</select></label>'
+    +'<label class="pg-opt"><span>Level</span><select aria-label="Level" onchange="lsSet(\'lv\',this.value)">'
+      +Object.keys(LS_LEVELS).map(k=>opt(k,LS_LEVELS[k].label,k===lv)).join('')+'</select></label>'
+    +'<label class="pg-opt wide"><span>Voices</span><select aria-label="Voices" onchange="lsSet(\'src\',this.value)">'
+      +opt('real','Real people',src==='real')+opt('ai','AI podcast'+(getKey()?'':' (key)'),src==='ai')+'</select></label>'
+    +'</div>';
+}
+async function renderListen(fresh){
+  const area=$('#review-area'); if(!area) return;
+  practiceStage='playing';
+  if(fresh || !ls){ lsStop(); ls={item:null, plays:0, busy:false, now:-1, result:null, seq:++_lsSeq, hint:false}; }
+  const seq=ls.seq;
+  area.innerHTML=gameShell(lsOpts()+'<div class="pq ls" id="ls-card"></div>');
+  if(!ls.item){
+    $('#ls-card').innerHTML='<div class="ls-load"><span class="ls-wave"><i></i><i></i><i></i><i></i><i></i></span>Finding something to listen to…</div>';
+    const n=lsN(), lv=lsLv();
+    let item=lsSrc()==='ai' ? await lsAiScript(n, lv) : null;
+    if(!item) item=await lsTatoeba(n, lv);
+    if(seq!==ls.seq) return;
+    if(!item){
+      $('#ls-card').innerHTML='<div class="pq-body"><div class="pg-empty">Could not reach the sentence library. Check the connection and try again.</div>'
+        +'<div class="wc-acts"><button class="btn" onclick="renderListen(true)">Try again</button></div></div>';
+      return;
+    }
+    ls.item=item;
+    if(item.kind==='ai') ls.tts=lsTTS(item.parts.map(x=>x.text).join(' '));   // ready by the first tap
+  }
+  renderListenCard();
+}
+window.renderListen=renderListen;
+function renderListenCard(){
+  const card=$('#ls-card'); if(!card||!ls||!ls.item) return;
+  const r=ls.result, it=ls.item;
+  const pose=r?(r.score>=80?'thumbsup':r.score>=50?'good':'confused'):'investigate';
+  const say=r?(r.score>=80?'Sharp ears!':r.score>=50?'Most of it — nice.':'A tricky one. Play it again and compare?')
+    :(it.parts.length>1?'Listen to all '+it.parts.length+', then write them down.':'Listen, then write exactly what you hear.');
+  let h='<div class="pq-top"><img class="pq-fox" src="./mascot-'+pose+'.webp" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+    +'<div class="pq-bub">'+esc(say)+'</div><div class="pq-xp num">+2 XP</div></div><div class="pq-body">';
+  h+='<div class="ls-deck" id="ls-deck"></div>';
+  if(!r){
+    h+='<textarea id="ls-in" class="ls-in" rows="'+Math.min(5,1+it.parts.length)+'" placeholder="Type what you hear…" autocapitalize="sentences" autocomplete="off" autocorrect="off" spellcheck="false" data-noswipe="1"></textarea>';
+    if(ls.hint) h+='<div class="ls-vi">'+it.parts.map(p=>esc(p.vi||'—')).join('<br>')+'</div>';
+    h+='<div class="wc-acts"><button class="btn" onclick="lsCheck()">Check</button>'
+      +(ls.hint?'':'<button class="btn ghost" onclick="lsHint()">Vietnamese hint</button>')+'</div>';
+  } else {
+    h+='<div class="ls-score"><b class="num">'+r.score+'%</b><span><i class="num">'+r.ok+'</i> right'
+      +(r.slip?' · <i class="num">'+r.slip+'</i> small slip'+(r.slip===1?'':'s'):'')
+      +(r.miss?' · <i class="num">'+r.miss+'</i> missed':'')+'</span></div>';
+    if(r.notes.length) h+='<div class="ls-note"><b>Counted as right:</b> '+r.notes.map(esc).join(', ')+'. These are hard to hear in fast speech — just worth noticing.</div>';
+    h+='<div class="ls-diff">'+r.html+'</div>';
+    if(r.extra.length) h+='<div class="ls-extra">Not in what was said: <s>'+r.extra.map(esc).join(' ')+'</s></div>';
+    if(it.parts.some(p=>p.vi)) h+='<div class="ls-vi">'+it.parts.map(p=>esc(p.vi)).filter(Boolean).join('<br>')+'</div>';
+    const voices=[...new Set(it.parts.map(p=>p.voice).filter(Boolean))];
+    h+='<div class="ls-src">'+(it.kind==='ai'?'AI podcast · '+esc(it.topic)
+      :'Voices from Tatoeba'+(voices.length?' · '+esc(voices.join(', ')):'')+' · CC BY-NC-ND')+'</div>';
+    h+='<div class="wc-acts"><button class="btn" onclick="renderListen(true)">Next</button></div>';
+  }
+  h+='</div>';
+  card.innerHTML=h;
+  renderListenPlay();
+}
+function renderListenPlay(){
+  const deck=$('#ls-deck'); if(!deck||!ls||!ls.item) return;
+  const it=ls.item, wave='<span class="ls-wave"><i></i><i></i><i></i><i></i><i></i></span>';
+  let h='<button class="ls-play'+(ls.busy?' busy':'')+'" onclick="lsPlay()" aria-label="Play">'
+    +(ls.busy?wave:'<svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>')+'</button>';
+  h+='<div class="ls-side"><div class="ls-plays">'+(ls.busy?'Listening…':ls.plays?'Played <i class="num">'+ls.plays+'</i>× · again as often as you like':'Tap to play')+'</div>';
+  if(it.kind==='real' && it.parts.length>1) h+='<div class="ls-each">'+it.parts.map((_,i)=>
+      '<button class="num'+(ls.now===i&&ls.busy?' on':'')+'" onclick="lsPlay('+i+')" aria-label="Sentence '+(i+1)+'">'+(i+1)+'</button>').join('')+'</div>';
+  h+='<label class="ls-slow"><input type="checkbox"'+(lsSlow()?' checked':'')+' onchange="lsSet(\'slow\',this.checked)"/> Slower</label></div>';
+  deck.innerHTML=h;
+}
+window.lsHint=function(){ if(!ls) return; const v=($('#ls-in')||{}).value||''; ls.hint=true; renderListenCard(); const i=$('#ls-in'); if(i){ i.value=v; i.focus(); } };
+window.lsCheck=function(){
+  const i=$('#ls-in'); if(!i || !ls || !ls.item) return;
+  const t=i.value.trim();
+  if(!t){ i.classList.add('shake'); setTimeout(()=>i.classList.remove('shake'),400); return; }
+  lsStop(); ls.busy=false;
+  ls.result=lsGrade(ls.item.parts.map(x=>x.text).join(' '), t);
+  const xp=ls.result.score>=80?2:ls.result.score>=50?1:0;
+  if(xp) addXP(xp);
+  questBump('game');
+  logEvent(ls.result.score>=80?'review_correct':'review_wrong', null);
+  renderListenCard();
+  const c=$('#ls-card');
+  if(c){ c.classList.remove('ls-yay'); void c.offsetWidth; if(ls.result.score>=80){ c.classList.add('ls-yay'); confettiBurst(c, 26); } }
+};
 
 function renderReview(){
   const area=$('#review-area');
