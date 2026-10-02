@@ -4089,17 +4089,33 @@ export async function bootFocciWorld(root, opts) {
     character.updateMatrixWorld(true);
     let orange = null; const L = [], R = [];
     const v = new THREE.Vector3();
+    focciEyeSwap = [];
     character.traverse((o) => {
       if (!o.isMesh || !o.material) return;
       if (o.material.name === 'focci_orange') orange = o.material;
       if (o.material.name !== 'focci_black') return;
-      const pos = o.geometry.attributes.position;
+      const pos = o.geometry.attributes.position, eye = new Uint8Array(pos.count);
       for (let i = 0; i < pos.count; i++) {
         v.fromBufferAttribute(pos, i);
         if (o.isSkinnedMesh && o.boneTransform) o.boneTransform(i, v);
         o.localToWorld(v); rig.worldToLocal(v);
-        if (v.y > 0.6 && v.z < 0.245) (v.x < 0 ? L : R).push([v.x, v.y, v.z]);
+        if (v.y > 0.6 && v.z < 0.245) { (v.x < 0 ? L : R).push([v.x, v.y, v.z]); eye[i] = 1; }
       }
+      /* Closed eyes leave the open ones out altogether: the same mesh with
+         every triangle that touches an eye vertex dropped from its index
+         (attributes shared, nothing copied). A disc over them was not
+         enough -- the black rim still showed round its edge ("it still
+         bulges with a black rim"). */
+      const g0 = o.geometry, idx = g0.index ? g0.index.array : null, n = idx ? idx.length : pos.count, keep = [];
+      for (let t = 0; t < n; t += 3) {
+        const a = idx ? idx[t] : t, b = idx ? idx[t + 1] : t + 1, c = idx ? idx[t + 2] : t + 2;
+        if (!eye[a] && !eye[b] && !eye[c]) keep.push(a, b, c);
+      }
+      const g1 = new THREE.BufferGeometry();
+      Object.keys(g0.attributes).forEach((k) => g1.setAttribute(k, g0.attributes[k]));
+      g1.setIndex(keep);
+      g1.boundingBox = g0.boundingBox; g1.boundingSphere = g0.boundingSphere;
+      focciEyeSwap.push({ o, open: g0, shut: g1 });
     });
     const grp = new THREE.Group();
     const dark = new THREE.MeshBasicMaterial({ color: 0x2A1A12 });
@@ -4108,15 +4124,16 @@ export async function bootFocciWorld(root, opts) {
       const lo = [0, 1, 2].map((k) => Math.min(...pts.map((q) => q[k]))), hi = [0, 1, 2].map((k) => Math.max(...pts.map((q) => q[k])));
       const cx = (lo[0] + hi[0]) / 2, cy = (lo[1] + hi[1]) / 2, w = hi[0] - lo[0], fz = hi[2];
       /* Flat, not a dome: the half-sphere lids stood out of the face like
-         two bumps ("the round eyes bulge, it looks bad"). A disc of his own
-         orange just in front of the eye hides it, and on it one thin
-         curve -- the closed eye of someone asleep, nothing else. */
-      const r = w * 0.6;
+         two bumps ("the round eyes bulge, it looks bad"). With the eyes
+         themselves left out (focciEyeSwap), a disc of his own orange sits
+         at the BACK of where they were, filling any hole without standing
+         out, and on it one thin curve -- the closed eye of someone asleep. */
+      const r = w * 0.66, bz = lo[2];
       const lid = new THREE.Mesh(new THREE.CircleGeometry(r, 24), orange || new THREE.MeshStandardMaterial({ color: 0xF5510A }));
-      lid.position.set(cx, cy, fz + 0.003);
+      lid.position.set(cx, cy, bz + 0.002);
       grp.add(lid);
-      const lash = new THREE.Mesh(new THREE.TorusGeometry(r * 0.6, r * 0.075, 4, 18, Math.PI), dark);
-      lash.rotation.z = Math.PI; lash.scale.set(1, 0.7, 0.2); lash.position.set(cx, cy + r * 0.12, fz + 0.006);
+      const lash = new THREE.Mesh(new THREE.TorusGeometry(r * 0.58, r * 0.1, 4, 18, Math.PI), dark);
+      lash.rotation.z = Math.PI; lash.scale.set(1, 0.65, 0.15); lash.position.set(cx, cy + r * 0.1, bz + 0.006);
       grp.add(lash);
     });
     grp.visible = false;
@@ -4124,7 +4141,11 @@ export async function bootFocciWorld(root, opts) {
     focciLids = grp;
     return grp;
   }
-  function focciEyes(closed) { ensureLids().visible = !!closed; }
+  let focciEyeSwap = [];
+  function focciEyes(closed) {
+    ensureLids().visible = !!closed;
+    focciEyeSwap.forEach((e) => { e.o.geometry = closed ? e.shut : e.open; });
+  }
   function focciSleepOnBed(room, h) {
     if (!h || !h.kit || focciPose) return;
     const K = h.kitScale || 1, ax = h.kitX, az = h.kitZ;

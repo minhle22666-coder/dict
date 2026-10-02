@@ -279,6 +279,7 @@
     { k: 'birds', t: 'Birds', icon: 'snd-birds', synth: ['birds', 'birds2'], names: ['Morning birds', 'Birds in the breeze'] },
     { k: 'wind', t: 'Wind', icon: 'snd-wind', synth: ['wind'], names: ['Wind in the grass'] },
     { k: 'night', t: 'Night', icon: 'sleep', files: ['relax-night.mp3'], names: ['Crickets at night'] },
+    { k: 'airport', t: 'Airport', icon: 'snd-airport', files: ['relax-airport.mp3'], names: ['A quiet airport lounge'] },
     { k: 'none', t: 'Off' }
   ];
   var SNDV = {};

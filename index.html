@@ -6840,6 +6840,16 @@ document.documentElement.classList.add('home-on');</script>
   .fa-dots i.on{opacity:1}
   .fa-sndname{min-height:16px;margin:0 0 8px;font-size:12px;font-weight:600;text-align:center;color:var(--cz-ink-2)}
   html.fa-night .fa-sndname{color:#E9EEFF}
+
+  /* The breathing guide off Focci: a small pulse in a pill under the title,
+     not a ring drawn round him ("he looks cramped, shut in the circle") */
+  html body .fa-breath{position:absolute;top:calc(env(safe-area-inset-top,0px) + 104px);left:50%;transform:translateX(-50%);width:auto;height:auto;min-width:176px;
+    display:flex;align-items:center;justify-content:flex-start;gap:12px;padding:7px 18px 7px 8px;border-radius:99px;box-sizing:border-box;
+    background:rgba(255,255,250,.62);box-shadow:var(--cz-rim),0 4px 12px rgba(60,74,40,.12)}
+  html body .fa-circle{position:relative;inset:auto;flex:none;width:38px;height:38px}
+  html body .fa-blabel{font-size:15px;text-align:left}
+  html.fa-night body .fa-breath{background:rgba(20,30,60,.5);box-shadow:inset 0 0 0 1px rgba(200,215,255,.25)}
+  html body .fa-bcount{position:absolute;top:calc(env(safe-area-inset-top,0px) + 160px);left:50%;transform:translateX(-50%)}
 </style>
 </head>
 <body>
