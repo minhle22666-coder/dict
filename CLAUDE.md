@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v236`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v238`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -620,6 +620,14 @@ it comes in (`storyNear()`); there is no "back to the world" button.
 **Guitar arms stay within 0.6-0.75 rad**: bigger turns stretch the
 shoulder weights (swollen arms, smeared colour). Bring the guitar to the
 paws, not the paws to the guitar.
+His arms cannot reach in front of anything held before his belly (belly
+front z 0.248, arms 0.29 from z 0.065), so the paws are drawn a second time
+over the guitar: `pawLayerOn()` -- a copy of the paw triangles sharing his
+skeleton, depthTest off, renderOrder 30.
+
+**Heat on phones** (no leak was found; it is GPU fill): pixel ratio 1.25,
+shadows every other frame, 20fps after 5s idle, `heatGuard` drops to 1.0
+after 4s of slow frames, and no backdrop-filter over the island.
 
 **YouGlish on the word page is the full widget** (`ygOpen`, autoStart, a
 420px roll), opened by the tap, stopped on leaving or backgrounding.
