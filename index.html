@@ -7006,6 +7006,30 @@ document.documentElement.classList.add('home-on');</script>
   .cl-pick.on{box-shadow:inset 0 0 0 2px var(--cz-sage)}
   .cl-pick b{display:block;font-size:14.5px;color:var(--cz-ink)}
   .cl-pick span{display:block;margin-top:2px;font-size:12px;color:var(--cz-ink-2)}
+
+  /* ---- AI KEYS in Settings (gemini-keys.js): rows with a status dot ---- */
+  .ak-list,.ak-own{display:flex;flex-direction:column;gap:6px}
+  .ak-own{margin-top:6px}
+  .ak-row{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:0 14px;border:0;border-radius:14px;cursor:pointer;text-align:left;
+    color:var(--cz-ink);background:rgba(255,255,252,.7);box-shadow:inset 0 0 0 1px rgba(60,74,40,.1);-webkit-tap-highlight-color:transparent}
+  .ak-row b{flex:1;font-size:14px;font-weight:600}
+  .ak-row em{font-style:normal;font-size:12px;color:var(--cz-ink-2)}
+  .ak-row.on,.ak-own.on .ak-row{box-shadow:inset 0 0 0 1.5px var(--cz-sage);background:rgba(244,248,238,.95)}
+  .ak-tick{width:18px;height:18px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(60,74,40,.25)}
+  .ak-row.on .ak-tick,.ak-own.on .ak-tick{background:var(--cz-sage) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center/12px no-repeat;box-shadow:none}
+  .ak-dot{flex:none;width:9px;height:9px;border-radius:50%;background:#C9CCBF}
+  .ak-dot.ok{background:#4CB46A;box-shadow:0 0 0 3px rgba(76,180,106,.18)}
+  .ak-dot.bad{background:#D9694F;box-shadow:0 0 0 3px rgba(217,105,79,.15)}
+  .ak-dot.wait{background:#E8C27A;animation:ak-pulse 1s ease-in-out infinite}
+  @keyframes ak-pulse{50%{opacity:.35}}
+  .ak-own input{margin-top:2px}
+  .ak-check{align-self:flex-start;margin-top:10px;height:34px;padding:0 14px;border:0;border-radius:99px;cursor:pointer;font-size:12.5px;font-weight:600;
+    color:var(--cz-sage);background:rgba(60,74,40,.07)}
+  /* Save setup: the solid block of colour did not belong to the theme -- a light, tinted button instead */
+  html body #save-settings{height:44px;min-width:150px;padding:0 20px;border:0;border-radius:14px;font-size:14px;font-weight:700;letter-spacing:0;
+    color:var(--cz-sage) !important;background:rgba(244,248,238,.95) !important;box-shadow:inset 0 0 0 1.5px rgba(110,150,90,.45),0 4px 12px rgba(60,74,40,.08) !important;text-shadow:none !important}
+  html body #save-settings:active{transform:scale(.98);background:rgba(232,242,224,.95) !important}
+  html body #settings-flash{color:var(--cz-sage)}
 </style>
 </head>
 <body>
@@ -7271,14 +7295,22 @@ document.documentElement.classList.add('home-on');</script>
     <div class="sx-lbl">Setup</div>
     <div class="sx-card">
       <div class="sx-field">
-        <label for="key">Gemini API key</label>
-        <input id="key" type="password" placeholder="AIza…" autocapitalize="none" autocorrect="off" spellcheck="false"/>
-        <p class="sx-hint">Stored only on this device. Get a free key at aistudio.google.com.</p>
+        <label>Gemini API key</label>
+        <p class="sx-hint" style="margin-bottom:10px">Focci’s shared keys work straight away — a green dot means it answers, and if one runs out Focci moves to the next. Or use a key of your own.</p>
+        <!-- gemini-keys.js draws the shared keys here -->
+        <div class="ak-list" id="ak-list"></div>
+        <div class="ak-own" id="ak-own-row">
+          <button type="button" class="ak-row" onclick="akPick('own')"><span class="ak-dot-slot"></span><b>Your own key</b><em></em><u class="ak-tick"></u></button>
+          <input id="key" type="password" placeholder="Paste a key from aistudio.google.com" autocapitalize="none" autocorrect="off" spellcheck="false"/>
+        </div>
+        <button type="button" class="ak-check" onclick="akCheck()">Check the keys</button>
       </div>
       <div class="sx-sep"></div>
       <div class="sx-field">
         <label for="model">Model</label>
-        <input id="model" type="text" placeholder="gemini-2.5-flash-lite" autocapitalize="none" autocorrect="off" spellcheck="false"/>
+        <input id="model" type="text" list="ak-models" placeholder="gemini-3.1-flash-lite" autocapitalize="none" autocorrect="off" spellcheck="false"/>
+        <datalist id="ak-models"><option value="gemini-3.1-flash-lite"><option value="gemini-3.5-flash-lite"><option value="gemini-3.5-flash"><option value="gemini-2.5-flash-lite"><option value="gemini-flash-lite-latest"></datalist>
+        <p class="sx-hint">gemini-3.1-flash-lite is quick and light. Pick another from the list, or type one.</p>
       </div>
       <div class="sx-sep"></div>
       <div class="sx-field">
@@ -7824,6 +7856,7 @@ document.documentElement.classList.add('home-on');</script>
 <script src="./residents.js"></script>
 <script src="./hottake.js"></script>
 <script src="./journal.js"></script>
+<script src="./gemini-keys.js"></script>
 <script src="./app.js"></script>
 <script>
 /* ============================================================
@@ -8743,6 +8776,7 @@ document.documentElement.classList.add('home-on');</script>
     document.getElementById('fw-menu-cluster').classList.remove('open');
     showView(view);
     document.getElementById('fw-panel-close').style.display = 'flex';
+    if (view === 'settings' && window.akMaybeCheck) window.akMaybeCheck();
   };
   /* The full word entry lives in #v-home, which the 3D world covers — see
      the html.dict-open rules. These two are the only supported way in and

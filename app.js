@@ -198,7 +198,7 @@ async function logEvent(type, word){
 /* ---------- settings (localStorage) ---------- */
 const KEY_LS='sd_key', MODEL_LS='sd_model', NAME_LS='sd_name', THEME_LS='sd_theme';
 const getKey=()=>localStorage.getItem(KEY_LS)||'';
-const getModel=()=>localStorage.getItem(MODEL_LS)||'gemini-2.5-flash-lite';
+const getModel=()=>localStorage.getItem(MODEL_LS)||'gemini-3.1-flash-lite';
 const getName=()=>localStorage.getItem(NAME_LS)||'';
 
 /* ---------- XP / level / daily goal ---------- */
@@ -6923,7 +6923,7 @@ async function refreshStats(){
   const ai=$('#sx-ai');
   if(ai){
     const on=!!getKey();
-    ai.textContent = on ? 'On' : 'Off';
+    ai.textContent = on ? (/^focci:/.test(getKey()) ? 'Focci key '+getKey().slice(6) : 'Own key') : 'Off';
     ai.style.color = on ? 'var(--mint)' : 'var(--muted-2)';
   }
 }
@@ -7750,10 +7750,11 @@ function wire(){
   renderThemePicker(); applyTheme();
   wireJar();
 
-  $('#key').value=getKey(); $('#model').value=getModel(); $('#goal').value=getDailyGoal();
+  // the field holds only a key of the person's own; a shared one is a row (gemini-keys.js)
+  $('#key').value = window.akOwnValue ? akOwnValue() : getKey(); $('#model').value=getModel(); $('#goal').value=getDailyGoal();
   $('#save-settings').addEventListener('click',()=>{
-    localStorage.setItem(KEY_LS,$('#key').value.trim());
-    localStorage.setItem(MODEL_LS,($('#model').value.trim()||'gemini-2.5-flash-lite'));
+    localStorage.setItem(KEY_LS, window.akChosen ? akChosen() : $('#key').value.trim());
+    localStorage.setItem(MODEL_LS,($('#model').value.trim()||'gemini-3.1-flash-lite'));
     setDailyGoal(+$('#goal').value||20);
     renderHero();
     const f=$('#settings-flash'); f.textContent='Saved ✓'; setTimeout(()=>f.textContent='',1800);

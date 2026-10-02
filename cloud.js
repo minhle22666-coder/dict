@@ -39,7 +39,7 @@
   var CFG = window.FC_CLOUD || {};
   var ON = !!(CFG.url && CFG.anonKey);
   var LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
-  var NO_SYNC = { sd_key: 1, sd_merged_seeds: 1, fc_dict_applied: 1, fc_sleep_at: 1, fc_cloud_meta: 1, fc_freedict: 1, fc_scan: 1 };
+  var NO_SYNC = { sd_key: 1, sd_key_custom: 1, fc_key_status: 1, sd_merged_seeds: 1, fc_dict_applied: 1, fc_sleep_at: 1, fc_cloud_meta: 1, fc_freedict: 1, fc_scan: 1 };
   var META_LS = 'fc_cloud_meta';
   var sb = null, user = null, dirty = false, saveT = 0, busy = false, lastSaved = 0, libP = null;
 
