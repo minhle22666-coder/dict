@@ -6496,6 +6496,11 @@ document.documentElement.classList.add('home-on');</script>
   html.kb-on .pt-talk{bottom:calc(var(--kb) + 8px)}
   html.kb-on .oc,html.kb-on .fa-story,html.kb-on .pt-sheet{top:var(--vvt);bottom:auto;height:var(--vvh)}
   html.kb-on .oc-in{max-height:calc(var(--vvh) - 8px)}
+  /* typing the question: the explanation folds away so the box and the
+     button are what is on screen above the keys (the page jumped to the top
+     and the box was out of sight) */
+  html.kb-on .oc.ask .oc-mark,html.kb-on .oc.ask .oc-lead,html.kb-on .oc.ask .oc-how,html.kb-on .oc.ask .oc-last,html.kb-on .oc.ask .oc-steps{display:none}
+  html.kb-on .oc.ask .oc-h2{margin:6px 0 10px;font-size:20px}
   html.kb-on .pq2,html.kb-on .fa-bar{bottom:calc(var(--kb) + 10px)}
   html.kb-on .view.fw-panel.active{padding-bottom:var(--kb)}
   /* two bubbles have to share the strip above the keyboard */
@@ -6928,6 +6933,17 @@ document.documentElement.classList.add('home-on');</script>
   .fa-story button,.fa-bar button,.fa-relax button,.zz-pill,.pr button{-webkit-tap-highlight-color:transparent;outline:none}
   html body .rs-b{display:grid;place-items:center;border-radius:50%;-webkit-appearance:none;appearance:none;padding:0}
   html body .rs-b.star svg{display:block}
+
+  /* YouGlish on the word page: its own full widget, opened by the tap (app.js ygOpen) */
+  .yg-mini{margin:8px 0;padding:10px;border-radius:18px;background:rgba(255,255,252,.86);box-shadow:var(--cz-rim),0 6px 18px rgba(46,56,38,.1)}
+  .yg-mini-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 8px}
+  .yg-mini-h b{font-size:13.5px;font-weight:700;color:var(--cz-ink)}
+  .yg-mini-x{height:30px;padding:0 12px;border:0;border-radius:99px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--cz-ink-2);background:rgba(60,74,40,.08)}
+  .yg-mini .yg-peek,.yg-mini .yg-fade{display:none}
+  .yg-mini .yg-wrap{min-height:200px;border-radius:12px;overflow:hidden}
+  /* a small roll, not the widget's full height: the video at the top, the transcript and buttons a scroll away */
+  .yg-mini .yg-stage{height:auto !important;max-height:min(420px,58vh);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  button.yg-link-btn{width:100%;border:0;cursor:pointer;text-align:left;font:inherit}
 </style>
 </head>
 <body>
@@ -7778,7 +7794,7 @@ document.documentElement.classList.add('home-on');</script>
       upd();
       // the page itself never scrolls in this app: put it back where it was
       if (window.scrollY) window.scrollTo(0, 0);
-      try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) {}
+      try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (x) {}
     }, 320);
   });
   document.addEventListener('focusout', function () { setTimeout(upd, 120); });

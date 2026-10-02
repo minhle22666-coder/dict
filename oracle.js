@@ -72,7 +72,7 @@
      them, nothing tells me what is happening"): a steps bar on each, and
      each scene rises in rather than replacing the last in a blink. */
   function steps(n) {
-    return '<div class="oc-steps">' + ['Hỏi cây', 'Gieo quẻ', 'Thông điệp'].map(function (t, i) {
+    return '<div class="oc-steps">' + ['Hỏi', 'Gieo quẻ', 'Thông điệp'].map(function (t, i) {
       return '<i class="' + (i + 1 < n ? 'done' : i + 1 === n ? 'on' : '') + '"><b>' + (i + 1) + '</b>' + t + '</i>';
     }).join('<u></u>') + '</div>';
   }
@@ -85,12 +85,12 @@
     var h = topbar('The wisdom tree') + steps(1)
       + '<div class="oc-ask oc-enter">'
       + '<div class="oc-mark">易</div>'
-      + '<h2 class="oc-h2">Cây Thông Thái</h2>'
-      + '<p class="oc-lead">Cây trả lời bằng Kinh Dịch — một cuốn sách ba nghìn năm tuổi đọc tình thế qua sáu nét quẻ.</p>'
+      + '<h2 class="oc-h2">Wisdom Tree</h2>'
+      + '<p class="oc-lead">Wisdom Tree trả lời bằng Kinh Dịch — một cuốn sách ba nghìn năm tuổi đọc tình thế qua sáu nét quẻ.</p>'
       + '<ol class="oc-how">'
       +   '<li><b>Hỏi</b>Nghĩ về điều bạn đang băn khoăn. Viết ra nếu muốn.</li>'
       +   '<li><b>Gieo</b>Tung ba đồng xu sáu lần. Mỗi lần thành một hào, xếp từ dưới lên — sáu hào là một quẻ.</li>'
-      +   '<li><b>Nghe</b>Cây đọc quẻ và gửi bạn thông điệp cho câu hỏi.</li>'
+      +   '<li><b>Nghe</b>Wisdom Tree đọc quẻ và gửi bạn thông điệp cho câu hỏi.</li>'
       + '</ol>'
       + '<textarea id="oc-q" class="oc-q" rows="2" placeholder="Điều bạn muốn hỏi (không bắt buộc)…"></textarea>'
       + '<button class="oc-go" onclick="ocStart()">Bắt đầu gieo</button>'
@@ -161,7 +161,7 @@
       var R = reading(), p = R.prim, box = $('oc-made'); if (!box) return;
       box.innerHTML = '<b class="oc-mglyph">' + esc(p.chinese) + '</b><span>' + esc(p.name.vi) + ' · ' + esc(p.name.en) + '</span>'
         + (R.rel ? '<small>' + R.chg.length + ' hào động — quẻ sẽ chuyển sang ' + esc(R.rel.name.vi) + '</small>' : '<small>Không hào nào động — quẻ đứng yên</small>')
-        + '<button class="oc-go" onclick="ocReveal()">Nghe cây thông thái nói</button>';
+        + '<button class="oc-go" onclick="ocReveal()">Nghe Wisdom Tree nói</button>';
       box.classList.add('on');
     });
   }
@@ -394,7 +394,7 @@
       var h = topbar('Kết quả gieo quẻ') + steps(3)
         + (S.q ? '<p class="oc-qline">“' + esc(S.q) + '”</p>' : '')
         // the answer first: the AI's, or the app's own line until it comes
-        + '<div class="oc-answer" id="oc-answer">' + (key ? '<div class="oc-think"><span class="oc-dots"><i></i><i></i><i></i></span>Cây thông thái đang luận quẻ…</div>'
+        + '<div class="oc-answer" id="oc-answer">' + (key ? '<div class="oc-think"><span class="oc-dots"><i></i><i></i><i></i></span>Wisdom Tree đang luận quẻ…</div>'
             : '<p>' + esc(ip.modern_summary) + '</p><small>Thêm Gemini key trong Settings để được luận giải theo câu hỏi của bạn.</small>') + '</div>'
         + '<div class="oc-grid">'
         + '<div class="oc-left">'

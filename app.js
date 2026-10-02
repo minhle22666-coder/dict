@@ -2541,8 +2541,12 @@ window.renderFamilyChips=renderFamilyChips;
    ============================================================ */
 const YG_SCRIPT       = 'https://youglish.com/public/emb/widget.js';
 const YG_LANG         = 'english';
-const YG_COMPONENTS   = 0;        // chọn qua yg-calib.html
-const YG_MASK_TOP_PCT = 0.58;     // hiện 58% trên, thu gọn 42% dưới
+/* The user wants YouGlish's own screen on the word page -- the video, the
+   transcript under it and YouGlish's buttons -- opened only when they tap
+   to listen, and gone when they leave. So the full widget (no components
+   mask, nothing cropped), started by the tap. */
+const YG_COMPONENTS   = null;     // null: YouGlish's own full widget
+const YG_MASK_TOP_PCT = 1;        // nothing cropped
 const YG_LAZY         = true;     // true = bấm mới nạp video
 const YG_TIMEOUT      = 12000;
 const YG_DEBUG        = false;
@@ -2638,13 +2642,26 @@ const YG_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
   + 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 
 function ygLinkBtn(word){
-  const url = 'https://youglish.com/pronounce/'+encodeURIComponent(word)+'/english';
-  return '<a class="yg-link-btn" href="'+url+'" target="_blank" rel="noopener">'
+  // a button, not a link out: "remove the open-in-browser button"
+  return '<button class="yg-link-btn" type="button" data-w="'+esc(word)+'" onclick="ygOpen(this.dataset.w)">'
     + '<span class="yg-link-ico">\u25B6</span>'
     + '<span class="yg-link-text"><b>Hear it in real speech</b>'
-    +   '<i>Native speakers on YouGlish</i></span>'
-    + '<span class="yg-link-go">\u2197</span></a>';
+    +   '<i>Native speakers on YouGlish, with the transcript</i></span></button>';
 }
+window.ygOpen = function(word){
+  const box = document.getElementById('youglish-box'); if(!box || !word) return;
+  _ygSeq++;
+  box.innerHTML = '<div class="yg-mini"><div class="yg-mini-h"><b>\u25B6 '+esc(word)+'</b><button type="button" class="yg-mini-x" onclick="ygClose()" aria-label="Close the clips">Close</button></div><div class="yg-wrap"></div></div>';
+  ygMount(word, box.querySelector('.yg-wrap'), _ygSeq, ++_ygIdx);
+};
+window.ygClose = function(){
+  const box = document.getElementById('youglish-box'); if(!box) return;
+  const w = (box.querySelector('.yg-mini-h b')||{}).textContent || '';
+  _ygSeq++;
+  box.innerHTML = ygLinkBtn(w.replace(/^\u25B6\s*/, ''));
+};
+// leaving the app stops it too, not only leaving the word page
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden && document.querySelector('#youglish-box .yg-mini')) ygStopVideo(); });
 
 /* Nạp widget thật vào khung. Chỉ được gọi khi người dùng chủ động
    yêu cầu (chế độ lazy) hoặc ngay lập tức nếu YG_LAZY=false. */
@@ -2725,14 +2742,16 @@ function ygMount(word, wrap, seq, idx){
     const id = 'yg-widget-' + idx;
     inner.innerHTML = '<div id="'+id+'"></div>';
     try{
-      const w = new YG.Widget(id, {
+      const opts = {
         width: wrap.clientWidth || 340,
-        components: YG_COMPONENTS,
+        autoStart: 1,
         events: {
           onFetchDone: (e)=>{ _ygDiag.totalResult = e ? e.totalResult : '?'; },
           onError: (e)=>{ try{ _ygDiag.ygError = JSON.stringify(e); }catch(x){} }
         }
-      });
+      };
+      if(YG_COMPONENTS != null) opts.components = YG_COMPONENTS;
+      const w = new YG.Widget(id, opts);
       w.fetch(word, YG_LANG);
     }catch(e){
       _ygDiag.ctor = 'THROW: ' + (e && e.message ? e.message : e);
