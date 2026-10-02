@@ -118,8 +118,8 @@
      a daily cap on how much of it counts, so a gift is earned over days of
      looking after an animal rather than in one sitting of tapping:
        pet +1 (5 a day)  feed +1 (4)  talk +1 a message (6)  bath +2 (1)
-       sleep +1 (2)      paragraph hunt +3 each animal (2)
-     That is at most 22 a day; gifts come at 6, 16, 30, 48, 70, 96, 126,
+       sleep +1 (2)      paragraph hunt +3 each animal (2)   Word Pairs round +2 (2)
+     That is at most 26 a day; gifts come at 6, 16, 30, 48, 70, 96, 126,
      160 -- the first on day one, then every one to three days of care. */
   var GIFT_AT = [6, 16, 30, 48, 70, 96, 126, 160];
   function nextGiftAt(r) {
@@ -145,9 +145,9 @@
     window.resSave(list);
     return out === undefined ? r : out;
   }
-  var CAP = { pet: 5, feed: 4, talk: 6, bath: 1, sleep: 2, play: 2 };
-  var BOND = { pet: 1, feed: 1, talk: 1, bath: 2, sleep: 1, play: 3 };
-  var JOY = { pet: 4, feed: 0, talk: 2, bath: 6, sleep: 8, play: 5 };
+  var CAP = { pet: 5, feed: 4, talk: 6, bath: 1, sleep: 2, play: 2, quiz: 2 };
+  var BOND = { pet: 1, feed: 1, talk: 1, bath: 2, sleep: 1, play: 3, quiz: 2 };
+  var JOY = { pet: 4, feed: 0, talk: 2, bath: 6, sleep: 8, play: 5, quiz: 5 };
   function care(id, kind) {
     return withRecord(id, function (r) {
       var n = bump(r, kind + 'Day');
@@ -303,48 +303,225 @@
   function moodLine(r, said) { return said || (window.resLine ? window.resLine(r) : ''); }
 
   function W() { return window.fwWorld || null; }
+  /* ---------------- a tap on an animal: the ring ----------------
+     The camera eases in and turns toward the animal (world.js focusStart),
+     a small status card sits over its head, and its actions open around it
+     as round buttons with a caption under each -- the user's design. The
+     old card at the bottom of the screen read as a menu bolted onto the
+     island; the ring belongs to the animal it is around. The whole story
+     of the animal is behind the "?" on the card. Everything follows the
+     animal on screen every frame (focusAnchor). */
+  var SVG = {
+    feed: '<path d="M12 7c-1.2-2.6-4.6-2.4-5.8.2-1.4 3.1.4 8.3 2.8 9.8 1.2.8 2 .3 3 .3s1.8.5 3-.3c2.4-1.5 4.2-6.7 2.8-9.8C16.6 4.6 13.2 4.4 12 7z"/><path d="M12 7c0-1.6.6-3 2-4"/>',
+    pet: '<circle cx="7" cy="10" r="1.7"/><circle cx="10.5" cy="6.5" r="1.7"/><circle cx="14.5" cy="6.5" r="1.7"/><circle cx="18" cy="10" r="1.7"/><path d="M8.5 16.5c0-2.4 1.6-4.5 4-4.5s4 2.1 4 4.5c0 1.7-1.3 2.6-2.6 2.2-.9-.3-1.9-.3-2.8 0-1.3.4-2.6-.5-2.6-2.2z"/>',
+    talk: '<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.5V15h0A2 2 0 0 1 5 13z"/><path d="M9 9.5h6M9 12h3.5"/>',
+    quiz: '<rect x="3.5" y="6" width="8" height="12" rx="2"/><rect x="12.5" y="6" width="8" height="12" rx="2"/><path d="M6 10h3M15 10h3M6 13h2M15 13h2"/>',
+    bath: '<path d="M12 4c2.6 3.4 5 6.4 5 9a5 5 0 0 1-10 0c0-2.6 2.4-5.6 5-9z"/><path d="M10 13.5a2 2 0 0 0 2 2"/>',
+    sleep: '<path d="M18.5 14.5A7 7 0 0 1 9.5 5.5a7 7 0 1 0 9 9z"/><path d="M15 5h3l-3 3h3"/>',
+    play: '<path d="M10 4.5h4V7a1.6 1.6 0 1 0 3 0V4.5h2.5V9H17a1.6 1.6 0 1 0 0 3h2.5v7.5H15V17a1.6 1.6 0 1 0-3 0v2.5H4.5V12H7a1.6 1.6 0 1 0 0-3H4.5V4.5H10z"/>',
+    energy: '<path d="M13 3 6 13.5h5L10 21l7-10.5h-5z"/>',
+    heart: '<path d="M12 19.5s-7-4.3-7-9.4A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.1c0 5.1-7 9.4-7 9.4z"/>',
+    drop: '<path d="M12 4c2.6 3.4 5 6.4 5 9a5 5 0 0 1-10 0c0-2.6 2.4-5.6 5-9z"/>'
+  };
+  function ic(k) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + SVG[k] + '</svg>'; }
+  var ACTS = [
+    { k: 'feed', t: 'Feed', fn: 'petFeed', sub: '2 XP' },
+    { k: 'pet', t: 'Pet', fn: 'petPet' },
+    { k: 'talk', t: 'Talk', fn: 'petTalk' },
+    { k: 'quiz', t: 'Word Pairs', fn: 'petQuiz' },
+    { k: 'play', t: 'Play', fn: 'petPlay' },
+    { k: 'bath', t: 'Bath', fn: 'petBath' },
+    { k: 'sleep', t: 'Sleep', fn: 'petSleep' }
+  ];
+  var RG = { id: null, raf: 0, quiz: false };
+  function ringDom() {
+    if ($('pr')) return;
+    var d = document.createElement('div');
+    d.innerHTML = '<div class="pr" id="pr"><div class="pr-stat" id="pr-stat"></div><div class="pr-ring" id="pr-ring"></div></div>'
+      + '<div class="pq2" id="pq2"></div>';
+    while (d.firstChild) document.body.appendChild(d.firstChild);
+  }
+  function meter(k, pct, txt, cls) {
+    return '<div class="pr-m ' + (cls || '') + '"><i>' + ic(k) + '</i><div class="pr-bar"><b style="width:' + Math.max(0, Math.min(100, pct)) + '%"></b></div>'
+      + '<span class="num">' + txt + '</span></div>';
+  }
+  function timeLeft(ms) { var m = Math.max(1, Math.round(ms / 60000)); return m >= 60 ? Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm' : m + ' min'; }
   function renderAct(r, said) {
-    var el = $('pt-act'), m = masteryOf(r);
-    var meals = mealsToFull(r), ready = giftReady(r), c = cleanOf(r);
-    el.innerHTML =
-      '<div class="pt-act-h"><div class="pt-act-ttl"><b>' + esc(r.name) + '</b><span>' + esc(speciesLabel(r)) + ' · ' + esc(m.label) + '</span></div>'
-      + '<button class="pt-x" aria-label="Close" onclick="petHide()">×</button></div>'
-      + '<div class="pt-say">' + esc(moodLine(r, said)) + '</div>'
-      + '<div class="pt-energy">' + pips(r) + '<span class="pt-meals">' + (meals ? '<b class="num">' + meals + '</b> meal' + (meals === 1 ? '' : 's') + ' to full' : 'Full') + '</span>'
-      + '<span class="pt-clean c' + (c >= 85 ? 3 : c >= 55 ? 2 : 1) + '">\u{1FAE7} ' + cleanWord(c) + '</span></div>'
-      + bondBar(r)
-      + (ready ? '<button class="pt-giftbtn" onclick="petOpenGift(\'' + r.id + '\')"><span>\u{1F381}</span>' + esc(r.name) + ' has a gift for you</button>' : '')
-      + '<div class="pt-btns six">'
-      + '<button onclick="petFeed(\'' + r.id + '\')"><i>\u{1F34E}</i>Feed<small class="num">2 XP</small></button>'
-      + '<button onclick="petPet(\'' + r.id + '\')"><i>\u{1F43E}</i>Pet</button>'
-      + '<button onclick="petTalk(\'' + r.id + '\')"><i>\u{1F4AC}</i>Talk</button>'
-      + '<button onclick="petBath(\'' + r.id + '\')"><i>\u{1F6C1}</i>Bath</button>'
-      + '<button onclick="petSleep(\'' + r.id + '\')"><i>\u{1F319}</i>Sleep</button>'
-      + '<button onclick="petPlay()"><i>\u{1F9E9}</i>Play<small>together</small></button>'
-      + '</div>'
-      + '<button class="pt-about" onclick="petInfo(\'' + r.id + '\')">About ' + esc(r.name) + ' ›</button>';
+    var m = masteryOf(r), c = cleanOf(r), e = r.energy || 0, hp = r.happiness || 0;
+    var lo = prevGiftAt(r), hi = nextGiftAt(r), b = r.bond || 0;
+    var sleeping = asleep(r);
+    var h = '<div class="pr-h"><div class="pr-ttl"><b>' + esc(r.name) + '</b><span>' + esc(speciesLabel(r)) + ' · ' + esc(m.label) + '</span></div>'
+      + '<button class="pr-i" aria-label="About ' + esc(r.name) + '" onclick="petInfo(\'' + r.id + '\')">?</button></div>';
+    if (sleeping) {
+      h += '<div class="pr-sleep"><span class="pr-dots"><i></i><i></i><i></i></span>Asleep · wakes in <b class="num">' + timeLeft(r.sleepUntil - Date.now()) + '</b></div>';
+    } else {
+      h += '<div class="pr-ms">'
+        + meter('energy', e, Math.round(e / 10) + '/10', e < 34 ? 'lo' : e < 67 ? 'mid' : 'hi')
+        + meter('heart', hp, Math.round(hp) + '%', 'joy')
+        + meter('drop', c, cleanWord(c), 'wet') + '</div>';
+      h += '<div class="pr-bond"><span>Bond</span><div class="pr-bar"><b style="width:' + Math.max(0, Math.min(100, Math.round((b - lo) / Math.max(1, hi - lo) * 100))) + '%"></b></div>'
+        + '<span class="num">' + Math.min(b, hi) + '/' + hi + '</span></div>';
+      if (bondReached(r) && !r.giftWaiting) h += '<div class="pr-note">\u{1F319} After a long sleep, ' + esc(r.name) + ' will bring you a gift' + (hp < 50 ? ' (cheer them up first)' : '') + '</div>';
+    }
+    if (giftReady(r)) h += '<button class="pt-giftbtn pr-gift" onclick="petOpenGift(\'' + r.id + '\')"><span>\u{1F381}</span>A gift for you</button>';
+    var line = moodLine(r, said);
+    if (line) h += '<div class="pr-say">' + esc(line) + '</div>';
+    $('pr-stat').innerHTML = h;
+    var ring = $('pr-ring');
+    ring.innerHTML = sleeping ? '' : ACTS.map(function (a, i) {
+      return '<button class="pr-b pr-' + a.k + '" style="--i:' + i + '" onclick="' + a.fn + '(' + (a.k === 'play' ? '' : '\'' + r.id + '\'') + ')">'
+        + '<span class="pr-c">' + ic(a.k) + '</span><span class="pr-t">' + a.t + (a.sub ? '<small class="num">' + a.sub + '</small>' : '') + '</span></button>';
+    }).join('');
   }
-  var hideT = 0;
+  var _place = { w: 0 };
+  function placeRing() {
+    var el = $('pr'); if (!el || !RG.id) return;
+    var a = W() && W().focusAnchor ? W().focusAnchor() : null;
+    if (!a || !a.c.on || a.id !== RG.id) { el.classList.add('off'); return; }
+    el.classList.remove('off');
+    var VW = window.innerWidth, VH = window.innerHeight;
+    var st = $('pr-stat'), sw = st.offsetWidth, sh = st.offsetHeight;
+    var sx = Math.max(10, Math.min(VW - sw - 10, a.top.x - sw / 2));
+    var sy = Math.max(70, a.top.y - sh - 16);
+    st.style.transform = 'translate(' + Math.round(sx) + 'px,' + Math.round(sy) + 'px)';
+    var bs = $('pr-ring').children, n = bs.length;
+    if (!n) return;
+    /* An arc under and around the animal, from just above its left side,
+       through below it, to just above its right: the card has the top. */
+    var R = Math.max(108, Math.min(150, a.r + 58));
+    // the highest buttons sit level with the middle, so the middle goes below the card
+    var cy = Math.max(a.c.y, sy + sh + 44 + R * 0.17);
+    for (var i = 0; i < n; i++) {
+      var th = (190 - (200 * i) / (n - 1)) * Math.PI / 180;
+      var x = a.c.x + Math.cos(th) * R, y = cy + Math.sin(th) * R;
+      x = Math.max(34, Math.min(VW - 34, x));
+      y = Math.max(sy + sh + 30, Math.min(VH - 58, y));
+      bs[i].style.transform = 'translate(' + Math.round(x - 32) + 'px,' + Math.round(y - 27) + 'px)';
+    }
+  }
+  function ringLoop() {
+    cancelAnimationFrame(RG.raf);
+    var step = function () { if (!RG.id) return; placeRing(); RG.raf = requestAnimationFrame(step); };
+    step();
+  }
   function showAct(id, said) {
-    ensurePersonas(); ensureDom();
+    ensurePersonas(); ensureDom(); ringDom();
     var r = find(id); if (!r) return;
-    cur = id;
+    var fresh = RG.id !== id;
+    cur = id; RG.id = id;
     renderAct(r, said);
-    $('pt-act').classList.add('show');
-    clearTimeout(hideT);
-    hideT = setTimeout(petHide, 15000);
+    var el = $('pr');
+    if (fresh) {
+      el.classList.remove('on'); void el.offsetWidth;
+      if (W() && W().focusStart) W().focusStart(id);
+    }
+    el.classList.add('on');
+    document.documentElement.classList.add('pr-open');
+    ringLoop();
   }
-  /* A tap anywhere on the island that is not an animal puts the bubble
-     away -- the X was the only way out, and on a phone it was easy to miss. */
+  /* A tap anywhere on the island that is not an animal puts the ring
+     away and lets the camera go back. */
   document.addEventListener('pointerdown', function (e) {
-    if (e.target && e.target.id === 'fw-canvas') { var a = $('pt-act'); if (a && a.classList.contains('show')) petHide(); }
+    if (e.target && e.target.id === 'fw-canvas' && RG.id) petHide();
   }, true);
   window.petTap = function (id) {
     var r = find(id); if (r) settleSleep(r);
     if (H) { huntTap(id); return; }
     showAct(id);
   };
-  window.petHide = function () { var el = $('pt-act'); if (el) el.classList.remove('show'); clearTimeout(hideT); };
+  window.petHide = function (keepCam) {
+    var el = $('pr'); if (el) el.classList.remove('on');
+    cancelAnimationFrame(RG.raf);
+    RG.id = null;
+    document.documentElement.classList.remove('pr-open');
+    quizClose(true);
+    if (!keepCam && W() && W().focusEnd) W().focusEnd();
+  };
+
+  /* ---------------- Word Pairs, asked by an animal ----------------
+     The game moved here from the games page: five questions in a small
+     card at the bottom while the animal stands over it, four choices
+     each. Words you looked up or saved first, decoys from the whole
+     library (buildMatchRounds in app.js). +1 XP a right answer, and each
+     answer goes into the word's review record like the old game did. */
+  var Q = null;
+  async function quizDeck() {
+    var all = (await idbAllCached()).filter(function (r) { return !r.alias && r.data && !r.data.explain && !r.data.phrase && meaningOf(r); });
+    var seen = {};
+    try { (await logAll()).forEach(function (l) { if (l.type === 'search' && l.word) seen[l.word] = 1; }); } catch (e) {}
+    var mine = all.filter(function (r) { return r.saved || seen[r.word]; });
+    var shuffle = function (a) { return a.sort(function () { return Math.random() - 0.5; }); };
+    var deck = shuffle(mine.slice()).slice(0, 5);
+    if (deck.length < 5) deck = deck.concat(shuffle(all.filter(function (r) { return deck.indexOf(r) < 0; })).slice(0, 5 - deck.length));
+    return { deck: deck, all: all };
+  }
+  window.petQuiz = async function (id) {
+    var r = find(id); if (!r) return;
+    if (asleep(r)) return;
+    ringDom();
+    var got = await quizDeck();
+    if (got.deck.length < 4 || got.all.length < 6) { showAct(id, 'Look up a few words first — then I will quiz you on them!'); return; }
+    var rounds = buildMatchRounds(got.deck, got.all).map(function (x) {
+      var o = x.opts.filter(function (w) { return w !== x.answer; }).slice(0, 3).concat([x.answer]);
+      x.opts = o.sort(function () { return Math.random() - 0.5; });
+      return x;
+    });
+    Q = { id: id, name: r.name, rounds: rounds, i: 0, hits: 0, lock: false };
+    RG.quiz = true; $('pr').classList.add('quiz');
+    renderQuiz();
+    $('pq2').classList.add('on');
+  };
+  function renderQuiz() {
+    var el = $('pq2'); if (!Q || !el) return;
+    var dots = Q.rounds.map(function (x, i) { return '<i class="' + (x._ok === true ? 'ok' : x._ok === false ? 'no' : i === Q.i ? 'now' : '') + '"></i>'; }).join('');
+    var h = '<div class="pq2-h"><span class="pq2-who"><b>' + esc(Q.name) + '</b> asks</span><span class="pq2-dots">' + dots + '</span>'
+      + '<button class="pt-x" aria-label="Stop" onclick="petQuizClose()">×</button></div>';
+    if (Q.i >= Q.rounds.length) {
+      var n = Q.rounds.length, k = Q.hits;
+      var say = k === n ? 'Every single one! ' + Q.name + ' is very impressed.' : k >= n - 1 ? 'So close to perfect. Nicely done.' : k >= 2 ? 'Not bad at all — those were tricky.' : 'We will get them next time. Again?';
+      h += '<div class="pq2-end"><b class="num">' + k + ' / ' + n + '</b><span>' + esc(say) + '</span></div>'
+        + '<div class="pq2-acts"><button class="btn" onclick="petQuiz(\'' + Q.id + '\')">Again</button><button class="btn ghost" onclick="petQuizClose()">Done</button></div>';
+    } else {
+      var x = Q.rounds[Q.i];
+      h += '<div class="pq2-q">What is the English for <b>“' + esc(x.meaning) + '”</b>?</div><div class="pq2-o">'
+        + x.opts.map(function (o, j) { return '<button data-j="' + j + '" onclick="petQuizPick(' + j + ')">' + esc(o.word) + '</button>'; }).join('') + '</div>';
+    }
+    el.innerHTML = h;
+  }
+  window.petQuizPick = function (j) {
+    if (!Q || Q.lock) return;
+    var x = Q.rounds[Q.i]; if (!x) return;
+    Q.lock = true;
+    var pick = x.opts[j], ok = pick === x.answer;
+    x._ok = ok;
+    var bs = $('pq2').querySelectorAll('.pq2-o button');
+    bs.forEach(function (b, k) { if (x.opts[k] === x.answer) b.classList.add('ok'); else if (k === j) b.classList.add('no'); });
+    if (ok) {
+      Q.hits++;
+      if (window.addXP) window.addXP(1);
+      fx(Q.id, 'say');
+      var pop = document.createElement('span'); pop.className = 'pq2-xp num'; pop.textContent = '+1 XP'; bs[j].appendChild(pop);
+    } else fx(Q.id, 'nod');
+    try { if (window.gradeAndLog) window.gradeAndLog(x.answer, ok); } catch (e) {}
+    setTimeout(function () {
+      if (!Q) return;
+      Q.i++; Q.lock = false;
+      if (Q.i >= Q.rounds.length) {
+        var out = care(Q.id, 'quiz');
+        if (window.questBump) window.questBump('game');
+        if (Q.hits >= Q.rounds.length - 1) fx(Q.id, 'pet');
+        var rr = find(Q.id); if (rr && RG.id === Q.id) renderAct(rr, Q.hits >= 4 ? '*proud little hop*' : 'Thanks for playing with me.');
+      }
+      renderQuiz();
+    }, ok ? 750 : 1300);
+  };
+  function quizClose(silent) {
+    var el = $('pq2'); if (el) el.classList.remove('on');
+    var pr = $('pr'); if (pr) pr.classList.remove('quiz');
+    RG.quiz = false; Q = null;
+  }
+  window.petQuizClose = function () { quizClose(); };
+
   function fx(id, kind) { try { if (window.fwResidentFx) window.fwResidentFx(id, kind); } catch (e) {} }
 
   window.petFeed = function (id) {
@@ -437,7 +614,7 @@
   }
   function say(el, html) { el.innerHTML = html; el.classList.add('show'); }
   window.petTalk = function (id) {
-    ensurePersonas(); ensureDom(); talkDom(); petHide();
+    ensurePersonas(); ensureDom(); talkDom(); petHide(true);
     var r = find(id); if (!r) return;
     if (asleep(r)) { if (window.fwToast) window.fwToast(r.name + ' is asleep — let them rest'); return; }
     cur = id; T.id = id;
@@ -462,7 +639,8 @@
     document.documentElement.classList.remove('pt-talk-on');
     if (H && H.open) talkLoop();
   };
-  document.addEventListener('focci-talk-end', function () { if (T.id) petCloseChat(); });
+  // walking away from an animal ends the talk, or puts its ring away
+  document.addEventListener('focci-talk-end', function () { if (T.id) petCloseChat(); else if (RG.id) petHide(true); });
   window.petSuggest = function (b) {
     var i = $('pt-input'); if (!i) return;
     var t = b.textContent;
@@ -973,7 +1151,7 @@
           ['Feed one energy bar', '\u22122'], ['Rescue rabbit \u00b7 duck \u00b7 sheep', '60 \u00b7 80 \u00b7 120'], ['Rescue cat \u00b7 wolf', '160 \u00b7 240']]) + '</table>'
       + '<div class="xr-h">Caring for an animal \u00b7 bond (counted per day)</div><table class="xr">' + rows([
           ['Feed \u00b7 +1 bar', '+1 \u00b7 4'], ['Pet \u00b7 +4 happiness', '+1 \u00b7 5'], ['Talk \u00b7 per message', '+1 \u00b7 6'],
-          ['Bath \u00b7 when not fresh', '+2 \u00b7 1'], ['Sleep \u00b7 3 h in a house, +5 bars, 4 h apart', '+1 \u00b7 2'], ['Play together \u00b7 each animal brought', '+3 \u00b7 2']]) + '</table>'
+          ['Bath \u00b7 when not fresh', '+2 \u00b7 1'], ['Sleep \u00b7 3 h in a house, +5 bars, 4 h apart', '+1 \u00b7 2'], ['Play together \u00b7 each animal brought', '+3 \u00b7 2'], ['Word Pairs \u00b7 a round of five', '+2 \u00b7 2']]) + '</table>'
       + '<p class="pt-g-intro">Gifts: reach bond 6, 16, 30, 48, 70, 96, 126, 160, keep the animal happy (50%+), and send it to sleep \u2014 it wakes three hours later with a gift. One a day per animal. Energy drops about 3.4 bars a day, cleanliness a quarter a day. A level is 100 XP.</p>';
     $('pt-gift-in').innerHTML = h;
     document.documentElement.classList.add('pt-gift-on');
@@ -984,7 +1162,8 @@
     var D = document.documentElement;
     if (D.classList.contains('pt-gift-on')) { petCloseGift(); return true; }
     if (T.id) { petCloseChat(); return true; }
-    var a = $('pt-act'); if (a && a.classList.contains('show')) { petHide(); return true; }
+    if (Q) { quizClose(); return true; }
+    if (RG.id) { petHide(); return true; }
     if (H && H.open) { huntClose(); return true; }
     if (H) { huntQuit(); return true; }
     return false;

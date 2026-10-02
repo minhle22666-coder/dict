@@ -2218,26 +2218,54 @@ export async function bootFocciWorld(root, opts) {
      one meal (FEED_ENERGY in residents.js), so the empty bars are the taps
      still to give. Redrawn only when the count of full bars changes. */
   const plateTextures = new Map();
+  /* Redrawn for the cozy look: the name on a white pill with a soft
+     shadow and a dot in the energy colour (a moon while asleep), and under
+     it one slim bar with ten notches -- the user found the old box of ten
+     separate squares "ugly and unclear": at follow-camera distance the
+     squares merged into a dotted line and the name sat in a flat panel. */
   function nameplateTexture(name, segs) {
     const key = name + '|' + segs;
     if (plateTextures.has(key)) return plateTextures.get(key);
-    const W = 320, H = 104;
+    const W = 360, H = 128;
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const g = c.getContext('2d');
-    g.fillStyle = 'rgba(251,252,244,.94)';
-    g.beginPath(); g.roundRect(4, 4, W - 8, H - 8, 26); g.fill();
-    g.strokeStyle = 'rgba(88,108,66,.18)'; g.lineWidth = 2; g.stroke();
-    g.fillStyle = '#2E3826';
-    g.font = '700 34px Raleway, "Segoe UI", sans-serif';
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(String(name || '').slice(0, 14), W / 2, 36);
+    const asleep = /^\u{1F4A4}/u.test(name);
+    const label = String(name || '').replace(/^\u{1F4A4}\s*/u, '').slice(0, 14);
     const col = segs <= 3 ? '#D3906E' : segs <= 6 ? '#D8B560' : '#7D9A63';
-    const pw = 20, gap = 5, x0 = (W - (10 * pw + 9 * gap)) / 2;
-    for (let i = 0; i < 10; i++) {
-      g.fillStyle = i < segs ? col : 'rgba(94,122,72,.18)';
-      g.beginPath(); g.roundRect(x0 + i * (pw + gap), 66, pw, 16, 5); g.fill();
+    g.font = '700 30px Raleway, "Segoe UI", sans-serif';
+    const tw = Math.min(W - 90, g.measureText(label).width);
+    const pw = tw + 66, px = (W - pw) / 2, py = 8, ph = 52;
+    g.save();
+    g.shadowColor = 'rgba(38,48,30,.30)'; g.shadowBlur = 12; g.shadowOffsetY = 3;
+    g.fillStyle = 'rgba(255,255,250,.97)';
+    g.beginPath(); g.roundRect(px, py, pw, ph, 26); g.fill();
+    g.restore();
+    if (asleep) {
+      g.fillStyle = '#8FA7D8'; g.beginPath(); g.arc(px + 27, py + 26, 9.5, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#FFFFFA'; g.beginPath(); g.arc(px + 31.5, py + 22, 8.5, 0, Math.PI * 2); g.fill();
+    } else {
+      g.fillStyle = col; g.beginPath(); g.arc(px + 27, py + 26, 7.5, 0, Math.PI * 2); g.fill();
     }
+    g.fillStyle = '#2E3826'; g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillText(label, px + 44, py + 27, tw);
+    // the energy: one bar, ten notches -- a notch is a meal
+    const bw = 168, bx = (W - bw) / 2, by = 80, bh = 14;
+    g.save();
+    g.shadowColor = 'rgba(38,48,30,.22)'; g.shadowBlur = 6; g.shadowOffsetY = 2;
+    g.fillStyle = 'rgba(255,255,250,.95)';
+    g.beginPath(); g.roundRect(bx - 4, by - 4, bw + 8, bh + 8, 11); g.fill();
+    g.restore();
+    g.fillStyle = 'rgba(94,122,72,.16)';
+    g.beginPath(); g.roundRect(bx, by, bw, bh, 7); g.fill();
+    if (segs > 0) {
+      const gr = g.createLinearGradient(bx, 0, bx + bw, 0);
+      gr.addColorStop(0, col); gr.addColorStop(1, segs >= 7 ? '#93AE74' : col);
+      g.fillStyle = gr;
+      g.beginPath(); g.roundRect(bx, by, Math.max(bh, bw * segs / 10), bh, 7); g.fill();
+    }
+    g.fillStyle = 'rgba(255,255,250,.8)';
+    for (let i = 1; i < 10; i++) g.fillRect(Math.round(bx + bw * i / 10) - 1, by + 3, 2, bh - 6);
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
     if (plateTextures.size > 60) { const k0 = plateTextures.keys().next().value; plateTextures.get(k0).dispose(); plateTextures.delete(k0); }
@@ -2423,7 +2451,7 @@ export async function bootFocciWorld(root, opts) {
        longer shrinks with a small animal the way the bare bar did. */
     const barW = 1.25;
     const barLift = headY * 0.3 + 0.3;
-    bar.scale.set(barW, barW * 0.325, 1);
+    bar.scale.set(barW, barW * (128 / 360), 1);
     bar.position.set(spot.x, spot.y + headY + barLift, spot.z);
     room.group.add(bar);
 
@@ -2432,13 +2460,14 @@ export async function bootFocciWorld(root, opts) {
 
     const body = {
       id: rec.id, obj, bar, hit, mixer, footOffset, headY, barLift,
+      halfW: (box.max.x - box.min.x) * scale / 2, minY: box.min.y * scale, maxY: box.max.y * scale, baseScale: scale,
       homeX: spot.x, homeZ: spot.z, level: lvl, segs, name: rec.name, hopT: 0,
       target: null, cooldown: 2 + Math.random() * 6
     };
     room.residents.push(body);
     if (rec.sleepUntil && rec.sleepUntil > Date.now()) {
-      const h = nearestDoor(room, spot.x, spot.z);
-      if (h) { body.busy = 'sleep'; body.asleep = true; body.door = { x: h.x, z: h.z, cx: h.cx, cz: h.cz, y: h.y }; setResidentVisible(body, false); }
+      const h = sleepHouse(room, spot.x, spot.z);
+      if (h) { body.busy = 'sleep'; body.door = { x: h.x, z: h.z, cx: h.cx, cz: h.cz, y: h.y }; layDown(room, body, h); }
     }
     return body;
   }
@@ -2903,7 +2932,7 @@ export async function bootFocciWorld(root, opts) {
     for (const b of room.residents) {
       const rec = byId[b.id];
       if (!rec) continue;
-      if (b.mixer) b.mixer.update(dt);
+      if (b.mixer && !b.asleep) b.mixer.update(dt);
 
       const segs = Math.round((rec.energy || 0) / 10);
       const label = (b.asleep ? '\u{1F4A4} ' : '') + rec.name;
@@ -2913,7 +2942,9 @@ export async function bootFocciWorld(root, opts) {
       }
       // only the plates near Focci: from across the island they were noise
       const pd = Math.hypot((b.asleep && b.door ? b.door.x : b.obj.position.x) - charState.x, (b.asleep && b.door ? b.door.z : b.obj.position.z) - charState.z);
-      b.bar.visible = pd < 12;
+      /* While the ring of actions is open its own status card says all of
+         this, bigger; two of them over one head was one too many. */
+      b.bar.visible = pd < 12 && !(talk && talk.mode === 'focus' && talk.b === b);
       if (b.bar.visible) b.bar.material.opacity = Math.min(1, (12 - pd) / 3);
       if (b.busy) { tickBusy(room, b, rec, dt, t); continue; }
       if (b.follow) { tickFollow(room, b, dt); }
@@ -3520,7 +3551,14 @@ export async function bootFocciWorld(root, opts) {
       }, ms)
     };
   }
+  const _pc = new THREE.Vector3();
   function updateCamera() {
+    if (focciPose && focciPose.cam) {
+      const c = focciPose.cam;
+      camera.position.lerp(_pc.set(c.x, c.y, c.z), focciPose.t < 0.05 ? 1 : 0.08);
+      camera.lookAt(c.lx, c.ly, c.lz);
+      return;
+    }
     cam.theta += (cam.tTheta - cam.theta) * 0.15;
     cam.phi += (cam.tPhi - cam.phi) * 0.15;
     cam.radius += (cam.tRadius - cam.radius) * 0.15;
@@ -3914,6 +3952,120 @@ export async function bootFocciWorld(root, opts) {
     'He straightens the pillow. Someone will be glad of that.',
     'Warm, dry, and nobody is asking anything of him.'
   ];
+  /* ============================================================
+     FOCCI ASLEEP (and, later, his other poses)
+
+     focciPose takes him out of walking: the movement code sees no input,
+     and after it has placed him for the frame the pose puts him where it
+     wants him. Its own camera, if it has one, replaces the usual. Any
+     touch on the island wakes him; the tap that does it is not passed on
+     to whatever is under the finger (it would be the bed, and he would go
+     straight back to sleep).
+
+     Eyes: the model's eyes are open in the mesh, so closing them is two
+     lids -- orange domes over the eyes with a dark closed-eye curve --
+     found from the eyes' own vertices (the black material above the
+     muzzle) rather than typed in, so they stay right if the model is
+     re-exported. */
+  let focciPose = null, wokeAt = 0, focciLids = null;
+  function ensureLids() {
+    if (focciLids) return focciLids;
+    character.updateMatrixWorld(true);
+    let orange = null; const L = [], R = [];
+    const v = new THREE.Vector3();
+    character.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      if (o.material.name === 'focci_orange') orange = o.material;
+      if (o.material.name !== 'focci_black') return;
+      const pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        if (o.isSkinnedMesh && o.boneTransform) o.boneTransform(i, v);
+        o.localToWorld(v); rig.worldToLocal(v);
+        if (v.y > 0.6 && v.z < 0.245) (v.x < 0 ? L : R).push([v.x, v.y, v.z]);
+      }
+    });
+    const grp = new THREE.Group();
+    const dark = new THREE.MeshBasicMaterial({ color: 0x2A1A12 });
+    [L, R].forEach((pts) => {
+      if (!pts.length) return;
+      const lo = [0, 1, 2].map((k) => Math.min(...pts.map((q) => q[k]))), hi = [0, 1, 2].map((k) => Math.max(...pts.map((q) => q[k])));
+      const cx = (lo[0] + hi[0]) / 2, cy = (lo[1] + hi[1]) / 2, w = hi[0] - lo[0], fz = hi[2];
+      const r = w * 0.62;
+      const lid = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), orange || new THREE.MeshStandardMaterial({ color: 0xF5510A }));
+      lid.scale.set(1, 1.1, 0.55); lid.position.set(cx, cy, fz - r * 0.2);
+      grp.add(lid);
+      const lash = new THREE.Mesh(new THREE.TorusGeometry(r * 0.62, r * 0.13, 5, 16, Math.PI), dark);
+      lash.rotation.z = Math.PI; lash.position.set(cx, cy + r * 0.18, fz + r * 0.33);
+      grp.add(lash);
+    });
+    grp.visible = false;
+    rig.add(grp);
+    focciLids = grp;
+    return grp;
+  }
+  function focciEyes(closed) { ensureLids().visible = !!closed; }
+  function focciSleepOnBed(room, h) {
+    if (!h || !h.kit || focciPose) return;
+    const K = h.kitScale || 1, ax = h.kitX, az = h.kitZ;
+    // the bed group: at (-1.5, 0.15, 0.4) in the room's layout, turned 0.35; its pillow end is its own -x
+    const bry = 0.35, hx = -Math.cos(bry), hz = Math.sin(bry);
+    const bedX = ax - 1.5 * K, bedZ = az + 0.4 * K;
+    const top = h.y + 0.57 * K;
+    // as long as the bed lets him be
+    const sc = Math.min(1, (1.8 * K) / FOCCI_HEIGHT);
+    const headX = bedX + hx * 0.86 * K, headZ = bedZ + hz * 0.86 * K;
+    const fx = headX - hx * FOCCI_HEIGHT * sc, fz = headZ - hz * FOCCI_HEIGHT * sc;
+    const yaw = Math.atan2(-hx, -hz);
+    const camX = ax + 1.0 * K, camZ = az + 0.2 * K;
+    focciPose = {
+      kind: 'bed', h, sc, yaw, x: fx, y: top + 0.24 * sc, z: fz,
+      head: { x: headX - hx * 0.3, y: top + 0.35, z: headZ - hz * 0.3 },
+      cam: { x: camX, y: h.y + 1.85, z: camZ, lx: bedX + hx * 0.35 * K, ly: top + 0.1, lz: bedZ + hz * 0.35 * K },
+      zT: 0.6, t: 0
+    };
+    character.visible = true;
+    focciEyes(true);
+    focciPose.dots = makeDots(room);
+    root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: 'Focci curls up under the quilt.\nTap anywhere to wake him.' } }));
+  }
+  function applyFocciPose(room, dt, t) {
+    const P = focciPose; if (!P) return;
+    P.t += dt;
+    character.rotation.order = 'YXZ';
+    character.rotation.set(-Math.PI / 2, P.yaw, 0);
+    const br = Math.sin(t * 1.25) * 0.5 + 0.5;    // a slow breath, about five seconds
+    character.scale.set(P.sc * (1 + br * 0.015), P.sc, P.sc * (1 + br * 0.05));
+    character.position.set(P.x, P.y, P.z);
+    legL.rotation.x = legR.rotation.x = 0; armL.rotation.x = armR.rotation.x = 0.15;
+    tailPivot.rotation.y = Math.sin(t * 0.7) * 0.05;
+    P.zT -= dt;
+    if (P.zT <= 0) { P.zT = 1.4; spawnZ(room, P.head.x, P.head.y + 0.25, P.head.z, 0.9); }
+    if (P.dots) { P.dots.position.set(P.head.x, P.head.y + 0.6 + br * 0.05, P.head.z); P.dots.material.map = dotsTex(Math.floor(t * 4.5)); }
+  }
+  function focciWake() {
+    const P = focciPose; if (!P) return;
+    focciPose = null; wokeAt = performance.now();
+    if (P.dots && P.dots.parent) P.dots.parent.remove(P.dots);
+    focciEyes(false);
+    character.rotation.order = 'XYZ';
+    character.rotation.set(0, P.yaw, 0);
+    character.scale.setScalar(1);
+    if (P.kind === 'bed' && P.h) {
+      // up and standing in the middle of the room, facing the bed
+      const h = P.h;
+      charState.x = h.kitX; charState.z = h.kitZ; charState.lastGroundY = h.y;
+      charState.angle = Math.atan2(P.head.x - h.kitX, P.head.z - h.kitZ);
+      character.position.set(h.kitX, h.y, h.kitZ);
+      cam.tTheta = cam.theta = charState.angle + Math.PI;
+      setCamMode(camMode);
+      root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: 'Focci stretches. That was a good nap.' } }));
+    }
+  }
+  canvas.addEventListener('pointerdown', (e) => {
+    if (focciPose && focciPose.wakeOnTouch !== false) { focciWake(); e.stopImmediatePropagation(); }
+  }, true);
+
   function onInteract(obj) {
     const room = activeRoom();
     const type = obj.userData.interactType;
@@ -3967,6 +4119,10 @@ export async function bootFocciWorld(root, opts) {
       // The marker is a sign now, not a door. Tapping it says where it goes.
       root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: 'Somewhere to sleep. Walk on in.' } }));
     } else if (type === 'hut-bed') {
+      // a tap that woke him is not also a tap on the bed
+      if (performance.now() - wokeAt < 800) return;
+      const h = room.houses && room.houses.find((x) => x.kitHits && x.kitHits.indexOf(obj) >= 0);
+      if (h && room._insideHut === h) { focciSleepOnBed(room, h); return; }
       root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: HUT_LINES[Math.floor(Math.random() * HUT_LINES.length)] } }));
       spawnPickupBurst(room, obj.position.x, obj.position.y, obj.position.z, 0x8FD8FF);
     } else if (type === 'hut-lamp') {
@@ -4334,8 +4490,8 @@ export async function bootFocciWorld(root, opts) {
       return;
     }
 
-    // Steering is not his while the boat is carrying him.
-    if (room.boat && room.boat.sailing) { moveVec.x = 0; moveVec.y = 0; }
+    // Steering is not his while the boat is carrying him, or while he is asleep.
+    if ((room.boat && room.boat.sailing) || focciPose) { moveVec.x = 0; moveVec.y = 0; }
     const fwdX = -Math.sin(cam.theta), fwdZ = -Math.cos(cam.theta);
     const rightX = Math.cos(cam.theta), rightZ = -Math.sin(cam.theta);
     const fwdAmt = -moveVec.y, rightAmt = moveVec.x;
@@ -4527,6 +4683,7 @@ export async function bootFocciWorld(root, opts) {
       armL.rotation.x = armR.rotation.x = -0.9 * k;
     }
     character.position.set(charState.x, surf.y + bob + charState.jumpY, charState.z);
+    if (focciPose) applyFocciPose(room, dt, t);
 
     if (room.sea) room.sea.uTime.value = t;
     tickBoat(room, dt, t);
@@ -4604,6 +4761,9 @@ export async function bootFocciWorld(root, opts) {
     get room() { return rooms[currentRoomKey]; },
     get state() { return { pending: !!pendingTravel, flight: !!flight, declined: Array.from(declined), camMode, inspectMode }; },
     animalModel, toggleCamMode, setCamMode, blockedAt, groundSmooth, groundUnderRoof,
+    layDown: (b, h) => layDown(rooms[currentRoomKey], b, h), getUp,
+    enterHut: (i) => enterHut(rooms[currentRoomKey], rooms[currentRoomKey].houses[i]), leaveHut: () => leaveHut(rooms[currentRoomKey]),
+    sleepOnBed: (i) => focciSleepOnBed(rooms[currentRoomKey], rooms[currentRoomKey].houses[i]), focciWake, get focciPose() { return focciPose; },
     jump() { startJump(rooms[currentRoomKey]); } };
 
   // island's here — now the ambience can have the connection to itself
@@ -4641,11 +4801,129 @@ export async function bootFocciWorld(root, opts) {
     const room = activeRoom();
     const b = room && (room.residents || []).find((x) => x.id === id);
     if (!b) return false;
-    const h = nearestDoor(room, b.obj.position.x, b.obj.position.z);
+    const h = sleepHouse(room, b.obj.position.x, b.obj.position.z);
     if (!h) return false;
+    if (talk && talk.b === b) talkEnd();
     b.busy = 'sleep'; b.asleep = false; b.target = null; b.follow = false;
     b.door = { x: h.x, z: h.z, cx: h.cx, cz: h.cz, y: h.y };
+    b.sleepHut = h;
     return true;
+  }
+  /* Which house an animal sleeps in: one with its furniture built, the
+     least crowded first, then the nearest. */
+  function sleepHouse(room, x, z) {
+    const hs = (room.houses || []).filter((h) => h.kit);
+    if (!hs.length) return nearestDoor(room, x, z);
+    const busyIn = (h) => (room.residents || []).filter((r) => r.asleep && r.sleepHut === h).length;
+    hs.sort((a, c) => (busyIn(a) - busyIn(c)) || (Math.hypot(a.x - x, a.z - z) - Math.hypot(c.x - x, c.z - z)));
+    return hs[0];
+  }
+  /* Lying down on the rug inside: the model is rolled onto its side about
+     its own forward axis and lifted by its half width so it rests on the
+     floor instead of sinking into it. Euler order XYZ applies the roll
+     (z) first and then the turn (y), so the roll is always about the
+     animal's own length whichever way it faces. Spots are spread over
+     the rug so two sleepers in one hut do not lie in each other. */
+  function layDown(room, b, h) {
+    // inside the function: this runs at boot for an animal already asleep,
+    // before a const further down this file would be initialised
+    const SLEEP_SPOTS = [[0.35, 0.45], [-0.25, -0.55], [0.95, 0.35], [0.15, -0.05], [-0.7, 0.45]];
+    const LIE = 1.42;
+    b.asleep = true; b.sleepHut = h;
+    const n = (room.residents || []).filter((x) => x !== b && x.asleep && x.sleepHut === h).length;
+    const K = h.kitScale || 1;
+    const kx = h.kitX !== undefined ? h.kitX : h.cx, kz = h.kitZ !== undefined ? h.kitZ : h.cz;
+    /* The floor is not flat in every hut: one has a raised bench of the
+       island's own mesh across the middle (measured: a surface at 10.66
+       over a floor at 10.07), and an animal laid at the floor's height
+       there was inside it, out of sight. So each spot is checked with one
+       ray down, and the first whose top surface is the floor is used. */
+    const topAt = (x, z) => {
+      raycaster.set(new THREE.Vector3(x, h.y + 1.6, z), new THREE.Vector3(0, -1, 0)); raycaster.far = 2.2;
+      const hit = raycaster.intersectObjects(room.collidables, true)[0];
+      raycaster.far = Infinity;
+      return hit ? hit.point.y : h.y;
+    };
+    const cands = [];
+    for (let k = 0; k < SLEEP_SPOTS.length; k++) {
+      const q = SLEEP_SPOTS[(n + k) % SLEEP_SPOTS.length];
+      cands.push([kx + q[0] * K, kz + q[1] * K], [h.cx + q[0] * K * 0.8, h.cz + q[1] * K * 0.8]);
+    }
+    let pick = cands.find((c) => Math.abs(topAt(c[0], c[1]) - h.y) < 0.15) || cands[0];
+    const sx = pick[0], sz = pick[1];
+    const ry = 0.8 + n * 1.9;
+    const sn = Math.sin(LIE), cs = Math.cos(LIE);
+    const hw = b.halfW || b.headY * 0.4, y0 = b.minY || 0, y1 = b.maxY || b.headY, cy = (y0 + y1) / 2;
+    const lowest = Math.min(-hw * sn + y0 * cs, -hw * sn + y1 * cs);
+    // the rolled body's middle, which is not over its feet any more
+    const offX = -sn * cy * Math.cos(ry), offZ = sn * cy * Math.sin(ry);
+    const floor = Math.max(h.y, topAt(sx, sz)) + 0.04;
+    b.obj.rotation.set(0, ry, LIE);
+    b.obj.position.set(sx - offX, floor - lowest + 0.02, sz - offZ);
+    b.obj.visible = true;
+    b.sleepSpot = { x: sx, y: floor + hw * 2, z: sz };
+    if (b.hit) b.hit.position.set(sx, floor + hw, sz);
+    b.zT = Math.random();
+  }
+  function getUp(b) {
+    b.obj.rotation.set(0, b.obj.rotation.y, 0);
+    b.obj.scale.setScalar(b.baseScale || b.obj.scale.x);
+    if (b.dots) { b.dots.parent && b.dots.parent.remove(b.dots); b.dots = null; }
+    b.sleepHut = null; b.sleepSpot = null;
+  }
+  /* zzz: a soft letter that rises, drifts and fades. No light (see the
+     light pool), a sprite each, a handful at most on screen. */
+  let zTex = null;
+  function spawnZ(room, x, y, z, size) {
+    if (!zTex) {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d');
+      g.font = '800 46px Raleway, "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineWidth = 7; g.strokeStyle = 'rgba(70,92,150,.55)'; g.strokeText('z', 32, 34);
+      g.fillStyle = '#F2F5FF'; g.fillText('z', 32, 34);
+      zTex = new THREE.CanvasTexture(c);
+    }
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: zTex, transparent: true, depthWrite: false, opacity: 0 }));
+    const s0 = (size || 1) * 0.22;
+    sp.scale.setScalar(s0);
+    sp.position.set(x, y, z);
+    room.group.add(sp);
+    let age = 0; const life = 2.4, ph = Math.random() * 6;
+    activeEffects.push((dt) => {
+      age += dt;
+      const k = age / life;
+      sp.position.set(x + Math.sin(ph + age * 2.2) * 0.14 * (size || 1) + k * 0.25, y + k * 0.75 * (size || 1), z);
+      sp.scale.setScalar(s0 * (1 + k * 0.9));
+      sp.material.opacity = Math.min(1, age / 0.4) * Math.max(0, 1 - k) * 0.95;
+      if (age < life) return true;
+      room.group.remove(sp); sp.material.dispose(); return false;
+    });
+  }
+  /* Three dots that breathe: each swells and fades in turn, one slow cycle
+     a breath. Twelve frames drawn once and stepped through. */
+  const dotFrames = [];
+  function dotsTex(i) {
+    if (!dotFrames.length) {
+      for (let f = 0; f < 12; f++) {
+        const c = document.createElement('canvas'); c.width = 96; c.height = 32;
+        const g = c.getContext('2d');
+        for (let d = 0; d < 3; d++) {
+          const ph = (f / 12) * Math.PI * 2 - d * 0.9;
+          const k = 0.5 + 0.5 * Math.cos(ph);
+          g.fillStyle = 'rgba(242,245,255,' + (0.35 + 0.6 * k).toFixed(2) + ')';
+          g.strokeStyle = 'rgba(70,92,150,' + (0.25 + 0.3 * k).toFixed(2) + ')'; g.lineWidth = 2.5;
+          g.beginPath(); g.arc(18 + d * 30, 16, 6 + 3.5 * k, 0, Math.PI * 2); g.fill(); g.stroke();
+        }
+        dotFrames.push(new THREE.CanvasTexture(c));
+      }
+    }
+    return dotFrames[i % 12];
+  }
+  function makeDots(room) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotsTex(0), transparent: true, depthWrite: false }));
+    sp.scale.set(0.5, 0.5 / 3, 1);
+    room.group.add(sp);
+    return sp;
   }
   function residentBath(id) {
     const room = activeRoom();
@@ -4688,10 +4966,11 @@ export async function bootFocciWorld(root, opts) {
       if (!b.asleep && (!rec.sleepUntil || Date.now() >= rec.sleepUntil)) { b.busy = null; }
       else if (!b.asleep) {
         if (stepToward(room, b, b.door.x, b.door.z, dt, 1.9)) {
-          b.asleep = true; setResidentVisible(b, false);
           spawnPickupBurst(room, b.door.x, p.y + 0.6, b.door.z, 0xC9D8FF);
+          layDown(room, b, b.sleepHut || sleepHouse(room, b.door.x, b.door.z));
         }
       } else if (!rec.sleepUntil || Date.now() >= rec.sleepUntil) {
+        getUp(b);
         // out through the door, a step onto the grass
         const dx = b.door.x - b.door.cx, dz = b.door.z - b.door.cz, d = Math.hypot(dx, dz) || 1;
         const ox = b.door.x + (dx / d) * 1.2, oz = b.door.z + (dz / d) * 1.2;
@@ -4699,9 +4978,39 @@ export async function bootFocciWorld(root, opts) {
         p.set(ox, (g.hit ? g.y : b.door.y) - b.footOffset, oz);
         b.homeX = ox; b.homeZ = oz;
         b.asleep = false; b.busy = null; setResidentVisible(b, true);
+        if (b.hit) b.hit.userData.disabled = false;
         spawnHearts(room, ox, p.y + b.headY, oz);
         root.dispatchEvent(new CustomEvent('focci-resident-woke', { detail: { id: b.id }, bubbles: true }));
       }
+    }
+    if (b.asleep && b.sleepSpot && b.door) {
+      /* Asleep in a house. From outside: the nameplate by the door with a
+         moon on it, and a z now and then out of the doorway, so you can
+         tell someone is in there. From inside: the animal itself on the
+         rug, breathing, with the zzz and the three dots over it. */
+      const hutIn = room._insideHut === b.sleepHut;
+      const sp = b.sleepSpot, br = Math.sin(t * 1.5 + b.homeX) * 0.5 + 0.5;
+      const bs = b.baseScale || 1;
+      b.obj.scale.set(bs * (1 + br * 0.025), bs * (1 + br * 0.045), bs * (1 + br * 0.025));
+      b.zT -= dt;
+      if (b.zT <= 0) {
+        b.zT = hutIn ? 1.5 : 2.6;
+        if (hutIn) spawnZ(room, sp.x, sp.y + 0.15, sp.z, 0.8);
+        else spawnZ(room, b.door.x, b.door.y + 2.1, b.door.z, 1.3);
+      }
+      if (hutIn) {
+        if (!b.dots) b.dots = makeDots(room);
+        b.dots.position.set(sp.x, sp.y + 0.35 + br * 0.04, sp.z);
+        b.dots.material.map = dotsTex(Math.floor(t * 4.5)); b.dots.visible = true;
+      } else if (b.dots) b.dots.visible = false;
+      b.bar.position.set(hutIn ? sp.x : b.door.x, hutIn ? sp.y + 0.55 : b.door.y + 1.6, hutIn ? sp.z : b.door.z);
+      // a room is a few units across: the outdoor size filled the view
+      const bw = hutIn ? 0.5 : 1.25;
+      if (b.bar.scale.x !== bw) b.bar.scale.set(bw, bw * (128 / 360), 1);
+      if (focciPose) b.bar.visible = false;
+      // only tappable from inside: through the wall it would steal taps on the house
+      if (b.hit) b.hit.userData.disabled = !hutIn;
+      return;
     }
     const bx = b.asleep ? b.door.x : p.x, bz = b.asleep ? b.door.z : p.z;
     const by = b.asleep ? (b.door.y + 1.4) : (p.y + b.headY + (b.barLift || 0.5));
@@ -4747,15 +5056,24 @@ export async function bootFocciWorld(root, opts) {
      appear in bubbles over their heads (pets.js places those, reading
      talkAnchors() every frame). Walking away ends it. */
   let talk = null;
-  function talkStart(id) {
+  /* opts.focus: the gentle version for a tap -- no hop, the camera comes
+     in a little lower and closer and leans toward the animal so the ring
+     of actions has room around it. Talking from there keeps the view it
+     was saved from, so closing the talk goes back to where you were. */
+  function talkStart(id, opts) {
     const room = activeRoom();
     const b = room && (room.residents || []).find((x) => x.id === id);
     if (!b) return false;
-    talk = { id, b, radius: cam.tRadius };
+    const focus = !!(opts && opts.focus);
+    const saved = talk ? { radius: talk.radius, phi: talk.phi } : { radius: cam.tRadius, phi: cam.tPhi };
+    if (talk && talk.b !== b) talk.b.talking = false;
+    talk = { id, b, radius: saved.radius, phi: saved.phi, mode: focus ? 'focus' : 'talk' };
     b.target = null; b.talking = true;
+    // asleep in a hut, seen through Focci's own eyes: nothing to move
+    if (b.asleep || camMode === 'fpv') return true;
     const p = b.obj.position;
     let dx = charState.x - p.x, dz = charState.z - p.z, d = Math.hypot(dx, dz) || 1;
-    if (d > 2.8 || d < 1.1) {
+    if (!focus && (d > 2.8 || d < 1.1)) {
       // a short hop to a comfortable talking distance
       const tx = p.x + (dx / d) * 1.9, tz = p.z + (dz / d) * 1.9;
       const g = groundSmooth(room, tx, tz);
@@ -4779,27 +5097,90 @@ export async function bootFocciWorld(root, opts) {
       return 1;
     };
     const c1 = clear(a1), c2 = clear(a2);
-    cam.tTheta = Math.abs(c1 - c2) > 0.1 ? (c1 > c2 ? a1 : a2) : (near(a1) < near(a2) ? a1 : a2);
-    cam.tRadius = Math.min(cam.tRadius, 7.5);
+    if (focus) {
+      /* A three-quarter view rather than side-on: from Focci's side of the
+         animal, turned 40 degrees, so the animal is in front and Focci is
+         still in the shot. The clearer of the two turns wins. */
+      /* The height field has no fences, posts or trees in it, and the
+         first try put the lens inside a fence post. So the candidates are
+         also checked with one real ray each, from the point the camera
+         will look at out to where it will sit -- once, at the tap, not
+         per frame (a ray is ~2.5ms). The first clear one in order of
+         preference wins; if none is, the clearest by the height field. */
+      const aF = Math.atan2(ux, uz);
+      const R = Math.min(saved.radius, 6.2), PH = 1.1;
+      const lean = 0.88;
+      const tg = new THREE.Vector3(charState.x + (p.x - charState.x) * lean, character.position.y + (p.y - character.position.y) * lean + 1.0, charState.z + (p.z - charState.z) * lean);
+      const mine = new Set((room.residents || []).map((r) => r.obj));
+      const solid = (o) => {
+        if (!o.isMesh || o.isSprite || (o.userData && o.userData.interactType)) return false;
+        for (let q = o; q; q = q.parent) { if (!q.visible || mine.has(q)) return false; }
+        return true;
+      };
+      const rayClear = (a) => {
+        const sp = Math.sin(PH), off = new THREE.Vector3(R * sp * Math.sin(a), R * Math.cos(PH) + 0.1, R * sp * Math.cos(a));
+        const len = off.length();
+        raycaster.set(tg, off.normalize()); raycaster.far = len;
+        const hits = raycaster.intersectObject(room.group, true);
+        raycaster.far = Infinity;
+        return !hits.some((h) => solid(h.object));
+      };
+      const cands = [aF + 0.7, aF - 0.7].sort((x, y) => near(x) - near(y)).concat([aF + 0.35, aF - 0.35, aF + 1.1, aF - 1.1, aF, aF + 1.6, aF - 1.6]);
+      let pick = cands.find((a) => clear(a) > 0.95 && rayClear(a));
+      if (pick === undefined) pick = cands.slice().sort((x, y) => clear(y) - clear(x))[0];
+      // the short way round: theta is not kept in -pi..pi
+      cam.tTheta = cam.theta + Math.atan2(Math.sin(pick - cam.theta), Math.cos(pick - cam.theta));
+      cam.tRadius = R;
+      cam.tPhi = PH;
+    } else {
+      cam.tTheta = Math.abs(c1 - c2) > 0.1 ? (c1 > c2 ? a1 : a2) : (near(a1) < near(a2) ? a1 : a2);
+      cam.tRadius = Math.min(cam.tRadius, 7.5);
+      if (saved.phi) cam.tPhi = saved.phi;
+    }
     camFocus.on = true;
     return true;
   }
   function talkEnd() {
     if (!talk) return;
     if (talk.b) talk.b.talking = false;
-    cam.tRadius = talk.radius || cam.tRadius;
+    if (camMode !== 'fpv') {
+      cam.tRadius = talk.radius || cam.tRadius;
+      if (talk.phi) cam.tPhi = talk.phi;
+    }
     talk = null; camFocus.on = false;
+  }
+  function focusEnd() { if (talk && talk.mode === 'focus') talkEnd(); }
+  /* Where the ring goes: the body's middle on screen, the top of its head,
+     and how big it is there, in pixels. */
+  const _tr = new THREE.Vector3();
+  function focusAnchor() {
+    if (!talk) return null;
+    const b = talk.b, p = b.obj.position;
+    const proj = (x, y, z) => {
+      _tv.set(x, y, z).project(camera);
+      return { x: (_tv.x * 0.5 + 0.5) * window.innerWidth, y: (-_tv.y * 0.5 + 0.5) * window.innerHeight, on: _tv.z < 1 && _tv.z > -1 };
+    };
+    let x = p.x, y = p.y + b.headY * 0.5, z = p.z, top = p.y + b.headY + 0.1;
+    if (b.asleep && b.sleepSpot) { x = b.sleepSpot.x; z = b.sleepSpot.z; y = b.sleepSpot.y - (b.halfW || 0.3); top = b.sleepSpot.y + 0.2; }
+    const c = proj(x, y, z), tp = proj(x, top, z);
+    _tr.setFromMatrixColumn(camera.matrixWorld, 0);
+    const half = Math.max(0.35, b.headY * 0.55);
+    const sd = proj(x + _tr.x * half, y, z + _tr.z * half);
+    return { c, top: tp, r: Math.hypot(sd.x - c.x, sd.y - c.y), asleep: !!b.asleep, id: talk.id, mode: talk.mode };
   }
   function tickTalk(dt) {
     if (!talk) return;
     const b = talk.b, p = b.obj.position;
     const d = Math.hypot(charState.x - p.x, charState.z - p.z);
     if (d > 6.5) { talkEnd(); root.dispatchEvent(new CustomEvent('focci-talk-end', { bubbles: true })); return; }
+    if (b.asleep || camMode === 'fpv') return;
     if (!flight) charState.angle = Math.atan2(p.x - charState.x, p.z - charState.z);
     b.obj.rotation.y = lerpAngle(b.obj.rotation.y, Math.atan2(charState.x - p.x, charState.z - p.z), 0.15);
-    camFocus.tx = (charState.x + p.x) / 2;
-    camFocus.ty = (character.position.y + p.y) / 2;
-    camFocus.tz = (charState.z + p.z) / 2;
+    // a tap leans the view onto the animal; a talk keeps both in the middle
+    const lean = talk.mode === 'focus' ? 0.88 : 0.5;
+    camFocus.tx = charState.x + (p.x - charState.x) * lean;
+    camFocus.ty = character.position.y + (p.y - character.position.y) * lean;
+    camFocus.tz = charState.z + (p.z - charState.z) * lean;
   }
   function talkAnchors() {
     if (!talk) return null;
@@ -4844,6 +5225,7 @@ export async function bootFocciWorld(root, opts) {
     else if (kind === 'gift') spawnPickupBurst(room, p.x, top, p.z, 0xFFD36A);
   }
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
+    focusStart: (id) => talkStart(id, { focus: true }), focusEnd, focusAnchor, focciWake, get focciPose() { return focciPose ? focciPose.kind : null; },
     residentSleep, residentBath, residentFollow, anchorOf, residentsHere, celebrateAt, get currentRoom() { return currentRoomKey; } };
   } catch (err) {
     // Surface the real error on-screen instead of a silent black canvas —

@@ -65,7 +65,8 @@ slowly follows energy.
 | Pet | +4 happiness, hearts | +1 | 5 | — |
 | Talk | +2 happiness per message | +1 | 6 | needs a Gemini key |
 | Bath | clean again, +6 happiness | +2 | 1 | only when no longer "fresh" |
-| Sleep | 3 h in the nearest house, then +5 energy bars and +8 happiness | +1 | 2 | 4 h after waking |
+| Sleep | 3 h lying down inside a house, then +5 energy bars and +8 happiness | +1 | 2 | 4 h after waking |
+| Word Pairs | five questions the animal asks; +1 XP for each right answer, +5 happiness | +2 | 2 | needs a few looked-up words |
 | Play together | +5 happiness for each animal you brought | +3 each | 2 | needs 3 or more animals awake |
 
 Actions past the daily count still work. They give +1 happiness but no
