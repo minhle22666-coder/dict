@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v210`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v218`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -532,14 +532,73 @@ killed the whole boot (TDZ). Keep such tables inside the function.
 rays per candidate -- to the lens and four points round it, half a unit
 past -- once, when the shot starts. The height field has no trees or
 fences, and one centre ray came back clear while a crown filled the frame.
+The follow camera has the same blind spot: `camClearance()` also tests its
+14 line samples against each tree crown kept by `treeIndex()` (a cylinder:
+lowest leaf to top, 95% of the widest leaf). Without it the spawn view was
+three crowns.
+
+**Shaders are warmed a material at a time: `warmShaders()`** (world.js),
+1.5s after any `enterRoom()`. three.js compiles a program the first time a
+material is DRAWN, so the island behind the camera at boot compiled when
+the camera turned to it (5 programs in one look round = the walking
+stutter). `renderer.compile(scene)` does it all but in one 565ms block.
+The trick: `Object.create(scene)` with its own `traverse()` visiting one
+object keeps the scene's lights/fog, so the program matches the real frame.
+r149's `compile()` uses `traverse`, not `traverseVisible` -- hiding things
+does not narrow it. Dev timing tools: `.claude/perf.js`, `gpu.js` (WebGL
+timer query), `bench.js` (one frozen view), all excluded from git. Measured
+steady frame: ~1.4ms script, ~2.3ms GPU; shadows are not the cost.
+
+**Round buttons are `ringPress(root, onAct)`** (pets.js, also used by
+focci-acts.js): the act fires on pointerup over the same button, and the
+ring stops following its animal while a finger is down (`RG.press`) --
+a button moving under the finger was "Bath does nothing". Icons are the
+user's PNGs in `assets/icons/`.
+
+**Keyboard: `visualViewport` sets `--kb`, `--vvh`, `--vvt` and
+`html.kb-on`** (inline script before pets.js). Inputs that must stay above
+the keyboard read those, not `100vh`. Not yet tested on a real iPhone.
+
+**Hold-and-sweep lookup works in any `.lookable` block** (story.js
+`selHostOf`): animal chat (`fmtMsg`), the hunt's paragraphs, Hot Take lines.
+Text must go through `tokenizeForTap()` to get `.wtap` spans. The offline
+library comes first (a phrase also tries "a/an/the ..." -- one-letter words
+are not tappable); only a miss shows "Ask Focci" (`askFocciSheetHTML`). The
+word sheet is z-index 110: Hot Take (90), the journal (91) and the oracle
+(92) all open it from inside.
+
+**Story night is a radio, not a list** (focci-acts.js `RS`, world.js
+`buildRadio/storyRadio/storyPick/storyAnchor`). The radio is procedural:
+the user's `digital_radio_clock.glb` never arrived on disk. Knob drags tune
+(Radio Browser, https streams only) or change country; positions resume
+from `fc_story_pos`; favourites `fc_fm_favs` sort first.
+
+**Trees drop apples** (world.js `treeIndex/treeTap/dropApple`, three taps
+on a trunk); the word on the apple is from the recent searches, skipping
+the two newest (focci-acts.js `focci-apple` listener). **Gifts arrive in
+`present.glb`** beside the animal (`giftBoxFor`, `openGiftBox`, its own
+Open clip); the card is `giftHtml` in pets.js.
+
+**Echo Catch is the listening game** (was "Listening"); a sentence scored
+under 90 goes to `fc_echo_review`, replayed from the setup's review button.
+
+**Guitar tracks:** `SONGS` in focci-acts.js wants four files in
+`assets/audio/`; only `guitar-gentle-touch.mp3` exists. Missing ones are
+skipped. The user still has to drop in `guitar-lowden.mp3`,
+`guitar-sunset-strings.mp3`, `guitar-star.mp3`.
+
+**Dead CSS sweep:** 579 rules went in Oct 2026 (index.html 664KB -> 597KB).
+A class counts as live if any script or markup names it, OR any string
+fragment ending at `+`/`${` is a prefix of it (`'pos-'+c`). Re-run the
+same idea before deleting more; never trust a plain grep for the full name.
 
 ## File map
 
 | File | What's in it |
 |---|---|
-| `index.html` | 441KB. **All CSS**, all markup, and several inline scripts including the ES module that boots the world. The biggest file and the one most edits touch. |
-| `app.js` | 373KB. Dictionary, search, IndexedDB, games, Saved, Gemini calls. |
-| `world.js` | 186KB. The entire 3D island. ES module, `bootFocciWorld()`. |
+| `index.html` | 605KB. **All CSS**, all markup, and several inline scripts including the ES module that boots the world. The biggest file and the one most edits touch. |
+| `app.js` | 441KB. Dictionary, search, IndexedDB, games, Saved, Gemini calls. |
+| `world.js` | 336KB. The entire 3D island. ES module, `bootFocciWorld()`. |
 | `story.js` | Story mode + the word "peek" sheet (`condensedEntryHTML`). |
 | `story-content.js` | Story text. |
 | `residents.js` | Rescued-animal species, names, breeding. |
