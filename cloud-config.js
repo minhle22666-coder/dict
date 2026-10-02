@@ -9,6 +9,6 @@
    Left empty, the app works exactly as before, offline, and the account
    sheet says the cloud save is not set up yet. */
 window.FC_CLOUD = {
-  url: '',
-  anonKey: ''
+  url: 'https://mnvljprgbpwpqqzqeklk.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1udmxqcHJnYnB3cHFxenFla2xrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NDgzNDYsImV4cCI6MjEwNjUyNDM0Nn0.SzRZijNSV0rnJlFceT_n9mnaTbN1PLU2ZSaLwQYdE98'
 };
