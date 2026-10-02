@@ -10,14 +10,12 @@
    (supabase/setup.sql; row-level security, so a person reaches only their
    own row).
 
-   Sign-in is a link sent by email (the user could not get the 6-digit
-   code template working). signInWithOtp sends it with emailRedirectTo =
-   this page's own address; the link comes back here with the session in
-   the URL's #fragment (implicit flow, so it also works when the email is
-   opened in another browser than the one that asked), supabase-js reads
-   it, and the sheet opens to finish. The catch on iPhone: the link opens
-   Safari, and iOS keeps a home-screen copy's storage apart from Safari's,
-   so the account lands in Safari's copy.
+   Sign-in is email + password, with "Confirm email" off in Supabase, so
+   no email is ever sent. Both email ways were tried first -- a 6-digit
+   code, then a magic link -- and Supabase's free mail service answered
+   500 "Error sending confirmation email" for every address. It also works
+   inside a home-screen app, which a link (opening Safari) could not reach.
+   (The link handling below, fromLink, stays for links sent before.)
 
    What is saved (one JSON document):
    - localStorage keys starting sd_ or fc_ (XP, streaks, quests, history,
@@ -29,8 +27,9 @@
    Not the dictionary: every device has that.
 
    Sync: after sign-in, the cloud copy is compared with this device. One
-   side empty -> the other is used; both have data -> the person chooses
-   (merge both, the default; the cloud's; this device's). After that, any
+   side empty -> the other is used; both have progress -> they are put
+   together, value by value (mergeJ), and the result saved to the account:
+   what was done before signing in is never lost. After that, any
    change marks the copy dirty and it is saved 20s after the last change,
    and when the app goes to the background.
    ============================================================ */
@@ -102,19 +101,47 @@
     return acts + (d.entries || []).length + (xp > 0 ? 1 : 0);
   }
 
+  /* Two copies of one value put together (the user: what was made on this
+     phone before signing in must join the account's, not vanish). Numbers
+     keep the bigger (XP, totals, streaks); lists keep every item once (the
+     same word, day or id is one item, the newer of the two by t/ts);
+     objects are merged key by key, the same rules all the way down; a
+     plain string stays as this phone has it. */
+  function mergeJ(A, B) {
+    if (typeof A === 'number' && typeof B === 'number') return Math.max(A, B);
+    if (Array.isArray(A) && Array.isArray(B)) {
+      var at = {}, out = [];
+      var keyOf = function (x) { return x && typeof x === 'object' ? String(x.w || x.word || x.id || x.date || x.day || JSON.stringify(x)) : JSON.stringify(x); };
+      A.concat(B).forEach(function (x) {
+        var k = keyOf(x);
+        if (at[k] === undefined) { at[k] = out.length; out.push(x); return; }
+        var y = out[at[k]];
+        if (x && y && typeof x === 'object' && typeof y === 'object') out[at[k]] = ((x.t || x.ts || 0) > (y.t || y.ts || 0)) ? mergeJ(x, y) : mergeJ(y, x);
+      });
+      return out;
+    }
+    if (A && B && typeof A === 'object' && typeof B === 'object') {
+      var o = {};
+      Object.keys(B).forEach(function (k) { o[k] = B[k]; });
+      Object.keys(A).forEach(function (k) { o[k] = (k in B) ? mergeJ(A[k], B[k]) : A[k]; });
+      return o;
+    }
+    return A == null ? B : A;
+  }
+  function mergeVal(a, b) {
+    var A, B;
+    try { A = JSON.parse(a); B = JSON.parse(b); } catch (e) { return a; }
+    var m = mergeJ(A, B);
+    return typeof m === 'string' ? m : JSON.stringify(m);
+  }
   async function apply(d, mode) {
-    // mode: 'cloud' (the cloud's wins), 'merge' (both, newest wins per word)
+    // mode: 'cloud' (the account's copy onto an empty phone), 'merge' (both put together)
     var local = mode === 'merge' ? await collect() : null;
     var ls = d.ls || {};
     Object.keys(ls).forEach(function (k) {
       if (!isMine(k)) return;
-      if (mode === 'merge' && local.ls[k] != null) {
-        // a number keeps the bigger (XP, totals); anything else stays as this device has it
-        var a = +local.ls[k], b = +ls[k];
-        if (!isNaN(a) && !isNaN(b) && String(a) === local.ls[k] && String(b) === ls[k]) { if (b > a) localStorage.setItem(k, ls[k]); }
-        return;
-      }
-      try { localStorage.setItem(k, ls[k]); } catch (e) {}
+      var v = (mode === 'merge' && local.ls[k] != null) ? mergeVal(local.ls[k], ls[k]) : ls[k];
+      try { localStorage.setItem(k, v); } catch (e) {}
     });
     var have = {};
     if (local) local.entries.forEach(function (r) { have[r.word] = r; });
@@ -179,7 +206,11 @@
       if (!weight(local)) { await apply(cloud, 'cloud'); m.uid = user.id; m.savedAt = Date.now(); setMeta(m); return 'restored'; }
       await save('resume'); return 'saved';
     }
-    return { choose: true, cloud: cloud, cloudAt: Date.parse(r.data.updated_at), local: local };
+    // both have progress: put them together, then save the result to the account
+    await apply(cloud, 'merge');
+    m.uid = user.id; setMeta(m);
+    await save('merged');
+    return 'merged';
   }
 
   /* ---------------- the sheet ---------------- */
@@ -196,7 +227,7 @@
     var h = '<button class="cl-x" onclick="fcCloudClose()" aria-label="Close">×</button><div class="cl-ic">' + ICON + '</div>';
     if (!ON) {
       h += '<h3>Cloud save is not set up yet</h3><p>Add the Supabase project URL and anon key to <b>cloud-config.js</b>.</p>';
-    } else if (user && view !== 'choose') {
+    } else if (user && !/^(choose|merged|done|signing)$/.test(view)) {
       h += '<h3 class="cl-hello">' + nameHTML('sheet') + '</h3>'
         + '<p>Your little world is connected to <b>' + esc(user.email || '') + '</b>. Your searches, saved words, XP, animals and games are kept in your account.</p>'
         + '<div class="cl-stat"><span>Last saved</span><b class="num">' + esc(ago(lastSaved || meta().savedAt)) + '</b></div>'
@@ -215,15 +246,19 @@
         + '<button class="cl-pick on" onclick="fcCloudPick(\'merge\')"><b>Keep both</b><span>Put this phone’s and the account’s together. Recommended.</span></button>'
         + '<button class="cl-pick" onclick="fcCloudPick(\'cloud\')"><b>Use the account’s</b><span>Saved <span class="num">' + esc(ago(pending.cloudAt)) + '</span> · <span class="num">' + (pending.cloud.log || []).length + '</span> activities</span></button>'
         + '<button class="cl-pick" onclick="fcCloudPick(\'local\')"><b>Use this phone’s</b><span><span class="num">' + (pending.local.log || []).length + '</span> activities · replaces the account’s copy</span></button>';
+    } else if (view === 'merged') {
+      h += '<h3>All together now</h3><p>What you did on this phone has joined your account’s progress — nothing was lost. Focci is reloading…</p>';
     } else if (view === 'done') {
       h += '<h3>Welcome back</h3><p>Your little world has been brought back. Focci is reloading it…</p>';
     } else {
       h += '<h3>Keep your little world safe</h3>'
-        + '<p>Sign in with your email and Focci keeps your <b>recent searches, saved words, XP, animals and games</b> in your account. Clear Safari, lose the bookmark or change phones — sign in again and it all comes back.</p>'
+        + '<p>Sign in and Focci keeps your <b>recent searches, saved words, XP, animals and games</b> in your account. Clear Safari, lose the bookmark or change phones — sign in again and it all comes back.</p>'
         + '<input id="cl-email" class="cl-in" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="' + esc(email) + '"/>'
+        + '<div class="cl-pw"><input id="cl-pass" class="cl-in" type="password" autocomplete="current-password" placeholder="Password (6+ characters)" onkeydown="if(event.key===\'Enter\')fcCloudSend()"/>'
+        + '<button type="button" class="cl-eye" onclick="var i=document.getElementById(\'cl-pass\');i.type=i.type===\'password\'?\'text\':\'password\'" aria-label="Show password">Show</button></div>'
         + (err ? '<div class="cl-err">' + esc(err) + '</div>' : '')
-        + '<button class="cl-go" onclick="fcCloudSend()">' + (busy ? 'Sending…' : 'Email me a sign-in link') + '</button>'
-        + '<small>No password. Your email is used only to sign you in.</small>';
+        + '<button class="cl-go" onclick="fcCloudSend()">' + (busy ? 'Signing in…' : 'Continue') + '</button>'
+        + '<small>New here? This makes your account. No email is sent — just remember your password to sign in on another phone.</small>';
     }
     s.innerHTML = h;
     var f = $('cl-email'); if (f && !busy) setTimeout(function () { try { f.focus({ preventScroll: true }); } catch (e) {} }, 60);
@@ -289,19 +324,37 @@
   };
   window.fcCloudClose = function () { var s = $('cl-scrim'); if (s) s.classList.remove('on'); };
   window.fcCloudView = function (v) { view = v; err = ''; paintSheet(); };
+  /* Email + password. The magic link could not be used: Supabase's free
+     mail service answered 500 "Error sending confirmation email" for every
+     address (measured, a throwaway one too). With "Confirm email" turned
+     off in Supabase, an account opens at once and no email is ever sent.
+     One button: sign in; if no such account, make it. Supabase answers
+     "Invalid login credentials" both for a wrong password and for no
+     account, so a sign-up decides: an existing email comes back with no
+     identities (wrong password), a new one with a session. */
   window.fcCloudSend = async function () {
-    var f = $('cl-email'); if (f) email = f.value.trim();
+    var f = $('cl-email'), pw = $('cl-pass'); if (f) email = f.value.trim();
+    var pass = pw ? pw.value : '';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err = 'That email does not look right.'; view = 'start'; paintSheet(); return; }
+    if (pass.length < 6) { err = 'The password needs at least 6 characters.'; view = 'start'; paintSheet(); return; }
     busy = true; err = ''; paintSheet();
     try {
       var c = await client();
-      // the link comes back to exactly this page (the Vercel address once deployed)
-      var back = location.origin + location.pathname;
-      var r = await c.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true, emailRedirectTo: back } });
-      if (r.error) throw r.error;
-      view = 'sent';
-    } catch (e) { err = /rate|limit/i.test(e.message || '') ? 'Too many emails asked for just now — wait a little and try again.' : (e.message || 'Could not send the email.'); }
-    busy = false; paintSheet();
+      var r = await c.auth.signInWithPassword({ email: email, password: pass });
+      if (r.error) {
+        if (/not confirmed/i.test(r.error.message || '')) throw new Error('This account is waiting for an email that cannot be sent. In Supabase, turn off “Confirm email”, then try again.');
+        if (!/invalid login/i.test(r.error.message || '')) throw r.error;
+        var u = await c.auth.signUp({ email: email, password: pass });
+        if (u.error) throw (/sending|confirm/i.test(u.error.message || '') ? new Error('Almost there: in Supabase, turn off “Confirm email” so accounts open without an email.') : u.error);
+        if (!u.data.session) {
+          if (u.data.user && u.data.user.identities && u.data.user.identities.length === 0) throw new Error('That password is not right for this email.');
+          throw new Error('Almost there: in Supabase, turn off “Confirm email” so accounts open without an email.');
+        }
+        user = u.data.user;
+      } else user = r.data.user;
+      busy = false; view = 'signing'; paintBadge();
+      await finishSignIn();
+    } catch (e) { busy = false; err = /rate|limit/i.test(e.message || '') ? 'Too many tries just now — wait a minute and try again.' : (e.message || 'Could not sign in.'); view = 'start'; paintSheet(); }
   };
   /* After the link: the session is there (supabase-js read it from the
      URL); bring the two copies together the same way as before. */
@@ -311,7 +364,7 @@
       if (!had && user) setName((user.user_metadata && user.user_metadata.name) || fromEmail(user.email));
       var out = await reconcile();
       if (out && out.choose) { pending = out; view = 'choose'; paintSheet(); return; }
-      if (out === 'restored') { view = 'done'; paintSheet(); setTimeout(function () { location.reload(); }, 1200); return; }
+      if (out === 'restored' || out === 'merged') { view = out === 'merged' ? 'merged' : 'done'; paintSheet(); setTimeout(function () { location.reload(); }, 1600); return; }
       view = 'start'; paintBadge();
       if (window.fwToast) fwToast('Hello, ' + myName() + ' — your world is saved');
     } catch (e) { view = 'start'; err = e.message || 'Could not reach your account.'; paintSheet(); }
