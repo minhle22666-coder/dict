@@ -10,8 +10,14 @@
    (supabase/setup.sql; row-level security, so a person reaches only their
    own row).
 
-   Sign-in is a 6-digit code sent by email, not a link: a link opens in
-   Safari, outside the home-screen app, and signs in the wrong one.
+   Sign-in is a link sent by email (the user could not get the 6-digit
+   code template working). signInWithOtp sends it with emailRedirectTo =
+   this page's own address; the link comes back here with the session in
+   the URL's #fragment (implicit flow, so it also works when the email is
+   opened in another browser than the one that asked), supabase-js reads
+   it, and the sheet opens to finish. The catch on iPhone: the link opens
+   Safari, and iOS keeps a home-screen copy's storage apart from Safari's,
+   so the account lands in Safari's copy.
 
    What is saved (one JSON document):
    - localStorage keys starting sd_ or fc_ (XP, streaks, quests, history,
@@ -65,7 +71,7 @@
   function client() {
     if (sb) return Promise.resolve(sb);
     return lib().then(function (S) {
-      sb = S.createClient(CFG.url, CFG.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'fc-cloud-auth' } });
+      sb = S.createClient(CFG.url, CFG.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit', storageKey: 'fc-cloud-auth' } });
       sb.auth.onAuthStateChange(function (ev, session) { user = session ? session.user : null; paintBadge(); });
       return sb;
     });
@@ -197,12 +203,13 @@
         + '<button class="cl-go" onclick="fcCloudSaveNow()"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : 'Save now') + '</button>'
         + '<button class="cl-ghost" onclick="fcCloudSignOut()">Sign out</button>'
         + '<small>Signing out keeps everything on this phone. Sign in on another phone or browser with the same email to bring it there.</small>';
-    } else if (view === 'code') {
-      h += '<h3>Check your email</h3><p>We sent a 6-digit code to <b>' + esc(email) + '</b>.</p>'
-        + '<input id="cl-code" class="cl-in cl-code num" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"/>'
+    } else if (view === 'sent') {
+      h += '<h3>Check your email</h3><p>We sent a sign-in link to <b>' + esc(email) + '</b>. Open it on this phone and tap <b>Log in</b> — Focci opens and brings your world with it.</p>'
         + (err ? '<div class="cl-err">' + esc(err) + '</div>' : '')
-        + '<button class="cl-go" onclick="fcCloudVerify()">' + (busy ? 'Checking…' : 'Sign in') + '</button>'
-        + '<div class="cl-row"><button class="cl-link" onclick="fcCloudSend()">Send a new code</button><button class="cl-link" onclick="fcCloudView(\'start\')">Use another email</button></div>';
+        + '<div class="cl-stat"><span>No email?</span><b>Look in Spam or Promotions</b></div>'
+        + '<div class="cl-row"><button class="cl-link" onclick="fcCloudSend()">Send it again</button><button class="cl-link" onclick="fcCloudView(\'start\')">Use another email</button></div>';
+    } else if (view === 'signing') {
+      h += '<h3>Signing you in…</h3><p>Fetching your little world from your account.</p>';
     } else if (view === 'choose' && pending) {
       h += '<h3>Two copies of your world</h3><p>This phone and your account both have progress. Which should Focci keep?</p>'
         + '<button class="cl-pick on" onclick="fcCloudPick(\'merge\')"><b>Keep both</b><span>Put this phone’s and the account’s together. Recommended.</span></button>'
@@ -215,11 +222,11 @@
         + '<p>Sign in with your email and Focci keeps your <b>recent searches, saved words, XP, animals and games</b> in your account. Clear Safari, lose the bookmark or change phones — sign in again and it all comes back.</p>'
         + '<input id="cl-email" class="cl-in" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="' + esc(email) + '"/>'
         + (err ? '<div class="cl-err">' + esc(err) + '</div>' : '')
-        + '<button class="cl-go" onclick="fcCloudSend()">' + (busy ? 'Sending…' : 'Send me a code') + '</button>'
+        + '<button class="cl-go" onclick="fcCloudSend()">' + (busy ? 'Sending…' : 'Email me a sign-in link') + '</button>'
         + '<small>No password. Your email is used only to sign you in.</small>';
     }
     s.innerHTML = h;
-    var f = $('cl-code') || $('cl-email'); if (f && !busy) setTimeout(function () { try { f.focus({ preventScroll: true }); } catch (e) {} }, 60);
+    var f = $('cl-email'); if (f && !busy) setTimeout(function () { try { f.focus({ preventScroll: true }); } catch (e) {} }, 60);
   }
   function paintBadge() {
     document.documentElement.classList.toggle('cl-signed', !!user);
@@ -229,7 +236,7 @@
 
   window.fcCloudOpen = function () {
     dom(); err = '';
-    if (view !== 'code' && view !== 'choose') view = 'start';
+    if (view !== 'sent' && view !== 'choose' && view !== 'signing') view = 'start';
     $('cl-scrim').classList.add('on');
     paintSheet();
     if (ON) client().then(function (c) { return c.auth.getSession(); }).then(function (r) { user = r.data.session ? r.data.session.user : null; paintSheet(); }).catch(function (e) { err = e.message; paintSheet(); });
@@ -242,29 +249,25 @@
     busy = true; err = ''; paintSheet();
     try {
       var c = await client();
-      var r = await c.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
+      // the link comes back to exactly this page (the Vercel address once deployed)
+      var back = location.origin + location.pathname;
+      var r = await c.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true, emailRedirectTo: back } });
       if (r.error) throw r.error;
-      view = 'code';
-    } catch (e) { err = /rate|limit/i.test(e.message || '') ? 'Too many codes asked for just now — wait a minute and try again.' : (e.message || 'Could not send the code.'); }
+      view = 'sent';
+    } catch (e) { err = /rate|limit/i.test(e.message || '') ? 'Too many emails asked for just now — wait a little and try again.' : (e.message || 'Could not send the email.'); }
     busy = false; paintSheet();
   };
-  window.fcCloudVerify = async function () {
-    var f = $('cl-code'), code = f ? f.value.replace(/\D/g, '') : '';
-    if (code.length !== 6) { err = 'The code has 6 digits.'; paintSheet(); return; }
-    busy = true; err = ''; paintSheet();
+  /* After the link: the session is there (supabase-js read it from the
+     URL); bring the two copies together the same way as before. */
+  async function finishSignIn() {
     try {
-      var c = await client();
-      var r = await c.auth.verifyOtp({ email: email, token: code, type: 'email' });
-      if (r.error) throw r.error;
-      user = r.data.user || (r.data.session && r.data.session.user);
       var out = await reconcile();
-      busy = false;
       if (out && out.choose) { pending = out; view = 'choose'; paintSheet(); return; }
       if (out === 'restored') { view = 'done'; paintSheet(); setTimeout(function () { location.reload(); }, 1200); return; }
       view = 'start'; paintBadge();
       if (window.fwToast) fwToast('Signed in — your progress is saved');
-    } catch (e) { busy = false; err = /expired|invalid/i.test(e.message || '') ? 'That code is wrong or has expired.' : (e.message || 'Could not sign in.'); paintSheet(); }
-  };
+    } catch (e) { view = 'start'; err = e.message || 'Could not reach your account.'; paintSheet(); }
+  }
   window.fcCloudPick = async function (mode) {
     if (!pending) return;
     var p = pending; pending = null;
@@ -283,6 +286,27 @@
   window.fcCloudBack = function () { var s = $('cl-scrim'); if (s && s.classList.contains('on')) { fcCloudClose(); return true; } return false; };
   window.fcCloudCollect = collect;   // for diagnosis: what a save would send
   window.fcCloudState = function () { return { on: ON, user: user && user.email, dirty: dirty, lastSaved: lastSaved || meta().savedAt || 0 }; };
+
+  /* Arriving from the email link: the address carries #access_token=...
+     (or #error_description= when the link is old). Load the library at
+     once, let it take the session, tidy the address, and finish. */
+  (function fromLink() {
+    var h = location.hash || '';
+    if (!ON || !/access_token=|error_description=/.test(h)) return;
+    var bad = /error_description=([^&]+)/.exec(h);
+    var start = function () {
+      dom(); $('cl-scrim').classList.add('on');
+      if (bad) { view = 'start'; err = decodeURIComponent(bad[1].replace(/\+/g, ' ')) + ' — ask for a new link.'; paintSheet(); history.replaceState(null, '', location.pathname + location.search); return; }
+      view = 'signing'; paintSheet();
+      client().then(function (c) { return c.auth.getSession(); }).then(function (r) {
+        history.replaceState(null, '', location.pathname + location.search);
+        user = r.data.session ? r.data.session.user : null;
+        if (!user) { view = 'start'; err = 'That link did not sign you in. Ask for a new one.'; paintSheet(); return; }
+        paintBadge(); finishSignIn();
+      }).catch(function (e) { view = 'start'; err = e.message; paintSheet(); });
+    };
+    if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+  })();
 
   /* Already signed in on this device: pick the session up quietly a little
      after start (the library is only fetched if there is a session to
