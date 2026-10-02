@@ -3961,6 +3961,14 @@ export async function bootFocciWorld(root, opts) {
   function handleTap(clientX, clientY) {
     // Touching anything returns you to steering Focci.
     if (inspectMode) { inspectMode = false; root.dispatchEvent(new CustomEvent('focci-inspect', { detail: { on: false } })); }
+    /* A tap on Focci opens his round of things to do -- the user found the
+       hold alone hard to discover (focci-acts.js pops the ring open). */
+    try {
+      if (onFocciAt(clientX, clientY)) {
+        root.dispatchEvent(new CustomEvent('focci-hold', { bubbles: true, detail: { tap: true } }));
+        return;
+      }
+    } catch (err) {}
     const rect = canvas.getBoundingClientRect();
     ndcVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     ndcVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -4142,8 +4150,9 @@ export async function bootFocciWorld(root, opts) {
     if (P.kind === 'guitar') {
       // the right arm strums on every strum the music makes; the left holds the neck
       strumKick = Math.max(0, strumKick - dt * 5);
-      armL.rotation.set(-0.55 + strumDir * 0.42 * strumKick, 0, 0.2);
-      armR.rotation.set(-1.0 + chordShift * 0.07, 0, -0.5);
+      // GUITAR_ARMS: right paw on the soundhole, left paw on the neck (see guitarOn)
+      armL.rotation.set(-0.68 + strumDir * 0.16 * strumKick, 0, 0.56);
+      armR.rotation.set(-1.21 + chordShift * 0.05, 0, 0.23);
       legL.rotation.x = legR.rotation.x = 0;
       tailPivot.rotation.y = Math.sin(t * 2.2) * 0.12;
       character.rotation.y = charState.angle + Math.sin(t * 1.1) * 0.05;
@@ -4292,8 +4301,8 @@ export async function bootFocciWorld(root, opts) {
       const g = await loadProp('guitar.glb');
       const m = g.scene;
       const box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
-      // long side to 0.5 of the model's own height (rig units: he is 0.97 tall)
-      const L = Math.max(size.x, size.y, size.z), s = 0.5 / L;
+      // long side to 0.68 of the model's own height (rig units: he is 0.97 tall); 0.5 was too small
+      const L = Math.max(size.x, size.y, size.z), s = 0.68 / L;
       const inner = new THREE.Group();
       m.position.set(-ctr.x, -ctr.y, -ctr.z);
       inner.add(m);
@@ -4304,23 +4313,36 @@ export async function bootFocciWorld(root, opts) {
       inner.scale.setScalar(s);
       const holder = new THREE.Group();
       holder.add(inner);
-      inner.position.y = 0.12;     // the body below his hand, the neck rising past it
       m.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
       guitarRig = holder;
     }
     /* Neck to his left hand, body under his right -- the way a right-handed
        player holds it, so from the front the neck points to the viewer's
-       right. It pointed the other way, which the user saw as "backwards". */
-    guitarRig.position.set(-0.02, 0.33, 0.2);
-    guitarRig.rotation.set(0.15, 0, -1.0);
+       right. It pointed the other way, which the user saw as "backwards".
+
+       "His hands do not touch it": the arms are 0.29 long from the shoulder
+       (y 0.43) to the paw (measured from the vertices weighted to each arm
+       bone). The right paw can reach the soundhole S = (-0.06, 0.25, 0.22)
+       and the left the neck at N = (0.28, 0.36, 0.33), so the guitar lies
+       along S->N: its axis (the model's +y, the neck end) is that line, its
+       face turned forward, and its centre 0.14 up the axis from S, which is
+       where a soundhole sits on a guitar 0.68 long. GUITAR_ARMS holds the
+       arm angles solved for the same two points. */
+    const gS = new THREE.Vector3(-0.06, 0.25, 0.22), gN = new THREE.Vector3(0.28, 0.36, 0.33);
+    const gy = gN.clone().sub(gS).normalize();
+    const gz = new THREE.Vector3(0, 0, 1).addScaledVector(gy, -gy.z).normalize();
+    const gx = new THREE.Vector3().crossVectors(gy, gz);
+    guitarRig.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(gx, gy, gz));
+    guitarRig.position.copy(gS).addScaledVector(gy, 0.14);
     rig.add(guitarRig);
     guitarRig.visible = true;
     holdCam();
-    cam.tRadius = 3.4; cam.tPhi = 1.36;
+    // far enough out that all of him and the guitar fit a phone held upright
+    cam.tRadius = 4.3; cam.tPhi = 1.33;
     const a0 = charState.angle;
     const prefs0 = [a0, a0 + 0.45, a0 - 0.45, a0 + 0.9, a0 - 0.9, a0 + 1.4, a0 - 1.4];
-    let base = shortTurn(pickCamAngle(charState.x, character.position.y + 1.0, charState.z, 3.4, 1.36, prefs0));
-    if (pickBlocked) { cam.tRadius = 2.4; base = shortTurn(pickCamAngle(charState.x, character.position.y + 1.0, charState.z, 2.4, 1.36, prefs0)); }
+    let base = shortTurn(pickCamAngle(charState.x, character.position.y + 1.0, charState.z, 4.3, 1.33, prefs0));
+    if (pickBlocked) { cam.tRadius = 3.0; base = shortTurn(pickCamAngle(charState.x, character.position.y + 1.0, charState.z, 3.0, 1.33, prefs0)); }
     cam.tTheta = base;
     focciPose = { kind: 'guitar', wakeOnTouch: false, t: 0, x: charState.x, z: charState.z, base };
     return true;

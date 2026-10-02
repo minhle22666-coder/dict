@@ -155,23 +155,47 @@
     { name: 'Star', file: 'guitar-star.mp3' }
   ];
   var G = null;
-  function guitarStart(i, tries) {
-    guitarStop();
-    tries = tries || 0;
-    if (tries >= SONGS.length) { bar('<div class="fa-bt"><b>No guitar music found</b><span>Add the tracks to assets/audio</span></div><button class="pt-x" onclick="faStop()" aria-label="Stop">×</button>'); return; }
-    var ctx = ac();
-    var el = new Audio('./assets/audio/' + SONGS[i].file);
+  /* "Skipping to another song does not play": every song made a new Audio
+     element, and the skip after a missing file (or the next song at the end
+     of one) made it outside a tap -- iOS keeps such an element silent. Now
+     there is ONE element, wired once through the analyser, and a song is a
+     change of its src: an element that has played from a tap may play again
+     later. Which files exist is found once with HEAD requests, so the arrows
+     only step through real ones (and hide when there is only one). */
+  var GA = null, HAVE = null;
+  function gAudio() {
+    if (GA) return GA;
+    var ctx = ac(), el = new Audio();
     el.preload = 'auto'; el.crossOrigin = 'anonymous';
     var src = ctx.createMediaElementSource(el), an = ctx.createAnalyser();
     an.fftSize = 1024; an.smoothingTimeConstant = 0.35;
     src.connect(an); an.connect(ctx.destination);
-    G = { song: i, el: el, an: an, buf: new Uint8Array(an.frequencyBinCount), avg: 0, last: 0, dir: 1, raf: 0, bar: 0 };
+    GA = { el: el, an: an, buf: new Uint8Array(an.frequencyBinCount) };
+    return GA;
+  }
+  function haveSongs() {
+    if (HAVE) return Promise.resolve(HAVE);
+    return Promise.all(SONGS.map(function (s, i) {
+      return fetch('./assets/audio/' + s.file, { method: 'HEAD', cache: 'no-store' }).then(function (r) { return r.ok ? i : -1; }).catch(function () { return -1; });
+    })).then(function (l) { HAVE = l.filter(function (i) { return i >= 0; }); if (!HAVE.length) HAVE = [0]; if (G) guitarBar(); return HAVE; });
+  }
+  function guitarStart(i, tries) {
+    tries = tries || 0;
+    if (tries >= SONGS.length) { guitarStop(); bar('<div class="fa-bt"><b>No guitar music found</b><span>Add the tracks to assets/audio</span></div><button class="pt-x" onclick="faStop()" aria-label="Stop">×</button>'); return; }
+    if (G) cancelAnimationFrame(G.raf);
+    var A = gAudio(), el = A.el, an = A.an, ctx = ac();
+    el.src = './assets/audio/' + SONGS[i].file;
+    G = { song: i, el: el, an: an, buf: A.buf, avg: 0, last: 0, dir: 1, raf: 0, bar: 0 };
     el.onended = function () { faSong(1); };
-    el.onerror = function () { if (G && G.el === el) guitarStart((i + 1) % SONGS.length, tries + 1); };
+    el.onerror = function () {
+      if (!G || G.song !== i) return;
+      if (HAVE) HAVE = HAVE.filter(function (k) { return k !== i; });
+      guitarStart((i + 1) % SONGS.length, tries + 1);
+    };
     el.play().catch(function () {});
     var sr = ctx.sampleRate, lo = Math.max(1, Math.round(90 / (sr / an.fftSize))), hi = Math.round(1700 / (sr / an.fftSize));
     var tick = function () {
-      if (!G || G.el !== el) return;
+      if (!G || G.song !== i) return;
       an.getByteFrequencyData(G.buf);
       var e = 0; for (var k = lo; k < hi; k++) e += G.buf[k]; e /= (hi - lo);
       var now = performance.now();
@@ -188,21 +212,36 @@
   function guitarStop() {
     if (!G) return;
     cancelAnimationFrame(G.raf);
-    try { G.el.pause(); G.el.removeAttribute('src'); G.el.load(); } catch (e) {}
+    try { G.el.onended = null; G.el.onerror = null; G.el.pause(); } catch (e) {}
     G = null;
   }
   function guitarBar() {
-    var S = SONGS[G.song];
-    bar('<button class="fa-nb" onclick="faSong(-1)" aria-label="Previous">‹</button>'
-      + '<div class="fa-bt"><b>♪ ' + esc(S.name) + '</b><span>Focci on guitar</span></div>'
-      + '<button class="fa-nb" onclick="faSong(1)" aria-label="Next">›</button>'
+    if (!G) return;
+    var S = SONGS[G.song], many = !HAVE || HAVE.length > 1;
+    var on = G.el && !G.el.paused;
+    bar((many ? '<button class="fa-nb" onclick="faSong(-1)" aria-label="Previous">‹</button>' : '')
+      + '<button class="fa-nb fa-pp" onclick="faGuitarPP()" aria-label="Play or pause">' + (on ? '❚❚' : '▶') + '</button>'
+      + '<div class="fa-bt"><b>♪ ' + esc(S.name) + '</b><span>Focci on guitar' + (HAVE ? ' · ' + (HAVE.indexOf(G.song) + 1) + ' of ' + HAVE.length : '') + '</span></div>'
+      + (many ? '<button class="fa-nb" onclick="faSong(1)" aria-label="Next">›</button>' : '')
       + '<button class="pt-x" onclick="faStop()" aria-label="Stop">×</button>');
   }
-  window.faSong = function (d) { if (!G) return; guitarStart((G.song + d + SONGS.length) % SONGS.length); };
+  window.faGuitarPP = function () {
+    if (!G) return;
+    if (G.el.paused) G.el.play().catch(function () {}); else G.el.pause();
+    setTimeout(guitarBar, 60);
+  };
+  // the next or the last of the songs that are really there
+  window.faSong = function (d) {
+    if (!G) return;
+    var L = HAVE && HAVE.length ? HAVE : SONGS.map(function (s, i) { return i; });
+    var at = L.indexOf(G.song); if (at < 0) at = 0;
+    guitarStart(L[(at + d + L.length) % L.length]);
+  };
   window.faGuitar = async function () {
     ringClose(); faStop(); CUR = 'guitar';
     D.classList.add('fa-quiet');
     guitarStart(0);   // inside the tap: iOS only lets audio start from the gesture itself
+    haveSongs();
     if (W() && W().focciDo) await W().focciDo('guitar');
   };
 
@@ -848,7 +887,7 @@
   var TIP = { shown: 0, until: 0, still: 0, last: null, raf: 0 };
   function tipEl() {
     var t = $('fa-tip');
-    if (!t) { t = document.createElement('div'); t.className = 'fa-tip'; t.id = 'fa-tip'; t.innerHTML = '<i></i>Hold me'; document.body.appendChild(t); }
+    if (!t) { t = document.createElement('div'); t.className = 'fa-tip'; t.id = 'fa-tip'; t.innerHTML = '<i></i>Tap me'; document.body.appendChild(t); }
     return t;
   }
   function held() { try { return localStorage.getItem('fc_held') === '1'; } catch (e) { return false; } }
