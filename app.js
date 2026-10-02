@@ -4318,7 +4318,7 @@ const PG_META = {
   write: { banner:'banner-speakup.webp', fox:'fox-speak-up.webp', name:'Speak Up',
            intro:'Read the scenario, type your best English, and Focci gives you instant feedback with native tips.' },
   type:  { banner:'banner-lettertrail.webp', art:'box-lettertrail.png', fox:'fox-letter-trail.webp', name:'Letter Trail',
-           intro:'Read the meaning, follow the letter hints and type the English word \u2014 a slip of spelling still counts.' },
+           intro:'Five words hide in the letters. Read the Vietnamese clue, then drag across the letters to join each one.' },
   match: { banner:'banner-wordpairs.webp', art:'box-wordpairs.png', fox:'fox-word-pairs.webp', name:'Word Pairs',
            intro:'Read the Vietnamese, pick the English word that matches, then swipe left for the next one.' }
 };
@@ -4335,7 +4335,8 @@ function pgControls(){
   const n=getQCount(), lv=getLevel(), pool=getPool();
   const opt=(v,label,on)=>'<option value="'+v+'"'+(on?' selected':'')+'>'+label+'</option>';
   let h='<div class="pg-opts">';
-  h+='<label class="pg-opt"><span>Questions</span><select aria-label="Number of questions" onchange="setQCount(+this.value)">'
+  if(practiceMode==='type') h+='<div class="pg-opt fixed"><span>A board</span><b class="num">5 words</b></div>';
+  else h+='<label class="pg-opt"><span>Questions</span><select aria-label="Number of questions" onchange="setQCount(+this.value)">'
     +QCOUNTS.map(q=>opt(q, q, q===n)).join('')+'</select></label>';
   h+='<label class="pg-opt"><span>Level</span><select aria-label="Level" onchange="setLevel(+this.value)">'
     +opt(0,'Any',lv===0)+[1,2,3,4,5,6].map(l=>opt(l, LEVEL_NAMES[l], l===lv)).join('')+'</select></label>';
@@ -4459,6 +4460,9 @@ async function startPractice(preAvail){
   wirePracticeSwipe();
   practiceStage='playing';
   if(practiceMode==='match') return startMatch(avail);
+  // Letter Trail is the connect board now; a due-review session from Saved
+  // keeps the one-word-at-a-time card, which is what it is built around.
+  if(practiceMode==='type' && !dueReviewMode) return startConnect(avail);
   // Ôn tới hạn: hết đúng bộ từ đó, không cắt theo số câu đã chọn — mục
   // tiêu là ôn hết những gì tới hạn, không phải một vòng ngắn tuỳ chọn.
   revQueue=dueReviewMode ? avail.sort(()=>Math.random()-0.5)
@@ -4488,7 +4492,7 @@ function roundBar(idx,total,states){
     +'<div class="rb-right num" title="Right so far">✓ '+right+'</div></div>';
 }
 function quitRound(){
-  revQueue=[]; matchRounds=[]; revState=null; matchPicked=null;
+  revQueue=[]; matchRounds=[]; revState=null; matchPicked=null; wc=null;
   practiceStage='setup'; renderPracticeSetup();
 }
 window.quitRound=quitRound;
@@ -4504,7 +4508,7 @@ function practiceAnswered(){ return practiceMode==='match' ? !!matchPicked : !!r
    moment a game opens. */
 function practiceHasProgress(){
   if(practiceMode==='match') return matchIdx>0 || !!matchPicked;
-  if(practiceMode==='type') return revIdx>0 || !!revState;
+  if(practiceMode==='type') return revIdx>0 || !!revState || !!(wc && !wc.done && wcFoundCount()>0);
   return false;
 }
 window.practiceHasProgress=practiceHasProgress;
@@ -4554,6 +4558,8 @@ function wirePracticeSwipe(){
        to take both directions as "next", so there was no way to use the
        gesture people reach for to leave. */
     if(dx>0 || practiceStage!=='playing') return;
+    // a drag across the letter board is spelling, not turning the page
+    if(e.target && e.target.closest && e.target.closest('[data-noswipe]')) return;
     practiceAdvance('left');
   },{passive:true});
   document.addEventListener('keydown',(e)=>{
@@ -5604,6 +5610,193 @@ function maskHint(word){
   }
   return '<div class="mask-hint">'+out+'<span class="mh-count">'+total+' letters</span></div>';
 }
+
+
+/* ============================================================
+   LETTER TRAIL — connect the letters
+
+   Rebuilt as a word-connect board, as asked: five words, phrases or idioms
+   a board (never whole sentences -- the journal is full of searched
+   sentences, and a sentence is not something you trace), their Vietnamese
+   meanings above as the clues, and a grid of letters below. Drag through
+   neighbouring letters (diagonals too) to spell one; drag back over the
+   last letter to take it off. Every target is laid along its own path of
+   neighbouring cells, the rest of the grid is filled with letters drawn
+   from the same words, and any path that spells a target counts -- a
+   second route the filler happened to make is not "wrong".
+
+   Scoring stays what XP-RULES.md says for Letter Trail: +1 a word found.
+   ============================================================ */
+let wc=null;
+const WC_COLORS=['#7D9A63','#C99A3E','#5F948A','#C98468','#8E7CB5'];
+function wcLetters(w){ return String(w||'').toUpperCase().replace(/[^A-Z]/g,''); }
+function wcOk(r){
+  const w=String(r.word||'').trim();
+  if(!w || /[.?!,;:]/.test(w)) return false;
+  if(w.split(/\s+/).length>4) return false;            // a phrase or idiom, not a sentence
+  const L=wcLetters(w).length;
+  return L>=3 && L<=12;
+}
+function wcPlace(targets, N){
+  const grid=new Array(N*N).fill(null);
+  const nb=(i)=>{ const x=i%N, y=(i/N)|0, out=[];
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ if(!dx&&!dy) continue;
+      const nx=x+dx, ny=y+dy; if(nx>=0&&ny>=0&&nx<N&&ny<N) out.push(ny*N+nx); }
+    return out.sort(()=>Math.random()-0.5); };
+  // longest first: they need the room
+  const order=targets.map((t,i)=>i).sort((a,b)=>targets[b].letters.length-targets[a].letters.length);
+  for(const ti of order){
+    const L=targets[ti].letters; let placed=null, budget=4000;
+    const starts=grid.map((v,i)=>i).filter(i=>grid[i]===null).sort(()=>Math.random()-0.5);
+    const dfs=(path)=>{
+      if(--budget<0) return false;
+      if(path.length===L.length) { placed=path.slice(); return true; }
+      for(const n of nb(path[path.length-1])){ if(grid[n]===null && path.indexOf(n)<0){ path.push(n); if(dfs(path)) return true; path.pop(); } }
+      return false;
+    };
+    for(const st of starts){ if(dfs([st])) break; if(budget<0) break; }
+    if(!placed) return null;
+    placed.forEach((c,k)=>{ grid[c]=L[k]; });
+    targets[ti].path=placed;
+  }
+  const pool=targets.map(t=>t.letters).join('')+'EARIOTNSLCUDPMHGB';
+  for(let i=0;i<grid.length;i++) if(grid[i]===null) grid[i]=pool[Math.floor(Math.random()*pool.length)];
+  return grid;
+}
+async function startConnect(avail){
+  let cands=avail.filter(r=>wcOk(r) && meaningOf(r));
+  if(cands.length<5){
+    // not enough saved yet: top up from the rest of the library, same level
+    const lv=getLevel();
+    const more=(await idbAllCached()).filter(r=>!r.alias && r.data && !r.data.explain && !r.data.phrase
+      && wcOk(r) && meaningOf(r) && (!lv || levelOf(r.word)===lv) && !cands.some(c=>c.word===r.word));
+    cands=cands.concat(more.sort(()=>Math.random()-0.5).slice(0, 5-cands.length));
+  }
+  if(cands.length<3){
+    $('#review-area').innerHTML=gameShell(pgCard('wonder','Nothing to connect yet','<div class="pg-empty">Save a few words or phrases from any word page and they become the trail.</div>'));
+    return;
+  }
+  const pick=cands.sort(()=>Math.random()-0.5).slice(0,5);
+  const targets=pick.map((r,i)=>({rec:r, word:r.word, letters:wcLetters(r.word), vi:meaningOf(r), color:WC_COLORS[i%WC_COLORS.length], found:false, hinted:false, path:null}));
+  const total=targets.reduce((a,t)=>a+t.letters.length,0);
+  let N=Math.max(6, Math.min(9, Math.ceil(Math.sqrt(total*1.6)))), grid=null;
+  for(let tries=0; tries<40 && !grid; tries++){ grid=wcPlace(targets, N); if(!grid && tries%8===7 && N<10) N++; }
+  if(!grid){ N=10; grid=wcPlace(targets,N); }
+  wc={targets, N, grid, sel:[], done:false, gaveUp:false, foundCells:{}};
+  revQueue=[]; revIdx=0; revState=null;
+  renderConnect();
+}
+function wcFoundCount(){ return wc ? wc.targets.filter(t=>t.found).length : 0; }
+function renderConnect(){
+  const area=$('#review-area'); if(!area||!wc) return;
+  const f=wcFoundCount(), n=wc.targets.length;
+  let h='<div class="wc">';
+  h+='<div class="wc-top"><div class="wc-prog">'+wc.targets.map(t=>'<i'+(t.found?' class="on" style="background:'+t.color+'"':'')+'></i>').join('')+'</div>'
+    +'<span class="num">'+f+' / '+n+'</span></div>';
+  h+='<div class="wc-hints">'+wc.targets.map((t,i)=>{
+    const shape=String(t.word).split(/\s+/).map(p=>wcLetters(p).split('').map((c,k)=>t.found?c:(t.hinted&&k===0&&p===t.word.split(/\s+/)[0]?c:'_')).join(' ')).join('   ');
+    return '<button class="wc-h'+(t.found?' found':'')+'" style="--c:'+t.color+'" onclick="wcHint('+i+')">'
+      +'<span class="wc-dot"></span><span class="wc-ht"><b>'+esc(t.vi)+'</b><i class="num">'+(t.found?esc(t.word):shape)+'</i></span>'
+      +(t.found?'<span class="wc-ok">✓</span>':'<span class="wc-hint">hint</span>')+'</button>';
+  }).join('')+'</div>';
+  h+='<div class="wc-word" id="wc-word">&nbsp;</div>';
+  h+='<div class="wc-board" data-noswipe id="wc-board" style="--n:'+wc.N+'"><svg class="wc-lines" id="wc-lines"></svg><div class="wc-grid" id="wc-grid">'
+    +wc.grid.map((c,i)=>{ const fc=wc.foundCells[i]; return '<span class="wc-c'+(fc?' found':'')+'" data-i="'+i+'"'+(fc?' style="--c:'+fc+'"':'')+'>'+c+'</span>'; }).join('')
+    +'</div></div>';
+  if(!wc.done) h+='<div class="wc-acts"><button class="btn ghost" onclick="wcGiveUp()">Show me the answers</button></div>';
+  else h+='<div class="wc-acts"><button class="btn" onclick="startPractice()">Next board</button><button class="btn ghost" onclick="quitRound()">New settings</button></div>';
+  h+='</div>';
+  area.innerHTML=gameShell(h);
+  wcDrawFound(); wcWire();
+}
+function wcCenter(i){
+  const g=$('#wc-grid'), c=g&&g.children[i]; if(!c) return null;
+  const b=$('#wc-board').getBoundingClientRect(), r=c.getBoundingClientRect();
+  return { x:r.left-b.left+r.width/2, y:r.top-b.top+r.height/2 };
+}
+function wcLine(path, color, cls){
+  const pts=path.map(wcCenter).filter(Boolean).map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+  return '<polyline class="'+(cls||'')+'" points="'+pts+'" style="stroke:'+color+'"/>';
+}
+function wcDrawFound(extra){
+  const svg=$('#wc-lines'); if(!svg) return;
+  let h=wc.targets.filter(t=>t.found && t.usedPath).map(t=>wcLine(t.usedPath, t.color, 'done')).join('');
+  if(wc.gaveUp) h+=wc.targets.filter(t=>!t.found && t.path).map(t=>wcLine(t.path, t.color, 'shown')).join('');
+  if(extra) h+=extra;
+  svg.innerHTML=h;
+}
+function wcWire(){
+  const board=$('#wc-board'); if(!board || wc.done) return;
+  const cellAt=(x,y)=>{
+    const el=document.elementFromPoint(x,y);
+    const c=el&&el.closest&&el.closest('.wc-c'); if(!c) return -1;
+    // only near the middle of a cell, so a diagonal does not catch the corner of its neighbour
+    const r=c.getBoundingClientRect(), dx=x-(r.left+r.width/2), dy=y-(r.top+r.height/2);
+    return Math.hypot(dx,dy) < r.width*0.42 ? +c.dataset.i : -1;
+  };
+  const adj=(a,b)=>{ const N=wc.N; return Math.max(Math.abs(a%N-b%N), Math.abs(((a/N)|0)-((b/N)|0)))===1; };
+  const paint=()=>{
+    const g=$('#wc-grid'); if(!g) return;
+    [...g.children].forEach((c,i)=>c.classList.toggle('on', wc.sel.indexOf(i)>=0));
+    const w=$('#wc-word'); if(w) w.textContent=wc.sel.map(i=>wc.grid[i]).join('') || ' ';
+    wcDrawFound(wc.sel.length>1 ? wcLine(wc.sel,'rgba(94,122,72,.55)','live') : '');
+  };
+  let down=false;
+  board.onpointerdown=(e)=>{ const i=cellAt(e.clientX,e.clientY); if(i<0) return; down=true; wc.sel=[i]; try{board.setPointerCapture(e.pointerId);}catch(_){}
+    paint(); e.preventDefault(); };
+  board.onpointermove=(e)=>{ if(!down) return; const i=cellAt(e.clientX,e.clientY); if(i<0) return;
+    const s=wc.sel, last=s[s.length-1];
+    if(i===last) return;
+    if(s.length>1 && i===s[s.length-2]){ s.pop(); paint(); return; }      // back over the last letter takes it off
+    if(s.indexOf(i)<0 && adj(last,i)){ s.push(i); paint(); } };
+  const up=()=>{ if(!down) return; down=false; wcCheck(); };
+  board.onpointerup=up; board.onpointercancel=up;
+}
+async function wcCheck(){
+  const s=wc.sel.slice(); wc.sel=[];
+  const word=s.map(i=>wc.grid[i]).join('');
+  const t=s.length>=3 && wc.targets.find(x=>!x.found && x.letters===word);
+  const g=$('#wc-grid');
+  if(t){
+    t.found=true; t.usedPath=s;
+    s.forEach(i=>{ wc.foundCells[i]=t.color; });
+    addXP(1);
+    try{ await gradeAndLog(t.rec, true); }catch(e){}
+    const f=wcFoundCount();
+    if(f===wc.targets.length){
+      wc.done=true;
+      if(!revSessionAwarded){ revSessionAwarded=true; questBump('game'); checkAchievements(); }
+    }
+    renderConnect();
+    const g2=$('#wc-grid');
+    if(g2) s.forEach((i,k)=>{ const c=g2.children[i]; if(c){ c.style.animationDelay=(k*35)+'ms'; c.classList.add('pop'); } });
+    const w=$('#wc-word'); if(w){ w.textContent=t.word; w.classList.add('yes'); }
+    if(wc.done){ const b=$('#wc-board'); if(b) confettiBurst(b, 36); }
+  } else {
+    if(g && s.length>1) s.forEach(i=>{ const c=g.children[i]; if(c){ c.classList.remove('on'); c.classList.add('no'); setTimeout(()=>c.classList.remove('no'), 420); } });
+    const w=$('#wc-word'); if(w && s.length>1){ w.textContent=word; w.classList.add('nope'); setTimeout(()=>{ w.classList.remove('nope'); w.textContent=' '; }, 600); }
+    wcDrawFound();
+  }
+}
+window.wcHint=function(i){
+  if(!wc || wc.done) return;
+  const t=wc.targets[i]; if(!t || t.found || !t.path) return;
+  t.hinted=true;
+  renderConnect();
+  const c=$('#wc-grid') && $('#wc-grid').children[t.path[0]];
+  if(c){ c.classList.add('hint'); c.style.setProperty('--c', t.color); }
+};
+window.wcGiveUp=async function(){
+  if(!wc || wc.done) return;
+  wc.gaveUp=true; wc.done=true;
+  for(const t of wc.targets) if(!t.found){
+    try{ await gradeAndLog(t.rec, false); }catch(e){}
+    if(typeof window.jnLogMiss==='function') window.jnLogMiss(t.word,'Letter Trail');
+  }
+  if(!revSessionAwarded){ revSessionAwarded=true; questBump('game'); }
+  renderConnect();
+};
+window.startConnect=startConnect;
 
 function renderReview(){
   const area=$('#review-area');

@@ -7015,6 +7015,50 @@ document.documentElement.classList.add('home-on');</script>
   html body .view.fw-panel#v-stats .pc-notes .pg-note-txt{display:block;text-align:left}
   html body .view.fw-panel#v-stats .pc-notes .pg-note-txt b{display:block;font-size:13.5px;font-weight:600;color:var(--cz-ink)}
   html body .view.fw-panel#v-stats .pc-notes .pg-note-txt span{display:block;margin-top:2px;font-size:12px;line-height:1.5;color:var(--cz-soft)}
+
+  /* ---------------- Letter Trail: the connect board ---------------- */
+  .wc{padding:14px 14px 16px;border-radius:24px;background:var(--cz-glass-hi);box-shadow:var(--cz-rim),var(--cz-hair),var(--cz-lift)}
+  .wc-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .wc-prog{flex:1;display:flex;gap:4px}
+  .wc-prog i{flex:1;height:6px;border-radius:99px;background:rgba(94,122,72,.14);transition:background .3s}
+  .wc-top .num{font-size:13px;color:var(--cz-ink)}
+  .wc-hints{display:flex;flex-direction:column;gap:5px}
+  .wc-h{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:13px;cursor:pointer;text-align:left;
+    background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line);transition:background .25s}
+  .wc-dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--c)}
+  .wc-ht{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .wc-ht b{font-size:13px;font-weight:600;color:var(--cz-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wc-ht i{font-style:normal;font-size:11px;letter-spacing:.06em;color:var(--cz-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wc-hint{flex:none;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--cz-faint)}
+  .wc-ok{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;background:var(--c)}
+  .wc-h.found{background:color-mix(in srgb, var(--c) 12%, #fff)}
+  .wc-h.found .wc-ht i{color:var(--c);font-weight:700;letter-spacing:.02em}
+  .wc-word{height:30px;margin:10px 0 6px;text-align:center;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--cz-sage);transition:transform .2s}
+  .wc-word.yes{animation:wc-yes .5s ease}
+  .wc-word.nope{color:var(--cz-clay);animation:wc-shake .4s ease}
+  @keyframes wc-yes{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}
+  @keyframes wc-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+  .wc-board{position:relative;touch-action:none;-webkit-user-select:none;user-select:none}
+  .wc-grid{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:5px}
+  .wc-c{position:relative;z-index:1;aspect-ratio:1;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:min(5.2vw,20px);font-weight:700;color:var(--cz-ink);background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line),0 2px 4px rgba(60,72,44,.05);
+    transition:transform .12s ease, background .15s ease, color .15s ease}
+  .wc-c.on{transform:scale(1.1);color:#fff;background:var(--cz-sage);box-shadow:0 4px 10px rgba(94,122,72,.3)}
+  .wc-c.found{color:#fff;background:var(--c)}
+  .wc-c.pop{animation:wc-pop .45s cubic-bezier(.3,1.5,.4,1) both}
+  .wc-c.no{animation:wc-shake .35s ease;background:var(--cz-clay-bg);color:var(--cz-clay)}
+  .wc-c.hint{animation:wc-glow 1s ease-in-out 3;box-shadow:inset 0 0 0 2px var(--c)}
+  @keyframes wc-pop{0%{transform:scale(1)}45%{transform:scale(1.28)}100%{transform:scale(1)}}
+  @keyframes wc-glow{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+  .wc-lines{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible}
+  .wc-lines polyline{fill:none;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;opacity:.55}
+  .wc-lines polyline.live{stroke-width:9;opacity:.6}
+  .wc-lines polyline.done{opacity:.35}
+  .wc-lines polyline.shown{stroke-dasharray:2 9;opacity:.8}
+  .wc-acts{display:flex;gap:8px;margin-top:14px}
+  .wc-acts .btn{flex:1;height:44px;border-radius:15px;font-size:14px;font-weight:600}
+
+  html body .view.fw-panel#v-review .wc-acts .btn.ghost{color:var(--cz-sage);background:var(--cz-sage-bg);box-shadow:none}
 </style>
 </head>
 <body>
