@@ -68,15 +68,30 @@
   function topbar(cap) {
     return '<div class="oc-top"><span class="oc-cap">' + cap + '</span><button class="oc-x" aria-label="Close" onclick="ocClose()">×</button></div>';
   }
+  /* The three scenes as one journey ("the scenes are cut, nothing joins
+     them, nothing tells me what is happening"): a steps bar on each, and
+     each scene rises in rather than replacing the last in a blink. */
+  function steps(n) {
+    return '<div class="oc-steps">' + ['Hỏi cây', 'Gieo quẻ', 'Thông điệp'].map(function (t, i) {
+      return '<i class="' + (i + 1 < n ? 'done' : i + 1 === n ? 'on' : '') + '"><b>' + (i + 1) + '</b>' + t + '</i>';
+    }).join('<u></u>') + '</div>';
+  }
+  // shaking works only where a page may read motion without asking (not iOS, where a shake is "Undo Typing")
+  function canShake() { return !!window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function' && ('ontouchstart' in window); }
   window.ocOpen = function () {
     dom();
     S = { q: '', throws: [], busy: false };
     load().catch(function () {});
-    var h = topbar('The wisdom tree')
-      + '<div class="oc-ask">'
+    var h = topbar('The wisdom tree') + steps(1)
+      + '<div class="oc-ask oc-enter">'
       + '<div class="oc-mark">易</div>'
-      + '<h2 class="oc-h2">Gieo quẻ Kinh Dịch</h2>'
-      + '<p class="oc-lead">Lặng lại một chút, thở chậm, và nghĩ về điều bạn đang băn khoăn.<br/>Ba đồng xu, gieo sáu lần — mỗi lần là một hào, từ dưới lên.</p>'
+      + '<h2 class="oc-h2">Cây Thông Thái</h2>'
+      + '<p class="oc-lead">Cây trả lời bằng Kinh Dịch — một cuốn sách ba nghìn năm tuổi đọc tình thế qua sáu nét quẻ.</p>'
+      + '<ol class="oc-how">'
+      +   '<li><b>Hỏi</b>Nghĩ về điều bạn đang băn khoăn. Viết ra nếu muốn.</li>'
+      +   '<li><b>Gieo</b>Tung ba đồng xu sáu lần. Mỗi lần thành một hào, xếp từ dưới lên — sáu hào là một quẻ.</li>'
+      +   '<li><b>Nghe</b>Cây đọc quẻ và gửi bạn thông điệp cho câu hỏi.</li>'
+      + '</ol>'
       + '<textarea id="oc-q" class="oc-q" rows="2" placeholder="Điều bạn muốn hỏi (không bắt buộc)…"></textarea>'
       + '<button class="oc-go" onclick="ocStart()">Bắt đầu gieo</button>'
       + histLine() + '</div>';
@@ -94,7 +109,7 @@
     var q = $('oc-q'); S.q = q ? q.value.trim() : '';
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     renderCast();
-    motionOn();
+    if (canShake()) motionOn();
   };
 
   /* ---------------- casting: the whole screen ---------------- */
@@ -113,19 +128,44 @@
     return h + '</div>';
   }
   function renderCast() {
-    var n = S.throws.length, last = S.throws[n - 1];
-    var h = topbar('Lần gieo <b class="num">' + Math.min(6, n + 1) + '</b> / 6')
-      + '<div class="oc-stage" onclick="ocThrow()">'
+    var n = S.throws.length, last = S.throws[n - 1], full = n >= 6;
+    var tip = canShake() ? 'Chạm vào đồng xu, hoặc lắc nhẹ điện thoại' : 'Chạm vào đồng xu để tung';
+    var h = topbar(full ? 'Quẻ đã thành' : 'Lần gieo <b class="num">' + (n + 1) + '</b> / 6') + steps(2)
+      + '<div class="oc-stage' + (n ? '' : ' oc-enter') + '"' + (full ? '' : ' onclick="ocThrow()"') + '>'
       + (S.q ? '<p class="oc-qq">“' + esc(S.q) + '”</p>' : '<p class="oc-qq">Giữ câu hỏi trong lòng…</p>')
-      + '<div class="oc-coins">' + coinHTML(0) + coinHTML(1) + coinHTML(2) + '</div>'
-      + '<div class="oc-say" id="oc-say">' + (last ? 'Hào ' + POS_ZH[n - 1] + ' · <b class="num">' + last.v + '</b> · ' + LINE_VI[last.v] : 'Chạm vào đồng xu, hoặc lắc nhẹ điện thoại') + '</div>'
+      + '<div class="oc-coins3" id="oc-c3"></div>'
+      /* Both faces of the user's coin are the same gold -- measured, the
+         texture under the +z and -z faces averages (227,194,75) and
+         (226,193,75) -- so which side landed up is written under each coin. */
+      + '<div class="oc-faces">' + (last ? last.coins.map(function (c) { return '<i class="' + (c === 3 ? 'z' : 'f') + '"><b>' + (c === 3 ? '正' : '反') + '</b>' + c + '</i>'; }).join('') : '') + '</div>'
+      + '<div class="oc-say" id="oc-say">' + (last ? 'Hào ' + POS_ZH[n - 1] + ' · <b class="num">' + last.v + '</b> · ' + LINE_VI[last.v] : tip) + '</div>'
+      + '<p class="oc-why">' + (full ? 'Sáu hào đã đủ — đây là quẻ của bạn.' : 'Ba mặt <b>正</b> và <b>反</b> cộng lại thành một hào: 6, 7, 8 hoặc 9. Hào xếp từ dưới lên.') + '</p>'
       + linesHTML(S.throws, false, true)
       + '</div>'
-      + '<button class="oc-go" id="oc-shake" onclick="ocThrow()">' + (n ? 'Gieo tiếp' : 'Tung đồng xu') + '</button>';
+      + (full ? '<div class="oc-made" id="oc-made"></div>'
+              : '<button class="oc-go" id="oc-shake" onclick="ocThrow()">' + (n ? 'Gieo hào ' + (n + 1) : 'Tung đồng xu') + '</button>');
     $('oc-in').innerHTML = h;
     $('oc').className = 'oc cast';
-    if (last) last.coins.forEach(function (c, i) { setCoin(i, c, false); });
+    var host = $('oc-c3');
+    if (coins3d(host)) { if (last) c3face(last.coins); }
+    else {
+      host.className = 'oc-coins'; host.innerHTML = coinHTML(0) + coinHTML(1) + coinHTML(2);
+      if (last) last.coins.forEach(function (c, i) { setCoin(i, c, false); });
+    }
+    if (full) made();
   }
+  /* The hexagram whole, before the reading: its character, its name, and
+     one step on -- the tree's message is a choice, not a cut. */
+  function made() {
+    load().then(function () {
+      var R = reading(), p = R.prim, box = $('oc-made'); if (!box) return;
+      box.innerHTML = '<b class="oc-mglyph">' + esc(p.chinese) + '</b><span>' + esc(p.name.vi) + ' · ' + esc(p.name.en) + '</span>'
+        + (R.rel ? '<small>' + R.chg.length + ' hào động — quẻ sẽ chuyển sang ' + esc(R.rel.name.vi) + '</small>' : '<small>Không hào nào động — quẻ đứng yên</small>')
+        + '<button class="oc-go" onclick="ocReveal()">Nghe cây thông thái nói</button>';
+      box.classList.add('on');
+    });
+  }
+  window.ocReveal = function () { c3stop(); result(); };
   var coinDeg = [0, 0, 0];
   function setCoin(i, v, spin) {
     var el = $('oc-c' + i); if (!el) return;
@@ -143,7 +183,7 @@
     var cs = [coin(), coin(), coin()], v = cs[0] + cs[1] + cs[2];
     var btn = $('oc-shake'); if (btn) btn.disabled = true;
     if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {}
-    cs.forEach(function (c, i) { setCoin(i, c, true); });
+    if (!c3toss(cs)) cs.forEach(function (c, i) { setCoin(i, c, true); });
     $('oc').classList.add('tossing');
     setTimeout(function () {
       clink();
@@ -152,8 +192,8 @@
     setTimeout(function () {
       S.throws.push({ coins: cs, v: v });
       S.busy = false;
-      if (S.throws.length < 6) renderCast();
-      else { renderCast(); motionOff(); setTimeout(result, 1000); }
+      if (S.throws.length >= 6) motionOff();
+      renderCast();
     }, 1650);
   };
   /* A soft clink from two short sine partials -- no file to download. */
@@ -171,6 +211,117 @@
       });
     } catch (e) {}
   }
+  /* ---------------- the coins in 3D ----------------
+     The user's coin (assets/glb/coin.glb: one mesh, one texture atlas, its
+     two faces on the model's +z and -z) tossed on a small stage of its own:
+     a second, small WebGL canvas, made once and kept, only drawing while the
+     casting screen is up. The island under the oracle is parked meanwhile
+     (overlayOpen() sees oc-on), so the GPU is free. +z up is 正 (3), -z up
+     is 反 (2): each toss spins a coin end over end a few whole turns and
+     lands it on the face the throw came out as -- the coins show the line
+     they make. Without the world's three.js (fwWorld.kit) the flat CSS
+     coins are still there. */
+  var C3 = null;
+  function coins3d(host) {
+    var K = window.fwWorld && window.fwWorld.kit ? window.fwWorld.kit() : null;
+    if (!K || !host) return null;
+    var T = K.THREE;
+    if (!C3) {
+      var cv = document.createElement('canvas'); cv.className = 'oc-gl';
+      var r;
+      try { r = new T.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); } catch (e) { return null; }
+      r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      if ('outputEncoding' in r) r.outputEncoding = T.sRGBEncoding;
+      var sc = new T.Scene();
+      sc.add(new T.HemisphereLight(0xFFF1D6, 0x3A2412, 1.0));
+      var dl = new T.DirectionalLight(0xFFE6B8, 1.5); dl.position.set(2.5, 6, 3.5); sc.add(dl);
+      // a soft pool of warm light on the dark table the coins fall on
+      var pc = document.createElement('canvas'); pc.width = pc.height = 128;
+      var pg = pc.getContext('2d'), grd = pg.createRadialGradient(64, 64, 4, 64, 64, 64);
+      grd.addColorStop(0, 'rgba(255,214,140,.38)'); grd.addColorStop(1, 'rgba(255,214,140,0)');
+      pg.fillStyle = grd; pg.fillRect(0, 0, 128, 128);
+      var pool = new T.Mesh(new T.PlaneGeometry(7, 4.2), new T.MeshBasicMaterial({ map: new T.CanvasTexture(pc), transparent: true, depthWrite: false }));
+      pool.rotation.x = -Math.PI / 2; sc.add(pool);
+      var cam = new T.PerspectiveCamera(34, 2, 0.1, 50); cam.position.set(0, 5.4, 4.2); cam.lookAt(0, 0.2, 0.15);
+      C3 = { T: T, r: r, sc: sc, cam: cam, cv: cv, coins: [], raf: 0, toss: null, ready: false, want: null };
+      K.loadProp('coin.glb').then(function (g) {
+        var src = g.scene, box = new T.Box3().setFromObject(src), s = box.getSize(new T.Vector3()), c = box.getCenter(new T.Vector3());
+        var d = Math.max(s.x, s.y, s.z) || 1;
+        for (var i = 0; i < 3; i++) {
+          var inner = src.clone(true); inner.position.set(-c.x, -c.y, -c.z);
+          var flip = new T.Group(); flip.add(inner); flip.scale.setScalar(1.18 / d);
+          flip.rotation.x = -Math.PI / 2;   // +z up: 正
+          var hold = new T.Group(); hold.add(flip); hold.position.set((i - 1) * 1.5, 0.07, 0);
+          sc.add(hold);
+          C3.coins.push({ hold: hold, flip: flip, x0: (i - 1) * 1.5 });
+        }
+        C3.ready = true;
+        if (C3.want) { var w = C3.want; C3.want = null; c3face(w); }
+      }).catch(function () {});
+    }
+    host.appendChild(C3.cv);
+    c3size(host);
+    c3loop();
+    return C3;
+  }
+  function c3size(host) {
+    var w = host.clientWidth || 320, h = host.clientHeight || 220;
+    C3.r.setSize(w, h, false); C3.cv.style.width = w + 'px'; C3.cv.style.height = h + 'px';
+    C3.cam.aspect = w / h; C3.cam.fov = w / h < 1.3 ? 44 : 34; C3.cam.updateProjectionMatrix();
+  }
+  function c3loop() {
+    cancelAnimationFrame(C3.raf);
+    var last = performance.now();
+    var step = function (now) {
+      if (!C3 || !C3.cv.isConnected) return;
+      var dt = Math.min(0.05, (now - last) / 1000); last = now;
+      var tz = C3.toss;
+      if (tz) {
+        tz.t += dt;
+        var done = true;
+        C3.coins.forEach(function (c, i) {
+          var D = tz.dur + i * 0.12, k = Math.min(1, tz.t / D);
+          if (k < 1) done = false;
+          var e = 1 - Math.pow(1 - k, 3);
+          c.flip.rotation.x = tz.from[i] + (tz.to[i] - tz.from[i]) * e;
+          // high enough to read as a toss, low enough to stay in the frame
+          var y = Math.sin(Math.PI * Math.min(1, k * 1.08)) * (1.25 + i * 0.15);
+          // a small bounce once it is down
+          if (k >= 1) { var b = tz.t - D; y = b < 0.3 ? Math.sin(b / 0.3 * Math.PI) * 0.12 * (1 - b / 0.3) : 0; if (b < 0.3) done = false; }
+          c.hold.position.y = 0.07 + Math.max(0, y);
+          c.hold.position.x = c.x0 + Math.sin(Math.PI * k) * tz.dx[i];
+          c.hold.rotation.y = tz.ry[i] * e;
+        });
+        if (done) { C3.toss = null; C3.coins.forEach(function (c) { c.flip.rotation.x = ((c.flip.rotation.x % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); }); }
+      }
+      C3.r.render(C3.sc, C3.cam);
+      C3.raf = requestAnimationFrame(step);
+    };
+    C3.raf = requestAnimationFrame(step);
+  }
+  function faceAngle(v) { return v === 3 ? 3 * Math.PI / 2 : Math.PI / 2; }   // -pi/2 (= 3pi/2) is +z up
+  function c3face(vals) {
+    if (!C3) return;
+    if (!C3.ready) { C3.want = vals; return; }
+    C3.coins.forEach(function (c, i) { c.flip.rotation.x = faceAngle(vals[i]); });
+  }
+  function c3toss(vals) {
+    if (!C3 || !C3.ready) return false;
+    var from = [], to = [], dx = [], ry = [];
+    C3.coins.forEach(function (c, i) {
+      var a = c.flip.rotation.x;
+      from.push(a);
+      // whole turns on top of the face it must land on
+      var base = faceAngle(vals[i]), turns = 3 + i;
+      var t = base + Math.ceil((a - base) / (2 * Math.PI) + 0.01) * 2 * Math.PI + turns * 2 * Math.PI;
+      to.push(t);
+      dx.push((Math.random() - 0.5) * 0.5);
+      ry.push((Math.random() - 0.5) * 1.2);
+    });
+    C3.toss = { t: 0, dur: 1.05, from: from, to: to, dx: dx, ry: ry };
+    return true;
+  }
+  function c3stop() { if (C3) cancelAnimationFrame(C3.raf); }
   // shaking the phone throws the coins (where the browser lets a page read motion without asking)
   var motionFn = null, lastShake = 0;
   function motionOn() {
@@ -240,7 +391,7 @@
       var R = reading(); S.R = R;
       var p = R.prim, ip = p.interpretation;
       var key = window.getKey && window.getKey();
-      var h = topbar('Kết quả gieo quẻ')
+      var h = topbar('Kết quả gieo quẻ') + steps(3)
         + (S.q ? '<p class="oc-qline">“' + esc(S.q) + '”</p>' : '')
         // the answer first: the AI's, or the app's own line until it comes
         + '<div class="oc-answer" id="oc-answer">' + (key ? '<div class="oc-think"><span class="oc-dots"><i></i><i></i><i></i></span>Cây thông thái đang luận quẻ…</div>'
@@ -278,6 +429,7 @@
         + '<div class="oc-src">Nguyên văn: Chu Dịch (Wikisource) · Bản dịch: James Legge, 1882' + (p.legge ? '' : ' (quẻ này chưa có bản Legge trong nguồn mở)') + '</div>';
       $('oc-in').innerHTML = h;
       $('oc').className = 'oc done';
+      var gr = $('oc-in').querySelector('.oc-answer'); if (gr) gr.classList.add('oc-enter');
       $('oc-in').scrollTop = 0;
       save(R);
       if (key) ocAsk();
@@ -356,7 +508,7 @@
     }
   };
   window.ocClose = function () {
-    motionOff();
+    motionOff(); c3stop();
     document.documentElement.classList.remove('oc-on');
     S = null;
   };

@@ -5320,7 +5320,12 @@ export async function bootFocciWorld(root, opts) {
          (oracle.js): three coins, six throws. The blossom tree at home
          still answers with a line of wisdom. */
       if (character.position.y > GROUND_CEIL && window.ocOpen) {
-        setTimeout(() => root.dispatchEvent(new CustomEvent('focci-oracle', { bubbles: true })), 450);
+        /* A moment with the tree before the reading opens: its glow rises,
+           Focci turns to it and it says what it does -- the oracle used to
+           appear 0.45s after the tap with nothing to say why. */
+        root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction',
+          message: 'The wisdom tree’s leaves begin to glow.\nAsk it something, and it will answer with three coins.' } }));
+        setTimeout(() => root.dispatchEvent(new CustomEvent('focci-oracle', { bubbles: true })), 1900);
         return;
       }
       const q = randomQuote();
@@ -6413,7 +6418,9 @@ export async function bootFocciWorld(root, opts) {
     else if (kind === 'gift') spawnPickupBurst(room, p.x, top, p.z, 0xFFD36A);
   }
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
-    storyRadio, storyPick, storyAnchor, storyOrbit, appleAnchor, openGiftBox: (id) => openGiftBox(rooms[currentRoomKey], id),
+    storyRadio, storyPick, storyAnchor, storyOrbit,
+    // three.js and the model cache for the other scripts (oracle.js tosses the user's coin with it)
+    kit: () => ({ THREE, loadProp }), appleAnchor, openGiftBox: (id) => openGiftBox(rooms[currentRoomKey], id),
     treeTapAt: (x, z) => treeTap(rooms[currentRoomKey], { x, z }),
     _warmTrees: () => { const r = rooms[currentRoomKey]; if (r && r.collidables && r.collidables[0]) treeIndex(r); },
     focciDo, focciStop, focciAnchor, strum, jogStats: () => (jog ? { t: jog.t, dist: jog.dist } : null),
