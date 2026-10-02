@@ -3661,7 +3661,7 @@ export async function bootFocciWorld(root, opts) {
        rescue board while it rendered five portraits -- the lag on "Sail
        home alone". */
     { const c = document.documentElement.classList;
-      if (c.contains('rb-on') || c.contains('xp-on') || c.contains('jn-on') || c.contains('pt-gift-on')) return true; }
+      if (c.contains('rb-on') || c.contains('xp-on') || c.contains('jn-on') || c.contains('pt-gift-on') || c.contains('oc-on')) return true; }
     return !!document.querySelector('.view.fw-panel.active'); // Games/Saved/Progress/Settings
   }
   function releaseGesture() {
@@ -4141,6 +4141,13 @@ export async function bootFocciWorld(root, opts) {
       focusOnFocci(7000);
       root.dispatchEvent(new CustomEvent('focci-wisdom-focus', { detail: { on: true } }));
       setTimeout(() => root.dispatchEvent(new CustomEvent('focci-wisdom-focus', { detail: { on: false } })), 7000);
+      /* On Zen Island the gate and the great tree are the I Ching
+         (oracle.js): three coins, six throws. The blossom tree at home
+         still answers with a line of wisdom. */
+      if (character.position.y > GROUND_CEIL && window.ocOpen) {
+        setTimeout(() => root.dispatchEvent(new CustomEvent('focci-oracle', { bubbles: true })), 450);
+        return;
+      }
       const q = randomQuote();
       root.dispatchEvent(new CustomEvent('focci-quote', { detail: q ? { ...q, kind: 'wisdom' } : null }));
     }

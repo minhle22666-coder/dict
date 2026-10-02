@@ -7188,6 +7188,96 @@ document.documentElement.classList.add('home-on');</script>
   .pq2-acts{display:flex;gap:8px}
   .pq2-acts .btn{flex:1;height:42px;border:0;border-radius:14px;cursor:pointer;font-size:14px;font-weight:600;color:#fff;background:var(--cz-sage)}
   .pq2-acts .btn.ghost{color:var(--cz-sage);background:var(--cz-sage-bg)}
+
+  /* ---------------- the wisdom tree: I Ching (oracle.js) ---------------- */
+  .oc{position:fixed;inset:0;z-index:92;display:none;align-items:flex-end;justify-content:center;background:rgba(36,40,28,.42)}
+  html.oc-on .oc{display:flex}
+  .oc-in{box-sizing:border-box;width:min(460px,100vw);max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+    padding:16px 18px calc(env(safe-area-inset-bottom,0px) + 18px);border-radius:28px 28px 0 0;
+    background:linear-gradient(180deg,#FBF8EE,#F4EFE0);box-shadow:0 -12px 40px rgba(36,40,28,.3);animation:oc-up .34s cubic-bezier(.3,1.1,.4,1)}
+  @keyframes oc-up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+  .oc-h{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+  .oc-h > div{flex:1;min-width:0}
+  .oc-title{display:block;font-size:19px;font-weight:700;color:var(--cz-ink)}
+  .oc-intro{margin:0 0 12px;font-size:13.5px;line-height:1.55;color:var(--cz-ink-2)}
+  .oc-q{display:block;box-sizing:border-box;width:100%;padding:11px 13px;border:0;border-radius:15px;resize:none;font-size:15px;line-height:1.4;
+    color:var(--cz-ink);background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line);outline:none}
+  .oc-q:focus{box-shadow:inset 0 0 0 2px #D9A15A}
+  .oc-btn{display:block;width:100%;height:46px;margin-top:12px;border:0;border-radius:15px;cursor:pointer;font-size:15px;font-weight:700;color:#FFF8EC;
+    background:linear-gradient(180deg,#C2533A,#A23D28);box-shadow:0 6px 16px rgba(162,61,40,.3)}
+  .oc-btn:disabled{opacity:.55}
+  .oc-btn.ghost{color:#A23D28;background:rgba(194,83,58,.1);box-shadow:none}
+  .oc-btn.soft{color:#7A4B12;background:linear-gradient(180deg,#F5E2B4,#E9C985);box-shadow:0 4px 12px rgba(201,154,62,.28)}
+  .oc-last{margin-top:12px;font-size:11.5px;text-align:center;color:var(--cz-faint)}
+  .oc-last b{font-weight:600;color:var(--cz-soft)}
+  .oc-cast{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 10px}
+  .oc-coins{display:flex;gap:10px}
+  .oc-coin{position:relative;width:62px;height:62px;perspective:420px}
+  .oc-coin.toss{animation:oc-toss 1s cubic-bezier(.3,.6,.4,1)}
+  @keyframes oc-toss{0%{transform:translateY(0)}35%{transform:translateY(-46px)}70%{transform:translateY(0)}82%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+  .oc-coin b{position:absolute;inset:0;transform-style:preserve-3d}
+  .oc-coin i{position:absolute;inset:0;border-radius:50%;-webkit-backface-visibility:hidden;backface-visibility:hidden;
+    background:radial-gradient(circle at 34% 28%,#FBE7A6,#D7A84A 55%,#9C6E24);box-shadow:inset 0 0 0 3px rgba(110,74,20,.5),inset 0 0 0 7px rgba(251,231,166,.45),0 4px 10px rgba(80,56,16,.3)}
+  .oc-coin i::after{content:'';position:absolute;left:50%;top:50%;width:15px;height:15px;margin:-7.5px 0 0 -7.5px;background:#F7F2E4;box-shadow:inset 0 0 0 2px rgba(110,74,20,.55)}
+  .oc-coin i.r{transform:rotateX(180deg);background:radial-gradient(circle at 34% 28%,#F3DE9C,#C99A3E 55%,#8A6020)}
+  .oc-coin i.r::before{content:'';position:absolute;inset:12px;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(110,74,20,.35)}
+  .oc-coin s{position:absolute;text-decoration:none;font-size:12px;font-weight:700;line-height:1;color:rgba(92,58,14,.85);font-family:'Songti SC','Noto Serif SC',serif}
+  .oc-coin s:nth-child(1){left:50%;top:6px;transform:translateX(-50%)}
+  .oc-coin s:nth-child(2){left:50%;bottom:6px;transform:translateX(-50%)}
+  .oc-coin s:nth-child(3){right:6px;top:50%;transform:translateY(-50%)}
+  .oc-coin s:nth-child(4){left:6px;top:50%;transform:translateY(-50%)}
+  .oc-coin em{position:absolute;left:0;right:0;bottom:-19px;text-align:center;font-style:normal;font-size:12px;color:var(--cz-soft)}
+  .oc-stack{display:flex;flex-direction:column;gap:5px;width:84px;flex:none}
+  .oc-stack.big{width:112px;gap:7px}
+  .oc-l{position:relative;flex:none;display:flex;gap:8px;height:9px;min-height:0}
+  .oc-stack.big .oc-l{height:12px;gap:12px}
+  .oc-l i{flex:1;border-radius:3px;background:#3A3226}
+  .oc-l.yang i:nth-child(2){display:none}
+  .oc-l.oc-e i{background:none;box-shadow:inset 0 0 0 1.5px rgba(58,50,38,.16)}
+  .oc-l.oc-e i:nth-child(2){display:none}
+  .oc-l.ch i{background:#B8432F}
+  .oc-l u{position:absolute;right:-18px;top:50%;transform:translateY(-50%);text-decoration:none;font-size:12px;font-weight:700;color:#B8432F}
+  .oc-l.new{animation:oc-line .5s cubic-bezier(.3,1.4,.4,1)}
+  @keyframes oc-line{from{transform:scaleX(.2);opacity:0}to{transform:none;opacity:1}}
+  .oc-status{min-height:20px;margin:18px 0 0;text-align:center;font-size:13.5px;color:var(--cz-ink-2)}
+  .oc-status b{font-size:16px;font-weight:600;color:#A23D28}
+  .oc-hint{margin-top:8px;text-align:center;font-size:11px;color:var(--cz-faint)}
+  .oc-res{display:flex;align-items:center;gap:20px;margin:4px 0 12px;padding:14px 16px;border-radius:20px;background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line)}
+  .oc-res-r{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+  .oc-name{display:flex;align-items:center;gap:10px}
+  .oc-glyph{flex:none;font-size:34px;line-height:1;color:#3A3226}
+  .oc-name b{display:block;font-size:20px;font-weight:700;color:var(--cz-ink);font-family:'Songti SC','Noto Serif SC',serif}
+  .oc-py{font-family:var(--cz-font);font-size:13px;font-weight:500;color:var(--cz-soft)}
+  .oc-name span{display:block;font-size:12.5px;color:var(--cz-ink-2)}
+  .oc-name small{display:block;margin-top:2px;font-size:10.5px;color:var(--cz-faint)}
+  .oc-to{padding-top:9px;border-top:1px dashed var(--cz-line)}
+  .oc-to > span{display:block;margin-bottom:4px;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#B8432F}
+  .oc-to .oc-glyph{font-size:24px}.oc-to .oc-name b{font-size:16px}
+  .oc-qline{margin:-4px 0 12px;font-size:14px;font-style:italic;line-height:1.45;color:var(--cz-ink-2)}
+  .oc-theme{margin:2px 0 10px;text-align:center;font-size:15px;font-style:italic;color:#7A4B12}
+  .oc-wise{display:flex;flex-direction:column;gap:9px}
+  .oc-w{display:flex;gap:11px;align-items:flex-start}
+  .oc-w > i{flex:none;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:14px;
+    color:#FFF8EC;background:#A23D28;font-family:'Songti SC','Noto Serif SC',serif}
+  .oc-w p{margin:0 0 3px;font-size:13.5px;line-height:1.5;color:var(--cz-ink-2)}
+  .oc-in p.zh{font-size:15px;letter-spacing:.04em;color:var(--cz-ink);font-family:'Songti SC','Noto Serif SC',serif}
+  .oc-in p.en{font-size:12.5px;font-style:italic;color:var(--cz-soft)}
+  .oc-focus{margin-top:14px;padding:12px 14px;border-radius:18px;background:rgba(194,83,58,.07)}
+  .oc-rule{margin:4px 0 8px;font-size:12px;color:#8C3A26}
+  .oc-fi{margin-top:8px}
+  .oc-fi b{display:block;font-size:12px;font-weight:700;color:var(--cz-ink)}
+  .oc-fi p{margin:2px 0 0;font-size:13px;line-height:1.5}
+  .oc-fi:not(.lead){opacity:.8}
+  .oc-ai{margin-top:12px}
+  .oc-think{display:flex;align-items:center;justify-content:center;gap:9px;padding:14px;font-size:13px;color:var(--cz-soft)}
+  .oc-read{padding:13px 15px;border-radius:18px;background:#fff;box-shadow:inset 0 0 0 1px rgba(201,154,62,.35)}
+  .oc-read p{margin:0 0 8px;font-size:14px;line-height:1.6;color:var(--cz-ink)}
+  .oc-read p:last-child{margin:0}
+  .oc-nokey{padding:10px 12px;border-radius:14px;font-size:12.5px;color:var(--cz-soft);background:var(--cz-sage-bg)}
+  .oc-remind{margin:16px 4px 4px;font-size:13px;line-height:1.6;text-align:center;font-style:italic;color:#6B5A3A}
+  .oc-acts{display:flex;gap:8px}
+  .oc-acts .oc-btn{flex:1}
+  .oc-src{margin-top:10px;font-size:10px;text-align:center;color:var(--cz-faint)}
 </style>
 </head>
 <body>
@@ -8013,6 +8103,7 @@ document.documentElement.classList.add('home-on');</script>
 <script src="./journal.js"></script>
 <script src="./app.js"></script>
 <script src="./pets.js"></script>
+<script src="./oracle.js"></script>
 <script src="./story.js"></script>
 <script src="./dict-system.js"></script>
 
@@ -8939,6 +9030,7 @@ document.documentElement.classList.add('home-on');</script>
     const H = document.documentElement, on = (c) => H.classList.contains(c);
     const active = (id) => { const v = document.getElementById(id); return !!(v && v.classList.contains('active')); };
     if (on('ask-on') && window.fwAnswer) { fwAnswer(false); return true; }
+    if (window.oracleBack && window.oracleBack()) return true;
     if (window.petBack && window.petBack()) return true;
     if (on('rz-on') && window.rzClose) { rzClose(); return true; }
     const sheet = document.getElementById('word-sheet');
