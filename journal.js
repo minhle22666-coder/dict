@@ -221,7 +221,7 @@
           return row(m.w, m.vi, '<span class="jn-tag">' + esc(m.game || 'game') + (m.n > 1 ? ' <span class="num">×' + m.n + '</span>' : '') + '</span>', true);
         }).join('');
       body = (d.gifts || []).map(function (g) {
-        return '<div class="jn-r gift"><button class="jn-go" onclick="petShowGift(\'' + esc(g.id) + '\')"><b>\u{1F381} ' + esc(g.title) + '</b>'
+        return '<div class="jn-r gift"><button class="jn-go" onclick="petShowGift(\'' + esc(g.id) + '\')"><b><img class="jn-gift-ic" src="./assets/icons/gift.png" alt=""/>' + esc(g.title) + '</b>'
           + '<i>a gift from ' + esc(g.name) + '</i></button></div>';
       }).join('') + body;
       var n = (d.words || []).length;

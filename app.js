@@ -4020,7 +4020,7 @@ function renderGiftSaved(box, head){
   }
   box.innerHTML='<div class="sv-group">'+gifts.map(g=>
     '<div class="sv-row gift-row" onclick="petShowGift(\''+g.id+'\')">'
-    +'<span class="gift-ic">\u{1F381}</span>'
+    +'<span class="gift-ic"><img src="./assets/icons/gift.png" alt=""/></span>'
     +'<div class="sv-mid"><div class="sv-l1"><span class="sv-w">'+esc(g.title)+'</span></div>'
     +'<span class="sv-e">From '+esc(g.name)+' \u00b7 '+esc(g.masteryLabel||'')+' \u00b7 <span class="num">'+(g.items||[]).length+'</span> phrases</span></div>'
     +'<button class="sv-star gift-play" onclick="event.stopPropagation();petListenGift(\''+g.id+'\')" aria-label="Listen">\u25B6</button>'

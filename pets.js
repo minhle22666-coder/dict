@@ -367,7 +367,7 @@
         + '<span class="num">' + Math.min(b, hi) + '/' + hi + '</span></div>';
       if (bondReached(r) && !r.giftWaiting) h += '<div class="pr-note">\u{1F319} After a long sleep, ' + esc(r.name) + ' will bring you a gift' + (hp < 50 ? ' (cheer them up first)' : '') + '</div>';
     }
-    if (giftReady(r)) h += '<button class="pt-giftbtn pr-gift" onclick="petOpenGift(\'' + r.id + '\')"><span>\u{1F381}</span>A gift for you</button>';
+    if (giftReady(r)) h += '<button class="pt-giftbtn pr-gift" onclick="petGiftTap(\'' + r.id + '\')"><img src="./assets/icons/gift.png" alt=""/>A gift for you</button>';
     var line = moodLine(r, said);
     if (line) h += '<div class="pr-say">' + esc(line) + '</div>';
     $('pr-stat').innerHTML = h;
@@ -902,44 +902,62 @@
   /* ---------------- the gift reader ---------------- */
   function regChip(x) { return x ? '<span class="pt-reg ' + esc(x) + '">' + esc(x) + '</span>' : ''; }
   function giftHtml(g) {
-    var h = '<div class="pt-g-h"><div><span class="cz-cap">A gift from ' + esc(g.name) + ' · ' + esc(g.masteryLabel || '') + '</span>'
-      + '<b class="pt-g-title">' + esc(g.title) + '</b></div><button class="pt-x" aria-label="Close" onclick="petCloseGift()">×</button></div>';
-    if (g.intro) h += '<p class="pt-g-intro">' + esc(g.intro) + '</p>';
-    h += '<button class="pt-listen" onclick="petListenGift(\'' + g.id + '\')"><span>▶</span>Listen to all of them in real clips</button>';
-    h += '<ol class="pt-items">' + (g.items || []).map(function (it, i) {
-      return '<li><div class="pt-it-h"><b>' + esc(it.phrase) + '</b>' + regChip(it.register)
-        + '<button class="pt-play" aria-label="Listen" onclick="petListenGift(\'' + g.id + '\',' + i + ')">▶</button></div>'
-        + (it.vi ? '<div class="pt-it-vi">' + esc(it.vi) + '</div>' : '')
-        + (it.example ? '<div class="pt-it-ex">“' + esc(it.example) + '”' + (it.example_vi ? '<span>' + esc(it.example_vi) + '</span>' : '') + '</div>' : '')
-        + (it.note ? '<div class="pt-it-note">' + esc(it.note) + '</div>' : '') + '</li>';
-    }).join('') + '</ol>';
-    if (g.tip) h += '<div class="pt-g-tip"><b>Use it today</b>' + esc(g.tip) + '</div>';
-    if (g.task) h += '<div class="pt-g-task"><b>Try this</b>' + esc(g.task) + '</div>';
-    h += '<div class="pt-g-foot">Kept in Saved › Gifts and in today’s Journal</div>';
+    /* Redrawn: the user found the old reader plain. A hero with the gift
+       icon, then the five expressions as cards you swipe through one at a
+       time, each with its own clip; the tip and the task after. */
+    var items = g.items || [];
+    var h = '<div class="gf">'
+      + '<div class="gf-hero"><img class="gf-ic" src="./assets/icons/gift.png" alt=""/><div class="gf-ht"><span>A gift from ' + esc(g.name) + '</span>'
+      + '<b>' + esc(g.title) + '</b><small>' + esc(g.masteryLabel || '') + ' \u00b7 <i class="num">' + items.length + '</i> expressions</small></div>'
+      + '<button class="pt-x" aria-label="Close" onclick="petCloseGift()">\u00d7</button></div>';
+    if (g.intro) h += '<p class="gf-intro">' + esc(g.intro) + '</p>';
+    h += '<div class="gf-track" id="gf-track">' + items.map(function (it, i) {
+      return '<div class="gf-card"><div class="gf-n num">' + (i + 1) + ' / ' + items.length + '</div>'
+        + '<div class="gf-ph">' + esc(it.phrase) + '</div>' + regChip(it.register)
+        + (it.vi ? '<div class="gf-vi">' + esc(it.vi) + '</div>' : '')
+        + (it.example ? '<div class="gf-ex">\u201c' + esc(it.example) + '\u201d' + (it.example_vi ? '<span>' + esc(it.example_vi) + '</span>' : '') + '</div>' : '')
+        + (it.note ? '<div class="gf-note">' + esc(it.note) + '</div>' : '')
+        + '<button class="gf-play" onclick="petListenGift(\'' + g.id + '\',' + i + ')"><span>\u25B6</span>Hear it in real clips</button></div>';
+    }).join('') + '</div>';
+    h += '<div class="gf-dots" id="gf-dots">' + items.map(function (_, i) { return '<i' + (i ? '' : ' class="on"') + '></i>'; }).join('') + '</div>';
+    h += '<button class="gf-all" onclick="petListenGift(\'' + g.id + '\')"><span>\u25B6</span>Listen to all of them</button>';
+    if (g.tip || g.task) h += '<div class="gf-do">' + (g.tip ? '<div><b>Use it today</b>' + esc(g.tip) + '</div>' : '') + (g.task ? '<div><b>Try this</b>' + esc(g.task) + '</div>' : '') + '</div>';
+    h += '<div class="pt-g-foot">Kept in Saved \u203A Gifts and in today\u2019s Journal</div></div>';
     return h;
+  }
+  function gfDots() {
+    var t = $('gf-track'), d = $('gf-dots'); if (!t || !d) return;
+    t.addEventListener('scroll', function () {
+      var i = Math.round(t.scrollLeft / Math.max(1, t.clientWidth * 0.86));
+      Array.prototype.forEach.call(d.children, function (x, k) { x.classList.toggle('on', k === i); });
+    }, { passive: true });
   }
   function openGiftSheet(html) {
     ensureDom();
     $('pt-gift-in').innerHTML = html;
     document.documentElement.classList.add('pt-gift-on');
+    gfDots();
   }
   window.petCloseGift = function () { document.documentElement.classList.remove('pt-gift-on'); };
   window.petOpenGift = async function (id) {
     petHide();
     var r = find(id); if (!r) return;
     if (!giftReady(r)) { var last = giftLoad().find(function (g) { return g.rid === id; }); if (last) openGiftSheet(giftHtml(last)); return; }
-    openGiftSheet('<div class="pt-g-wait"><div class="pt-box">\u{1F381}</div><b>' + esc(r.name) + ' is wrapping something…</b><span>A little lesson in ' + esc(masteryOf(r).label.toLowerCase()) + '</span></div>');
+    openGiftSheet('<div class="pt-g-wait"><img class="pt-box gf-wait" src="./assets/icons/gift.png" alt=""/><b>' + esc(r.name) + ' is wrapping something…</b><span>A little lesson in ' + esc(masteryOf(r).label.toLowerCase()) + '</span></div>');
     fx(id, 'gift');
     try {
       var g = await makeGift(r);
       openGiftSheet(giftHtml(g));
       if (window.fwToast) window.fwToast('New gift from ' + r.name + ' — kept in Saved');
     } catch (e) {
-      openGiftSheet('<div class="pt-g-wait"><div class="pt-box">\u{1F381}</div><b>The gift is still wrapped</b><span>'
+      openGiftSheet('<div class="pt-g-wait"><img class="pt-box" src="./assets/icons/gift.png" alt=""/><b>The gift is still wrapped</b><span>'
         + (e.message === 'NO_KEY' ? 'Add a Gemini key in Settings and it opens.' : 'It could not be opened just now.') + '</span>'
         + '<button class="btn" onclick="petOpenGift(\'' + id + '\')">Try again</button></div>');
     }
   };
+  // the box by the animal opens first (world.js openGiftBox), then the card
+  window.petGiftTap = function (id) { petHide(true); if (!(W() && W().openGiftBox && W().openGiftBox(id))) petOpenGift(id); };
+  document.addEventListener('focci-gift-open', function (e) { var id = (e.detail || {}).id; if (id) petOpenGift(id); });
   window.petShowGift = function (gid) { var g = giftLoad().find(function (x) { return x.id === gid; }); if (g) openGiftSheet(giftHtml(g)); };
   window.petListenGift = function (gid, idx) {
     var g = giftLoad().find(function (x) { return x.id === gid; }); if (!g) return;

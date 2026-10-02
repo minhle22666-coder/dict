@@ -656,6 +656,47 @@
     else playChapter(0);
   }
 
+  /* ---------------- the apple's word ----------------
+     An apple that falls from a tree (world.js treeTap) carries a word the
+     user looked up a while ago -- from the recent searches, skipping the
+     two newest (those are still fresh) -- with its Vietnamese meaning
+     from the offline library. The tag rides over the apple until it fades;
+     a tap on it opens the word. */
+  var APPLES = {};
+  document.addEventListener('focci-apple', async function (e) {
+    var id = (e.detail || {}).id; if (!id) return;
+    var h = []; try { h = (typeof histLoad === 'function' ? histLoad() : []).slice().sort(function (a, b) { return b.t - a.t; }); } catch (x) {}
+    var pool = h.slice(2, 42).filter(function (x) { return x && x.w && x.w.split(' ').length <= 3; });
+    if (!pool.length) pool = h.slice(0, 10);
+    var w = null, vi = '';
+    for (var tries = 0; tries < 6 && pool.length; tries++) {
+      var pick = pool[Math.floor(Math.random() * pool.length)];
+      try {
+        var r = await idbGet(pick.w); if (r && r.alias) r = await idbGet(r.alias);
+        if (r && r.data) { w = r.word; vi = (typeof meaningOf === 'function' ? meaningOf(r) : '') || ''; break; }
+      } catch (x) {}
+    }
+    var el = document.createElement('button');
+    el.className = 'fa-apple';
+    el.innerHTML = w ? '<b>' + esc(w) + '</b>' + (vi ? '<span>' + esc(vi) + '</span>' : '') : '<b>An apple!</b><span>Look up words and the apples will carry them</span>';
+    if (w) el.addEventListener('click', function () { if (window.openWordPopup) openWordPopup(w); });
+    document.body.appendChild(el);
+    APPLES[id] = el;
+    requestAnimationFrame(function () { el.classList.add('on'); });
+    var step = function () {
+      if (!APPLES[id]) return;
+      var a = W() && W().appleAnchor ? W().appleAnchor(id) : null;
+      if (a && a.on) { el.style.opacity = ''; el.style.transform = 'translate(' + Math.round(a.x - el.offsetWidth / 2) + 'px,' + Math.round(a.y - el.offsetHeight) + 'px)'; }
+      else el.style.opacity = 0;
+      requestAnimationFrame(step);
+    };
+    step();
+  });
+  document.addEventListener('focci-apple-gone', function (e) {
+    var id = (e.detail || {}).id, el = APPLES[id]; if (!el) return;
+    delete APPLES[id]; el.classList.remove('on'); setTimeout(function () { el.remove(); }, 400);
+  });
+
   /* ---------------- telling people the hold exists ----------------
      Nothing on screen said Focci could be held, so nobody found it. Until
      the first real hold, a small "Hold me" chip with a pulsing ring sits

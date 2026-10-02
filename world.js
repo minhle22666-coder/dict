@@ -2928,6 +2928,7 @@ export async function bootFocciWorld(root, opts) {
     for (const b of room.residents) {
       const rec = byId[b.id];
       if (!rec) continue;
+      tickGiftBox(room, b, rec, dt, t);
       if (b.mixer && !b.asleep) b.mixer.update(dt);
 
       const segs = Math.round((rec.energy || 0) / 10);
@@ -3926,6 +3927,11 @@ export async function bootFocciWorld(root, opts) {
     // furniture inside a hut he is not in should not answer a tap through the wall
     if (root3d && root3d.userData.disabled) root3d = null;
     if (!root3d || !root3d.userData.interactType) {
+      // a tree: three taps and it drops an apple (see treeTap)
+      if (camMode !== 'fpv' && room.collidables && room.collidables[0]) {
+        const first = raycaster.intersectObject(room.collidables[0], true)[0];
+        if (first && isLeafy(first.object) && treeTap(room, first.point)) return;
+      }
       // Nothing interactive under the finger: a second tap here within
       // 320ms swaps the camera between the orbit view and Focci's own eyes.
       // Gating it on empty ground keeps taps on objects instant — no
@@ -4709,6 +4715,238 @@ export async function bootFocciWorld(root, opts) {
     return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: (-v.y * 0.5 + 0.5) * window.innerHeight, on: v.z < 1 };
   }
 
+  /* ============================================================
+     A TREE THAT DROPS AN APPLE, and AN ANIMAL'S GIFT IN A BOX
+
+     Trees: the island's trees are baked into three merged meshes
+     (merged_tree_body, merged_tree1, merged_tree2), so there is no tree
+     object to shake. They are found once, on the first tap on foliage:
+     trunk vertices gathered into 1.2-unit cells, neighbouring cells joined
+     into one tree each, and every vertex of the three meshes within 3.4
+     of a trunk listed under it. A tap shakes just those vertices (more
+     at the top, decaying over 0.7s) and puts the originals back after.
+     Three taps on one tree within 2.5s drop an apple
+     (assets/glb/apple.glb): it falls from the crown, bounces twice, sits
+     with a word from the recent searches over it (focci-acts.js shows
+     the word and its meaning), and fades away. One apple a tree a minute.
+
+     Gifts: an animal with a gift waiting has a present box beside it
+     (assets/glb/present.glb), bobbing with a glow. A tap plays the box's
+     own Open animation with a burst, and the gift card opens.
+     ============================================================ */
+  const TRUNK = /tree_body|trunk|tronco/i;
+  function treeIndex(room) {
+    if (room._trees !== undefined) return room._trees;
+    room._trees = [];
+    const meshes = [];
+    room.collidables[0].updateMatrixWorld(true);
+    room.collidables[0].traverse((o) => { if (o.isMesh && isLeafy(o)) meshes.push(o); });
+    const trunks = meshes.filter((m) => TRUNK.test((m.material && m.material.name) || ''));
+    if (!trunks.length) return room._trees;
+    const v = new THREE.Vector3(), CELL = 1.2, cells = new Map();
+    trunks.forEach((m) => {
+      const p = m.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld);
+        const gx = Math.round(v.x / CELL), gz = Math.round(v.z / CELL), k = gx + ',' + gz;
+        let c = cells.get(k);
+        if (!c) cells.set(k, c = { gx, gz, x: 0, z: 0, n: 0, y0: Infinity, y1: -Infinity, t: -1 });
+        c.x += v.x; c.z += v.z; c.n++; c.y0 = Math.min(c.y0, v.y); c.y1 = Math.max(c.y1, v.y);
+      }
+    });
+    // neighbouring cells are one trunk
+    const trees = [];
+    cells.forEach((c) => {
+      if (c.t >= 0) return;
+      const tr = { x: 0, z: 0, n: 0, y0: Infinity, y1: -Infinity, top: -Infinity, verts: [], taps: [], lastApple: 0 };
+      const q = [c]; c.t = trees.length;
+      while (q.length) {
+        const a = q.pop();
+        tr.x += a.x; tr.z += a.z; tr.n += a.n; tr.y0 = Math.min(tr.y0, a.y0); tr.y1 = Math.max(tr.y1, a.y1);
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+          const b = cells.get((a.gx + dx) + ',' + (a.gz + dz));
+          if (b && b.t < 0) { b.t = c.t; q.push(b); }
+        }
+      }
+      tr.x /= tr.n; tr.z /= tr.n;
+      if (tr.n > 20) trees.push(tr); else c.t = -2;
+    });
+    // every vertex of the trees' meshes goes with the nearest trunk
+    meshes.forEach((m) => {
+      const p = m.geometry.attributes.position;
+      if (!m.userData.orig) m.userData.orig = p.array.slice();
+      const lists = trees.map(() => []);
+      for (let i = 0; i < p.count; i++) {
+        v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld);
+        let best = -1, bd = 3.4;
+        for (let t = 0; t < trees.length; t++) { const d = Math.hypot(trees[t].x - v.x, trees[t].z - v.z); if (d < bd) { bd = d; best = t; } }
+        if (best >= 0) { lists[best].push(i); if (v.y > trees[best].top) trees[best].top = v.y; }
+      }
+      lists.forEach((l, t) => { if (l.length) trees[t].verts.push({ m, idx: Int32Array.from(l) }); });
+    });
+    room._trees = trees;
+    return trees;
+  }
+  function treeAt(room, point) {
+    let best = null, bd = 3.6;
+    for (const t of treeIndex(room)) { const d = Math.hypot(t.x - point.x, t.z - point.z); if (d < bd) { bd = d; best = t; } }
+    return best;
+  }
+  function shakeTree(tr, amp) {
+    if (tr.shaking) { tr.shaking.amp = Math.max(tr.shaking.amp, amp); tr.shaking.t = 0; return; }
+    const S = tr.shaking = { t: 0, amp };
+    activeEffects.push((dt) => {
+      S.t += dt;
+      const k = Math.max(0, 1 - S.t / 0.7), w = Math.sin(S.t * 34) * S.amp * k;
+      tr.verts.forEach(({ m, idx }) => {
+        const p = m.geometry.attributes.position, a = p.array, o = m.userData.orig;
+        const sc = m.matrixWorld.elements[0] || 1;   // the merged meshes carry a uniform scale
+        const span = Math.max(0.5, tr.top - tr.y0);
+        for (let j = 0; j < idx.length; j++) {
+          const i3 = idx[j] * 3;
+          const wy = (o[i3 + 1] * sc + m.matrixWorld.elements[13]) - tr.y0;
+          const h = Math.max(0, Math.min(1, wy / span));
+          a[i3] = o[i3] + (w * h * h) / sc;
+          a[i3 + 2] = o[i3 + 2] + (w * 0.6 * h * h) / sc;
+        }
+        p.needsUpdate = true;
+      });
+      if (k > 0) return true;
+      tr.verts.forEach(({ m, idx }) => { const a = m.geometry.attributes.position.array, o = m.userData.orig; for (let j = 0; j < idx.length; j++) { const i3 = idx[j] * 3; a[i3] = o[i3]; a[i3 + 2] = o[i3 + 2]; } m.geometry.attributes.position.needsUpdate = true; });
+      tr.shaking = null;
+      return false;
+    });
+  }
+  function leafBurst(room, tr) {
+    for (let i = 0; i < 7; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x8FC46A, transparent: true, depthWrite: false }));
+      sp.scale.set(0.14, 0.09, 1);
+      const a = Math.random() * 6.28, r = 0.6 + Math.random() * 1.6;
+      sp.position.set(tr.x + Math.cos(a) * r, tr.top - 0.5 - Math.random(), tr.z + Math.sin(a) * r);
+      room.group.add(sp);
+      let age = 0; const vx = (Math.random() - 0.5) * 0.6, life = 1.6 + Math.random();
+      activeEffects.push((dt) => {
+        age += dt; sp.position.y -= dt * 0.9; sp.position.x += vx * dt + Math.sin(age * 5) * 0.01;
+        sp.material.rotation += dt * 3; sp.material.opacity = Math.max(0, 1 - age / life);
+        if (age < life) return true;
+        room.group.remove(sp); sp.material.dispose(); return false;
+      });
+    }
+  }
+  const apples = [];
+  async function dropApple(room, tr) {
+    const g = await loadProp('apple.glb');
+    const src = g.scene;
+    if (!src.userData.size) { const b = new THREE.Box3().setFromObject(src), s = b.getSize(new THREE.Vector3()); src.userData.size = Math.max(s.x, s.y, s.z) || 1; src.userData.ctr = b.getCenter(new THREE.Vector3()); }
+    const holder = new THREE.Group(), o = src.clone(true);
+    o.position.copy(src.userData.ctr).multiplyScalar(-1);
+    holder.add(o);
+    holder.scale.setScalar(0.34 / src.userData.size);
+    o.traverse((n) => { if (n.isMesh) { n.material = n.material.clone(); n.material.transparent = true; n.castShadow = true; } });
+    const a = Math.random() * 6.28, r = 0.9 + Math.random() * 0.9;
+    const x = tr.x + Math.cos(a) * r, z = tr.z + Math.sin(a) * r;
+    const gs = groundSmooth(room, x, z), floor = (gs.hit ? gs.y : tr.y0) + 0.17;
+    holder.position.set(x, tr.top - 0.9, z);
+    room.group.add(holder);
+    const A = { holder, vy: 0, bounces: 0, rest: 0, age: 0, floor, id: 'a' + Date.now().toString(36), shown: false };
+    apples.push(A);
+    activeEffects.push((dt) => {
+      A.age += dt;
+      const p = holder.position;
+      if (A.bounces < 3) {
+        A.vy -= 11 * dt; p.y += A.vy * dt; holder.rotation.x += dt * 4; holder.rotation.z += dt * 2.5;
+        if (p.y <= floor) { p.y = floor; A.vy = -A.vy * 0.36; A.bounces++; if (A.bounces === 1) spawnLandingPuff(room, x, floor - 0.17, z); }
+      } else if (!A.shown) {
+        A.shown = true; A.rest = A.age;
+        root.dispatchEvent(new CustomEvent('focci-apple', { bubbles: true, detail: { id: A.id } }));
+      }
+      // seven seconds at rest, then it fades into the grass
+      if (A.shown && A.age - A.rest > 7) {
+        const k = Math.min(1, (A.age - A.rest - 7) / 1.6);
+        holder.traverse((n) => { if (n.isMesh) n.material.opacity = 1 - k; });
+        holder.scale.setScalar((0.34 / src.userData.size) * (1 - k * 0.3));
+        if (k >= 1) { room.group.remove(holder); apples.splice(apples.indexOf(A), 1); root.dispatchEvent(new CustomEvent('focci-apple-gone', { bubbles: true, detail: { id: A.id } })); return false; }
+      }
+      return true;
+    });
+  }
+  function appleAnchor(id) {
+    const A = apples.find((x) => x.id === id); if (!A) return null;
+    _tv.copy(A.holder.position); _tv.y += 0.45; _tv.project(camera);
+    return { x: (_tv.x * 0.5 + 0.5) * window.innerWidth, y: (-_tv.y * 0.5 + 0.5) * window.innerHeight, on: _tv.z < 1 };
+  }
+  function treeTap(room, point) {
+    const tr = treeAt(room, point); if (!tr) return false;
+    const now = performance.now();
+    tr.taps = tr.taps.filter((t) => now - t < 2500); tr.taps.push(now);
+    shakeTree(tr, tr.taps.length >= 3 ? 0.16 : 0.07);
+    leafBurst(room, tr);
+    if (tr.taps.length >= 3) {
+      tr.taps = [];
+      if (Date.now() - tr.lastApple > 60000) { tr.lastApple = Date.now(); dropApple(room, tr).catch(() => {}); }
+      else root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: 'This tree has given its apple for now.' } }));
+    } else if (tr.taps.length === 1) hintNear('appletree', 'Tap the tree three times — something might fall');
+    return true;
+  }
+
+  /* ---------- the gift box by an animal ---------- */
+  async function giftBoxFor(room, b) {
+    if (b.gift || b.giftLoading) return;
+    b.giftLoading = true;
+    try {
+      const g = await loadProp('present.glb');
+      const src = g.scene;
+      src.updateMatrixWorld(true);
+      if (!src.userData.size) { const bb = skinnedBox(src), s = bb.getSize(new THREE.Vector3()); src.userData.size = Math.max(s.x, s.y, s.z) || 1; src.userData.minY = bb.min.y; }
+      const o = cloneSkinned(src);
+      const sc = 0.55 / src.userData.size;
+      const holder = new THREE.Group(); holder.add(o); holder.scale.setScalar(sc);
+      o.position.y = -src.userData.minY;
+      o.traverse((n) => { if (n.isMesh) { n.frustumCulled = false; n.castShadow = true; } });
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFFD27A, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55 }));
+      glow.scale.setScalar(1.6 / sc); glow.position.y = 0.3 / sc; holder.add(glow);
+      room.group.add(holder);
+      const mixer = new THREE.AnimationMixer(o);
+      const open = g.animations[0] ? mixer.clipAction(g.animations[0]) : null;
+      if (open) { open.setLoop(THREE.LoopOnce); open.clampWhenFinished = true; }
+      const hit = addInvisibleHitbox(room, 0, 0, 0, 0.55, 'gift-box');
+      hit.userData.residentId = b.id;
+      b.gift = { holder, mixer, open, glow, hit, opening: 0 };
+    } catch (e) { /* no box; the ring still has the gift button */ }
+    b.giftLoading = false;
+  }
+  function tickGiftBox(room, b, rec, dt, t) {
+    const want = !!(rec && rec.giftWaiting && !b.asleep);
+    if (want && !b.gift) { giftBoxFor(room, b); return; }
+    if (!b.gift) return;
+    const G = b.gift;
+    if (!want && !G.opening) { room.group.remove(G.holder); room.group.remove(G.hit); room.interactive.splice(room.interactive.indexOf(G.hit), 1); b.gift = null; return; }
+    // beside the animal, on the ground, bobbing
+    const p = b.obj.position, side = b.obj.rotation.y + Math.PI / 2;
+    const gx = p.x + Math.sin(side) * 0.7, gz = p.z + Math.cos(side) * 0.7;
+    const gs = groundSmooth(room, gx, gz);
+    const gy = (gs.hit ? gs.y : p.y) + (G.opening ? 0 : Math.abs(Math.sin(t * 2.4)) * 0.12);
+    G.holder.position.set(gx, gy, gz);
+    G.holder.rotation.y = t * 0.6;
+    G.glow.material.opacity = 0.35 + Math.sin(t * 3) * 0.2;
+    G.hit.position.set(gx, gy + 0.3, gz);
+    G.mixer.update(dt);
+    if (G.opening) {
+      G.opening += dt;
+      if (G.opening > 2.2) { room.group.remove(G.holder); room.group.remove(G.hit); room.interactive.splice(room.interactive.indexOf(G.hit), 1); b.gift = null; }
+    }
+  }
+  function openGiftBox(room, id) {
+    const b = (room.residents || []).find((x) => x.id === id); if (!b || !b.gift || b.gift.opening) return false;
+    const G = b.gift;
+    G.opening = 0.001;
+    if (G.open) G.open.reset().play();
+    const p = G.holder.position;
+    setTimeout(() => { spawnPickupBurst(room, p.x, p.y + 0.5, p.z, 0xFFD36A); spawnHearts(room, p.x, p.y + 0.6, p.z); }, 450);
+    setTimeout(() => root.dispatchEvent(new CustomEvent('focci-gift-open', { bubbles: true, detail: { id } })), 950);
+    return true;
+  }
+
   /* ---------- the one way in and out ---------- */
   async function focciDo(kind) {
     focciStop(true);
@@ -4787,6 +5025,8 @@ export async function bootFocciWorld(root, opts) {
       if (l) { collectLetter(l); focciReact(); }
     } else if (type === 'word-treasure') {
       collectTreasure(room);
+    } else if (type === 'gift-box') {
+      openGiftBox(room, obj.userData.residentId);
     } else if (type === 'hut-door') {
       // The marker is a sign now, not a door. Tapping it says where it goes.
       root.dispatchEvent(new CustomEvent('focci-quote', { detail: { kind: 'reaction', message: 'Somewhere to sleep. Walk on in.' } }));
@@ -5444,6 +5684,8 @@ export async function bootFocciWorld(root, opts) {
     get state() { return { pending: !!pendingTravel, flight: !!flight, declined: Array.from(declined), camMode, inspectMode }; },
     animalModel, toggleCamMode, setCamMode, blockedAt, groundSmooth, groundUnderRoof,
     layDown: (b, h) => layDown(rooms[currentRoomKey], b, h), getUp,
+    trees: () => treeIndex(rooms[currentRoomKey]),
+    get apples() { return apples; },
     enterHut: (i) => enterHut(rooms[currentRoomKey], rooms[currentRoomKey].houses[i]), leaveHut: () => leaveHut(rooms[currentRoomKey]),
     sleepOnBed: (i) => focciSleepOnBed(rooms[currentRoomKey], rooms[currentRoomKey].houses[i]), focciWake, get focciPose() { return focciPose; },
     jump() { startJump(rooms[currentRoomKey]); } };
@@ -5908,7 +6150,8 @@ export async function bootFocciWorld(root, opts) {
     else if (kind === 'gift') spawnPickupBurst(room, p.x, top, p.z, 0xFFD36A);
   }
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
-    storyRadio, storyPick, storyAnchor,
+    storyRadio, storyPick, storyAnchor, appleAnchor, openGiftBox: (id) => openGiftBox(rooms[currentRoomKey], id),
+    treeTapAt: (x, z) => treeTap(rooms[currentRoomKey], { x, z }),
     focciDo, focciStop, focciAnchor, strum, jogStats: () => (jog ? { t: jog.t, dist: jog.dist } : null),
     breath(ph, ms) { if (focciPose && focciPose.kind === 'relax') focciPose.br = { ph, t0: performance.now(), dur: ms || 4000 }; },
     get day() { return dayFactor(); },

@@ -7607,6 +7607,49 @@ document.documentElement.classList.add('home-on');</script>
   .rs-resume div{display:flex;gap:8px}
   .rs-resume button{flex:1;height:36px;border:0;border-radius:12px;cursor:pointer;font-size:12.5px;font-weight:700;color:#1E2436;background:#FFE7A8}
   .rs-resume button.ghost{color:#FFF6DA;background:rgba(255,246,218,.14)}
+
+  /* ---------------- the apple's word ---------------- */
+  .fa-apple{position:fixed;left:0;top:0;z-index:58;display:flex;flex-direction:column;align-items:center;padding:7px 14px 8px;border:0;border-radius:16px;cursor:pointer;
+    background:rgba(255,255,250,.94);box-shadow:var(--cz-rim),0 10px 24px rgba(30,40,20,.25);opacity:0;scale:.6;transition:opacity .3s,scale .4s cubic-bezier(.3,1.6,.45,1)}
+  .fa-apple.on{opacity:1;scale:1}
+  .fa-apple::after{content:'';position:absolute;left:50%;bottom:-6px;width:12px;height:12px;margin-left:-6px;transform:rotate(45deg);background:rgba(255,255,250,.94)}
+  .fa-apple b{font-size:15px;font-weight:800;color:#B3402E}
+  .fa-apple span{max-width:200px;font-size:11.5px;color:var(--cz-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* ---------------- the gift card ---------------- */
+  .gf-hero{display:flex;align-items:center;gap:12px;margin:-2px 0 10px}
+  .gf-ic{flex:none;width:58px;height:58px;filter:drop-shadow(0 6px 10px rgba(201,154,62,.35));animation:gf-bob 2.4s ease-in-out infinite}
+  @keyframes gf-bob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-4px) rotate(3deg)}}
+  .gf-ht{flex:1;min-width:0}
+  .gf-ht span{display:block;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--cz-honey)}
+  .gf-ht b{display:block;font-size:19px;font-weight:700;line-height:1.2;color:var(--cz-ink)}
+  .gf-ht small{display:block;margin-top:2px;font-size:11.5px;color:var(--cz-faint)}
+  .gf-ht small i{font-style:normal}
+  .gf-intro{margin:0 0 12px;font-size:13.5px;line-height:1.55;font-style:italic;color:var(--cz-ink-2)}
+  .gf-track{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:4px 4px 10px;scrollbar-width:none}
+  .gf-track::-webkit-scrollbar{display:none}
+  .gf-card{flex:none;width:86%;scroll-snap-align:center;box-sizing:border-box;padding:16px;border-radius:22px;
+    background:linear-gradient(170deg,#FFF8E6,#FFFFFA 55%);box-shadow:inset 0 0 0 1px rgba(214,170,80,.28),0 8px 20px rgba(120,90,30,.1)}
+  .gf-n{font-size:10.5px;color:var(--cz-faint);margin-bottom:6px}
+  .gf-ph{font-size:22px;font-weight:800;line-height:1.2;color:var(--cz-ink);margin-bottom:6px}
+  .gf-vi{margin-top:8px;font-size:14px;font-weight:600;color:#8E6A1E}
+  .gf-ex{margin-top:10px;font-size:13.5px;line-height:1.5;color:var(--cz-ink-2)}
+  .gf-ex span{display:block;margin-top:3px;font-size:12px;color:var(--cz-faint)}
+  .gf-note{margin-top:10px;padding:8px 10px;border-radius:12px;font-size:12px;line-height:1.45;color:var(--cz-soft);background:var(--cz-sage-bg)}
+  .gf-play,.gf-all{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:40px;margin-top:12px;border:0;border-radius:14px;cursor:pointer;
+    font-size:13px;font-weight:700;color:#6B4D12;background:linear-gradient(180deg,#F7E3AE,#EBC873)}
+  .gf-all{margin:4px 0 12px;color:#fff;background:var(--cz-sage)}
+  .gf-dots{display:flex;justify-content:center;gap:5px;margin:0 0 10px}
+  .gf-dots i{width:6px;height:6px;border-radius:99px;background:rgba(214,170,80,.3);transition:width .25s}
+  .gf-dots i.on{width:18px;background:#C99A3E}
+  .gf-do{display:grid;gap:8px;margin-bottom:10px}
+  .gf-do div{padding:10px 12px;border-radius:14px;font-size:13px;line-height:1.45;color:var(--cz-ink-2);background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line)}
+  .gf-do b{display:block;margin-bottom:2px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--cz-sage)}
+  img.pt-box{width:84px;height:84px;margin:0 auto 10px;display:block}
+  img.gf-wait{animation:gf-shake 1s ease-in-out infinite}
+  @keyframes gf-shake{0%,100%{transform:rotate(0)}20%{transform:rotate(-8deg)}40%{transform:rotate(7deg)}60%{transform:rotate(-4deg)}80%{transform:rotate(3deg)}}
+  .pr-gift img,.pt-giftbtn img{width:22px;height:22px}
+  .jn-gift-ic{width:18px;height:18px;vertical-align:-3px;margin-right:6px}
+  .gift-ic img{width:30px;height:30px;display:block}
 </style>
 </head>
 <body>
