@@ -269,21 +269,54 @@
     for (var i = 0; i < len; i++) { var w = Math.random() * 2 - 1; if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.2; } else d[i] = w; }
     return b;
   }
+  /* The user's recordings, grouped by kind: tap a kind to hear it, tap it
+     again for its next version (the dots under it say which). Wind and the
+     birds are still made here -- there were no recordings of those. */
   var SOUNDS = [
-    { k: 'wind', t: 'Wind' }, { k: 'rain', t: 'Rain' }, { k: 'waves', t: 'Waves' },
-    { k: 'birds', t: 'Birds' }, { k: 'none', t: 'Silence' }
+    { k: 'rain', t: 'Rain', icon: 'snd-rain', files: ['relax-rain-1.mp3', 'relax-rain-2.mp3', 'relax-rain-3.mp3'], names: ['Rain on the cabin', 'Midday rain', 'Soft rain'] },
+    { k: 'waves', t: 'Waves', icon: 'snd-waves', files: ['relax-waves-1.mp3', 'relax-waves-2.mp3'], names: ['Waves under the moon', 'A soft sea'] },
+    { k: 'chimes', t: 'Chimes', icon: 'snd-chimes', files: ['relax-chimes-1.mp3', 'relax-chimes-2.mp3'], names: ['Wind chimes', 'Little chimes'] },
+    { k: 'birds', t: 'Birds', icon: 'snd-birds', synth: ['birds', 'birds2'], names: ['Morning birds', 'Birds in the breeze'] },
+    { k: 'wind', t: 'Wind', icon: 'snd-wind', synth: ['wind'], names: ['Wind in the grass'] },
+    { k: 'night', t: 'Night', icon: 'sleep', files: ['relax-night.mp3'], names: ['Crickets at night'] },
+    { k: 'none', t: 'Off' }
   ];
-  function ambientStart(k) {
+  var SNDV = {};
+  function sndOf(k) { for (var i = 0; i < SOUNDS.length; i++) if (SOUNDS[i].k === k) return SOUNDS[i]; return SOUNDS[0]; }
+  /* One element for the recordings, wired once through a gain: iOS ignores
+     an audio element's own volume, so the fade has to be a Web Audio gain,
+     and an element that has played from a tap may change src and play on. */
+  var FA = null;
+  function fileAmb() {
+    if (FA) return FA;
+    var ctx = ac(), el = new Audio();
+    el.loop = true; el.preload = 'auto'; el.crossOrigin = 'anonymous';
+    var src = ctx.createMediaElementSource(el), g = ctx.createGain();
+    g.gain.value = 0; src.connect(g); g.connect(ctx.destination);
+    FA = { el: el, g: g, tok: 0 };
+    return FA;
+  }
+  function ambientStart(k, v) {
     ambientStop();
     if (k === 'none') { AMB = { k: k }; return; }
+    var S = sndOf(k), kind = k; v = v || 0;
+    if (S.files) {
+      var F = fileAmb(), ctx0 = ac(); F.tok++;
+      F.el.src = './assets/audio/' + S.files[v % S.files.length];
+      F.el.play().catch(function () {});
+      F.g.gain.cancelScheduledValues(ctx0.currentTime); F.g.gain.setTargetAtTime(0.9, ctx0.currentTime, 0.8);
+      AMB = { k: k, v: v, file: true };
+      return;
+    }
+    k = S.synth[v % S.synth.length];
     var ctx = ac(), out = ctx.createGain(); out.gain.value = 0; out.connect(ctx.destination);
     out.gain.setTargetAtTime(1, ctx.currentTime, 1.2);
     var A = { k: k, out: out, nodes: [], iv: 0 };
     var src = ctx.createBufferSource(); src.buffer = noiseBuf(ctx, k !== 'rain'); src.loop = true;
     var f = ctx.createBiquadFilter(), g = ctx.createGain();
     var lfo = ctx.createOscillator(), lg = ctx.createGain();
-    if (k === 'wind' || k === 'birds') {
-      f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 0.6; g.gain.value = k === 'birds' ? 0.18 : 0.5;
+    if (k === 'wind' || k === 'birds' || k === 'birds2') {
+      f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 0.6; g.gain.value = k === 'birds' ? 0.18 : k === 'birds2' ? 0.38 : 0.5;
       lfo.frequency.value = 0.09; lg.gain.value = 260; lfo.connect(lg); lg.connect(f.frequency);
     } else if (k === 'rain') {
       f.type = 'bandpass'; f.frequency.value = 2600; f.Q.value = 0.5; g.gain.value = 0.16;
@@ -294,7 +327,8 @@
     }
     src.connect(f); f.connect(g); g.connect(out); src.start(); lfo.start();
     A.nodes.push(src, lfo);
-    if (k === 'birds') {
+    A.k = kind; A.v = v;
+    if (k === 'birds' || k === 'birds2') {
       var chirp = function () {
         if (!AMB || AMB !== A) return;
         var t = ctx.currentTime, o = ctx.createOscillator(), e = ctx.createGain(), base = 2600 + Math.random() * 1400, n = 2 + Math.floor(Math.random() * 4);
@@ -305,7 +339,7 @@
           e.gain.setValueAtTime(0, s); e.gain.linearRampToValueAtTime(0.05, s + 0.02); e.gain.linearRampToValueAtTime(0, s + 0.1);
         }
         o.connect(e); e.connect(out); o.start(t); o.stop(t + n * 0.13 + 0.1);
-        A.iv = setTimeout(chirp, 900 + Math.random() * 3200);
+        A.iv = setTimeout(chirp, (k === 'birds2' ? 1800 : 900) + Math.random() * 3200);
       };
       A.iv = setTimeout(chirp, 800);
     }
@@ -315,12 +349,34 @@
     if (!AMB) return;
     var A = AMB; AMB = null;
     clearTimeout(A.iv);
+    if (A.file && FA) {
+      var tok = FA.tok;
+      try { FA.g.gain.cancelScheduledValues(ac().currentTime); FA.g.gain.setTargetAtTime(0, ac().currentTime, 0.3); } catch (e) {}
+      setTimeout(function () { if (FA.tok === tok) FA.el.pause(); }, 1300);
+      return;
+    }
     if (A.out) { try { A.out.gain.setTargetAtTime(0, ac().currentTime, 0.4); } catch (e) {} setTimeout(function () { A.nodes.forEach(function (n) { try { n.stop(); } catch (e) {} }); }, 1500); }
   }
+  // a tap on the kind playing now is its next version
   window.faSound = function (k) {
-    ambientStart(k);
-    document.querySelectorAll('#fa-relax .fa-snd button').forEach(function (b) { b.classList.toggle('on', b.dataset.k === k); });
+    var S = sndOf(k), n = (S.files || S.synth || [0]).length;
+    var v = SNDV[k] || 0;
+    if (AMB && AMB.k === k && n > 1) v = (v + 1) % n;
+    SNDV[k] = v;
+    ambientStart(k, v);
+    sndUI();
   };
+  function sndUI() {
+    var cur = AMB ? AMB.k : null;
+    document.querySelectorAll('#fa-relax .fa-snd button').forEach(function (b) {
+      var k = b.dataset.k, S = sndOf(k), n = (S.files || S.synth || []).length, v = SNDV[k] || 0;
+      b.classList.toggle('on', k === cur);
+      var d = b.querySelector('.fa-dots');
+      if (d) d.innerHTML = n > 1 ? new Array(n).fill(0).map(function (x, i) { return '<i' + (i === v ? ' class="on"' : '') + '></i>'; }).join('') : '';
+    });
+    var nm = $('fa-sndname'), S0 = cur ? sndOf(cur) : null;
+    if (nm) nm.textContent = !S0 || cur === 'none' ? 'Silence' : (S0.names[SNDV[cur] || 0] || S0.t) + ((S0.files || S0.synth).length > 1 ? ' · tap again for another' : '');
+  }
   /* 4 in, 2 hold, 6 out: a slow breath that lengthens the out-breath. Each
      phase is sent to the island too, so Focci's belly rises and falls
      with the circle (fwWorld.breath). */
@@ -346,8 +402,8 @@
     var night = W() && W().day !== undefined ? W().day < 0.5 : false;
     D.classList.add('fa-quiet', 'fa-full', 'fa-relaxing');
     D.classList.toggle('fa-night', night);
-    faSoundStartPending = night ? 'waves' : 'wind';
-    ambientStart(faSoundStartPending);       // inside the tap, so the browser lets it play
+    faSoundStartPending = night ? 'night' : 'wind';
+    ambientStart(faSoundStartPending, SNDV[faSoundStartPending] || 0);       // inside the tap, so the browser lets it play
     if (W() && W().focciDo) await W().focciDo('relax');
     var el = $('fa-relax');
     /* Readable on a bright island: dark ink on frosted chips by day, warm
@@ -358,12 +414,17 @@
       + '<div class="fa-rtop"><span>' + (night ? 'A quiet night in the grass' : 'Sun, wind and grass') + '</span><b>Breathe with Focci</b></div>'
       + '<div class="fa-breath"><div class="fa-circle" id="fa-circle"></div><div class="fa-blabel" id="fa-blabel">Breathe in</div></div>'
       + '<div class="fa-bcount num" id="fa-bcount"></div>'
-      + '<div class="fa-snd">' + SOUNDS.map(function (s) { return '<button data-k="' + s.k + '" onclick="faSound(\'' + s.k + '\')">' + s.t + '</button>'; }).join('') + '</div>'
+      + '<div class="fa-sndname" id="fa-sndname"></div>'
+      + '<div class="fa-snd">' + SOUNDS.map(function (s) {
+          return '<button data-k="' + s.k + '" onclick="faSound(\'' + s.k + '\')">'
+            + (s.icon ? '<img src="./assets/icons/' + s.icon + '.png" alt=""/>' : '<em>×</em>')
+            + '<span>' + s.t + '</span><b class="fa-dots"></b></button>';
+        }).join('') + '</div>'
       + '<button class="fa-unlock" id="fa-unlock"><i></i><span>Hold to unlock</span></button>';
     el.classList.add('on');
     BR = { n: 0, t: 0 };
     breathLoop();
-    faSound(faSoundStartPending);
+    sndUI();
     // the lock: only a press held for a second gets you out
     var u = $('fa-unlock'), ut = 0;
     var down = function (e) { e.preventDefault(); u.classList.add('hold'); ut = setTimeout(function () { u.classList.remove('hold'); clearTimeout(BR && BR.t); faStop(); }, 1000); };

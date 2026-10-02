@@ -3398,7 +3398,8 @@ export async function bootFocciWorld(root, opts) {
     hintClock += dt;
     if (hintClock < 0.4) return;
     hintClock = 0;
-    if (!room || room._insideHut || flight || talk) return;
+    // not while he is resting, playing or reading: a "walk over a mushroom" tip over the breathing circle
+    if (!room || room._insideHut || flight || talk || focciPose || jog || storyMode) return;
     const cx = charState.x, cz = charState.z;
     for (const h of room.houses || []) {
       if (Math.hypot(h.x - cx, h.z - cz) < 3.2) { hintCD('house', 'Double-tap the house to step inside \u00b7 jump to climb onto its roof', 90000); return; }
@@ -4106,12 +4107,16 @@ export async function bootFocciWorld(root, opts) {
       if (!pts.length) return;
       const lo = [0, 1, 2].map((k) => Math.min(...pts.map((q) => q[k]))), hi = [0, 1, 2].map((k) => Math.max(...pts.map((q) => q[k])));
       const cx = (lo[0] + hi[0]) / 2, cy = (lo[1] + hi[1]) / 2, w = hi[0] - lo[0], fz = hi[2];
-      const r = w * 0.62;
-      const lid = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), orange || new THREE.MeshStandardMaterial({ color: 0xF5510A }));
-      lid.scale.set(1, 1.1, 0.55); lid.position.set(cx, cy, fz - r * 0.2);
+      /* Flat, not a dome: the half-sphere lids stood out of the face like
+         two bumps ("the round eyes bulge, it looks bad"). A disc of his own
+         orange just in front of the eye hides it, and on it one thin
+         curve -- the closed eye of someone asleep, nothing else. */
+      const r = w * 0.6;
+      const lid = new THREE.Mesh(new THREE.CircleGeometry(r, 24), orange || new THREE.MeshStandardMaterial({ color: 0xF5510A }));
+      lid.position.set(cx, cy, fz + 0.003);
       grp.add(lid);
-      const lash = new THREE.Mesh(new THREE.TorusGeometry(r * 0.62, r * 0.13, 5, 16, Math.PI), dark);
-      lash.rotation.z = Math.PI; lash.position.set(cx, cy + r * 0.18, fz + r * 0.33);
+      const lash = new THREE.Mesh(new THREE.TorusGeometry(r * 0.6, r * 0.075, 4, 18, Math.PI), dark);
+      lash.rotation.z = Math.PI; lash.scale.set(1, 0.7, 0.2); lash.position.set(cx, cy + r * 0.12, fz + 0.006);
       grp.add(lash);
     });
     grp.visible = false;
@@ -4160,7 +4165,6 @@ export async function bootFocciWorld(root, opts) {
       cam.tTheta = P.base + Math.sin(P.t * 0.22) * 0.14;
       return;
     }
-    if (P.kind === 'relax') tickFlies(dt, t);
     character.rotation.order = 'YXZ';
     character.rotation.set(-Math.PI / 2, P.yaw, 0);
     let br = Math.sin(t * 1.25) * 0.5 + 0.5;    // a slow breath, about five seconds
@@ -4180,6 +4184,11 @@ export async function bootFocciWorld(root, opts) {
     if (P.kind === 'bed' && P.zT <= 0) { P.zT = 1.4; spawnZ(room, P.head.x, P.head.y + 0.25, P.head.z, 0.9); }
     if (P.kind === 'relax' && P.base !== undefined) cam.tTheta = P.base + Math.sin(P.t * 0.12) * 0.2;
     if (P.dots) { P.dots.position.set(P.head.x, P.head.y + 0.6 + br * 0.05, P.head.z); P.dots.material.map = dotsTex(Math.floor(t * 4.5)); }
+    /* The butterfly last, once he is lying where this frame puts him: at
+       the top of this function he has just been stood up again by the
+       walking code, so his nose was read off the standing body and the
+       butterfly sat 0.66 away, in the grass beside him. */
+    if (P.kind === 'relax') { character.updateMatrixWorld(true); tickFlies(dt, t); }
   }
   function focciWake() {
     const P = focciPose; if (!P) return;
@@ -4408,6 +4417,8 @@ export async function bootFocciWorld(root, opts) {
       base.updateMatrixWorld(true);
       const bb = skinnedBox(base), sz = bb.getSize(new THREE.Vector3());
       const sc = 0.34 / Math.max(sz.x, sz.z, 0.001);
+      // its feet, not its middle, go on the nose
+      const lift = Math.max(0, -bb.min.y * sc);
       const o = cloneSkinned(base);
       o.scale.setScalar(sc);
       o.traverse((n) => { if (n.isMesh) { n.frustumCulled = false; if (night && n.material) { n.material = n.material.clone(); n.material.emissive = new THREE.Color(0x3a5cff); n.material.emissiveIntensity = 0.35; } } });
@@ -4418,7 +4429,7 @@ export async function bootFocciWorld(root, opts) {
       const idle = g.animations.find((a) => /idle/i.test(a.name)) || fly;
       const aF = mixer.clipAction(fly), aI = mixer.clipAction(idle);
       aF.play();
-      flies = [{ o, mixer, aF, aI, ph: 0, r: 1.3, h: 1.1, state: 'fly', t: 0, land: 5.5 }];
+      flies = [{ o, mixer, aF, aI, ph: 0, r: 1.3, h: 1.1, state: 'fly', t: 0, land: 5.5, lift }];
     } catch (e) { /* no butterfly is still a rest */ }
     return true;
   }
@@ -4481,21 +4492,29 @@ export async function bootFocciWorld(root, opts) {
       const p = f.o.position;
       if (f.state === 'fly') {
         const a = t * 0.8 + f.ph;
-        const tx = mx + Math.cos(a) * f.r, tz = mz + Math.sin(a) * f.r, ty = my + f.h + Math.sin(t * 2.1) * 0.15;
+        _nose.set(mx + Math.cos(a) * f.r, my + f.h + Math.sin(t * 2.1) * 0.15, mz + Math.sin(a) * f.r);
+        if (f.o.parent) f.o.parent.worldToLocal(_nose);
+        const tx = _nose.x, tz = _nose.z, ty = _nose.y;
         const vx = tx - p.x, vz = tz - p.z;
         const k = Math.min(1, dt * 1.6);
         p.x += vx * k; p.y += (ty - p.y) * k; p.z += vz * k;
         if (Math.hypot(vx, vz) > 0.001) f.o.rotation.y = Math.atan2(vx, vz);
         if (f.t > f.land) { f.state = 'come'; f.t = 0; }
       } else {
-        rig.localToWorld(_nose.set(0.005, 0.69, 0.26));
+        /* The tip of his nose, measured from the black vertices in front of
+           the face: x 0, y 0.58-0.635, z up to 0.279 (rig units). The old
+           point, (0.005, 0.69, 0.26), was in the air above his forehead, so
+           the butterfly "landed" on nothing ("it has not landed on his nose"). */
+        rig.localToWorld(_nose.set(0, 0.615, 0.285));
+        // its position is local to the room's group (at the origin today, but not by contract)
+        if (f.o.parent) f.o.parent.worldToLocal(_nose);
         if (f.state === 'come') {
           const k = Math.min(1, dt * 1.8);
-          p.x += (_nose.x - p.x) * k; p.y += (_nose.y + 0.03 - p.y) * k; p.z += (_nose.z - p.z) * k;
-          if (p.distanceTo(_nose) < 0.06 || f.t > 4) { f.state = 'rest'; f.t = 0; f.aI.reset().play(); f.aF.crossFadeTo(f.aI, 0.5, false); }
+          p.x += (_nose.x - p.x) * k; p.y += (_nose.y + f.lift - p.y) * k; p.z += (_nose.z - p.z) * k;
+          if (Math.hypot(p.x - _nose.x, p.y - _nose.y - f.lift, p.z - _nose.z) < 0.05 || f.t > 4) { f.state = 'rest'; f.t = 0; f.aI.reset().play(); f.aF.crossFadeTo(f.aI, 0.5, false); }
         } else {
           // rests there, wings slowly opening and closing, rising with each breath
-          p.copy(_nose); p.y += 0.03;
+          p.copy(_nose); p.y += f.lift;
           f.o.rotation.y = P.yaw + Math.PI / 2;
         }
       }
@@ -5797,7 +5816,7 @@ export async function bootFocciWorld(root, opts) {
     get state() { return { pending: !!pendingTravel, flight: !!flight, declined: Array.from(declined), camMode, inspectMode }; },
     animalModel, toggleCamMode, setCamMode, blockedAt, groundSmooth, groundUnderRoof,
     layDown: (b, h) => layDown(rooms[currentRoomKey], b, h), getUp,
-    trees: () => treeIndex(rooms[currentRoomKey]),
+    trees: () => treeIndex(rooms[currentRoomKey]), flies: () => flies, rigOf: () => rig,
     get apples() { return apples; },
     enterHut: (i) => enterHut(rooms[currentRoomKey], rooms[currentRoomKey].houses[i]), leaveHut: () => leaveHut(rooms[currentRoomKey]),
     sleepOnBed: (i) => focciSleepOnBed(rooms[currentRoomKey], rooms[currentRoomKey].houses[i]), focciWake, get focciPose() { return focciPose; },

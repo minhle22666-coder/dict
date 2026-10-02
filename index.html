@@ -6827,6 +6827,18 @@ document.documentElement.classList.add('home-on');</script>
   .rs-row span{display:block;margin-top:1px;font-size:11px;color:#8A7652;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rs-row.on{background:rgba(255,211,106,.5);box-shadow:inset 0 0 0 1px rgba(201,154,91,.55)}
   .rs-empty{padding:14px 10px;font-size:13px;color:#8A7652}
+
+  /* relax sounds: an icon tile for each kind, dots for its versions (focci-acts.js SOUNDS) */
+  html body .fa-snd{display:grid;grid-template-columns:repeat(4,64px);gap:8px;justify-content:center;max-width:none}
+  html body .fa-snd button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    width:64px;height:66px;padding:4px 0 9px;border-radius:18px;font-size:11px;font-weight:700}
+  .fa-snd button img{display:block;width:28px;height:28px;object-fit:contain}
+  .fa-snd button em{font-style:normal;font-size:22px;line-height:28px;opacity:.6}
+  .fa-dots{position:absolute;left:0;right:0;bottom:5px;display:flex;justify-content:center;gap:3px}
+  .fa-dots i{width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.3}
+  .fa-dots i.on{opacity:1}
+  .fa-sndname{min-height:16px;margin:0 0 8px;font-size:12px;font-weight:600;text-align:center;color:var(--cz-ink-2)}
+  html.fa-night .fa-sndname{color:#E9EEFF}
 </style>
 </head>
 <body>
