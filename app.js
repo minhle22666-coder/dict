@@ -7845,6 +7845,11 @@ async function syncSeedFiles(){
 
 /* ---------- onboarding ---------- */
 function wireOnboarding(){
+  /* The first-run "Welcome to Focci" page with its name box is gone: the
+     user wanted the app to open straight onto home. Greetings that use the
+     name already cope without one. */
+  return;
+  // eslint-disable-next-line no-unreachable
   if(getName()){ return; }
   $('#onboarding').style.display='flex';
   $('#ob-start').addEventListener('click',()=>{

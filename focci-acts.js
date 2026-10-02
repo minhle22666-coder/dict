@@ -133,7 +133,6 @@
   });
   window.faBack = function () {
     if (R.open) { ringClose(); return true; }
-    if (CUR === 'stories' && RS && RS.focus) { unfocusRadio(); return true; }
     if (CUR) { faStop(); return true; }
     return false;
   };
@@ -533,7 +532,7 @@
     var el = $('fa-story');
     el.innerHTML = '<div class="fa-fade"></div>'
       + '<div class="rs-stage" id="rs-stage"></div>'
-      + '<div class="rs-top"><button class="rs-back" id="rs-back" aria-label="Back to the world"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>World</button>'
+      + '<div class="rs-top">'
       +   '<div class="rs-ttl"><span>Story night</span><b>The Little Prince’s world</b></div>'
       +   '<button class="pt-x rs-x" onclick="faStop()" aria-label="Back to the island">×</button></div>'
       + '<div class="rs-hint" id="rs-hint"><i></i>Tap the radio</div>'
@@ -546,7 +545,6 @@
       + '<div class="rs-player" id="rs-player" data-noswipe="1"></div>';
     el.classList.add('on');
     stageWire();
-    $('rs-back').addEventListener('click', unfocusRadio);
     $('rs-list').addEventListener('click', listClick);
     // a touch anywhere but the list (or the button that opens it) rolls it up
     el.addEventListener('pointerdown', function (e) {
@@ -576,6 +574,12 @@
     var st = $('fa-story');
     var step = function () {
       if (!RS || CUR !== 'stories') return;
+      /* No "back to the world" button: the camera is always free, and how
+         close it is to the radio decides whether the radio's controls are
+         live (the user: tapping the radio should not lock the world). */
+      var nr = W() && W().storyNear ? W().storyNear() : 0;
+      if (RS.focus && nr < 0.2) { RS.focus = false; closeList(); hideCountry(); playerDraw(); }
+      else if (!RS.focus && nr > 0.8) { RS.focus = true; RS.met = true; playerDraw(); }
       st.classList.toggle('focused', RS.focus); st.classList.toggle('m-fm', RS.mode === 'fm'); st.classList.toggle('m-story', RS.mode === 'story');
       if (!RS.focus) { if (RS.met) $('rs-hint').style.opacity = 0; else place('rs-hint', 'radio', 6); }
       else place('rs-pop', 'band', 60);
@@ -845,8 +849,9 @@
       h = '<button class="rs-b" data-a="prev" aria-label="Previous">‹</button>'
         + '<button class="rs-b pp" data-a="pp" aria-label="Play or pause">' + (on ? '❚❚' : '▶') + '</button>'
         + '<button class="rs-b" data-a="next" aria-label="Next">›</button>'
-        + '<div class="rs-tt"><b>' + esc(s ? s.name : 'Tuning…') + '</b><span class="rs-live">' + liveLine() + '</span></div>'
-        + '<button class="rs-b star' + (fav ? ' on' : '') + '" data-a="fav" aria-label="Save station">★</button>' + listB;
+        + '<div class="rs-tt"><b>' + esc(s ? s.name : 'Tuning…') + '</b><span class="rs-live num">' + liveLine() + '</span></div>'
+        // an SVG star: the ★ glyph drew on iOS as an emoji tile, the "square frame round the star"
+        + '<button class="rs-b star' + (fav ? ' on' : '') + '" data-a="fav" aria-label="Save station"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.5l6-.8z"/></svg></button>' + listB;
     } else {
       var b = RS.books && RS.books[RS.bookIdx], c = b && b.ch && b.ch[RS.chIdx];
       if (RS.resume && b && RS.resume.id === b.id && RS.resume.t > 20) {

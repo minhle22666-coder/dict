@@ -4748,23 +4748,74 @@ export async function bootFocciWorld(root, opts) {
     dialM.rotation.y = Math.PI / 2; dialM.position.set(0.806, -0.04, -0.425); mount.add(dialM);
     const needle = new THREE.Mesh(new THREE.PlaneGeometry(0.01, 0.19), new THREE.MeshBasicMaterial({ color: 0xFF3B30 }));
     needle.rotation.y = Math.PI / 2; needle.position.set(0.809, -0.04, RADIO_NEEDLE[0]); mount.add(needle);
-    const glow = {}, hits = [ledM, dialM];
-    [['fm', 0.80, 0.2, 0x5AA2FF], ['fav', 0.475, 0.15, 0x7FC0FF], ['story', 0.225, 0.15, 0xFF4A3A]].forEach(([k, z, w, c]) => {
-      // a soft glow for the key that is on, none for the others ("the buttons' colours are off, too bright")
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.014, w), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
-      m.position.set(0.61, 0.338, z); mount.add(m); glow[k] = m;
-      const h = part(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, w + 0.1), hidden), k);
-      h.position.set(0.58, 0.38, z); mount.add(h); hits.push(h);
-    });
-    const knobs = {};
-    const capM = new THREE.MeshStandardMaterial({ color: 0x22262E, roughness: 0.35, metalness: 0.6 });
-    const markM = new THREE.MeshBasicMaterial({ color: 0xF2F4FA });
-    [['tune', -0.12], ['band', -0.365], ['list', -0.605]].forEach(([k, z]) => {
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.07, 0.05, 24), capM);
-      cap.position.set(0.61, 0.4, z); mount.add(cap); knobs[k] = cap;
-      const mk = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.008, 0.012), markM); mk.position.set(0.03, 0.027, 0); cap.add(mk);
-      const h = part(new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), hidden), k);
-      h.position.set(0.6, 0.42, z); mount.add(h); hits.push(h);
+    /* The radio's own controls ("why not use its buttons and animate them?").
+       Measured on the model (300 triangles): the three knobs are real
+       geometry standing above the top (y 0.318 up to 0.356) at z -0.19,
+       -0.43 and -0.68 -- not where the first caps were put, which is why
+       they floated beside them. They are cut out of the mesh here, each into
+       its own mesh with its pivot on its own axis, so they turn. The keys
+       are only painted on the flat top (FM z 0.605-0.875, save 0.33-0.51,
+       story 0.075-0.255, all x 0.525-0.65, blue (47,143,204), red
+       (203,61,69)): a cap of the same size and colour sits on each, so a key
+       goes down when pressed and lights for its mode. */
+    const hits = [ledM, dialM], knobs = {}, keys = {}, knobHits = {};
+    model.updateMatrixWorld(true);
+    let body = null; model.traverse((o) => { if (o.isMesh && !body) body = o; });
+    if (body) {
+      const gg = body.geometry, pa = gg.attributes.position, ua = gg.attributes.uv, na = gg.attributes.normal;
+      const ix = gg.index ? gg.index.array : null, nn = ix ? ix.length : pa.count;
+      const Mw = body.matrixWorld.clone(), Nm = new THREE.Matrix3().getNormalMatrix(Mw);
+      const P = (i) => new THREE.Vector3().fromBufferAttribute(pa, i).applyMatrix4(Mw);
+      const KZ = [-0.19, -0.43, -0.68], groups = [[], [], []], keep = [];
+      for (let t = 0; t < nn; t += 3) {
+        const ia = ix ? ix[t] : t, ib = ix ? ix[t + 1] : t + 1, ic = ix ? ix[t + 2] : t + 2;
+        const A = P(ia), B = P(ib), C = P(ic);
+        const cx = (A.x + B.x + C.x) / 3, cy = (A.y + B.y + C.y) / 3, cz = (A.z + B.z + C.z) / 3;
+        let k = -1;
+        if (cy > 0.322 && cx > 0.4 && cx < 0.8) {
+          k = 0; for (let j = 1; j < 3; j++) if (Math.abs(cz - KZ[j]) < Math.abs(cz - KZ[k])) k = j;
+          if (Math.abs(cz - KZ[k]) > 0.12) k = -1;
+        }
+        if (k < 0) keep.push(ia, ib, ic); else groups[k].push(ia, ib, ic);
+      }
+      if (groups.every((gr) => gr.length)) {
+        const g2 = gg.clone(); g2.setIndex(keep); body.geometry = g2;   // a clone: the loaded geometry is shared through the prop cache
+        ['tune', 'band', 'list'].forEach((name, k) => {
+          const list = groups[k], ctr = new THREE.Vector3();
+          list.forEach((i) => ctr.add(P(i))); ctr.divideScalar(list.length); ctr.y = 0;
+          const pos = [], nor = [], uvs = [];
+          list.forEach((i) => {
+            const v = P(i).sub(ctr); pos.push(v.x, v.y, v.z);
+            if (na) { const n = new THREE.Vector3().fromBufferAttribute(na, i).applyMatrix3(Nm).normalize(); nor.push(n.x, n.y, n.z); }
+            if (ua) uvs.push(ua.getX(i), ua.getY(i));
+          });
+          const kg = new THREE.BufferGeometry();
+          kg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+          if (nor.length) kg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); else kg.computeVertexNormals();
+          if (uvs.length) kg.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+          const km = new THREE.Mesh(kg, body.material);
+          km.position.copy(ctr); mount.add(km); knobs[name] = km;
+          const h = part(new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), hidden), name);
+          h.position.set(ctr.x, 0.34, ctr.z); mount.add(h); hits.push(h); knobHits[name] = h;
+        });
+      }
+    }
+    if (!knobs.tune) {   // the cut failed (a re-exported model): plain caps, as before
+      const capM = new THREE.MeshStandardMaterial({ color: 0x22262E, roughness: 0.35, metalness: 0.6 });
+      [['tune', -0.19], ['band', -0.43], ['list', -0.68]].forEach(([k, z]) => {
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.04, 20), capM);
+        cap.position.set(0.595, 0.338, z); mount.add(cap); knobs[k] = cap;
+        const h = part(new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), hidden), k);
+        h.position.set(0.595, 0.34, z); mount.add(h); hits.push(h); knobHits[k] = h;
+      });
+    }
+    [['fm', 0.74, 0.27, '#2F8FCC'], ['fav', 0.42, 0.18, '#2F8FCC'], ['story', 0.165, 0.18, '#CB3D45']].forEach(([k, z, w, c]) => {
+      const col = new THREE.Color(c).convertSRGBToLinear();
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.125, 0.018, w - 0.012),
+        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0, roughness: 0.45 }));
+      cap.position.set(0.5875, 0.327, z); cap.userData.up = 0.327; mount.add(cap); keys[k] = cap;
+      const h = part(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, w + 0.04), hidden), k);
+      h.position.set(0.59, 0.37, z); mount.add(h); hits.push(h);
     });
     model.traverse((o) => { if (o.isMesh) hits.push(o); });
     // the names of the controls, printed on the top (see drawLabels)
@@ -4775,7 +4826,7 @@ export async function bootFocciWorld(root, opts) {
     drawLabels(labels, 'fm');
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFFD27A, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.5 }));
     halo.scale.setScalar(2.4); halo.position.set(0, 0.6, -0.4); R.add(halo);
-    return { R, mount, led, needle, knobs, glow, keys: glow, halo, parts: hits, ledM, dialM, labels };
+    return { R, mount, led, needle, knobs, keys, knobHits, halo, parts: hits, ledM, dialM, labels };
   }
   /* What each control is, printed on the radio itself, on a strip lying on
      the top between the keys and knobs and the front edge. The first try
@@ -4789,7 +4840,7 @@ export async function bootFocciWorld(root, opts) {
     return t;
   }
   // model z of each control, and where that falls across the strip (z 0.98 .. -0.80)
-  const RADIO_CTL = [['FM', 0.80], ['SAVE', 0.475], ['STORY', 0.225], ['TUNE', -0.12], ['BAND', -0.365], ['LIST', -0.605]];
+  const RADIO_CTL = [['FM', 0.74], ['SAVE', 0.42], ['STORY', 0.165], ['TUNE', -0.19], ['BAND', -0.43], ['LIST', -0.68]];
   function drawLabels(tex, mode) {
     if (tex.userData.key === mode) return;
     tex.userData.key = mode;
@@ -4865,7 +4916,6 @@ export async function bootFocciWorld(root, opts) {
     }
     story.t = 0; story.focusT = 0; story.focus = 0; story.hint = true;
     story.orb = { th: 1.95, ph: 1.05, r: 13, tth: 1.95, tph: 1.05, tr: 13, touched: false };
-    story.forb = { th: 0, ph: 1.12, r: 2.9, tth: 0, tph: 1.12, tr: 2.9 };
     storyMode = true;
     return true;
   }
@@ -4887,21 +4937,21 @@ export async function bootFocciWorld(root, opts) {
       else Rd.halo.material.opacity += (0.04 - Rd.halo.material.opacity) * 0.1;
       Rd.R.position.y = y;
     }
-    // the world view: the player's own orbit, a slow sway until they first touch it
+    /* One camera, always free ("after tapping the radio I can no longer turn
+       the Little Prince's world until I press back"). It orbits a centre
+       that slides from the book to the radio as it comes in: far out it
+       turns round the whole book, close in round the radio, and a pinch
+       out from the radio is already back in the world. A tap on the radio
+       only sets where the orbit is heading. */
     if (!O.touched) O.tth = 1.95 + Math.sin(S.t * 0.1) * 0.3;
-    const ease = Math.min(1, dt * 6);
+    const ease = Math.min(1, dt * 4);
     O.th += (O.tth - O.th) * ease; O.ph += (O.tph - O.ph) * ease; O.r += (O.tr - O.r) * ease;
-    F.th += (F.tth - F.th) * ease; F.ph += (F.tph - F.ph) * ease; F.r += (F.tr - F.r) * ease;
-    const ox = S.c.x + O.r * Math.sin(O.ph) * Math.sin(O.th), oy = S.c.y + O.r * Math.cos(O.ph), oz = S.c.z + O.r * Math.sin(O.ph) * Math.cos(O.th);
-    // the close view: its own orbit round the radio, measured from the radio's front
     S.spot.updateMatrixWorld(true);
     const at = Rd.R.localToWorld(_sl.set(0, 0.35, 0.15));
-    const yaw = S.spot.rotation.y + F.th;
-    _sf.set(at.x + F.r * Math.sin(F.ph) * Math.sin(yaw), at.y + F.r * Math.cos(F.ph), at.z + F.r * Math.sin(F.ph) * Math.cos(yaw));
-    S.focusT += ((S.focus ? 1 : 0) - S.focusT) * Math.min(1, dt * 2.4);
-    const k = S.focusT * S.focusT * (3 - 2 * S.focusT);
-    S.cm.position.set(ox + (_sf.x - ox) * k, oy + (_sf.y - oy) * k, oz + (_sf.z - oz) * k);
+    const nearK = Math.max(0, Math.min(1, (9 - O.r) / 6)), k = nearK * nearK * (3 - 2 * nearK);
+    S.near = nearK;
     _sc.set(S.c.x + (at.x - S.c.x) * k, S.c.y + (at.y - S.c.y) * k, S.c.z + (at.z - S.c.z) * k);
+    S.cm.position.set(_sc.x + O.r * Math.sin(O.ph) * Math.sin(O.th), _sc.y + O.r * Math.cos(O.ph), _sc.z + O.r * Math.sin(O.ph) * Math.cos(O.th));
     /* A phone held upright sees a narrow slice: fov is vertical, so at 42 the
        width was 20 degrees. Widen it until about 36 degrees across fit. */
     const asp = window.innerWidth / window.innerHeight;
@@ -4916,17 +4966,10 @@ export async function bootFocciWorld(root, opts) {
      round the book, or -- in front of the radio -- the radio itself. */
   function storyOrbit(o) {
     if (!story) return;
-    if (story.focus) {
-      const F = story.forb;
-      if (o.dx) F.tth = Math.max(-1.25, Math.min(1.25, F.tth - o.dx * 0.009));
-      if (o.dy) F.tph = Math.max(0.45, Math.min(1.42, F.tph - o.dy * 0.006));
-      if (o.zoom) F.tr = Math.max(1.3, Math.min(5.5, F.tr * o.zoom));
-      return;
-    }
     const O = story.orb; O.touched = true;
     if (o.dx) O.tth -= o.dx * 0.0085;
-    if (o.dy) O.tph = Math.max(0.35, Math.min(1.42, O.tph - o.dy * 0.006));
-    if (o.zoom) O.tr = Math.max(4, Math.min(26, O.tr * o.zoom));
+    if (o.dy) O.tph = Math.max(0.35, Math.min(1.45, O.tph - o.dy * 0.006));
+    if (o.zoom) O.tr = Math.max(1.3, Math.min(26, O.tr * o.zoom));
   }
   /* What the controls ask of the radio. */
   function storyRadio(o) {
@@ -4935,19 +4978,24 @@ export async function bootFocciWorld(root, opts) {
     if (o.hint !== undefined) story.hint = o.hint;
     if (o.focus !== undefined) {
       story.focus = o.focus ? 1 : 0;
-      // each visit starts straight in front of it
-      if (o.focus) Object.assign(story.forb, { tth: 0, tph: 1.12, tr: 2.9 });
+      const O = story.orb; O.touched = true;
+      if (o.focus) {
+        // in front of it: the radio's facing, by the shorter way round
+        const want = story.spot.rotation.y;
+        O.tth = O.th + Math.atan2(Math.sin(want - O.th), Math.cos(want - O.th));
+        O.tph = 1.12; O.tr = 2.9;
+      } else { O.tr = 13; O.tph = 1.05; }
     }
     if (o.mode) {
       story.mode = o.mode;
-      Rd.glow.fm.material.opacity = o.mode === 'fm' ? 0.45 : 0;
-      Rd.glow.story.material.opacity = o.mode === 'story' ? 0.45 : 0;
+      Rd.keys.fm.material.emissiveIntensity = o.mode === 'fm' ? 0.55 : 0;
+      Rd.keys.story.material.emissiveIntensity = o.mode === 'story' ? 0.55 : 0;
       drawLabels(Rd.labels, o.mode);
     }
-    if (o.fav !== undefined) Rd.glow.fav.material.opacity = o.fav ? 0.4 : 0;
+    if (o.fav !== undefined) Rd.keys.fav.material.emissiveIntensity = o.fav ? 0.5 : 0;
     if (o.needle !== undefined) Rd.needle.position.z = RADIO_NEEDLE[0] + (RADIO_NEEDLE[1] - RADIO_NEEDLE[0]) * Math.max(0, Math.min(1, o.needle));
     if (o.knob) Object.keys(o.knob).forEach((n) => { if (Rd.knobs[n]) Rd.knobs[n].rotation.y = o.knob[n]; });
-    if (o.press && Rd.keys[o.press]) { const kk = Rd.keys[o.press]; kk.position.y = 0.326; setTimeout(() => { kk.position.y = 0.338; }, 140); }
+    if (o.press && Rd.keys[o.press]) { const kk = Rd.keys[o.press]; kk.position.y = kk.userData.up - 0.009; setTimeout(() => { kk.position.y = kk.userData.up; }, 150); }
     if (o.led) drawLed(Rd.led, o.led[0], o.led[1], o.led[2], story.mode);
   }
   /* Which part of the radio is under a point on screen. */
@@ -4965,7 +5013,7 @@ export async function bootFocciWorld(root, opts) {
   function storyAnchor(part) {
     if (!story) return null;
     const Rd = story.radio;
-    const obj = { fm: Rd.glow.fm, fav: Rd.glow.fav, story: Rd.glow.story, tune: Rd.knobs.tune, band: Rd.knobs.band, list: Rd.knobs.list, led: Rd.ledM, dial: Rd.dialM }[part] || Rd.halo;
+    const obj = { fm: Rd.keys.fm, fav: Rd.keys.fav, story: Rd.keys.story, tune: Rd.knobHits.tune, band: Rd.knobHits.band, list: Rd.knobHits.list, led: Rd.ledM, dial: Rd.dialM }[part] || Rd.halo;
     obj.getWorldPosition(_sc);
     if (part === 'radio') _sc.y += 0.35;
     const v = _sc.project(story.cm);
@@ -6419,7 +6467,7 @@ export async function bootFocciWorld(root, opts) {
     else if (kind === 'gift') spawnPickupBurst(room, p.x, top, p.z, 0xFFD36A);
   }
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
-    storyRadio, storyPick, storyAnchor, storyOrbit,
+    storyRadio, storyPick, storyAnchor, storyOrbit, storyNear: () => (story ? story.near || 0 : 0),
     // three.js and the model cache for the other scripts (oracle.js tosses the user's coin with it)
     kit: () => ({ THREE, loadProp }), appleAnchor, openGiftBox: (id) => openGiftBox(rooms[currentRoomKey], id),
     treeTapAt: (x, z) => treeTap(rooms[currentRoomKey], { x, z }),

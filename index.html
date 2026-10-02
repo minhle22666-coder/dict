@@ -7,7 +7,7 @@
    search row and XP pill showed for a moment over a blank page. */
 document.documentElement.classList.add('home-on');</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-<title>Focci&rsquo;s Little Tales</title>
+<title>Focci&rsquo;s Little World</title>
 
 <link rel="manifest" href="./manifest.json" />
 <meta name="theme-color" content="#0E1B2A" />
@@ -6923,6 +6923,11 @@ document.documentElement.classList.add('home-on');</script>
   .zz-night h3{margin:10px 0 6px;font-size:20px;font-weight:600;color:#EDEFFB}
   .zz-night p{margin:0 0 24px;font-size:13px}
   .zz-night button{height:42px;padding:0 20px;border:0;border-radius:99px;cursor:pointer;font-size:13.5px;color:#C9CDE6;background:rgba(237,239,251,.1)}
+
+  /* the strip's buttons: round, no grey tap square on iOS */
+  .fa-story button,.fa-bar button,.fa-relax button,.zz-pill,.pr button{-webkit-tap-highlight-color:transparent;outline:none}
+  html body .rs-b{display:grid;place-items:center;border-radius:50%;-webkit-appearance:none;appearance:none;padding:0}
+  html body .rs-b.star svg{display:block}
 </style>
 </head>
 <body>
@@ -6940,7 +6945,7 @@ document.documentElement.classList.add('home-on');</script>
 <div class="topbar">
   <div class="brand" onclick="backToHome()" title="Back to home">
     <img src="./icon-192.png" alt="" />
-    <h1>Focci&rsquo;s Little Tales</h1>
+    <h1>Focci&rsquo;s Little World</h1>
     <button class="topbar-theme-btn" id="theme-btn" aria-label="Change theme" title="Change theme" onclick="event.stopPropagation();toggleThemePop()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="13.5" cy="6.5" r=".6" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r=".6" fill="currentColor" stroke="none"/>
@@ -7596,10 +7601,10 @@ document.documentElement.classList.add('home-on');</script>
        mascots are not all on home at once. -->
   <div class="cz-main">
     <div class="cz-status">
-      <span class="cz-mark">Focci&rsquo;s Little Tales</span>
+      <span class="cz-mark">Focci&rsquo;s Little World</span>
       <span class="cz-live" id="cz-live"><i></i><b id="cz-live-t">Island waking</b><span class="num" id="cz-clock"></span></span>
     </div>
-    <h1 class="cz-title">Find your<br/>own words.</h1>
+    <h1 class="cz-title">A Little World<br/>of Words</h1>
     <p class="cz-sub">A quiet island to learn on.<br/>Focci is waiting for you.</p>
     <button class="cz-today" id="cz-today" onclick="czOpen('stats')"><span class="cz-today-bar"><i id="cz-today-i"></i></span><b class="num" id="cz-today-n">0 / 20 XP</b><span id="cz-today-s">today</span></button>
 
