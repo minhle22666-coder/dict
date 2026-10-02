@@ -3483,6 +3483,47 @@ export async function bootFocciWorld(root, opts) {
     const sp = spawnOverride || r.spawn;
     charState.x = sp.x; charState.z = sp.z;
     cam.tTheta = DEFAULT_CAM.theta; cam.tPhi = DEFAULT_CAM.phi; cam.tRadius = DEFAULT_CAM.radius;
+    warmShaders(1500);
+  }
+
+  /* Shaders before they are needed, a material at a time.
+
+     three.js compiles a material's program the first time it is DRAWN.
+     Everything behind the camera at boot -- most of the island -- was
+     compiled the moment the camera turned to it: measured, a look round
+     after landing built 5 new programs and an apple 2, each one a frame
+     the main thread is blocked for (up to 47ms here, several times that on
+     a phone, which is the stutter while walking). renderer.compile(scene)
+     does all of it up front but in one go: 12 programs, 565ms, a freeze.
+
+     So one object per idle slot. compile() takes its lights and fog from
+     the scene passed in and walks it with traverse(); a view made with
+     Object.create(scene) keeps the scene's lights, fog and environment and
+     visits only the one object, so the program it builds is the same one
+     the real frame will ask for (light count included -- see the light
+     pool). Measured after: 11 programs, none over 14ms, and a full look
+     round built nothing. Re-run whenever a room is entered. */
+  let warmTok = 0;
+  function warmShaders(delay) {
+    const tok = ++warmTok, tried = new WeakSet();
+    const later = (fn, ms) => (ms ? setTimeout(fn, ms) : window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 800 }) : setTimeout(fn, 60));
+    const slot = () => {
+      if (tok !== warmTok) return;
+      const props = renderer.properties;
+      let job = null;
+      scene.traverseVisible((o) => {
+        if (job || !o.material || tried.has(o)) return;
+        const ms = Array.isArray(o.material) ? o.material : [o.material];
+        if (ms.some((m) => m && !props.get(m).currentProgram)) job = o;
+      });
+      if (!job) return;
+      tried.add(job);
+      const view = Object.create(scene);
+      view.traverse = (cb) => cb(job);
+      try { renderer.compile(view, camera); } catch (e) { /* drawn the old way, then */ }
+      later(slot);
+    };
+    later(slot, delay || 1);
   }
   enterRoom('station');
 
@@ -3642,16 +3683,29 @@ export async function bootFocciWorld(root, opts) {
      raycast. It comes in quickly and goes back out slowly, so a gable
      sliding past does not make the view pump. Not on the sky island (the
      field stops below it) or indoors, where the view is his own eyes. */
+  /* Trees are not in the height field, and at the spawn three crowns sat
+     between the lens and Focci: the first view of the island was a wall
+     of green polygons. treeIndex() keeps each crown as a cylinder (its
+     lowest leaf to its top, 95% of its widest leaf), and the same line
+     samples are tested against the few within reach -- arithmetic, no
+     raycast. A crown he is standing under (blocked in the first quarter)
+     is left alone: pulling in there would only push the lens into him. */
   let camPull = 1;
   function camClearance(ox, oy, oz) {
     const room = activeRoom();
     let want = 1;
     if (room && room.field && !room._insideHut && character.position.y < GROUND_CEIL) {
       const N = 14, tx = charState.x, ty = character.position.y + 1.0, tz = charState.z;
+      const reach = Math.hypot(ox, oz) + 4;
+      const near = (room.collidables && room.collidables[0] && room._trees !== undefined ? room._trees : [])
+        .filter((t) => t.r > 0 && Math.hypot(t.x - tx, t.z - tz) < reach + t.r);
       for (let i = 1; i <= N; i++) {
-        const s = i / N;
-        const g = groundAt(room, tx + ox * s, tz + oz * s);
-        if (g.hit && g.y + 0.5 > ty + oy * s) { want = Math.max(0.22, s - 1.5 / N); break; }
+        const s = i / N, px = tx + ox * s, py = ty + oy * s, pz = tz + oz * s;
+        const g = groundAt(room, px, pz);
+        if (g.hit && g.y + 0.5 > py) { want = Math.max(0.22, s - 1.5 / N); break; }
+        if (s > 0.25 && near.some((t) => py > t.lo && py < t.top + 0.3 && Math.hypot(t.x - px, t.z - pz) < t.r * 0.95)) {
+          want = Math.max(0.22, s - 1.5 / N); break;
+        }
       }
     }
     camPull += (want - camPull) * (want < camPull ? 0.35 : 0.06);
@@ -4758,7 +4812,7 @@ export async function bootFocciWorld(root, opts) {
     const trees = [];
     cells.forEach((c) => {
       if (c.t >= 0) return;
-      const tr = { x: 0, z: 0, n: 0, y0: Infinity, y1: -Infinity, top: -Infinity, verts: [], taps: [], lastApple: 0 };
+      const tr = { x: 0, z: 0, n: 0, y0: Infinity, y1: -Infinity, top: -Infinity, lo: Infinity, r: 0, verts: [], taps: [], lastApple: 0 };
       const q = [c]; c.t = trees.length;
       while (q.length) {
         const a = q.pop();
@@ -4776,11 +4830,17 @@ export async function bootFocciWorld(root, opts) {
       const p = m.geometry.attributes.position;
       if (!m.userData.orig) m.userData.orig = p.array.slice();
       const lists = trees.map(() => []);
+      const crown = !TRUNK.test((m.material && m.material.name) || '');
       for (let i = 0; i < p.count; i++) {
         v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld);
         let best = -1, bd = 3.4;
         for (let t = 0; t < trees.length; t++) { const d = Math.hypot(trees[t].x - v.x, trees[t].z - v.z); if (d < bd) { bd = d; best = t; } }
-        if (best >= 0) { lists[best].push(i); if (v.y > trees[best].top) trees[best].top = v.y; }
+        if (best >= 0) {
+          const tb = trees[best];
+          lists[best].push(i); if (v.y > tb.top) tb.top = v.y;
+          // the crown as a cylinder, for the camera (camClearance)
+          if (crown) { if (v.y < tb.lo) tb.lo = v.y; if (bd > tb.r) tb.r = bd; }
+        }
       }
       lists.forEach((l, t) => { if (l.length) trees[t].verts.push({ m, idx: Int32Array.from(l) }); });
     });
@@ -6152,6 +6212,7 @@ export async function bootFocciWorld(root, opts) {
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
     storyRadio, storyPick, storyAnchor, appleAnchor, openGiftBox: (id) => openGiftBox(rooms[currentRoomKey], id),
     treeTapAt: (x, z) => treeTap(rooms[currentRoomKey], { x, z }),
+    _warmTrees: () => { const r = rooms[currentRoomKey]; if (r && r.collidables && r.collidables[0]) treeIndex(r); },
     focciDo, focciStop, focciAnchor, strum, jogStats: () => (jog ? { t: jog.t, dist: jog.dist } : null),
     breath(ph, ms) { if (focciPose && focciPose.kind === 'relax') focciPose.br = { ph, t0: performance.now(), dur: ms || 4000 }; },
     get day() { return dayFactor(); },
