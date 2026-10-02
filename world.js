@@ -3695,10 +3695,34 @@ export async function bootFocciWorld(root, opts) {
   let lastInputAt = 0;
   ['pointerdown', 'pointermove', 'wheel'].forEach((ev) =>
     canvas.addEventListener(ev, () => { lastInputAt = performance.now(); }, { passive: true }));
+  let holdTimer = 0, holdAt = null;
+  function holdCancel() {
+    if (!holdAt) return;
+    clearTimeout(holdTimer); holdAt = null;
+    root.dispatchEvent(new CustomEvent('focci-hold-cancel', { bubbles: true }));
+  }
   canvas.addEventListener('pointerdown', (e) => {
     if (overlayOpen()) return;
     // Touching the world always gives control straight back.
     if (camCinematic) { clearTimeout(camCinematic.timer); camCinematic = null; }
+    try { if (jog) jogStop(); } catch (err) {}
+    /* Held still on Focci for a second and a half: his own things to do
+       (focci-acts.js). Moving the finger first is a walk, as always. */
+    holdCancel();
+    let onHim = false;
+    try { onHim = !pointers.size && onFocciAt(e.clientX, e.clientY); } catch (err) {}
+    if (onHim) {
+      const id = e.pointerId;
+      holdAt = { x: e.clientX, y: e.clientY };
+      root.dispatchEvent(new CustomEvent('focci-hold-start', { bubbles: true, detail: { x: e.clientX, y: e.clientY } }));
+      holdTimer = setTimeout(() => {
+        const q = pointers.get(id);
+        if (!holdAt || !q || Math.hypot(q.x - holdAt.x, q.y - holdAt.y) > 14) { holdCancel(); return; }
+        holdAt = null;
+        releaseGesture();
+        root.dispatchEvent(new CustomEvent('focci-hold', { bubbles: true }));
+      }, 1500);
+    }
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) { singleId = e.pointerId; moveOrigin = { x: e.clientX, y: e.clientY }; fpvLast = null; moveVec = { x: 0, y: 0 }; downTime = Date.now(); downPos = { x: e.clientX, y: e.clientY }; }
@@ -3712,6 +3736,7 @@ export async function bootFocciWorld(root, opts) {
   canvas.addEventListener('pointermove', (e) => {
     if (overlayOpen()) { releaseGesture(); return; }
     if (!pointers.has(e.pointerId)) return;
+    if (holdAt && Math.hypot(e.clientX - holdAt.x, e.clientY - holdAt.y) > 14) holdCancel();
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1 && singleId === e.pointerId && moveOrigin) {
       if (inspectMode) {
@@ -3758,6 +3783,7 @@ export async function bootFocciWorld(root, opts) {
     }
   });
   function endPointer(e) {
+    holdCancel();
     if (e.pointerId === singleId && downPos) {
       const upDist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
       const dyUp = downPos.y - e.clientY, dxAbs = Math.abs(e.clientX - downPos.x);
@@ -4056,6 +4082,19 @@ export async function bootFocciWorld(root, opts) {
   function applyFocciPose(room, dt, t) {
     const P = focciPose; if (!P) return;
     P.t += dt;
+    if (P.kind === 'guitar') {
+      // the right arm strums on every strum the music makes; the left holds the neck
+      strumKick = Math.max(0, strumKick - dt * 5);
+      armR.rotation.set(-0.55 + strumDir * 0.42 * strumKick, 0, -0.2);
+      armL.rotation.set(-1.0 + chordShift * 0.07, 0, 0.5);
+      legL.rotation.x = legR.rotation.x = 0;
+      tailPivot.rotation.y = Math.sin(t * 2.2) * 0.12;
+      character.rotation.y = charState.angle + Math.sin(t * 1.1) * 0.05;
+      character.position.y += Math.abs(Math.sin(t * 3.1)) * 0.02;
+      cam.tTheta = P.base + Math.sin(P.t * 0.22) * 0.14;
+      return;
+    }
+    if (P.kind === 'relax') tickFlies(dt, t);
     character.rotation.order = 'YXZ';
     character.rotation.set(-Math.PI / 2, P.yaw, 0);
     const br = Math.sin(t * 1.25) * 0.5 + 0.5;    // a slow breath, about five seconds
@@ -4064,7 +4103,8 @@ export async function bootFocciWorld(root, opts) {
     legL.rotation.x = legR.rotation.x = 0; armL.rotation.x = armR.rotation.x = 0.15;
     tailPivot.rotation.y = Math.sin(t * 0.7) * 0.05;
     P.zT -= dt;
-    if (P.zT <= 0) { P.zT = 1.4; spawnZ(room, P.head.x, P.head.y + 0.25, P.head.z, 0.9); }
+    if (P.kind === 'bed' && P.zT <= 0) { P.zT = 1.4; spawnZ(room, P.head.x, P.head.y + 0.25, P.head.z, 0.9); }
+    if (P.kind === 'relax' && P.base !== undefined) cam.tTheta = P.base + Math.sin(P.t * 0.12) * 0.2;
     if (P.dots) { P.dots.position.set(P.head.x, P.head.y + 0.6 + br * 0.05, P.head.z); P.dots.material.map = dotsTex(Math.floor(t * 4.5)); }
   }
   function focciWake() {
@@ -4089,6 +4129,350 @@ export async function bootFocciWorld(root, opts) {
   canvas.addEventListener('pointerdown', (e) => {
     if (focciPose && focciPose.wakeOnTouch !== false) { focciWake(); e.stopImmediatePropagation(); }
   }, true);
+
+  /* ============================================================
+     THINGS FOCCI DOES ON HIS OWN (hold him for a second and a half)
+
+     focci-acts.js draws the ring and the controls; this is the body:
+     - guitar: a guitar in his arms (assets/glb/guitar.glb), the right
+       arm strumming on every strum the music makes (strum()), the left
+       holding the neck, the camera circling slowly in front of him.
+     - relax: lying on his back in the grass where he stands, eyes closed,
+       breathing; grass blades sway around him in the wind and three
+       butterflies (assets/glb/butterfly.glb) circle, one coming to rest
+       on his nose for a while.
+     - jog: he runs a loop of the island by himself -- waypoints around
+       the middle at the furthest dry, open ground on each bearing, steered
+       through the ordinary movement code so walls and water still apply.
+       A touch on the island hands control back.
+     - stories: a separate little scene, the pop-up book of the Little
+       Prince (assets/glb/prince-book.glb) opening under a night sky,
+       drawn instead of the island while the story player is open.
+     All poses go through focciPose (see above); none of them adds a light.
+     ============================================================ */
+  const _hv = new THREE.Vector3();
+  function focciScreen(dy) {
+    _hv.set(character.position.x, character.position.y + dy, character.position.z).project(camera);
+    return { x: (_hv.x * 0.5 + 0.5) * window.innerWidth, y: (-_hv.y * 0.5 + 0.5) * window.innerHeight, on: _hv.z < 1 && _hv.z > -1 };
+  }
+  function onFocciAt(x, y) {
+    if (camMode === 'fpv' || flight || focciPose || storyMode) return false;
+    const f = focciScreen(0), h = focciScreen(1.7);
+    if (!f.on || !h.on) return false;
+    const H = Math.abs(f.y - h.y), cx = (f.x + h.x) / 2;
+    return y > h.y - H * 0.1 && y < f.y + H * 0.08 && Math.abs(x - cx) < Math.max(30, H * 0.45);
+  }
+  function focciAnchor() {
+    const c = focciScreen(0.85), top = focciScreen(1.85), f = focciScreen(0);
+    return { c, top, r: Math.max(40, Math.abs(f.y - top.y) * 0.55) };
+  }
+  const props = {};
+  function loadProp(name) {
+    if (!props[name]) props[name] = loadGLB(ASSET(name));
+    return props[name];
+  }
+  /* A camera bearing around a point with nothing solid between: the
+     orbiting shot went straight through a tree on the first try (trees and
+     fences are not in the height field). One real ray per candidate, once,
+     when the pose starts; then the view only sways a little around it. */
+  let pickBlocked = 0;
+  function pickCamAngle(tx, ty, tz, R, PH, prefs) {
+    const room = activeRoom();
+    const tg = new THREE.Vector3(tx, ty, tz), dir = new THREE.Vector3();
+    const solid = (o) => {
+      if (!o.isMesh || o.isSprite || (o.userData && o.userData.interactType)) return false;
+      for (let q = o; q; q = q.parent) { if (!q.visible || q === character || q === grass) return false; }
+      return true;
+    };
+    /* Five rays per candidate: to the lens and to four points around it,
+       each carried half a unit past it. The middle ray alone came back
+       clear while a tree crown beside the lens filled the frame. Of the
+       candidates, the first with all five clear wins, else the one with
+       the fewest blocked. */
+    const lens = new THREE.Vector3(), side = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), pt = new THREE.Vector3();
+    let best = prefs[0], bestN = 99;
+    raycaster.camera = camera;     // sprites (nameplates) need the camera to be hit-tested at all
+    for (const a of prefs) {
+      const sp = Math.sin(PH);
+      lens.set(tx + R * sp * Math.sin(a), ty + R * Math.cos(PH) + 0.1, tz + R * sp * Math.cos(a));
+      side.set(Math.cos(a), 0, -Math.sin(a));
+      let n = 0;
+      for (const [u, v] of [[0, 0], [0.9, 0], [-0.9, 0], [0, 0.7], [0, -0.5]]) {
+        pt.copy(lens).addScaledVector(side, u).addScaledVector(up, v);
+        dir.copy(pt).sub(tg);
+        const len = dir.length() + 0.5;
+        raycaster.set(tg, dir.normalize()); raycaster.far = len;
+        if (raycaster.intersectObject(room.group, true).some((h) => solid(h.object))) n++;
+      }
+      raycaster.far = Infinity;
+      if (n === 0) { pickBlocked = 0; return a; }
+      if (n < bestN) { bestN = n; best = a; }
+    }
+    pickBlocked = bestN;
+    return best;
+  }
+  function shortTurn(a) { return cam.theta + Math.atan2(Math.sin(a - cam.theta), Math.cos(a - cam.theta)); }
+  let savedCam = null;
+  function holdCam() { if (!savedCam) savedCam = { theta: cam.tTheta, phi: cam.tPhi, radius: cam.tRadius }; }
+  function giveCamBack() {
+    if (savedCam) { cam.tPhi = savedCam.phi; cam.tRadius = savedCam.radius; savedCam = null; }
+    camFocus.on = false;
+  }
+
+  /* ---------- the guitar ---------- */
+  let guitarRig = null, strumKick = 0, strumDir = 1, chordShift = 0;
+  async function guitarOn() {
+    const room = activeRoom();
+    if (!guitarRig) {
+      const g = await loadProp('guitar.glb');
+      const m = g.scene;
+      const box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+      // long side to 0.5 of the model's own height (rig units: he is 0.97 tall)
+      const L = Math.max(size.x, size.y, size.z), s = 0.5 / L;
+      const inner = new THREE.Group();
+      m.position.set(-ctr.x, -ctr.y, -ctr.z);
+      inner.add(m);
+      // stand the longest side up, whichever it is in the file
+      if (L === size.x) inner.rotation.z = Math.PI / 2; else if (L === size.z) inner.rotation.x = Math.PI / 2;
+      inner.scale.setScalar(s);
+      const holder = new THREE.Group();
+      holder.add(inner);
+      inner.position.y = 0.12;     // the body below his hand, the neck rising past it
+      m.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+      guitarRig = holder;
+    }
+    guitarRig.position.set(0.02, 0.33, 0.2);
+    guitarRig.rotation.set(0.15, 0, 1.0);
+    rig.add(guitarRig);
+    guitarRig.visible = true;
+    holdCam();
+    cam.tRadius = 3.4; cam.tPhi = 1.36;
+    const a0 = charState.angle;
+    const prefs0 = [a0, a0 + 0.45, a0 - 0.45, a0 + 0.9, a0 - 0.9, a0 + 1.4, a0 - 1.4];
+    let base = shortTurn(pickCamAngle(charState.x, character.position.y + 1.0, charState.z, 3.4, 1.36, prefs0));
+    if (pickBlocked) { cam.tRadius = 2.4; base = shortTurn(pickCamAngle(charState.x, character.position.y + 1.0, charState.z, 2.4, 1.36, prefs0)); }
+    cam.tTheta = base;
+    focciPose = { kind: 'guitar', wakeOnTouch: false, t: 0, x: charState.x, z: charState.z, base };
+    return true;
+  }
+  function strum(dir, shift) { strumKick = 1; strumDir = dir || -strumDir; if (shift !== undefined) chordShift = shift; }
+
+  /* ---------- lying in the grass ---------- */
+  let grass = null, flies = [];
+  function grassAround(room, cx, cy, cz) {
+    const g = new THREE.Group();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([-0.035, 0, 0, 0.035, 0, 0, 0, 1, 0], 3));
+    geo.computeVertexNormals();
+    const mats = [0x7FAF4E, 0x93C25C, 0x6A9A42, 0xA8C96A].map((c) => new THREE.MeshLambertMaterial({ color: c, side: THREE.DoubleSide }));
+    for (let i = 0; i < 46; i++) {
+      const a = Math.random() * Math.PI * 2, r = 0.45 + Math.random() * 2.1;
+      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+      const s = groundSmooth(room, x, z);
+      const b = new THREE.Mesh(geo, mats[i % 4]);
+      b.position.set(x, (s.hit ? s.y : cy) - 0.02, z);
+      b.scale.set(1, 0.25 + Math.random() * 0.4, 1);
+      b.rotation.y = Math.random() * Math.PI;
+      b.userData.ph = Math.random() * 6;
+      g.add(b);
+    }
+    room.group.add(g);
+    return g;
+  }
+  async function relaxOn() {
+    const room = activeRoom();
+    const s = groundSmooth(room, charState.x, charState.z);
+    const gy = s.hit ? s.y : character.position.y;
+    // head the way he faces, feet where he stood
+    const hx = Math.sin(charState.angle), hz = Math.cos(charState.angle);
+    const yaw = Math.atan2(-hx, -hz);
+    const midX = charState.x + hx * 0.8, midZ = charState.z + hz * 0.8;
+    focciPose = { kind: 'relax', wakeOnTouch: false, t: 0, yaw, sc: 1, x: charState.x, y: gy + 0.24, z: charState.z,
+      head: { x: charState.x + hx * 1.45, y: gy + 0.45, z: charState.z + hz * 1.45 }, zT: 3 };
+    focciEyes(true);
+    grass = grassAround(room, midX, gy, midZ);
+    holdCam();
+    camFocus.on = true; camFocus.tx = midX; camFocus.ty = gy - 0.6; camFocus.tz = midZ;
+    cam.tRadius = 4.2; cam.tPhi = 0.62;
+    const a1 = cam.theta;
+    const prefs1 = [a1, a1 + 0.6, a1 - 0.6, a1 + 1.2, a1 - 1.2, a1 + 2, a1 - 2, a1 + Math.PI];
+    focciPose.base = shortTurn(pickCamAngle(midX, gy + 0.4, midZ, 4.2, 0.62, prefs1));
+    // nothing clear at that distance under the trees: come in closer and look again
+    if (pickBlocked) { cam.tRadius = 2.8; focciPose.base = shortTurn(pickCamAngle(midX, gy + 0.4, midZ, 2.8, 0.62, prefs1)); }
+    cam.tTheta = focciPose.base;
+    try {
+      const g = await loadProp('butterfly.glb');
+      if (!focciPose || focciPose.kind !== 'relax') return true;
+      const base = g.scene;
+      base.updateMatrixWorld(true);
+      const bb = skinnedBox(base), sz = bb.getSize(new THREE.Vector3());
+      const sc = 0.42 / Math.max(sz.x, sz.z, 0.001);   // a cartoon butterfly: 0.22 was a speck from the camera
+      const colors = [0xFFB347, 0x8EC5FF, 0xFF9AC1];
+      flies = [0, 1, 2].map((k) => {
+        const o = cloneSkinned(base);
+        o.scale.setScalar(sc);
+        o.traverse((n) => { if (n.isMesh && n.material && k > 0) { n.material = n.material.clone(); n.material.color = new THREE.Color(colors[k]); } });
+        room.group.add(o);
+        const mixer = new THREE.AnimationMixer(o);
+        const fly = g.animations.find((a) => /fly/i.test(a.name)) || g.animations[0];
+        const idle = g.animations.find((a) => /idle/i.test(a.name)) || fly;
+        const aF = mixer.clipAction(fly), aI = mixer.clipAction(idle);
+        aF.play(); aF.time = Math.random() * 2;
+        return { o, mixer, aF, aI, ph: k * 2.1, r: 1.1 + k * 0.35, h: 0.9 + k * 0.3, land: k === 0 ? 7 : 1e9, state: 'fly', t: 0 };
+      });
+    } catch (e) { /* no butterflies is still a rest */ }
+    return true;
+  }
+  const _nose = new THREE.Vector3();
+  function tickFlies(dt, t) {
+    const P = focciPose; if (!P || P.kind !== 'relax') return;
+    const mx = (P.x + P.head.x) / 2, mz = (P.z + P.head.z) / 2, my = P.y;
+    flies.forEach((f) => {
+      f.mixer.update(dt * (f.state === 'rest' ? 0.5 : 1.6));
+      f.t += dt;
+      const p = f.o.position;
+      if (f.state === 'fly') {
+        const a = t * 0.55 + f.ph;
+        const tx = mx + Math.cos(a) * f.r, tz = mz + Math.sin(a * 1.3) * f.r, ty = my + f.h + Math.sin(t * 2.1 + f.ph) * 0.18;
+        const vx = tx - p.x, vz = tz - p.z;
+        p.x += vx * Math.min(1, dt * 3); p.y += (ty - p.y) * Math.min(1, dt * 3); p.z += vz * Math.min(1, dt * 3);
+        if (Math.hypot(vx, vz) > 0.001) f.o.rotation.y = Math.atan2(vx, vz);
+        if (f.t > f.land) { f.state = 'come'; f.t = 0; }
+      } else if (f.state === 'come' || f.state === 'rest') {
+        rig.localToWorld(_nose.set(0.005, 0.69, 0.26));
+        if (f.state === 'come') {
+          const k = Math.min(1, dt * 2.2);
+          p.x += (_nose.x - p.x) * k; p.y += (_nose.y + 0.02 - p.y) * k; p.z += (_nose.z - p.z) * k;
+          if (p.distanceTo(_nose) < 0.05 || f.t > 4) { f.state = 'rest'; f.t = 0; f.aI.reset().play(); f.aF.crossFadeTo(f.aI, 0.4, false); }
+        } else {
+          p.copy(_nose); p.y += 0.02;
+          if (f.t > 10) { f.state = 'fly'; f.t = 0; f.land = 12 + Math.random() * 8; f.aF.reset().play(); f.aI.crossFadeTo(f.aF, 0.3, false); }
+        }
+      }
+    });
+    if (grass) grass.children.forEach((b) => {
+      const w = Math.sin(t * 1.7 + b.userData.ph) * 0.16 + Math.sin(t * 0.45) * 0.12;
+      b.rotation.z = w; b.rotation.x = w * 0.4;
+    });
+  }
+
+  /* ---------- running a lap of the island ---------- */
+  let jog = null;
+  function jogOn() {
+    const room = activeRoom();
+    const c = room.spawn || { x: 0, z: 0 };
+    const pts = [];
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * Math.PI * 2;
+      for (let r = 19; r >= 5; r -= 1) {
+        const x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
+        const s = groundSmooth(room, x, z);
+        if (s.hit && !s.water && !s.building && !blockedAt(room, x, z, s.y)) { pts.push({ x, z }); break; }
+      }
+    }
+    if (pts.length < 4) return false;
+    // start from the nearest, run round in order
+    let i0 = 0, bd = Infinity;
+    pts.forEach((p, i) => { const d = Math.hypot(p.x - charState.x, p.z - charState.z); if (d < bd) { bd = d; i0 = i; } });
+    jog = { pts, i: i0, t: 0, dist: 0, lx: charState.x, lz: charState.z, best: Infinity, stuckT: 0 };
+    holdCam();
+    return true;
+  }
+  function jogSteer(dt) {
+    const p = jog.pts[jog.i];
+    const dx = p.x - charState.x, dz = p.z - charState.z, d = Math.hypot(dx, dz);
+    jog.t += dt;
+    jog.dist += Math.hypot(charState.x - jog.lx, charState.z - jog.lz); jog.lx = charState.x; jog.lz = charState.z;
+    if (d < 1.2 || jog.stuckT > 2.5) { jog.i = (jog.i + 1) % jog.pts.length; jog.best = Infinity; jog.stuckT = 0; return; }
+    if (d < jog.best - 0.3) { jog.best = d; jog.stuckT = 0; } else jog.stuckT += dt;
+    const ux = dx / d, uz = dz / d;
+    const fX = -Math.sin(cam.theta), fZ = -Math.cos(cam.theta), rX = Math.cos(cam.theta), rZ = -Math.sin(cam.theta);
+    moveVec.y = -(ux * fX + uz * fZ); moveVec.x = ux * rX + uz * rZ;
+    // the camera drifts round behind him
+    const want = charState.angle + Math.PI;
+    cam.tTheta += Math.atan2(Math.sin(want - cam.tTheta), Math.cos(want - cam.tTheta)) * Math.min(1, dt * 0.8);
+  }
+  function jogStop() {
+    if (!jog) return;
+    const st = { t: jog.t, dist: jog.dist };
+    jog = null; moveVec.x = 0; moveVec.y = 0;
+    giveCamBack();
+    root.dispatchEvent(new CustomEvent('focci-act-end', { bubbles: true, detail: { kind: 'jog', t: st.t, dist: st.dist } }));
+  }
+
+  /* ---------- the Little Prince's book ---------- */
+  let storyMode = false, story = null;
+  async function storyOn(on) {
+    if (!on) { storyMode = false; return true; }
+    if (!story) {
+      const sc = new THREE.Scene();
+      sc.background = new THREE.Color(0x1B2342);
+      sc.add(new THREE.HemisphereLight(0xFFE9C9, 0x2B3A66, 1.05));
+      const sun = new THREE.DirectionalLight(0xFFE2B0, 1.15); sun.position.set(4, 8, 6); sc.add(sun);
+      const stars = new THREE.BufferGeometry(), sp = [];
+      for (let i = 0; i < 420; i++) {
+        const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = 45;
+        const y = Math.abs(u) * r * 0.9 + 2;
+        sp.push(Math.cos(a) * Math.sqrt(1 - u * u) * r, y, Math.sin(a) * Math.sqrt(1 - u * u) * r);
+      }
+      stars.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+      const starPts = new THREE.Points(stars, new THREE.PointsMaterial({ color: 0xFFF6DA, size: 0.22, sizeAttenuation: true, transparent: true, opacity: 0.85 }));
+      sc.add(starPts);
+      const g = await loadProp('prince-book.glb');
+      const m = g.scene;
+      const box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+      const s = 3.2 / Math.max(size.x, size.z, 0.001);
+      const holder = new THREE.Group(); m.position.set(-ctr.x, -box.min.y, -ctr.z); holder.add(m); holder.scale.setScalar(s);
+      sc.add(holder);
+      const mixer = g.animations.length ? new THREE.AnimationMixer(m) : null;
+      if (mixer) { const a = mixer.clipAction(g.animations[0]); a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; a.play(); }
+      const cm = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.05, 200);
+      story = { sc, cm, mixer, stars: starPts, t: 0, h: size.y * s };
+    } else if (story.mixer) {
+      story.mixer._actions.forEach((a) => { a.reset(); a.play(); });
+    }
+    story.t = 0;
+    storyMode = true;
+    return true;
+  }
+  function renderStory(dt) {
+    const S = story; S.t += dt;
+    if (S.mixer) S.mixer.update(dt);
+    const a = 0.6 + S.t * 0.06, R = 6.2 - Math.min(1.2, S.t * 0.15);
+    S.cm.aspect = window.innerWidth / window.innerHeight; S.cm.updateProjectionMatrix();
+    S.cm.position.set(Math.sin(a) * R, 2.6 + Math.sin(S.t * 0.2) * 0.3, Math.cos(a) * R);
+    S.cm.lookAt(0, Math.max(0.5, S.h * 0.35), 0);
+    S.stars.rotation.y = S.t * 0.01;
+    renderer.render(S.sc, S.cm);
+  }
+
+  /* ---------- the one way in and out ---------- */
+  async function focciDo(kind) {
+    focciStop(true);
+    if (kind === 'guitar') return guitarOn();
+    if (kind === 'relax') return relaxOn();
+    if (kind === 'jog') return jogOn();
+    if (kind === 'stories') return storyOn(true);
+    return false;
+  }
+  function focciStop(quiet) {
+    if (jog) jogStop();
+    if (storyMode) storyOn(false);
+    const P = focciPose;
+    if (!P || (P.kind !== 'guitar' && P.kind !== 'relax')) return;
+    focciPose = null;
+    if (guitarRig) { rig.remove(guitarRig); }
+    if (grass) { grass.parent && grass.parent.remove(grass); grass = null; }
+    flies.forEach((f) => { f.o.parent && f.o.parent.remove(f.o); f.mixer.stopAllAction(); }); flies = [];
+    if (P.dots && P.dots.parent) P.dots.parent.remove(P.dots);
+    focciEyes(false);
+    character.rotation.order = 'XYZ';
+    character.rotation.set(0, charState.angle, 0);
+    character.scale.setScalar(1);
+    armL.rotation.set(0, 0, 0); armR.rotation.set(0, 0, 0);
+    giveCamBack();
+    if (!quiet) root.dispatchEvent(new CustomEvent('focci-act-end', { bubbles: true, detail: { kind: P.kind } }));
+  }
 
   function onInteract(obj) {
     const room = activeRoom();
@@ -4219,7 +4603,8 @@ export async function bootFocciWorld(root, opts) {
   function syncMusic() {
     /* Quiet while a real clip is playing (the YouGlish player, html.ygm-on):
        the island's music used to play on underneath the speaker. */
-    const want = musicArmed && soundOn && !overlayOpen() && !document.documentElement.classList.contains('ygm-on');
+    const want = musicArmed && soundOn && !overlayOpen() && !document.documentElement.classList.contains('ygm-on')
+      && !document.documentElement.classList.contains('fa-quiet');
     if (!want) { if (!bgm.paused) bgm.pause(); return; }
     if (!bgm.paused || bgmTrying || bgmNeedsTouch) return;
     bgmTrying = true;
@@ -4473,6 +4858,7 @@ export async function bootFocciWorld(root, opts) {
        doesn't lurch forward by the whole paused duration on resume. */
     syncMusic();
     if (overlayOpen()) { releaseGesture(); clock.getDelta(); return; }
+    if (storyMode && story) { renderStory(Math.min(clock.getDelta(), 0.05)); return; }
     /* Half rate while nobody is doing anything. Standing still, the island
        still has water, birds and a grazing doe to move, but none of it
        needs sixty frames a second, and a GPU drawing the same view sixty
@@ -4481,7 +4867,7 @@ export async function bootFocciWorld(root, opts) {
        a jump -- and the full rate is back on the next frame. Skipped frames
        do not read the clock, so the next one's dt covers both and nothing
        slows down. */
-    const busy = pointers.size > 0 || flight || (activeRoom().boat && activeRoom().boat.sailing)
+    const busy = pointers.size > 0 || flight || jog || focciPose || (activeRoom().boat && activeRoom().boat.sailing)
       || charState.jumpY > 0 || performance.now() - lastInputAt < 1200;
     if (!busy) { halfRateSkip = !halfRateSkip; if (halfRateSkip) return; }
     const dt = Math.min(clock.getDelta(), 0.05);
@@ -4523,6 +4909,7 @@ export async function bootFocciWorld(root, opts) {
 
     // Steering is not his while the boat is carrying him, or while he is asleep.
     if ((room.boat && room.boat.sailing) || focciPose) { moveVec.x = 0; moveVec.y = 0; }
+    if (jog) jogSteer(dt);
     const fwdX = -Math.sin(cam.theta), fwdZ = -Math.cos(cam.theta);
     const rightX = Math.cos(cam.theta), rightZ = -Math.sin(cam.theta);
     const fwdAmt = -moveVec.y, rightAmt = moveVec.x;
@@ -4531,7 +4918,7 @@ export async function bootFocciWorld(root, opts) {
     if (mag > 1) { moveX /= mag; moveZ /= mag; }
 
     if (mag > 0.04) {
-      const speedMul = charState.inWater ? 0.42 : 1;   // wading, not walking
+      const speedMul = (charState.inWater ? 0.42 : 1) * (jog ? 1.2 : 1);   // wading, not walking; a jog is a little quicker
       const stepX = moveX * SPEED * speedMul * dt, stepZ = moveZ * SPEED * speedMul * dt;
       /* Walk into a wall and stop; walk into it at an angle and slide
          along it. Trying the whole step first and then each axis on its
@@ -5151,6 +5538,7 @@ export async function bootFocciWorld(root, opts) {
       const rayClear = (a) => {
         const sp = Math.sin(PH), off = new THREE.Vector3(R * sp * Math.sin(a), R * Math.cos(PH) + 0.1, R * sp * Math.cos(a));
         const len = off.length();
+        raycaster.camera = camera;
         raycaster.set(tg, off.normalize()); raycaster.far = len;
         const hits = raycaster.intersectObject(room.group, true);
         raycaster.far = Infinity;
@@ -5256,6 +5644,7 @@ export async function bootFocciWorld(root, opts) {
     else if (kind === 'gift') spawnPickupBurst(room, p.x, top, p.z, 0xFFD36A);
   }
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
+    focciDo, focciStop, focciAnchor, strum, jogStats: () => (jog ? { t: jog.t, dist: jog.dist } : null),
     travelTo, get onZen() { return currentRoomKey === 'station' && character.position.y > GROUND_CEIL; },
     focusStart: (id) => talkStart(id, { focus: true }), focusEnd, focusAnchor, focciWake, get focciPose() { return focciPose ? focciPose.kind : null; },
     residentSleep, residentBath, residentFollow, anchorOf, residentsHere, celebrateAt, get currentRoom() { return currentRoomKey; } };

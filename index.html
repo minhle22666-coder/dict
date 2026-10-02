@@ -7341,6 +7341,86 @@ document.documentElement.classList.add('home-on');</script>
     transition:left .5s cubic-bezier(.5,0,.2,1),top .5s cubic-bezier(.5,0,.2,1),width .5s cubic-bezier(.5,0,.2,1),height .5s cubic-bezier(.5,0,.2,1),border-radius .5s,opacity .7s ease,filter .7s ease}
   .isl-fly.big{left:0 !important;top:0 !important;width:100vw !important;height:100vh !important;border-radius:0;filter:brightness(1.15)}
   .isl-fly.gone{opacity:0;filter:brightness(1.6) blur(6px)}
+
+  /* ---------------- Focci's own things to do (focci-acts.js) ---------------- */
+  .fa-hold{position:fixed;z-index:70;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;pointer-events:none;opacity:0}
+  .fa-hold.on{opacity:1;transition:opacity .15s}
+  .fa-hold i{position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(rgba(255,255,250,.95) var(--p,0%),rgba(255,255,250,.18) 0);
+    -webkit-mask:radial-gradient(circle,transparent 33px,#000 34px);mask:radial-gradient(circle,transparent 33px,#000 34px)}
+  .fa-hold.on i{animation:fa-fill 1.25s linear forwards}
+  @property --p{syntax:'<percentage>';inherits:false;initial-value:0%}
+  @keyframes fa-fill{to{--p:100%}}
+  .fa-ring .pr-c{width:56px;height:56px}
+  .fa-k-guitar{--a:#B5476A}.fa-k-jog{--a:#C4553F}.fa-k-relax{--a:#5E7A48}.fa-k-stories{--a:#3F5E9C}
+  .fa-bar{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);z-index:62;display:flex;align-items:center;gap:10px;
+    box-sizing:border-box;width:min(380px,calc(100vw - 24px));padding:10px 12px;border-radius:22px;background:rgba(255,255,250,.96);
+    box-shadow:var(--cz-rim),0 14px 34px rgba(30,40,20,.26);transform:translate(-50%,30px);opacity:0;pointer-events:none;transition:opacity .2s,transform .3s cubic-bezier(.3,1.2,.4,1)}
+  .fa-bar.on{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+  .fa-bt{flex:1;min-width:0;display:flex;flex-direction:column}
+  .fa-bt b{font-size:14px;font-weight:700;color:var(--cz-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fa-bt span{font-size:11.5px;color:var(--cz-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fa-nb{flex:none;width:38px;height:38px;border:0;border-radius:50%;cursor:pointer;font-size:22px;line-height:1;color:var(--cz-sage);background:var(--cz-sage-bg)}
+  .fa-run{flex:none;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;background:#C4553F;animation:fa-bob .5s ease-in-out infinite alternate}
+  .fa-run svg{width:20px;height:20px}
+  @keyframes fa-bob{to{transform:translateY(-3px)}}
+  .fa-stop{flex:none;height:36px;padding:0 16px;border:0;border-radius:13px;cursor:pointer;font-size:13px;font-weight:700;color:#fff;background:var(--cz-sage)}
+  html.fa-full .fw-menu-cluster, html.fa-full #fw-word-progress, html.fa-full #fw-chrome, html.fa-full .fw-topbar, html.fa-full .fw-xp-pill{visibility:hidden !important}
+  html.fa-on .fw-menu-cluster{visibility:hidden}
+  /* relax: the lock and the breath */
+  .fa-relax{position:fixed;inset:0;z-index:88;display:none;flex-direction:column;align-items:center;justify-content:flex-end;gap:14px;
+    padding:calc(env(safe-area-inset-top,0px) + 30px) 16px calc(env(safe-area-inset-bottom,0px) + 24px);box-sizing:border-box;
+    background:linear-gradient(180deg,rgba(20,30,18,.0) 40%,rgba(20,30,18,.32));touch-action:none}
+  .fa-relax.on{display:flex}
+  .fa-rtop{position:absolute;top:calc(env(safe-area-inset-top,0px) + 26px);left:0;right:0;text-align:center}
+  .fa-rtop .cz-cap{color:rgba(255,255,250,.85)}
+  .fa-rtop b{display:block;font-size:22px;font-weight:700;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .fa-breath{position:relative;width:170px;height:170px;display:flex;align-items:center;justify-content:center}
+  .fa-circle{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(255,255,250,.55),rgba(255,255,250,.12) 70%);
+    box-shadow:0 0 0 1.5px rgba(255,255,250,.75),0 0 40px rgba(255,255,250,.35);transform:scale(.55);transition-property:transform;transition-timing-function:ease-in-out}
+  .fa-circle.in{transform:scale(1)}.fa-circle.hold{transform:scale(1)}.fa-circle.out{transform:scale(.55)}
+  .fa-blabel{position:relative;text-align:center;font-size:20px;font-weight:700;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.4)}
+  .fa-blabel small{display:block;font-size:12px;font-weight:500;opacity:.85}
+  .fa-bcount{font-size:12px;color:rgba(255,255,250,.85)}
+  .fa-snd{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:360px}
+  .fa-snd button{height:32px;padding:0 12px;border:0;border-radius:99px;cursor:pointer;font-size:12px;font-weight:600;color:#fff;background:rgba(255,255,250,.18);
+    box-shadow:inset 0 0 0 1px rgba(255,255,250,.35)}
+  .fa-snd button.on{color:var(--cz-ink);background:rgba(255,255,250,.92)}
+  .fa-unlock{position:relative;overflow:hidden;height:44px;padding:0 22px;border:0;border-radius:99px;cursor:pointer;font-size:13px;font-weight:700;color:#fff;
+    background:rgba(20,30,18,.35);box-shadow:inset 0 0 0 1px rgba(255,255,250,.4);-webkit-user-select:none;user-select:none;touch-action:none}
+  .fa-unlock i{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,250,.3)}
+  .fa-unlock.hold i{width:100%;transition:width 1s linear}
+  .fa-unlock span{position:relative}
+  /* stories: the book behind, a sheet in front */
+  .fa-story{position:fixed;inset:0;z-index:88;display:none;flex-direction:column;justify-content:space-between}
+  .fa-story.on{display:flex}
+  .fa-fade{position:absolute;inset:0;background:#1B2342;animation:fa-fadeout 1.4s ease .45s forwards;pointer-events:none}
+  @keyframes fa-fadeout{to{opacity:0}}
+  .fa-stop-top{position:relative;display:flex;align-items:flex-start;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 24px) 18px 0}
+  .fa-stop-top .cz-cap{color:rgba(255,246,218,.75)}
+  .fa-stop-top b{display:block;font-size:20px;font-weight:700;color:#FFF6DA}
+  .fa-sheet{position:relative;box-sizing:border-box;display:flex;flex-direction:column;max-height:54vh;margin:0 auto;width:min(460px,100vw);
+    padding:12px 14px calc(env(safe-area-inset-bottom,0px) + 14px);border-radius:26px 26px 0 0;background:rgba(251,248,238,.97);box-shadow:0 -12px 34px rgba(0,0,0,.35)}
+  .fa-tabs{display:flex;gap:6px;margin-bottom:8px}
+  .fa-tabs button{flex:1;height:36px;border:0;border-radius:12px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--cz-soft);background:var(--cz-sage-bg)}
+  .fa-tabs button.on{color:#fff;background:#3F5E9C}
+  .fa-now{display:none;align-items:center;gap:10px;margin-bottom:8px;padding:8px 10px;border-radius:16px;background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line);color:#3F5E9C}
+  .fa-now.on{display:flex}
+  .fa-pp{flex:none;width:36px;height:36px;border:0;border-radius:50%;cursor:pointer;font-size:12px;color:#fff;background:#3F5E9C}
+  .fa-err{font-size:12px;color:var(--cz-clay)}
+  .fa-list{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;min-height:120px}
+  .fa-item{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:9px 10px;border:0;border-radius:12px;background:none;cursor:pointer;text-align:left}
+  .fa-item:active{background:var(--cz-sage-bg)}
+  .fa-item b{font-size:13.5px;font-weight:600;color:var(--cz-ink)}
+  .fa-item span{font-size:11px;color:var(--cz-faint)}
+  .fa-note{margin:4px 10px 8px;font-size:11.5px;line-height:1.45;color:var(--cz-soft)}
+  .fa-back{height:30px;margin:0 0 4px 4px;padding:0 10px;border:0;border-radius:10px;cursor:pointer;font-size:12px;font-weight:700;color:#3F5E9C;background:rgba(63,94,156,.1)}
+  .fa-load{display:flex;align-items:center;justify-content:center;gap:9px;padding:26px;font-size:13px;color:var(--cz-soft)}
+  .fa-cc{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none}
+  .fa-cc button{flex:none;height:30px;padding:0 12px;border:0;border-radius:99px;cursor:pointer;font-size:12px;font-weight:600;color:var(--cz-ink);background:#fff;box-shadow:inset 0 0 0 1px var(--cz-line)}
+  .fa-cc button.on{color:#fff;background:#3F5E9C;box-shadow:none}
+  .fa-yt{position:relative;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000}
+  .fa-yt iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 </style>
 </head>
 <body>
@@ -8157,6 +8237,7 @@ document.documentElement.classList.add('home-on');</script>
 <script src="./app.js"></script>
 <script src="./pets.js"></script>
 <script src="./oracle.js"></script>
+<script src="./focci-acts.js"></script>
 <script src="./story.js"></script>
 <script src="./dict-system.js"></script>
 
@@ -9084,6 +9165,7 @@ document.documentElement.classList.add('home-on');</script>
     const active = (id) => { const v = document.getElementById(id); return !!(v && v.classList.contains('active')); };
     if (on('ask-on') && window.fwAnswer) { fwAnswer(false); return true; }
     if (window.oracleBack && window.oracleBack()) return true;
+    if (window.faBack && window.faBack()) return true;
     if (on('map-on') && window.closeFwMap) { closeFwMap(); return true; }
     { const cl = document.getElementById('fw-menu-cluster'); if (cl && cl.classList.contains('open')) { cl.classList.remove('open'); return true; } }
     if (window.petBack && window.petBack()) return true;
