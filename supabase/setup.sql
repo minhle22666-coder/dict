@@ -26,3 +26,9 @@ create policy "own row: read"   on public.user_state for select using (auth.uid(
 create policy "own row: insert" on public.user_state for insert with check (auth.uid() = user_id);
 create policy "own row: update" on public.user_state for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own row: delete" on public.user_state for delete using (auth.uid() = user_id);
+
+-- Newer Supabase projects do not hand table rights to the API roles on their
+-- own: without this a signed-in person got "permission denied for table
+-- user_state" before the row-level policies above were even asked. Signed-in
+-- users only; the policies still limit each one to their own row.
+grant select, insert, update, delete on public.user_state to authenticated;
