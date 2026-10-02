@@ -77,7 +77,15 @@ export async function bootFocciWorld(root, opts) {
      low-poly island that holds its edges at that density. A phone running
      the island warm was the complaint; fill rate is what warms it. */
   const COARSE = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, COARSE ? 1.5 : 2));
+  /* 1.25 now ("the phone gets hot, then it lags and stutters"): measured,
+     nothing leaks -- heap, geometries, textures and objects held level over
+     a minute of walking and tree taps -- and a frame costs 1.6ms of script
+     here, so the heat is the GPU filling pixels many times a second, and the
+     lag is the phone slowing itself down once it is hot. 1.25 is 31% fewer
+     pixels than 1.5. If frames still run slow (a hot phone), it drops to 1.0
+     by itself (see heatGuard in animate()). */
+  const BASE_PR = Math.min(window.devicePixelRatio || 1, COARSE ? 1.25 : 2);
+  renderer.setPixelRatio(BASE_PR);
   if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
   if ('NoToneMapping' in THREE) renderer.toneMapping = THREE.NoToneMapping;
 
@@ -4187,9 +4195,11 @@ export async function bootFocciWorld(root, opts) {
       armL.rotation.set(-0.6 + strumDir * 0.16 * strumKick, 0, 0.3 + strumDir * 0.05 * strumKick);
       armR.rotation.set(-0.75 + chordShift * 0.04, 0, -0.1);
       legL.rotation.x = legR.rotation.x = 0;
-      tailPivot.rotation.y = Math.sin(t * 2.2) * 0.12;
+      tailPivot.rotation.y = Math.sin(t * 2.6) * 0.22;
       character.rotation.y = charState.angle + Math.sin(t * 1.1) * 0.05;
-      character.position.y += Math.abs(Math.sin(t * 3.1)) * 0.02;
+      // more bounce: a little hop with the beat, and a kick on each strum
+      character.position.y += Math.abs(Math.sin(t * 3.6)) * 0.05 + strumKick * 0.03;
+      character.rotation.z = Math.sin(t * 1.8) * 0.04;
       cam.tTheta = P.base + Math.sin(P.t * 0.22) * 0.14;
       return;
     }
@@ -4377,7 +4387,16 @@ export async function bootFocciWorld(root, opts) {
        comes to where those paws are -- (-0.13, 0.20, 0.22) and
        (0.19, 0.22, 0.26) -- lying almost level across his front, its face
        just behind the paws. */
-    const gS = new THREE.Vector3(-0.12, 0.19, 0.17), gN = new THREE.Vector3(0.19, 0.23, 0.21);
+    /* Third try ("his paw still goes through the guitar"): his arms are
+       0.29 long from shoulders at z 0.065, and his belly's front is at
+       z 0.248 (measured from the vertices) -- a guitar held in front of the
+       belly is out of their reach, so any pose put the paws inside it. The
+       guitar now sits where it belongs, in front of the belly, and the paws
+       are drawn again ON TOP of it by pawLayer (below): the paw triangles
+       only, sharing his skeleton, drawn after the guitar without the depth
+       test. From the front, which is where the camera stands, the paws are
+       on the strings. */
+    const gS = new THREE.Vector3(-0.12, 0.2, 0.31), gN = new THREE.Vector3(0.19, 0.24, 0.33);
     const gy = gN.clone().sub(gS).normalize();
     const gz = new THREE.Vector3(0, 0, 1).addScaledVector(gy, -gy.z).normalize();
     const gx = new THREE.Vector3().crossVectors(gy, gz);
@@ -4385,6 +4404,7 @@ export async function bootFocciWorld(root, opts) {
     guitarRig.position.copy(gS).addScaledVector(gy, 0.14);
     rig.add(guitarRig);
     guitarRig.visible = true;
+    pawLayerOn(true);
     holdCam();
     // far enough out that all of him and the guitar fit a phone held upright
     cam.tRadius = 4.3; cam.tPhi = 1.33;
@@ -4398,7 +4418,44 @@ export async function bootFocciWorld(root, opts) {
   }
   function strum(dir, shift) {
     strumKick = 1; strumDir = dir || -strumDir; if (shift !== undefined) chordShift = shift;
-    if (guitarRig && guitarRig.parent && Math.random() < 0.6) spawnNote();
+    if (guitarRig && guitarRig.parent) spawnNote();   // every strum: "the notes should come quicker"
+  }
+  let pawLayer = null;
+  function pawLayerOn(on) {
+    if (!pawLayer) {
+      if (!on) return;
+      pawLayer = [];
+      character.updateMatrixWorld(true);
+      const v = new THREE.Vector3();
+      character.traverse((o) => {
+        if (!o.isSkinnedMesh || o.userData.pawCopy) return;
+        const g = o.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, pos = g.attributes.position;
+        if (!si || !sw) return;
+        const ia = si.array, wa = sw.array, arm = new Float32Array(pos.count), low = new Uint8Array(pos.count);
+        for (let i = 0; i < pos.count; i++) {
+          let w = 0; for (let k = 0; k < 4; k++) { const b = ia[i * 4 + k]; if (b === 3 || b === 4) w += wa[i * 4 + k]; }
+          arm[i] = w;
+          v.fromBufferAttribute(pos, i); o.boneTransform(i, v); o.localToWorld(v); rig.worldToLocal(v);
+          low[i] = v.y < 0.3 ? 1 : 0;   // the lower arm and the paw, not the shoulder
+        }
+        const idx = g.index ? g.index.array : null, n = idx ? idx.length : pos.count, keep = [];
+        for (let t = 0; t < n; t += 3) {
+          const a = idx ? idx[t] : t, b = idx ? idx[t + 1] : t + 1, c = idx ? idx[t + 2] : t + 2;
+          if (arm[a] > 0.6 && arm[b] > 0.6 && arm[c] > 0.6 && low[a] && low[b] && low[c]) keep.push(a, b, c);
+        }
+        if (!keep.length) return;
+        const g2 = new THREE.BufferGeometry();
+        Object.keys(g.attributes).forEach((k) => g2.setAttribute(k, g.attributes[k]));
+        g2.setIndex(keep); g2.boundingSphere = g.boundingSphere; g2.boundingBox = g.boundingBox;
+        const mats = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => { const c = m.clone(); c.depthTest = false; c.depthWrite = false; return c; });
+        const m = new THREE.SkinnedMesh(g2, Array.isArray(o.material) ? mats : mats[0]);
+        m.userData.pawCopy = true; m.bindMode = o.bindMode; m.bind(o.skeleton, o.bindMatrix);
+        m.position.copy(o.position); m.quaternion.copy(o.quaternion); m.scale.copy(o.scale);
+        m.renderOrder = 30; m.frustumCulled = false; m.castShadow = false;
+        o.parent.add(m); pawLayer.push(m);
+      });
+    }
+    pawLayer.forEach((m) => { m.visible = !!on; });
   }
   /* A note rises from the soundhole on a strum ("you cannot see him play
      any notes"): a sprite, no light, gone in a second and a half. */
@@ -4422,11 +4479,11 @@ export async function bootFocciWorld(root, opts) {
     sp.scale.setScalar(0.26);
     sp.position.copy(at);
     room.group.add(sp);
-    let age = 0; const life = 1.5, dx = (Math.random() - 0.5) * 0.5, dz = (Math.random() - 0.5) * 0.5;
+    let age = 0; const life = 1.1, dx = (Math.random() - 0.5) * 0.5, dz = (Math.random() - 0.5) * 0.5;
     activeEffects.push((dt) => {
       age += dt; const k = age / life;
-      sp.position.set(at.x + dx * k + Math.sin(age * 6) * 0.04, at.y + k * 0.95, at.z + dz * k);
-      sp.material.opacity = Math.min(1, age * 5) * (1 - k);
+      sp.position.set(at.x + dx * k + Math.sin(age * 7) * 0.04, at.y + k * 1.1, at.z + dz * k);
+      sp.material.opacity = Math.min(1, age * 9) * (1 - k);
       if (age < life) return true;
       room.group.remove(sp); sp.material.dispose(); return false;
     });
@@ -4832,9 +4889,10 @@ export async function bootFocciWorld(root, opts) {
     model.traverse((o) => { if (o.isMesh) hits.push(o); });
     // the names of the controls, printed on the top (see drawLabels)
     const labels = labelTexture();
-    const lab = new THREE.Mesh(new THREE.PlaneGeometry(1.78, 0.15), new THREE.MeshBasicMaterial({ map: labels, transparent: true, depthWrite: false }));
+    // x 0.655-0.905: from just in front of the keys and knobs to the front edge, where the old printing is
+    const lab = new THREE.Mesh(new THREE.PlaneGeometry(1.78, 0.25), new THREE.MeshBasicMaterial({ map: labels }));
     lab.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, -1), new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 1, 0)));
-    lab.position.set(0.76, 0.322, 0.09); mount.add(lab);
+    lab.position.set(0.78, 0.3205, 0.09); mount.add(lab);
     drawLabels(labels, 'fm');
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFFD27A, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.5 }));
     halo.scale.setScalar(2.4); halo.position.set(0, 0.6, -0.4); R.add(halo);
@@ -4847,8 +4905,9 @@ export async function bootFocciWorld(root, opts) {
      to tap"). Redrawn when the mode changes: the second knob is the
      country on FM and the chapter on Stories. */
   function labelTexture() {
-    const c = document.createElement('canvas'); c.width = 1024; c.height = 96;
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 144;
     const t = new THREE.CanvasTexture(c); t.userData = { c, g: c.getContext('2d'), key: '' };
+    t.encoding = THREE.sRGBEncoding;   // drawn in sRGB: without this the plate came out grey, not the case's black
     return t;
   }
   // model z of each control, and where that falls across the strip (z 0.98 .. -0.80)
@@ -4857,16 +4916,20 @@ export async function bootFocciWorld(root, opts) {
     if (tex.userData.key === mode) return;
     tex.userData.key = mode;
     const g = tex.userData.g;
-    g.clearRect(0, 0, 1024, 96);
+    /* An opaque plate the colour of the case, over the model's own printing
+       ("VOLUME MIN-MAX", "BAND FM-AM", "FUNCTION OFF-ON" still showed under
+       the new names); the right name for each control goes on it. */
+    g.fillStyle = '#17191F'; g.fillRect(0, 0, 1024, 144);
+    g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(0, 0, 1024, 2);
     g.textAlign = 'center'; g.textBaseline = 'middle';
     RADIO_CTL.forEach(([t, z]) => {
       // the knobs sit 0.245 apart (140px of the strip): their names a size down so COUNTRY fits
-      g.font = z < 0 ? '700 27px Arial, sans-serif' : '700 36px Arial, sans-serif';
+      g.font = z < 0 ? '700 30px "Helvetica Neue", Helvetica, Arial, sans-serif' : '700 38px "Helvetica Neue", Helvetica, Arial, sans-serif';
       const x = (0.98 - z) / 1.78 * 1024;
       const name = t === 'BAND' ? (mode === 'story' ? 'CHAPTER' : 'COUNTRY') : t;
       const lit = (t === 'FM' && mode === 'fm') || (t === 'STORY' && mode === 'story');
       g.fillStyle = lit ? (t === 'FM' ? '#8CB8FF' : '#FF8A7A') : 'rgba(232,236,246,.86)';
-      g.fillText(name, x, 50);
+      g.fillText(name, x, 76);
     });
     tex.needsUpdate = true;
   }
@@ -5286,6 +5349,7 @@ export async function bootFocciWorld(root, opts) {
     if (!P || (P.kind !== 'guitar' && P.kind !== 'relax')) return;
     focciPose = null;
     if (guitarRig) { rig.remove(guitarRig); }
+    pawLayerOn(false);
     if (grass) { grass.parent && grass.parent.remove(grass); grass = null; }
     if (drift) { drift.parent && drift.parent.remove(drift); drift.children.forEach((c) => c.material.dispose()); drift = null; }
     flies.forEach((f) => { f.o.parent && f.o.parent.remove(f.o); f.mixer.stopAllAction(); }); flies = [];
@@ -5680,7 +5744,25 @@ export async function bootFocciWorld(root, opts) {
   }
 
 
-  let halfRateSkip = false;
+  let halfRateSkip = false, idleSkip = 0, shadowTick = 0;
+  /* Heat guard, phones only: the time between drawn frames, averaged; held
+     over 30ms (under ~33fps) for four seconds, the pixel ratio steps down
+     to 1.0 once -- far cheaper than a phone throttling itself into stutter. */
+  const heat = { avg: 0, slow: 0, last: 0, dropped: false };
+  function heatGuard(now) {
+    if (!COARSE || heat.dropped) return;
+    if (heat.last) {
+      const gap = Math.min(200, now - heat.last);
+      heat.avg += (gap - heat.avg) * 0.05;
+      if (heat.avg > 30) heat.slow += gap; else heat.slow = 0;
+      if (heat.slow > 4000) {
+        heat.dropped = true;
+        renderer.setPixelRatio(1); resize();
+        console.info('Focci World: frames slow for 4s, pixel ratio 1.0');
+      }
+    }
+    heat.last = now;
+  }
   function animate() {
     requestAnimationFrame(animate);
     /* Nothing of this scene is visible while a full-screen panel covers
@@ -5703,6 +5785,16 @@ export async function bootFocciWorld(root, opts) {
     const busy = pointers.size > 0 || flight || jog || focciPose || (activeRoom().boat && activeRoom().boat.sailing)
       || charState.jumpY > 0 || performance.now() - lastInputAt < 1200;
     if (!busy) { halfRateSkip = !halfRateSkip; if (halfRateSkip) return; }
+    /* Five seconds with no input at all: 20 frames a second (two of every
+       three half-rate frames). The water and a grazing animal do not need
+       more, and an untouched phone on a table was still drawing 30. */
+    if (!busy && performance.now() - lastInputAt > 5000) { idleSkip = (idleSkip + 1) % 3; if (!idleSkip) return; }
+    // only while it is busy: the idle skipping spaces frames out on purpose
+    if (busy) heatGuard(performance.now()); else heat.last = 0;
+    /* Shadows every other drawn frame on a phone: the shadow pass draws 38
+       casters (53k triangles) again; a moving shadow a frame behind does
+       not show. */
+    if (COARSE) { renderer.shadowMap.autoUpdate = false; shadowTick ^= 1; if (shadowTick) renderer.shadowMap.needsUpdate = true; }
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
     const room = activeRoom();

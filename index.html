@@ -6948,6 +6948,18 @@ document.documentElement.classList.add('home-on');</script>
 
   /* figures that had no .num: quest counts, rewards, sense numbers, levels, the guitar's track count */
   html body .q-n,html body .q-rw,html body .senseno,html body .lv-tag,html body .fa-bt .num{font-family:var(--cz-num) !important;font-weight:400 !important;letter-spacing:.01em}
+
+  /* No blur over the moving island: a backdrop-filter there is a fresh blur
+     of the 3D scene every frame on iOS (heat). The island's XP chip, quote
+     and toast keep their look with a solid-ish colour instead. */
+  #fw-exp,#fw-quote,#fw-toast{-webkit-backdrop-filter:none !important;backdrop-filter:none !important}
+  #fw-exp{background-color:rgba(46,64,40,.62) !important}
+  #fw-quote{background-color:rgba(20,18,14,.78) !important}
+  #fw-toast{background-color:rgba(40,52,40,.78) !important}
+  html:not(.home-on) .topbar{-webkit-backdrop-filter:none !important;backdrop-filter:none !important}
+
+  /* the radio's words in Helvetica: the list, the country card, the strip, the help line */
+  html body .rs-list,html body .rs-list *,html body .rs-pop,html body .rs-pop *,html body .rs-player .rs-tt,html body .rs-player .rs-tt *,html body .rs-help,html body .rs-resume,html body .rs-resume *{font-family:var(--cz-num) !important}
 </style>
 </head>
 <body>
