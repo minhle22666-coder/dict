@@ -4563,17 +4563,27 @@ export async function bootFocciWorld(root, opts) {
 
   /* ---------- the Little Prince's book ---------- */
   let storyMode = false, story = null;
-  /* ---------- the radio by the Little Prince's book ----------
-     A clock radio built from boxes and cylinders after the photo the user
-     sent (navy case, red LED clock, an FM/AM tuning window with a red
-     needle, two blue keys and a red one on top, a ribbed tuning wheel on
-     the right side). Built rather than loaded so the parts can do things:
-     the keys glow for the mode they stand for (blue FM, red Stories), the
-     wheel and the band knob turn under a finger, the needle slides with
-     the station, and the LED is a canvas redrawn when its text changes.
-     No lights -- emissive only (see the light pool). */
+  /* ---------- the Little Prince's world, and the radio in its corner ----------
+     The user's brief: the book is a world like the hub island -- turn it
+     with a finger, pinch to come closer -- and the radio sits in a corner
+     of it, on its own little asteroid, hopping until it is tapped; a tap
+     flies the camera in to it.
+
+     The radio is the user's model (assets/glb/radio-clock.glb): one mesh,
+     one texture, its front facing +x, its LED printed "9:00" and its needle
+     printed at 104. The parts that do things are laid over it in the
+     model's own coordinates, measured by casting rays at the model and
+     reading the texture colour where they land: the inset front panel is
+     the plane x = 0.80, the LED window y -0.16..0.08 at z 0.10..0.75, the
+     tuning window the same at z -0.10..-0.75; the three keys at x 0.58..0.64
+     on top (y 0.318), z 0.80 / 0.475 / 0.225; three black knobs to their
+     right at z -0.12 / -0.365 / -0.605. Over those go a live LED (canvas),
+     a dial and needle, a glow on each key, and three knob caps that turn.
+     Each control also has a larger invisible box to catch a finger
+     (material.visible = false still raycasts). No lights -- emissive and
+     basic materials only (see the light pool). */
   function ledTexture() {
-    const c = document.createElement('canvas'); c.width = 512; c.height = 160;
+    const c = document.createElement('canvas'); c.width = 520; c.height = 190;
     const t = new THREE.CanvasTexture(c);
     t.userData = { c, g: c.getContext('2d'), key: '' };
     return t;
@@ -4582,100 +4592,110 @@ export async function bootFocciWorld(root, opts) {
     const key = big + '|' + small + '|' + live + '|' + mode;
     if (tex.userData.key === key) return;
     tex.userData.key = key;
-    const g = tex.userData.g, W = 512, H = 160;
-    g.fillStyle = '#0B0607'; g.fillRect(0, 0, W, H);
-    const red = mode === 'story' ? '#FF5A4A' : '#FF3B30';
-    g.shadowColor = red; g.shadowBlur = 14;
-    g.fillStyle = red; g.textBaseline = 'middle';
-    g.font = '700 74px "Courier New", monospace'; g.textAlign = 'left';
-    g.fillText(big, 22, 58);
-    g.shadowBlur = 8;
-    g.font = '700 26px "Courier New", monospace';
+    const g = tex.userData.g, W = 520, H = 190;
+    g.fillStyle = '#0A0506'; g.fillRect(0, 0, W, H);
+    const red = mode === 'story' ? '#FF6A4A' : '#FF3B30';
+    g.textBaseline = 'middle';
+    g.shadowColor = red; g.shadowBlur = 16; g.fillStyle = red;
+    g.font = '700 92px "Courier New", monospace'; g.textAlign = 'left';
+    g.fillText(big, 18, 70);
+    g.shadowBlur = 0;
+    g.font = '700 21px "Courier New", monospace'; g.textAlign = 'right';
+    g.fillStyle = mode === 'story' ? '#FF6A4A' : 'rgba(255,59,48,.35)'; g.fillText('STORY', W - 16, 30);
+    g.fillStyle = mode === 'story' ? 'rgba(255,59,48,.35)' : '#FF3B30'; g.fillText('FM', W - 16, 58);
+    g.fillStyle = live ? '#7CFF8A' : 'rgba(124,255,138,.2)'; g.fillText(live ? '● LIVE' : 'AUTO', W - 16, 88);
+    // the name scrolls when it does not fit (focci-acts.js passes it already cut to a window)
+    g.shadowColor = red; g.shadowBlur = 8;
+    g.font = '700 38px "Courier New", monospace'; g.textAlign = 'left';
     g.fillStyle = mode === 'story' ? '#FFB27A' : '#FFD08A';
-    g.fillText(String(small || '').slice(0, 30), 22, 128);
-    g.font = '700 22px "Courier New", monospace';
-    g.fillStyle = live ? '#FF3B30' : 'rgba(255,59,48,.25)';
-    g.textAlign = 'right'; g.fillText(mode === 'story' ? 'STORY' : 'FM', W - 20, 30);
-    g.fillStyle = live ? '#7CFF8A' : 'rgba(124,255,138,.2)';
-    g.fillText(live ? '● LIVE' : 'AUTO', W - 20, 62);
+    g.fillText(String(small || ''), 16, 150);
     g.shadowBlur = 0;
     tex.needsUpdate = true;
   }
   function dialTexture() {
-    const c = document.createElement('canvas'); c.width = 512; c.height = 160;
+    const c = document.createElement('canvas'); c.width = 520; c.height = 190;
     const g = c.getContext('2d');
-    g.fillStyle = '#0C0F16'; g.fillRect(0, 0, 512, 160);
-    g.fillStyle = '#E6EBF5'; g.font = '600 24px Arial, sans-serif'; g.textAlign = 'center';
-    [88, 92, 96, 100, 104, 108].forEach((f, i) => g.fillText(String(f), 50 + i * 80, 40));
-    g.fillStyle = '#FF5A4A'; g.font = '700 18px Arial'; g.textAlign = 'left'; g.fillText('FM', 8, 40);
-    g.fillStyle = '#E6EBF5'; g.textAlign = 'right'; g.font = '600 18px Arial'; g.fillText('MHz', 506, 40);
+    g.fillStyle = '#0C0F16'; g.fillRect(0, 0, 520, 190);
+    g.fillStyle = '#E6EBF5'; g.font = '600 26px Arial, sans-serif'; g.textAlign = 'center';
+    [88, 92, 96, 100, 104, 108].forEach((f, i) => g.fillText(String(f), 70 + i * 78, 46));
+    g.fillStyle = '#FF5A4A'; g.font = '700 20px Arial'; g.textAlign = 'left'; g.fillText('FM', 8, 46);
     g.fillStyle = 'rgba(230,235,245,.85)';
-    for (let i = 0; i <= 100; i++) { const x = 30 + i * 4.5; const h = i % 5 ? 10 : 18; g.fillRect(x, 64, 1.5, h); g.fillRect(x, 96, 1.5, i % 5 ? 8 : 14); }
-    g.font = '600 18px Arial'; g.textAlign = 'center'; g.fillStyle = '#E6EBF5';
-    [53, 60, 70, 80, 90, 100, 120, 140, 160].forEach((f, i) => g.fillText(String(f), 46 + i * 52, 140));
-    g.textAlign = 'left'; g.fillText('AM', 8, 140);
-    const t = new THREE.CanvasTexture(c); return t;
+    for (let i = 0; i <= 100; i++) { const x = 40 + i * 4.4; const h = i % 5 ? 12 : 22; g.fillRect(x, 78, 1.6, h); g.fillRect(x, 112, 1.6, i % 5 ? 9 : 16); }
+    g.font = '600 20px Arial'; g.textAlign = 'center'; g.fillStyle = '#E6EBF5';
+    [53, 60, 70, 80, 90, 100, 120, 140, 160].forEach((f, i) => g.fillText(String(f), 58 + i * 50, 164));
+    g.textAlign = 'left'; g.fillText('AM', 8, 164);
+    return new THREE.CanvasTexture(c);
   }
-  function buildRadio() {
-    const R = new THREE.Group();
-    const navy = new THREE.MeshStandardMaterial({ color: 0x1B2338, roughness: 0.42, metalness: 0.25 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x141A2A, roughness: 0.7 });
-    const trim = new THREE.MeshStandardMaterial({ color: 0x8C5A3C, roughness: 0.6 });
+  const RADIO_NEEDLE = [-0.17, -0.69];   // model z of 88 and of 108 on the dial above
+  async function buildRadio() {
+    const g = await loadProp('radio-clock.glb');
+    const model = g.scene.clone(true);
+    model.traverse((o) => { if (o.isMesh) o.userData.part = 'radio'; });
+    const mount = new THREE.Group();
+    mount.rotation.y = -Math.PI / 2;   // its front (+x) to the holder's +z
+    mount.position.y = 0.385;          // its bottom (-0.385) on the ground
+    mount.add(model);
+    const R = new THREE.Group(); R.add(mount);
     const part = (m, name) => { m.userData.part = name; return m; };
-    const body = part(new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.82, 1.1), navy), 'radio'); body.position.y = 0.41; R.add(body);
-    const side = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.78, 1.06), trim); side.position.set(1.12, 0.41, 0); R.add(side);
-    const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.52, 0.06), dark); bezel.position.set(-0.02, 0.38, 0.56); R.add(bezel);
+    const hidden = new THREE.MeshBasicMaterial({ visible: false });
     const led = ledTexture();
-    const ledM = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.3), new THREE.MeshBasicMaterial({ map: led }));
-    ledM.position.set(-0.52, 0.39, 0.595); R.add(part(ledM, 'radio'));
-    const dialM = new THREE.Mesh(new THREE.PlaneGeometry(0.98, 0.32), new THREE.MeshBasicMaterial({ map: dialTexture() }));
-    dialM.position.set(0.44, 0.39, 0.595); R.add(part(dialM, 'tune'));
-    const needle = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.3, 0.01), new THREE.MeshBasicMaterial({ color: 0xFF3B30 }));
-    needle.position.set(0.1, 0.39, 0.6); R.add(needle);
-    // the speaker grille: thin ribs over the right of the top
-    const ribM = new THREE.MeshStandardMaterial({ color: 0x1D2436, roughness: 0.8 });
-    for (let i = 0; i < 16; i++) { const r = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.012, 0.02), ribM); r.position.set(0.5, 0.825, -0.42 + i * 0.045); R.add(r); }
-    // keys: blue, blue, red -- the first blue is FM, the red is Stories
-    const keyGeo = new THREE.BoxGeometry(0.32, 0.07, 0.2);
-    const kFM = new THREE.MeshStandardMaterial({ color: 0x3E7BFF, emissive: 0x2F6BFF, emissiveIntensity: 0.2, roughness: 0.3 });
-    const kB2 = new THREE.MeshStandardMaterial({ color: 0x3E7BFF, emissive: 0x2F6BFF, emissiveIntensity: 0.15, roughness: 0.3 });
-    const kST = new THREE.MeshStandardMaterial({ color: 0xE23B3B, emissive: 0xFF2A2A, emissiveIntensity: 0.2, roughness: 0.3 });
-    const fm = part(new THREE.Mesh(keyGeo, kFM), 'fm'); fm.position.set(-0.85, 0.85, 0.28); R.add(fm);
-    const b2 = part(new THREE.Mesh(keyGeo, kB2), 'fav'); b2.position.set(-0.47, 0.85, 0.28); R.add(b2);
-    const st = part(new THREE.Mesh(keyGeo, kST), 'story'); st.position.set(-0.09, 0.85, 0.28); R.add(st);
-    const dotG = new THREE.MeshBasicMaterial({ color: 0x3BD16F }), dotR = new THREE.MeshBasicMaterial({ color: 0xE83B3B });
-    const d1 = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), dotG); d1.position.set(0.1, 0.835, -0.45); R.add(d1);
-    const d2 = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), dotR); d2.position.set(0.2, 0.835, -0.45); R.add(d2);
-    // the band knob on top, and the big ribbed wheel on the right side
-    const knob = part(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.12, 20), new THREE.MeshStandardMaterial({ color: 0x0F131D, roughness: 0.4, metalness: 0.4 })), 'band');
-    knob.position.set(0.35, 0.89, 0.32); R.add(knob);
-    const mark = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.01, 0.09), new THREE.MeshBasicMaterial({ color: 0xF0F3FA }));
-    mark.position.set(0, 0.065, 0.05); knob.add(mark);
-    const wheel = part(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.12, 36), new THREE.MeshStandardMaterial({ color: 0x161B28, roughness: 0.5, metalness: 0.3 })), 'tune');
-    wheel.rotation.z = Math.PI / 2; wheel.position.set(1.2, 0.42, 0.12); R.add(wheel);
-    for (let i = 0; i < 18; i++) {
-      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.03, 0.04), new THREE.MeshStandardMaterial({ color: 0x2A3348 }));
-      const a = (i / 18) * Math.PI * 2; rib.position.set(Math.cos(a) * 0.34, 0, Math.sin(a) * 0.34); rib.rotation.y = -a; wheel.add(rib);
-    }
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFFD27A, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.6 }));
-    halo.scale.setScalar(2.4); halo.position.set(0, 0.45, -0.3); R.add(halo);
-    return { R, led, needle, knob, wheel, kFM, kST, kB2, halo, parts: [body, ledM, dialM, fm, b2, st, knob, wheel] };
+    const ledM = part(new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.22), new THREE.MeshBasicMaterial({ map: led })), 'led');
+    ledM.rotation.y = Math.PI / 2; ledM.position.set(0.806, -0.04, 0.425); mount.add(ledM);
+    const dialM = part(new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.22), new THREE.MeshBasicMaterial({ map: dialTexture() })), 'dial');
+    dialM.rotation.y = Math.PI / 2; dialM.position.set(0.806, -0.04, -0.425); mount.add(dialM);
+    const needle = new THREE.Mesh(new THREE.PlaneGeometry(0.01, 0.19), new THREE.MeshBasicMaterial({ color: 0xFF3B30 }));
+    needle.rotation.y = Math.PI / 2; needle.position.set(0.809, -0.04, RADIO_NEEDLE[0]); mount.add(needle);
+    const glow = {}, hits = [ledM, dialM];
+    [['fm', 0.80, 0.2, 0x5AA2FF], ['fav', 0.475, 0.15, 0x7FC0FF], ['story', 0.225, 0.15, 0xFF4A3A]].forEach(([k, z, w, c]) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.014, w), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false }));
+      m.position.set(0.61, 0.338, z); mount.add(m); glow[k] = m;
+      const h = part(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, w + 0.1), hidden), k);
+      h.position.set(0.58, 0.38, z); mount.add(h); hits.push(h);
+    });
+    const knobs = {};
+    const capM = new THREE.MeshStandardMaterial({ color: 0x22262E, roughness: 0.35, metalness: 0.6 });
+    const markM = new THREE.MeshBasicMaterial({ color: 0xF2F4FA });
+    [['tune', -0.12], ['band', -0.365], ['list', -0.605]].forEach(([k, z]) => {
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.07, 0.05, 24), capM);
+      cap.position.set(0.61, 0.4, z); mount.add(cap); knobs[k] = cap;
+      const mk = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.008, 0.012), markM); mk.position.set(0.03, 0.027, 0); cap.add(mk);
+      const h = part(new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), hidden), k);
+      h.position.set(0.6, 0.42, z); mount.add(h); hits.push(h);
+    });
+    model.traverse((o) => { if (o.isMesh) hits.push(o); });
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xFFD27A, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.5 }));
+    halo.scale.setScalar(3.2); halo.position.set(0, 0.6, -0.4); R.add(halo);
+    return { R, mount, led, needle, knobs, glow, halo, parts: hits, ledM, dialM };
+  }
+  /* The asteroid the radio stands on: a flattened rock with a lid of grass,
+     and a few stones round it. */
+  function buildAsteroid() {
+    const A = new THREE.Group();
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0x4E4668, roughness: 0.95, flatShading: true }));
+    rock.scale.set(1.3, 0.55, 1.15); rock.position.y = -0.5; A.add(rock);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.26, 0.14, 11), new THREE.MeshStandardMaterial({ color: 0x3B6638, roughness: 0.9, flatShading: true }));
+    lid.position.y = -0.06; A.add(lid);
+    const stoneM = new THREE.MeshStandardMaterial({ color: 0xB9AFC8, roughness: 0.9, flatShading: true });
+    [[-0.9, 0.5, 0.11], [0.95, -0.55, 0.08], [-0.2, -0.95, 0.07]].forEach(([x, z, r]) => {
+      const s = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), stoneM); s.position.set(x, 0.03, z); A.add(s);
+    });
+    return A;
   }
   async function storyOn(on) {
     if (!on) { storyMode = false; return true; }
     if (!story) {
       const sc = new THREE.Scene();
       sc.background = new THREE.Color(0x141C38);
+      sc.fog = new THREE.Fog(0x141C38, 18, 46);
       sc.add(new THREE.HemisphereLight(0xFFE9C9, 0x2B3A66, 1.05));
       const sun = new THREE.DirectionalLight(0xFFE2B0, 1.15); sun.position.set(4, 8, 6); sc.add(sun);
       const stars = new THREE.BufferGeometry(), sp = [];
-      for (let i = 0; i < 520; i++) {
-        const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = 45;
-        const y = Math.abs(u) * r * 0.9 + 2;
-        sp.push(Math.cos(a) * Math.sqrt(1 - u * u) * r, y, Math.sin(a) * Math.sqrt(1 - u * u) * r);
+      for (let i = 0; i < 700; i++) {
+        const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = 40;
+        sp.push(Math.cos(a) * Math.sqrt(1 - u * u) * r, u * r * 0.9 + 4, Math.sin(a) * Math.sqrt(1 - u * u) * r);
       }
       stars.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
-      const starPts = new THREE.Points(stars, new THREE.PointsMaterial({ color: 0xFFF6DA, size: 0.22, sizeAttenuation: true, transparent: true, opacity: 0.85 }));
+      const starPts = new THREE.Points(stars, new THREE.PointsMaterial({ color: 0xFFF6DA, size: 0.22, sizeAttenuation: true, transparent: true, opacity: 0.85, fog: false }));
       sc.add(starPts);
       const g = await loadProp('prince-book.glb');
       const m = g.scene;
@@ -4685,47 +4705,47 @@ export async function bootFocciWorld(root, opts) {
       sc.add(holder);
       const mixer = g.animations.length ? new THREE.AnimationMixer(m) : null;
       if (mixer) { const a = mixer.clipAction(g.animations[0]); a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; a.play(); }
-      const radio = buildRadio();
-      // beside the book, to the right of the shot, facing the camera's resting place
-      radio.R.position.set(1.05, 0, 2.45); radio.R.rotation.y = 0.32; radio.R.scale.setScalar(0.44);
-      sc.add(radio.R);
+      const radio = await buildRadio();
+      // the corner: front right of the book, on its own asteroid, facing the camera's resting place
+      const corner = new THREE.Group(); corner.position.set(2.9, 0.15, 1.9); corner.rotation.y = 0.55;
+      const ast = buildAsteroid(); ast.scale.setScalar(0.72); corner.add(ast);
+      radio.R.scale.setScalar(0.56); corner.add(radio.R);
+      sc.add(corner);
       const cm = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.05, 200);
-      story = { sc, cm, mixer, stars: starPts, t: 0, h: size.y * s, radio, focus: 0, focusT: 0, hint: true, hop: 0,
-        cam: new THREE.Vector3(), look: new THREE.Vector3(0, 0.6, 0), mode: 'fm', ray: new THREE.Raycaster() };
+      story = { sc, cm, mixer, stars: starPts, t: 0, h: size.y * s, radio, corner, focus: 0, focusT: 0, hint: true, hop: 0,
+        orb: { th: 0.62, ph: 1.12, r: 8.2, tth: 0.62, tph: 1.12, tr: 8.2, touched: false },
+        cam: new THREE.Vector3(), look: new THREE.Vector3(), mode: 'fm', ray: new THREE.Raycaster() };
     } else if (story.mixer) {
       story.mixer._actions.forEach((a) => { a.reset(); a.play(); });
     }
-    story.t = 0; story.focusT = 0; story.focus = 0;
+    story.t = 0; story.focusT = 0; story.focus = 0; story.hint = true;
+    Object.assign(story.orb, { th: 0.62, ph: 1.12, r: 8.2, tth: 0.62, tph: 1.12, tr: 8.2, touched: false });
     storyMode = true;
     return true;
   }
-  const _sv = new THREE.Vector3(), _sl = new THREE.Vector3();
+  const _sv = new THREE.Vector3(), _sl = new THREE.Vector3(), _sc = new THREE.Vector3();
+  const STORY_C = new THREE.Vector3(1.2, 0.9, 0.8);   // what the world view turns round: between the book and the radio
   function renderStory(dt) {
     const S = story; S.t += dt;
     if (S.mixer) S.mixer.update(dt);
-    const Rd = S.radio;
-    // until it has been tapped, the radio hops to say "me"
-    if (S.hint) { S.hop += dt; const k = Math.abs(Math.sin(S.hop * 3.2)); Rd.R.position.y = k * 0.16; Rd.R.rotation.z = Math.sin(S.hop * 3.2) * 0.04; Rd.halo.material.opacity = 0.15 + k * 0.25; }
-    else { Rd.R.position.y *= 0.85; Rd.R.rotation.z *= 0.85; Rd.halo.material.opacity += (0.06 - Rd.halo.material.opacity) * 0.1; }
-    // the camera: a slow orbit of the book, or in front of the radio
-    S.focusT += ((S.focus ? 1 : 0) - S.focusT) * Math.min(1, dt * 2.2);
-    /* No full orbit: going round, the camera passed right over the radio and
-       it filled the bottom of the screen. It rests where the book is in the
-       middle and the radio stands to its right, and sways a little. */
-    const a = 0.32 + Math.sin(S.t * 0.08) * 0.22, R = 5.0 - Math.min(0.5, S.t * 0.08);
-    const ox = 0.4 + Math.sin(a) * R, oy = 2.3 + Math.sin(S.t * 0.2) * 0.25, oz = 1.0 + Math.cos(a) * R;
+    const Rd = S.radio, O = S.orb;
+    // until it has been tapped, the radio hops on its asteroid to say "me"
+    if (S.hint) { S.hop += dt; const k = Math.abs(Math.sin(S.hop * 3.2)); Rd.R.position.y = k * 0.22; Rd.R.rotation.z = Math.sin(S.hop * 3.2) * 0.05; Rd.halo.material.opacity = 0.2 + k * 0.35; }
+    else { Rd.R.position.y *= 0.85; Rd.R.rotation.z *= 0.85; Rd.halo.material.opacity += (0.05 - Rd.halo.material.opacity) * 0.1; }
+    // the world view: the player's own orbit, with a slow sway until they first touch it
+    if (!O.touched) O.tth = 0.62 + Math.sin(S.t * 0.12) * 0.28;
+    O.th += (O.tth - O.th) * Math.min(1, dt * 6); O.ph += (O.tph - O.ph) * Math.min(1, dt * 6); O.r += (O.tr - O.r) * Math.min(1, dt * 6);
+    const ox = STORY_C.x + O.r * Math.sin(O.ph) * Math.sin(O.th), oy = STORY_C.y + O.r * Math.cos(O.ph), oz = STORY_C.z + O.r * Math.sin(O.ph) * Math.cos(O.th);
+    S.focusT += ((S.focus ? 1 : 0) - S.focusT) * Math.min(1, dt * 2.4);
     Rd.R.updateMatrixWorld(true);
-    // far enough back that the whole case fits a phone held upright, the book behind it
-    const front = Rd.R.localToWorld(_sv.set(0.15, 1.5, 5.8));
-    const at = Rd.R.localToWorld(_sl.set(0.1, 0.42, 0));
+    // in front of the radio and a little above it: the keys on top and the LED both read
+    const front = Rd.R.localToWorld(_sv.set(0, 1.95, 4.4));
+    const at = Rd.R.localToWorld(_sl.set(0, 0.3, 0.2));
     const k = S.focusT * S.focusT * (3 - 2 * S.focusT);
     S.cm.position.set(ox + (front.x - ox) * k, oy + (front.y - oy) * k, oz + (front.z - oz) * k);
-    // resting, it looks between the book and the radio so both are in the shot
-    const ly = Math.max(0.5, S.h * 0.3);
-    S.look.set(0.4 + (at.x - 0.4) * k, ly + (at.y - ly) * k, 1.0 + (at.z - 1.0) * k);
+    S.look.set(STORY_C.x + (at.x - STORY_C.x) * k, STORY_C.y + (at.y - STORY_C.y) * k, STORY_C.z + (at.z - STORY_C.z) * k);
     /* A phone held upright sees a narrow slice: fov is vertical, so at 42 the
-       width was 20 degrees and the radio fell off the side. Widen it until
-       about 36 degrees across fit, up to 70 tall. */
+       width was 20 degrees. Widen it until about 36 degrees across fit. */
     const asp = window.innerWidth / window.innerHeight;
     S.cm.aspect = asp;
     S.cm.fov = Math.min(70, Math.max(42, 2 * Math.atan(Math.tan(18 * Math.PI / 180) / asp) * 180 / Math.PI));
@@ -4733,6 +4753,14 @@ export async function bootFocciWorld(root, opts) {
     S.cm.lookAt(S.look);
     S.stars.rotation.y = S.t * 0.01;
     renderer.render(S.sc, S.cm);
+  }
+  /* Turning and zooming the world view (focci-acts.js passes drags and pinches). */
+  function storyOrbit(o) {
+    if (!story || story.focus) return;
+    const O = story.orb; O.touched = true;
+    if (o.dx) O.tth -= o.dx * 0.0085;
+    if (o.dy) O.tph = Math.max(0.42, Math.min(1.42, O.tph - o.dy * 0.006));
+    if (o.zoom) O.tr = Math.max(3.6, Math.min(13, O.tr * o.zoom));
   }
   /* What the controls ask of the radio. */
   function storyRadio(o) {
@@ -4742,13 +4770,12 @@ export async function bootFocciWorld(root, opts) {
     if (o.focus !== undefined) story.focus = o.focus ? 1 : 0;
     if (o.mode) {
       story.mode = o.mode;
-      Rd.kFM.emissiveIntensity = o.mode === 'fm' ? 1.6 : 0.12;
-      Rd.kST.emissiveIntensity = o.mode === 'story' ? 1.6 : 0.12;
+      Rd.glow.fm.material.opacity = o.mode === 'fm' ? 0.95 : 0.08;
+      Rd.glow.story.material.opacity = o.mode === 'story' ? 0.95 : 0.08;
     }
-    if (o.fav !== undefined) Rd.kB2.emissiveIntensity = o.fav ? 1.4 : 0.12;
-    if (o.needle !== undefined) Rd.needle.position.x = -0.05 + (0.08 + Math.max(0, Math.min(1, o.needle)) * 0.8) * 0.98;   // across the printed 88-108
-    if (o.wheel !== undefined) Rd.wheel.rotation.x = o.wheel;
-    if (o.band !== undefined) Rd.knob.rotation.y = o.band;
+    if (o.fav !== undefined) Rd.glow.fav.material.opacity = o.fav ? 0.9 : 0.08;
+    if (o.needle !== undefined) Rd.needle.position.z = RADIO_NEEDLE[0] + (RADIO_NEEDLE[1] - RADIO_NEEDLE[0]) * Math.max(0, Math.min(1, o.needle));
+    if (o.knob) Object.keys(o.knob).forEach((n) => { if (Rd.knobs[n]) Rd.knobs[n].rotation.y = o.knob[n]; });
     if (o.led) drawLed(Rd.led, o.led[0], o.led[1], o.led[2], story.mode);
   }
   /* Which part of the radio is under a point on screen. */
@@ -4757,15 +4784,19 @@ export async function bootFocciWorld(root, opts) {
     const S = story;
     _sv.set((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1, 0.5);
     S.ray.setFromCamera(_sv, S.cm);
-    const hit = S.ray.intersectObjects(S.radio.parts, false)[0];
-    return hit ? hit.object.userData.part : null;
+    const hits = S.ray.intersectObjects(S.radio.parts, false);
+    if (!hits.length) return null;
+    // a control's box beats the radio body behind it
+    const ctl = hits.find((h) => h.object.userData.part !== 'radio');
+    return (ctl || hits[0]).object.userData.part;
   }
   function storyAnchor(part) {
     if (!story) return null;
     const Rd = story.radio;
-    const pos = { radio: [0, 1.2, 0], fm: [-0.85, 0.95, 0.28], story: [-0.09, 0.95, 0.28], fav: [-0.47, 0.95, 0.28], band: [0.35, 1.0, 0.32], tune: [1.25, 0.42, 0.12], led: [-0.52, 0.39, 0.6] }[part] || [0, 0.5, 0];
-    Rd.R.updateMatrixWorld(true);
-    const v = Rd.R.localToWorld(_sv.set(pos[0], pos[1], pos[2])).project(story.cm);
+    const obj = { fm: Rd.glow.fm, fav: Rd.glow.fav, story: Rd.glow.story, tune: Rd.knobs.tune, band: Rd.knobs.band, list: Rd.knobs.list, led: Rd.ledM, dial: Rd.dialM }[part] || Rd.halo;
+    obj.getWorldPosition(_sc);
+    if (part === 'radio') _sc.y += 0.25;
+    const v = _sc.project(story.cm);
     return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: (-v.y * 0.5 + 0.5) * window.innerHeight, on: v.z < 1 };
   }
 
@@ -6210,7 +6241,7 @@ export async function bootFocciWorld(root, opts) {
     else if (kind === 'gift') spawnPickupBurst(room, p.x, top, p.z, 0xFFD36A);
   }
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
-    storyRadio, storyPick, storyAnchor, appleAnchor, openGiftBox: (id) => openGiftBox(rooms[currentRoomKey], id),
+    storyRadio, storyPick, storyAnchor, storyOrbit, appleAnchor, openGiftBox: (id) => openGiftBox(rooms[currentRoomKey], id),
     treeTapAt: (x, z) => treeTap(rooms[currentRoomKey], { x, z }),
     _warmTrees: () => { const r = rooms[currentRoomKey]; if (r && r.collidables && r.collidables[0]) treeIndex(r); },
     focciDo, focciStop, focciAnchor, strum, jogStats: () => (jog ? { t: jog.t, dist: jog.dist } : null),

@@ -133,6 +133,7 @@
   });
   window.faBack = function () {
     if (R.open) { ringClose(); return true; }
+    if (CUR === 'stories' && RS && RS.focus) { unfocusRadio(); return true; }
     if (CUR) { faStop(); return true; }
     return false;
   };
@@ -332,25 +333,25 @@
   };
   var faSoundStartPending = 'wind';
 
-  /* ---------------- stories: the radio by the Little Prince's book ----------------
-     The first version was a flat sheet of lists over the book; the user
-     wanted it inside the little world. Now the scene stays clear and a
-     clock radio stands by the book (world.js buildRadio), hopping with a
-     "Tap the radio" chip until it is touched. A tap flies the camera to it:
-     - the keys on top choose the mode -- the blue one FM, the red one
-       Stories -- and the chosen key glows, with a label over each key;
-       the second blue key saves the station (saved stations come first,
-       and "Saved" is the first stop on the band knob);
-     - the big wheel on the side tunes: drag it and the needle slides,
-       the LED shows the station or the book; let go and it plays;
-     - the small knob on top turns the country (FM) or the chapter
-       (Stories), with a little card and a flag for the country;
-     - a glass strip at the bottom plays and pauses, swipes to the next or
-       last station or chapter, and for a story scrubs to any minute; a
-       story you started asks whether to carry on where you left off.
+  /* ---------------- stories: the Little Prince's world and its radio ----------------
+     The world is the hub of its own: one finger turns it, two pinch it
+     (world.js storyOrbit), and swipe-back is off while it is open -- X goes
+     back to the island. The radio is the user's model on an asteroid in a
+     corner, hopping with a "Tap the radio" chip until it is touched. A tap
+     flies the camera in front of it:
+     - the keys on top: blue FM, blue save, red Stories; the mode's key glows;
+     - the first knob tunes (station, or book), the second turns the country
+       (with a flag card and the time there) or the chapter, the third opens
+       the list -- as does the LED -- a scroll of paper three rows tall with
+       the stations, the countries, the books or a book's chapters;
+     - the LED is live: the station's own local time, the name running
+       across, LIVE when it plays;
+     - the strip at the bottom plays and pauses, swipes to the next or last,
+       scrubs a story, and offers where you left off; it stays, smaller,
+       when you go back out to the world.
      FM comes from the community Radio Browser directory (https streams
      only; HLS only where the browser plays it itself), stories from
-     LibriVox's children's shelf on archive.org. The YouTube tab is gone. */
+     LibriVox's children's shelf on archive.org. */
   var AU = null;
   function audioEl() { if (!AU) { AU = new Audio(); AU.preload = 'none'; } return AU; }
   function storyAudioStop() { if (AU) { try { AU.pause(); AU.removeAttribute('src'); AU.load(); } catch (e) {} } cancelAnimationFrame(RS && RS.raf); }
@@ -405,27 +406,58 @@
   function hhmm() { var d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
   function mm(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 
+  /* Live means the station's own clock: the LED and the strip show the time
+     where it is broadcasting, not the listener's. One zone a country. */
+  var TZ = { VN: ['Asia/Ho_Chi_Minh', 'Hanoi'], US: ['America/New_York', 'New York'], GB: ['Europe/London', 'London'], AU: ['Australia/Sydney', 'Sydney'],
+    CA: ['America/Toronto', 'Toronto'], JP: ['Asia/Tokyo', 'Tokyo'], KR: ['Asia/Seoul', 'Seoul'], FR: ['Europe/Paris', 'Paris'], DE: ['Europe/Berlin', 'Berlin'],
+    SG: ['Asia/Singapore', 'Singapore'], TH: ['Asia/Bangkok', 'Bangkok'] };
+  function hereTime(cc) {
+    var z = TZ[cc];
+    if (!z) return hhmm();
+    try { return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: z[0] }).format(new Date()); } catch (e) { return hhmm(); }
+  }
+  function stCC() { var s = RS.list[RS.stIdx]; return (s && s.cc) || bands()[RS.band][0]; }
+  // a name longer than the LED's window runs past it, a character a second
+  function marquee(t, n) {
+    t = String(t || '').toUpperCase(); n = n || 21;
+    if (t.length <= n) return t;
+    var loop = t + '   ·   ', i = (RS.marq || 0) % loop.length;
+    return (loop + loop).slice(i, i + n);
+  }
+
   window.faStories = async function () {
     ringClose(); faStop(); CUR = 'stories';
     D.classList.add('fa-quiet', 'fa-full', 'fa-storying');
-    RS = { mode: 'fm', band: 0, stIdx: 0, list: [], bookIdx: 0, chIdx: 0, focus: false, raf: 0, wheel: 0, knob: 0, cur: null, tuneT: 0 };
+    RS = { mode: 'fm', band: 0, stIdx: 0, list: [], bookIdx: 0, chIdx: 0, focus: false, raf: 0, knob: { tune: 0, band: 0, list: 0 }, tuneT: 0, marq: 0, listKind: null, orbited: false };
     var el = $('fa-story');
     el.innerHTML = '<div class="fa-fade"></div>'
       + '<div class="rs-stage" id="rs-stage"></div>'
-      + '<div class="rs-top"><div><span>Story night</span><b>The Little Prince’s world</b></div><button class="pt-x" onclick="faStop()" aria-label="Close">×</button></div>'
+      + '<div class="rs-top"><button class="rs-back" id="rs-back" aria-label="Back to the world"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>World</button>'
+      +   '<div class="rs-ttl"><span>Story night</span><b>The Little Prince’s world</b></div>'
+      +   '<button class="pt-x rs-x" onclick="faStop()" aria-label="Back to the island">×</button></div>'
       + '<div class="rs-hint" id="rs-hint"><i></i>Tap the radio</div>'
+      + '<div class="rs-help" id="rs-help">Drag to look around · pinch to zoom</div>'
       // one row of labels over the three keys -- each over its own key they overlapped -- and they work as the keys do
       + '<div class="rs-keys" id="rs-keys"><button class="rs-key fm" data-k="fm">FM radio</button><button class="rs-key fav" data-k="fav">★ Save</button><button class="rs-key story" data-k="story">Stories</button></div>'
-      + '<div class="rs-tag" id="rs-t-tune">Turn to tune</div><div class="rs-tag" id="rs-t-band">Country</div>'
+      // the knobs are close together on a phone: their three names as one row, in the same order
+      + '<div class="rs-knobs" id="rs-knobs"><span>Tune</span><span id="rs-t-band">Country</span><span>List</span></div>'
       + '<div class="rs-pop" id="rs-pop"></div>'
-      + '<div class="rs-player" id="rs-player"></div>';
+      + '<div class="rs-list" id="rs-list" data-noswipe="1"></div>'
+      + '<div class="rs-player" id="rs-player" data-noswipe="1"></div>';
     el.classList.add('on');
     stageWire();
     $('rs-keys').addEventListener('click', function (e) {
       var b = e.target.closest('[data-k]'); if (!b || !RS) return;
-      if (!RS.focus) { focusRadio(); }
       if (b.dataset.k === 'fav') toggleFav(); else setMode(b.dataset.k);
     });
+    $('rs-back').addEventListener('click', unfocusRadio);
+    $('rs-list').addEventListener('click', listClick);
+    // a touch anywhere but the list (or the button that opens it) rolls it up
+    el.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('#rs-list') || e.target.closest('[data-a="list"]')) return;
+      if (e.target.id === 'rs-stage') return;   // the stage decides on release: the LED and the third knob open it
+      closeList();
+    }, true);
     setTimeout(function () { if (W() && W().focciDo) W().focciDo('stories').then(function () { if (W().storyRadio) W().storyRadio({ hint: true, focus: false, mode: 'fm', led: [hhmm(), 'TAP TO TUNE IN', false] }); }); }, 450);
     anchorLoop();
     stationsFor(COUNTRIES[0][0]).then(function (l) { if (RS && RS.mode === 'fm' && !RS.list.length) { RS.list = l; } }).catch(function () {});
@@ -443,73 +475,110 @@
     var step = function () {
       if (!RS || CUR !== 'stories') return;
       st.classList.toggle('focused', RS.focus); st.classList.toggle('m-fm', RS.mode === 'fm'); st.classList.toggle('m-story', RS.mode === 'story');
-      if (!RS.focus) place('rs-hint', 'radio', 6);
-      else { place('rs-keys', 'fav', 10); place('rs-t-tune', 'tune', -46); place('rs-t-band', 'band', 48); place('rs-pop', 'band', 84); }
+      st.classList.toggle('orbited', RS.orbited);
+      if (!RS.focus) { if (RS.met) $('rs-hint').style.opacity = 0; else place('rs-hint', 'radio', 6); }
+      else { place('rs-keys', 'fav', 12); place('rs-knobs', 'band', 50); place('rs-pop', 'band', 60); }
       RS.raf = requestAnimationFrame(step);
     };
     step();
     clearInterval(RS.clock);
-    RS.clock = setInterval(function () { if (!RS || CUR !== 'stories') return; led(); if (RS.mode === 'story' && AU && !AU.paused) { savePos(); needle(); scrubSync(); } }, 1000);
+    RS.clock = setInterval(function () {
+      if (!RS || CUR !== 'stories') return;
+      RS.marq++; led();
+      if (RS.mode === 'story' && AU && !AU.paused) { savePos(); needle(); scrubSync(); }
+      if (RS.mode === 'fm' && RS.focus) { var sp = document.querySelector('#rs-player .rs-live'); if (sp) sp.textContent = liveLine(); }
+    }, 1000);
+  }
+  function liveLine() {
+    var on = AU && !AU.paused && !!AU.src, cc = stCC(), z = TZ[cc];
+    return on ? '● LIVE · ' + hereTime(cc) + (z ? ' in ' + z[1] : '') : (AU && AU.src ? 'Paused · ' + hereTime(cc) + (z ? ' in ' + z[1] : '') : 'Tuning…');
   }
   function led() {
-    if (!RS.focus) { radio({ led: [hhmm(), 'TAP TO TUNE IN', false] }); return; }
+    if (!RS.focus && !(AU && AU.src)) { radio({ led: [hhmm(), 'TAP TO TUNE IN', false] }); return; }
     var live = AU && !AU.paused && !!AU.src;
-    if (RS.mode === 'fm') { var s = RS.list[RS.stIdx]; radio({ led: [hhmm(), s ? s.name.toUpperCase() : 'TUNING…', live] }); }
-    else { var b = RS.books && RS.books[RS.bookIdx], c = b && b.ch && b.ch[RS.chIdx]; radio({ led: [live ? mm(AU.currentTime) : hhmm(), b ? (b.title + (c ? ' · ' + c.title : '')).toUpperCase() : 'LOADING BOOKS…', live] }); }
+    if (RS.mode === 'fm') { var s = RS.list[RS.stIdx]; radio({ led: [hereTime(stCC()), s ? marquee(s.name) : 'TUNING…', live] }); }
+    else { var b = RS.books && RS.books[RS.bookIdx], c = b && b.ch && b.ch[RS.chIdx]; radio({ led: [live ? mm(AU.currentTime) : hhmm(), b ? marquee(b.title + (c ? ' · ' + c.title : '')) : 'LOADING BOOKS…', live] }); }
   }
   function needle() {
     if (RS.mode === 'fm') radio({ needle: RS.list.length > 1 ? RS.stIdx / (RS.list.length - 1) : 0.5 });
     else radio({ needle: AU && AU.duration ? AU.currentTime / AU.duration : 0 });
   }
-  /* ---- touching the radio ---- */
+  /* ---- touching the world and the radio ----
+     In the world view one finger turns it and two pinch it; a tap on the
+     radio flies in. In front of the radio: the keys are taps, the knobs
+     turn with a drag (a tap is one step), the LED and the third knob open
+     the list, and a tap on nothing rolls the list up. */
   function stageWire() {
-    var stg = $('rs-stage'), drag = null;
+    var stg = $('rs-stage'), P = new Map(), down = null, drag = null, pinch = 0;
+    var dist = function () { var p = Array.from(P.values()); return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1; };
+    var pick = function (e) { return W() && W().storyPick ? W().storyPick(e.clientX, e.clientY) : null; };
     stg.addEventListener('pointerdown', function (e) {
-      var part = W() && W().storyPick ? W().storyPick(e.clientX, e.clientY) : null;
-      if (!RS.focus) {
-        if (part) focusRadio();
-        return;
-      }
-      if (part === 'fm' || part === 'story') { setMode(part); return; }
-      if (part === 'fav') { toggleFav(); return; }
-      if (part === 'tune' || part === 'band') {
-        drag = { part: part, x: e.clientX, y: e.clientY, moved: 0, acc: 0 };
-        try { stg.setPointerCapture(e.pointerId); } catch (x) {}
-      }
+      try { stg.setPointerCapture(e.pointerId); } catch (x) {}
+      P.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (P.size === 2) { pinch = dist(); down = null; drag = null; return; }
+      if (P.size > 2) return;
+      var part = pick(e);
+      down = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, part: part, moved: 0 };
+      if (RS.focus && (part === 'tune' || part === 'band' || part === 'list')) drag = { part: part, acc: 0 };
     });
     stg.addEventListener('pointermove', function (e) {
-      if (!drag) return;
-      var d = (e.clientX - drag.x) - (e.clientY - drag.y);
-      drag.x = e.clientX; drag.y = e.clientY;
-      drag.moved += Math.abs(d);
-      var rot = d * 0.012;
-      if (drag.part === 'tune') { RS.wheel += rot; radio({ wheel: RS.wheel }); }
-      else { RS.knob += rot; radio({ band: RS.knob }); }
-      drag.acc += rot;
-      // one step a notch (about 0.45 of a turn of the wheel)
-      while (Math.abs(drag.acc) >= 0.45) { var dir = drag.acc > 0 ? 1 : -1; drag.acc -= dir * 0.45; stepPart(drag.part, dir, true); }
+      if (!P.has(e.pointerId)) return;
+      P.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (P.size === 2) { var d2 = dist(); if (W() && W().storyOrbit) W().storyOrbit({ zoom: pinch / d2 }); pinch = d2; RS.orbited = true; return; }
+      if (!down) return;
+      var dx = e.clientX - down.lx, dy = e.clientY - down.ly;
+      down.lx = e.clientX; down.ly = e.clientY; down.moved += Math.abs(dx) + Math.abs(dy);
+      if (drag) {
+        var rot = (dx - dy) * 0.012;
+        RS.knob[drag.part] += rot; var k = {}; k[drag.part] = RS.knob[drag.part]; radio({ knob: k });
+        if (drag.part === 'list') return;
+        drag.acc += rot;
+        // one step a notch (about a quarter turn of the knob)
+        while (Math.abs(drag.acc) >= 0.5) { var dir = drag.acc > 0 ? 1 : -1; drag.acc -= dir * 0.5; stepPart(drag.part, dir, true); }
+        return;
+      }
+      if (!RS.focus && down.moved > 6 && W() && W().storyOrbit) { W().storyOrbit({ dx: dx, dy: dy }); RS.orbited = true; }
     });
-    var up = function () {
-      if (!drag) return;
-      var d = drag; drag = null;
-      if (d.moved < 8) stepPart(d.part, 1, true);   // a tap is one step
-      settle(d.part);
+    var up = function (e) {
+      P.delete(e.pointerId);
+      if (!down) return;
+      var d = down, dr = drag; down = null; drag = null;
+      if (dr) {
+        if (dr.part === 'list') { openList(); return; }   // turned or tapped, the third knob is the list
+        if (d.moved < 8) stepPart(dr.part, 1, true);   // a tap is one step
+        settle(dr.part);
+        return;
+      }
+      if (d.moved > 10) return;
+      if (!RS.focus) { if (d.part) focusRadio(); return; }
+      if (d.part === 'fm' || d.part === 'story') { setMode(d.part); return; }
+      if (d.part === 'fav') { toggleFav(); return; }
+      if (d.part === 'led' || d.part === 'dial') { openList(); return; }
+      closeList();
     };
     stg.addEventListener('pointerup', up); stg.addEventListener('pointercancel', up);
+    stg.addEventListener('wheel', function (e) { e.preventDefault(); if (W() && W().storyOrbit) W().storyOrbit({ zoom: e.deltaY > 0 ? 1.08 : 0.93 }); RS.orbited = true; }, { passive: false });
   }
   function focusRadio() {
-    RS.focus = true;
+    RS.focus = true; RS.met = true;   // the chip has done its job
     radio({ hint: false, focus: true, mode: RS.mode });
     if (navigator.vibrate) try { navigator.vibrate(15); } catch (e) {}
     // the tap is the gesture that lets audio start
-    if (RS.mode === 'fm') { if (RS.list.length) tune(); else stationsFor(bands()[RS.band][0]).then(function (l) { RS.list = l; tune(); }); }
+    if (RS.mode === 'fm' && !(AU && AU.src)) { if (RS.list.length) tune(); else stationsFor(bands()[RS.band][0]).then(function (l) { RS.list = l; tune(); }); }
+    led(); needle(); playerDraw();
+  }
+  function unfocusRadio() {
+    if (!RS) return;
+    RS.focus = false; closeList(); hideCountry();
+    radio({ focus: false });
     playerDraw();
   }
   async function setMode(m) {
     if (RS.mode === m) return;
-    RS.mode = m; RS.stIdx = 0;
+    RS.mode = m; RS.stIdx = 0; RS.marq = 0;
     radio({ mode: m });
     if (AU) AU.pause();
+    var t = $('rs-t-band'); if (t) t.textContent = m === 'fm' ? 'Country' : 'Chapter';
     if (m === 'story') {
       led();
       await booksList().catch(function () {});
@@ -520,18 +589,20 @@
       RS.list = await stationsFor(bands()[RS.band][0]).catch(function () { return []; });
       tune();
     }
+    if (RS.listKind) openList();
     led(); needle(); playerDraw();
   }
   function stepPart(part, dir, preview) {
     if (RS.mode === 'fm') {
-      if (part === 'tune') { if (!RS.list.length) return; RS.stIdx = (RS.stIdx + dir + RS.list.length) % RS.list.length; needle(); led(); }
+      if (part === 'tune') { if (!RS.list.length) return; RS.stIdx = (RS.stIdx + dir + RS.list.length) % RS.list.length; RS.marq = 0; needle(); led(); }
       else { var B = bands(); RS.band = (RS.band + dir + B.length) % B.length; showCountry(B[RS.band]); }
     } else {
       if (!RS.books) return;
-      if (part === 'tune') { RS.bookIdx = (RS.bookIdx + dir + RS.books.length) % RS.books.length; RS.chIdx = 0; RS.resume = null; led(); }
+      if (part === 'tune') { RS.bookIdx = (RS.bookIdx + dir + RS.books.length) % RS.books.length; RS.chIdx = 0; RS.resume = null; RS.marq = 0; led(); }
       else { var b = RS.books[RS.bookIdx]; if (b && b.ch && b.ch.length) { RS.chIdx = (RS.chIdx + dir + b.ch.length) % b.ch.length; RS.resume = null; led(); } }
     }
     if (navigator.vibrate) try { navigator.vibrate(6); } catch (e) {}
+    if ($('rs-list') && $('rs-list').classList.contains('on')) listDraw();
   }
   function settle(part) {
     clearTimeout(RS.tuneT);
@@ -545,14 +616,80 @@
         await chaptersOf(b).catch(function () {});
         playChapter(0);
       }
+      if ($('rs-list') && $('rs-list').classList.contains('on')) listDraw();
     }, part === 'band' ? 700 : 450);
   }
   function showCountry(B) {
     var p = $('rs-pop'), n = RS.st && RS.st[B[0]] ? RS.st[B[0]].length : null;
-    p.innerHTML = '<span class="rs-flag">' + flag(B[0]) + '</span><div><b>' + esc(B[1]) + '</b><small>' + (B[0] === '*' ? rj(FAV_LS, []).length + ' saved' : n !== null ? n + ' stations' : 'Tuning in…') + '</small></div>';
+    p.innerHTML = '<span class="rs-flag">' + flag(B[0]) + '</span><div><b>' + esc(B[1]) + '</b><small>' + (B[0] === '*' ? rj(FAV_LS, []).length + ' saved' : (n !== null ? n + ' stations · ' : '') + hereTime(B[0]) + ' there') + '</small></div>';
     p.classList.remove('on'); void p.offsetWidth; p.classList.add('on');
   }
   function hideCountry() { var p = $('rs-pop'); if (p) p.classList.remove('on'); }
+
+  /* ---- the list: a little scroll of paper, three rows tall ----
+     Stations (with a way to the countries), or books and then a book's
+     chapters. The row playing now is lit and scrolled to. */
+  function openList(kind) {
+    if (!RS) return;
+    var b = RS.books && RS.books[RS.bookIdx];
+    RS.listKind = kind || (RS.mode === 'fm' ? (RS.listKind === 'countries' ? 'countries' : 'stations') : (RS.listKind === 'books' || !(b && b.ch) ? 'books' : 'chapters'));
+    if (RS.mode === 'fm' && /books|chapters/.test(RS.listKind)) RS.listKind = 'stations';
+    if (RS.mode === 'story' && /stations|countries/.test(RS.listKind)) RS.listKind = 'books';
+    listDraw();
+    var L = $('rs-list'); L.classList.remove('on'); void L.offsetWidth; L.classList.add('on');
+  }
+  function closeList() { var L = $('rs-list'); if (L) L.classList.remove('on'); }
+  function listDraw() {
+    var L = $('rs-list'); if (!L || !RS) return;
+    var k = RS.listKind, head = '', rows = '', cur = -1;
+    var favIds = rj(FAV_LS, []).map(function (f) { return f.id; });
+    if (k === 'stations') {
+      var B = bands()[RS.band];
+      head = '<span class="rs-lt">' + flag(B[0]) + ' ' + esc(B[1]) + '<small>' + (TZ[B[0]] ? hereTime(B[0]) + ' there' : '') + '</small></span><button class="rs-lk" data-l="countries">Country ›</button>';
+      rows = RS.list.map(function (s, i) { return '<button class="rs-row" data-i="' + i + '"><b>' + (favIds.indexOf(s.id) >= 0 ? '★ ' : '') + esc(s.name) + '</b><span>' + esc(s.tags || 'Radio') + '</span></button>'; }).join('');
+      if (!RS.list.length) rows = '<div class="rs-empty">Tuning in…</div>';
+      cur = RS.stIdx;
+    } else if (k === 'countries') {
+      head = '<button class="rs-lk" data-l="stations">‹ Stations</button><span class="rs-lt">Countries</span>';
+      rows = bands().map(function (B, i) { return '<button class="rs-row" data-i="' + i + '"><b>' + flag(B[0]) + ' ' + esc(B[1]) + '</b><span>' + (TZ[B[0]] ? hereTime(B[0]) + ' there' : 'Your stations') + '</span></button>'; }).join('');
+      cur = RS.band;
+    } else if (k === 'books') {
+      head = '<span class="rs-lt">Bedtime stories<small>LibriVox · read aloud</small></span>';
+      rows = (RS.books || []).map(function (b, i) { return '<button class="rs-row" data-i="' + i + '"><b>' + esc(b.title) + '</b><span>' + esc(b.by || '') + '</span></button>'; }).join('');
+      if (!RS.books) rows = '<div class="rs-empty">Finding stories…</div>';
+      cur = RS.bookIdx;
+    } else {
+      var bk = RS.books[RS.bookIdx];
+      head = '<button class="rs-lk" data-l="books">‹ Books</button><span class="rs-lt">' + esc(bk.title) + '</span>';
+      rows = (bk.ch || []).map(function (c, i) { return '<button class="rs-row" data-i="' + i + '"><b>' + esc(c.title) + '</b><span>Part ' + (i + 1) + ' of ' + bk.ch.length + '</span></button>'; }).join('');
+      cur = RS.chIdx;
+    }
+    L.innerHTML = '<div class="rs-lh">' + head + '</div><div class="rs-lb" id="rs-lb">' + rows + '</div>';
+    var lb = $('rs-lb'), on = lb.querySelector('[data-i="' + cur + '"]');
+    if (on) { on.classList.add('on'); lb.scrollTop = Math.max(0, on.offsetTop - lb.offsetTop - on.offsetHeight); }
+  }
+  async function listClick(e) {
+    var t = e.target.closest('[data-l]');
+    if (t) {
+      RS.listKind = t.dataset.l;
+      if (RS.listKind === 'chapters' || RS.listKind === 'books') { if (RS.listKind === 'books') await booksList().catch(function () {}); }
+      listDraw(); return;
+    }
+    var r = e.target.closest('[data-i]'); if (!r) return;
+    var i = +r.dataset.i, k = RS.listKind;
+    if (k === 'stations') { RS.stIdx = i; RS.marq = 0; tune(); }
+    else if (k === 'countries') {
+      RS.band = i; RS.listKind = 'stations'; RS.list = []; listDraw();
+      RS.list = await stationsFor(bands()[i][0]).catch(function () { return []; }); RS.stIdx = 0; tune();
+    } else if (k === 'books') {
+      RS.bookIdx = i; RS.chIdx = 0; RS.resume = null; RS.marq = 0;
+      await chaptersOf(RS.books[i]).catch(function () {});
+      RS.listKind = 'chapters';
+      var last = rj(LAST_LS, null);
+      if (last && last.id === RS.books[i].id && last.t > 20) { RS.chIdx = last.ch || 0; RS.resume = last; }
+    } else { RS.chIdx = i; RS.resume = null; playChapter(0); }
+    led(); needle(); playerDraw(); listDraw();
+  }
   function tune() {
     var s = RS.list[RS.stIdx]; if (!s) { led(); playerDraw(); return; }
     play(s.url, function () { led(); playerDraw(); });
@@ -590,21 +727,24 @@
     radio({ fav: i < 0 });
     if (window.fwToast) window.fwToast(i < 0 ? '★ Saved ' + s.name : 'Removed from saved stations');
     playerDraw();
+    if ($('rs-list').classList.contains('on')) listDraw();
   }
   /* ---- the strip at the bottom ---- */
   function playerDraw() {
     var p = $('rs-player'); if (!p || !RS) return;
-    p.classList.toggle('on', RS.focus);
+    p.classList.toggle('on', RS.focus || !!(AU && AU.src));
+    p.classList.toggle('mini', !RS.focus);
     var on = AU && !AU.paused && !!AU.src;
     var h = '';
+    var listB = '<button class="rs-b" data-a="list" aria-label="Choose from a list">☰</button>';
     if (RS.mode === 'fm') {
       var s = RS.list[RS.stIdx], fav = s && rj(FAV_LS, []).some(function (x) { return x.id === s.id; });
       radio({ fav: !!fav });
-      h = '<button class="rs-b star' + (fav ? ' on' : '') + '" data-a="fav" aria-label="Save station">★</button>'
-        + '<button class="rs-b" data-a="prev" aria-label="Previous">‹</button>'
+      h = '<button class="rs-b" data-a="prev" aria-label="Previous">‹</button>'
         + '<button class="rs-b pp" data-a="pp" aria-label="Play or pause">' + (on ? '❚❚' : '▶') + '</button>'
         + '<button class="rs-b" data-a="next" aria-label="Next">›</button>'
-        + '<div class="rs-tt"><b>' + esc(s ? s.name : 'Tuning…') + '</b><span>' + flag(bands()[RS.band][0]) + ' ' + esc(bands()[RS.band][1]) + (s && s.tags ? ' · ' + esc(s.tags) : '') + (on ? ' · live ' + hhmm() : '') + '</span></div>';
+        + '<div class="rs-tt"><b>' + esc(s ? s.name : 'Tuning…') + '</b><span class="rs-live">' + liveLine() + '</span></div>'
+        + '<button class="rs-b star' + (fav ? ' on' : '') + '" data-a="fav" aria-label="Save station">★</button>' + listB;
     } else {
       var b = RS.books && RS.books[RS.bookIdx], c = b && b.ch && b.ch[RS.chIdx];
       if (RS.resume && b && RS.resume.id === b.id && RS.resume.t > 20) {
@@ -615,8 +755,9 @@
         h = '<button class="rs-b" data-a="prev" aria-label="Previous chapter">‹</button>'
           + '<button class="rs-b pp" data-a="pp" aria-label="Play or pause">' + (on ? '❚❚' : '▶') + '</button>'
           + '<button class="rs-b" data-a="next" aria-label="Next chapter">›</button>'
-          + '<div class="rs-tt"><b>' + esc(b ? b.title : 'Finding stories…') + '</b><span>' + esc(c ? c.title : (b ? 'Turn the wheel for a book, the knob for a chapter' : '')) + (b && b.by ? ' · ' + esc(b.by) : '') + '</span>'
-          + '<div class="rs-scrub"><i class="num" id="rs-cur">' + mm(AU && AU.src ? AU.currentTime : 0) + '</i><input type="range" id="rs-range" min="0" max="' + Math.round(dur || 1) + '" value="' + Math.round(AU && AU.src ? AU.currentTime : 0) + '" step="1" data-noswipe="1"/><i class="num">' + mm(dur) + '</i></div></div>';
+          + '<div class="rs-tt"><b>' + esc(b ? b.title : 'Finding stories…') + '</b><span>' + esc(c ? c.title : (b ? 'Pick a chapter from the list' : '')) + (b && b.by ? ' · ' + esc(b.by) : '') + '</span>'
+          + '<div class="rs-scrub"><i class="num" id="rs-cur">' + mm(AU && AU.src ? AU.currentTime : 0) + '</i><input type="range" id="rs-range" min="0" max="' + Math.round(dur || 1) + '" value="' + Math.round(AU && AU.src ? AU.currentTime : 0) + '" step="1" data-noswipe="1"/><i class="num">' + mm(dur) + '</i></div></div>'
+          + listB;
       }
     }
     p.innerHTML = h;
@@ -637,6 +778,7 @@
     p.addEventListener('click', function (e) {
       var b = e.target.closest('[data-a]'); if (!b || !RS) return;
       var a = b.dataset.a;
+      if (a === 'list') { var L = $('rs-list'); if (L.classList.contains('on')) closeList(); else openList(); return; }
       if (a === 'fav') return toggleFav();
       if (a === 'pp') { if (!AU || !AU.src) { RS.mode === 'fm' ? tune() : playChapter(0); return; } if (AU.paused) AU.play().catch(function () {}); else AU.pause(); return; }
       if (a === 'next' || a === 'prev') { var d = a === 'next' ? 1 : -1; stepPart(RS.mode === 'fm' ? 'tune' : 'band', d); settleNow(); return; }
