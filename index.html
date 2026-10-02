@@ -6967,7 +6967,17 @@ document.documentElement.classList.add('home-on');</script>
     font-size:12px;color:var(--cz-ink-2);background:rgba(255,255,252,.55);box-shadow:var(--cz-rim)}
   .cz-cloud svg{width:17px;height:17px;color:var(--cz-sage)}
   .cz-cloud b{color:var(--cz-sage);font-weight:700}
-  html.cl-signed .cz-cloud{display:none}
+  /* signed in: "Hello, Minh ✎ · Saved" -- the same pill, telling them the account is connected */
+  html.cl-signed .cz-cloud{gap:6px;color:var(--cz-ink);background:rgba(255,255,252,.75)}
+  .cl-dot{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;color:#fff;background:var(--cz-sage)}
+  .cl-hi b,.cl-hello b{font-weight:700;color:var(--cz-ink)}
+  .cl-pen{display:inline-grid;place-items:center;width:24px;height:24px;margin-left:-2px;border-radius:50%;cursor:pointer;color:var(--cz-sage)}
+  .cl-pen:hover{background:rgba(60,74,40,.08)}
+  .cl-saved{padding-left:8px;border-left:1px solid rgba(60,74,40,.15);font-size:11px;font-weight:600;color:var(--cz-sage)}
+  .cl-name-in{width:110px;height:24px;padding:0 8px;border:0;border-radius:8px;font:inherit;font-weight:700;color:var(--cz-ink);background:#fff;box-shadow:inset 0 0 0 1.5px var(--cz-sage);outline:none}
+  .cl-hello{display:flex;align-items:center;justify-content:center;gap:4px}
+  .cl-hello .cl-pen{width:30px;height:30px}
+  .cl-hello .cl-name-in{width:160px;height:32px;font-size:18px}
   .cl-scrim{position:fixed;inset:0;z-index:125;display:none;align-items:flex-end;justify-content:center;background:rgba(30,36,26,.4)}
   .cl-scrim.on{display:flex}
   html.kb-on .cl-scrim{top:var(--vvt);bottom:auto;height:var(--vvh)}
@@ -7676,7 +7686,7 @@ document.documentElement.classList.add('home-on');</script>
     <h1 class="cz-title">A Little World<br/>of Words</h1>
     <p class="cz-sub">A quiet island to learn on.<br/>Focci is waiting for you.</p>
     <button class="cz-today" id="cz-today" onclick="czOpen('stats')"><span class="cz-today-bar"><i id="cz-today-i"></i></span><b class="num" id="cz-today-n">0 / 20 XP</b><span id="cz-today-s">today</span></button>
-    <button class="cz-cloud" onclick="fcCloudOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5H7Z"/><path d="m9.5 13 2 2 3.5-4"/></svg><span>Keep your progress safe · <b>Sign in</b></span></button>
+    <div class="cz-cloud" id="cz-cloud" role="button" tabindex="0" onclick="fcCloudOpen()" data-out="<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><path d=&quot;M7 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5H7Z&quot;/><path d=&quot;m9.5 13 2 2 3.5-4&quot;/></svg><span>Keep your progress safe · <b>Sign in</b></span>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5H7Z"/><path d="m9.5 13 2 2 3.5-4"/></svg><span>Keep your progress safe · <b>Sign in</b></span></div>
 
     <div class="cz-cap">Where to</div>
     <div class="cz-where">

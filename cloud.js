@@ -197,8 +197,8 @@
     if (!ON) {
       h += '<h3>Cloud save is not set up yet</h3><p>Add the Supabase project URL and anon key to <b>cloud-config.js</b>.</p>';
     } else if (user && view !== 'choose') {
-      h += '<h3>Your little world is safe</h3>'
-        + '<p>Signed in as <b>' + esc(user.email || '') + '</b>. Your searches, saved words, XP, animals and games are kept in your account.</p>'
+      h += '<h3 class="cl-hello">' + nameHTML('sheet') + '</h3>'
+        + '<p>Your little world is connected to <b>' + esc(user.email || '') + '</b>. Your searches, saved words, XP, animals and games are kept in your account.</p>'
         + '<div class="cl-stat"><span>Last saved</span><b class="num">' + esc(ago(lastSaved || meta().savedAt)) + '</b></div>'
         + '<button class="cl-go" onclick="fcCloudSaveNow()"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : 'Save now') + '</button>'
         + '<button class="cl-ghost" onclick="fcCloudSignOut()">Sign out</button>'
@@ -228,11 +228,57 @@
     s.innerHTML = h;
     var f = $('cl-email'); if (f && !busy) setTimeout(function () { try { f.focus({ preventScroll: true }); } catch (e) {} }, 60);
   }
+  /* "Hello, Minh": once signed in the person sees their own name, so they
+     know the account is connected and their world is being kept. The name
+     starts as the email's first word (minh.le22@... -> Minh) and the pencil
+     beside it changes it, in place. It lives in sd_name -- the app's own
+     name key, saved with everything else -- and in the account's metadata. */
+  var PEN = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>';
+  var OK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  function fromEmail(e) {
+    var w = String(e || '').split('@')[0].split(/[._\-+\d]+/).filter(Boolean)[0] || '';
+    return w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : 'friend';
+  }
+  function myName() {
+    var n = ''; try { n = localStorage.getItem('sd_name') || ''; } catch (e) {}
+    if (!n && user) n = (user.user_metadata && user.user_metadata.name) || fromEmail(user.email);
+    return n || 'friend';
+  }
+  function setName(n) {
+    n = String(n || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    if (!n) { paintBadge(); return; }   // an emptied field keeps the old name
+    try { localStorage.setItem('sd_name', n); } catch (e) {}
+    if (sb && user) sb.auth.updateUser({ data: { name: n } }).catch(function () {});
+    if (typeof renderHero === 'function') try { renderHero(); } catch (e) {}
+    paintBadge();
+  }
+  function nameHTML(where) {
+    return '<span class="cl-hi">Hello, <b class="cl-name" id="cl-name-' + where + '">' + esc(myName()) + '</b></span>'
+      + '<span class="cl-pen" role="button" aria-label="Change your name" onclick="event.stopPropagation();fcCloudRename(\'' + where + '\')">' + PEN + '</span>';
+  }
   function paintBadge() {
     document.documentElement.classList.toggle('cl-signed', !!user);
-    var b = document.querySelectorAll('.cl-who'); b.forEach(function (x) { x.textContent = user ? 'Saved to ' + (user.email || 'your account') : 'Not signed in'; });
+    var chip = $('cz-cloud');
+    if (chip && !chip.querySelector('input')) {
+      chip.innerHTML = user
+        ? '<span class="cl-dot">' + OK + '</span>' + nameHTML('chip') + '<span class="cl-saved">Saved</span>'
+        : chip.dataset.out || chip.innerHTML;
+    }
     paintSheet();
   }
+  window.fcCloudRename = function (where) {
+    var b = $('cl-name-' + where); if (!b) return;
+    var inp = document.createElement('input');
+    inp.className = 'cl-name-in'; inp.value = myName(); inp.maxLength = 24; inp.setAttribute('aria-label', 'Your name');
+    inp.addEventListener('click', function (e) { e.stopPropagation(); });
+    // the field goes first: the chip is not repainted while a field is in it
+    var done = false, finish = function (keep) { if (done) return; done = true; var v = inp.value; inp.remove(); if (keep) setName(v); else paintBadge(); };
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') finish(false); });
+    inp.addEventListener('blur', function () { finish(true); });
+    b.replaceWith(inp);
+    var pen = inp.parentNode && inp.parentNode.parentNode && inp.parentNode.parentNode.querySelector('.cl-pen'); if (pen) pen.style.display = 'none';
+    inp.focus(); inp.select();
+  };
 
   window.fcCloudOpen = function () {
     dom(); err = '';
@@ -261,11 +307,13 @@
      URL); bring the two copies together the same way as before. */
   async function finishSignIn() {
     try {
+      var had = ''; try { had = localStorage.getItem('sd_name') || ''; } catch (e) {}
+      if (!had && user) setName((user.user_metadata && user.user_metadata.name) || fromEmail(user.email));
       var out = await reconcile();
       if (out && out.choose) { pending = out; view = 'choose'; paintSheet(); return; }
       if (out === 'restored') { view = 'done'; paintSheet(); setTimeout(function () { location.reload(); }, 1200); return; }
       view = 'start'; paintBadge();
-      if (window.fwToast) fwToast('Signed in — your progress is saved');
+      if (window.fwToast) fwToast('Hello, ' + myName() + ' — your world is saved');
     } catch (e) { view = 'start'; err = e.message || 'Could not reach your account.'; paintSheet(); }
   }
   window.fcCloudPick = async function (mode) {
