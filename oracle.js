@@ -2,36 +2,37 @@
    THE WISDOM TREE: an I Ching reading with three coins
 
    Tapping the red gate or the great tree on Zen Island opens this (the
-   sword under the gate is the way home). It used to show a random quote;
-   the user asked for a real divination instead: shake three coins six
-   times, build the hexagram from the bottom line up, and read it.
+   sword under the gate is the way home).
 
    The method, as it is traditionally done:
-   - Three coins, one side worth 3 (yang) and the other 2 (yin). Their sum
-     is a line: 6 old yin (changing), 7 young yang, 8 young yin, 9 old yang
-     (changing). The odds come out 1:3:3:1, as with real coins.
+   - Three coins, the inscribed side 正 worth 3 (yang) and the reverse 反
+     worth 2 (yin). Their sum is a line: 6 old yin (changing), 7 young
+     yang, 8 young yin, 9 old yang (changing) -- odds 1:3:3:1 as with real
+     coins (crypto random).
    - Six throws, the first is the bottom line.
-   - Changing lines turn into their opposite, giving the relating
-     hexagram (zhi gua).
-   - Which text to read follows Zhu Xi's rules (Yixue Qimeng): none
-     changing, the judgment; one, that line; two, both lines, the upper
-     leading; three, both hexagrams' judgments; four, the two unchanged
-     lines of the relating hexagram, the lower leading; five, its one
-     unchanged line; six, the relating judgment (use-nine / use-six for
-     Qian and Kun).
+   - Changing lines turn into their opposite: the relating hexagram (the
+     outcome). The nuclear hexagram (hỗ quái) is lines 2-4 under 3-5: what
+     is moving inside the situation.
+   - Which text to read follows Zhu Xi's rules (Yixue Qimeng) for 0-6
+     changing lines.
 
-   Text: hexagrams.json (built offline): the original Zhouyi from
-   Wikisource, James Legge's 1882 translation where Wikisource has it
-   (hexagrams 1-32; 32 has its judgment only), and the app's own layer --
-   core theme, traditional meaning, modern summary. ctext.org is the
-   reference the user named; its robots.txt turns away AI crawlers, so it
-   was not scraped.
+   The look follows the reference the user sent: a dark, warm room, the
+   hexagram's character large in gold, the lines drawn with their numbers
+   and the changing ones in red with 動, each throw's coins, the journey
+   from now to the outcome, the judgment and image, then the reading in
+   tiers. Casting is the whole screen -- three big coins tossed in the
+   dark with gold dust in the air -- not a box. The reading opens with the
+   AI's straight answer to the question; the tiers come after, folded, so
+   it is not a wall of text (the user crossed that out on the reference).
 
-   With a Gemini key, the reading of the user's question is asked in the
-   structure the user wrote: USER QUESTION / DIVINATION / SOURCE TEXT /
-   TRADITIONAL COMMENTARY, then "explain how this symbolism can be
-   reflected on the user's question; do not invent or alter the
-   traditional meaning; do not claim certainty about the future".
+   Text: hexagrams.json (built offline): the Zhouyi original from
+   Wikisource, Legge 1882 where Wikisource has it (1-31, 32's judgment),
+   and the app's own layer. With a Gemini key the prompt keeps the user's
+   structure: USER QUESTION / DIVINATION / SOURCE TEXT / TRADITIONAL
+   COMMENTARY, then "explain how this symbolism can be reflected on the
+   user's question; do not invent or alter the traditional meaning; do not
+   claim certainty about the future". Vietnamese and English mix here by
+   the user's choice -- the one screen outside vocabulary that does.
 
    Classic script, one IIFE; exports at the bottom.
    ============================================================ */
@@ -43,6 +44,7 @@
   var POS_ZH = ['初', '二', '三', '四', '五', '上'];
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+  function rich(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
   var DATA = null, BYPAT = {};
   function load() {
     if (DATA) return Promise.resolve(DATA);
@@ -54,78 +56,86 @@
   }
   function coin() { var a = new Uint8Array(1); (window.crypto || window.msCrypto).getRandomValues(a); return a[0] & 1 ? 3 : 2; }
 
-  var S = null;   // { q, throws:[{coins:[..], v}], busy }
+  var S = null;   // { q, throws:[{coins:[..], v}], busy, R, ai }
   function dom() {
     if ($('oc')) return;
     var d = document.createElement('div');
-    d.innerHTML = '<div class="oc" id="oc"><div class="oc-in" id="oc-in"></div></div>';
+    var dust = '';
+    for (var i = 0; i < 26; i++) dust += '<i style="left:' + (Math.random() * 100).toFixed(1) + '%;top:' + (Math.random() * 100).toFixed(1) + '%;animation-delay:-' + (Math.random() * 14).toFixed(1) + 's;animation-duration:' + (10 + Math.random() * 10).toFixed(1) + 's"></i>';
+    d.innerHTML = '<div class="oc" id="oc"><div class="oc-dust">' + dust + '</div><div class="oc-in" id="oc-in"></div></div>';
     document.body.appendChild(d.firstChild);
-    $('oc').addEventListener('click', function (e) { if (e.target.id === 'oc' && (!S || !S.busy)) ocClose(); });
   }
-  function head(cap) {
-    return '<div class="oc-h"><div><span class="cz-cap">' + cap + '</span><b class="oc-title">Gieo quẻ Kinh Dịch</b></div>'
-      + '<button class="pt-x" aria-label="Close" onclick="ocClose()">×</button></div>';
+  function topbar(cap) {
+    return '<div class="oc-top"><span class="oc-cap">' + cap + '</span><button class="oc-x" aria-label="Close" onclick="ocClose()">×</button></div>';
   }
   window.ocOpen = function () {
     dom();
     S = { q: '', throws: [], busy: false };
     load().catch(function () {});
-    var h = head('The wisdom tree')
-      + '<p class="oc-intro">Lặng lại một chút, thở chậm, và nghĩ về điều bạn đang băn khoăn. Ba đồng xu được gieo sáu lần — mỗi lần là một hào, từ dưới lên.</p>'
+    var h = topbar('The wisdom tree')
+      + '<div class="oc-ask">'
+      + '<div class="oc-mark">易</div>'
+      + '<h2 class="oc-h2">Gieo quẻ Kinh Dịch</h2>'
+      + '<p class="oc-lead">Lặng lại một chút, thở chậm, và nghĩ về điều bạn đang băn khoăn.<br/>Ba đồng xu, gieo sáu lần — mỗi lần là một hào, từ dưới lên.</p>'
       + '<textarea id="oc-q" class="oc-q" rows="2" placeholder="Điều bạn muốn hỏi (không bắt buộc)…"></textarea>'
-      + '<button class="oc-btn" onclick="ocStart()">Bắt đầu gieo</button>'
-      + histLine();
+      + '<button class="oc-go" onclick="ocStart()">Bắt đầu gieo</button>'
+      + histLine() + '</div>';
     $('oc-in').innerHTML = h;
+    $('oc').className = 'oc ask';
     document.documentElement.classList.add('oc-on');
   };
   function histLine() {
     var hs = []; try { hs = JSON.parse(localStorage.getItem(HIST_LS) || '[]'); } catch (e) {}
     if (!hs.length) return '';
     var x = hs[0];
-    return '<div class="oc-last">Lần trước: <b>' + esc(x.glyph) + ' ' + esc(x.name) + '</b>' + (x.to ? ' → ' + esc(x.to) : '') + ' · ' + esc(new Date(x.at).toLocaleDateString('vi-VN')) + '</div>';
+    return '<div class="oc-last">Lần trước: <b>' + esc(x.name) + '</b>' + (x.to ? ' → ' + esc(x.to) : '') + ' · ' + esc(new Date(x.at).toLocaleDateString('vi-VN')) + '</div>';
   }
   window.ocStart = function () {
     var q = $('oc-q'); S.q = q ? q.value.trim() : '';
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     renderCast();
     motionOn();
   };
+
+  /* ---------------- casting: the whole screen ---------------- */
   function coinHTML(i) {
-    return '<div class="oc-coin" id="oc-c' + i + '"><b><i class="f"><s>通</s><s>寶</s><s>太</s><s>平</s></i><i class="r"></i></b><em class="num"></em></div>';
+    return '<div class="oc-coin" id="oc-c' + i + '"><div class="oc-cf"><b class="f"><s>正</s></b><b class="r"><s>反</s></b></div><div class="oc-cs"></div></div>';
   }
-  function stackHTML(big) {
-    var h = '<div class="oc-stack' + (big ? ' big' : '') + '">';
+  function linesHTML(throws, big, reveal) {
+    // drawn top (6) to bottom (1), numbered, the changing ones red with 動
+    var h = '<div class="oc-lines' + (big ? ' big' : '') + '">';
     for (var k = 5; k >= 0; k--) {
-      var t = S.throws[k];
-      if (!t) { h += '<div class="oc-l oc-e"><i></i><i></i></div>'; continue; }
+      var t = throws[k];
+      if (!t) { h += '<div class="oc-ln none"><em>' + (k + 1) + '</em><i></i><u></u></div>'; continue; }
       var yang = t.v % 2 === 1, ch = t.v === 6 || t.v === 9;
-      h += '<div class="oc-l ' + (yang ? 'yang' : 'yin') + (ch ? ' ch' : '') + (k === S.throws.length - 1 && !big ? ' new' : '') + '"><i></i><i></i>'
-        + (ch ? '<u>' + (t.v === 9 ? '○' : '×') + '</u>' : '') + '</div>';
+      h += '<div class="oc-ln ' + (yang ? 'yang' : 'yin') + (ch ? ' ch' : '') + (reveal && k === throws.length - 1 ? ' new' : '') + '"><em class="num">' + (k + 1) + '</em><i></i><u>' + (ch ? '動' : '') + '</u></div>';
     }
     return h + '</div>';
   }
   function renderCast() {
-    var n = S.throws.length;
-    var last = S.throws[n - 1];
-    var h = head('Lần gieo ' + Math.min(6, n + 1) + ' / 6')
-      + '<div class="oc-cast"><div class="oc-coins">' + coinHTML(0) + coinHTML(1) + coinHTML(2) + '</div>' + stackHTML(false) + '</div>'
-      + '<div class="oc-status" id="oc-status">' + (last ? 'Hào ' + POS_ZH[n - 1] + ': <b class="num">' + last.v + '</b> · ' + LINE_VI[last.v] : (S.q ? '“' + esc(S.q) + '”' : 'Giữ câu hỏi trong lòng, rồi lắc.')) + '</div>'
-      + '<button class="oc-btn" id="oc-shake" onclick="ocThrow()">' + (n ? 'Lắc tiếp' : 'Lắc đồng xu') + '</button>'
-      + '<div class="oc-hint">Chạm nút, hoặc lắc nhẹ điện thoại.</div>';
+    var n = S.throws.length, last = S.throws[n - 1];
+    var h = topbar('Lần gieo <b class="num">' + Math.min(6, n + 1) + '</b> / 6')
+      + '<div class="oc-stage" onclick="ocThrow()">'
+      + (S.q ? '<p class="oc-qq">“' + esc(S.q) + '”</p>' : '<p class="oc-qq">Giữ câu hỏi trong lòng…</p>')
+      + '<div class="oc-coins">' + coinHTML(0) + coinHTML(1) + coinHTML(2) + '</div>'
+      + '<div class="oc-say" id="oc-say">' + (last ? 'Hào ' + POS_ZH[n - 1] + ' · <b class="num">' + last.v + '</b> · ' + LINE_VI[last.v] : 'Chạm vào đồng xu, hoặc lắc nhẹ điện thoại') + '</div>'
+      + linesHTML(S.throws, false, true)
+      + '</div>'
+      + '<button class="oc-go" id="oc-shake" onclick="ocThrow()">' + (n ? 'Gieo tiếp' : 'Tung đồng xu') + '</button>';
     $('oc-in').innerHTML = h;
+    $('oc').className = 'oc cast';
     if (last) last.coins.forEach(function (c, i) { setCoin(i, c, false); });
   }
   var coinDeg = [0, 0, 0];
   function setCoin(i, v, spin) {
     var el = $('oc-c' + i); if (!el) return;
-    var b = el.querySelector('b');
-    // 3 shows the plain side (yang), 2 the inscribed side (yin)
-    var face = v === 2 ? 0 : 180;
-    var base = Math.ceil(coinDeg[i] / 360) * 360 + (spin ? 1080 + i * 360 : 0);
+    var b = el.querySelector('.oc-cf');
+    var face = v === 3 ? 0 : 180;          // 正 up is 3, 反 up is 2
+    var base = Math.ceil(coinDeg[i] / 360) * 360 + (spin ? 1440 + i * 360 : 0);
     coinDeg[i] = base + face;
-    b.style.transition = spin ? 'transform ' + (0.95 + i * 0.12) + 's cubic-bezier(.2,.75,.25,1)' : 'none';
+    b.style.transition = spin ? 'transform ' + (1.05 + i * 0.12) + 's cubic-bezier(.2,.7,.25,1)' : 'none';
     b.style.transform = 'rotateX(' + coinDeg[i] + 'deg)';
-    if (spin) { el.classList.remove('toss'); void el.offsetWidth; el.classList.add('toss'); }
-    el.querySelector('em').textContent = spin ? '' : v;
+    if (spin) { el.classList.remove('toss', 'land'); void el.offsetWidth; el.classList.add('toss'); }
   }
   window.ocThrow = function () {
     if (!S || S.busy || S.throws.length >= 6) return;
@@ -134,13 +144,17 @@
     var btn = $('oc-shake'); if (btn) btn.disabled = true;
     if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {}
     cs.forEach(function (c, i) { setCoin(i, c, true); });
-    setTimeout(function () { clink(); cs.forEach(function (c, i) { var el = $('oc-c' + i); if (el) el.querySelector('em').textContent = c; }); }, 1150);
+    $('oc').classList.add('tossing');
+    setTimeout(function () {
+      clink();
+      cs.forEach(function (c, i) { var el = $('oc-c' + i); if (el) el.classList.add('land'); });
+    }, 1200);
     setTimeout(function () {
       S.throws.push({ coins: cs, v: v });
       S.busy = false;
       if (S.throws.length < 6) renderCast();
-      else { renderCast(); motionOff(); setTimeout(result, 900); }
-    }, 1500);
+      else { renderCast(); motionOff(); setTimeout(result, 1000); }
+    }, 1650);
   };
   /* A soft clink from two short sine partials -- no file to download. */
   var AC = null;
@@ -148,12 +162,12 @@
     try {
       AC = AC || new (window.AudioContext || window.webkitAudioContext)();
       var t = AC.currentTime;
-      [2400, 3170].forEach(function (f, k) {
+      [2400, 3170, 4100].forEach(function (f, k) {
         var o = AC.createOscillator(), g = AC.createGain();
         o.frequency.value = f; o.type = 'sine';
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06 / (k + 1), t + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-        o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + 0.55);
+        g.gain.setValueAtTime(0.0001, t + k * 0.04); g.gain.exponentialRampToValueAtTime(0.05 / (k + 1), t + k * 0.04 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + k * 0.04 + 0.6);
+        o.connect(g); g.connect(AC.destination); o.start(t + k * 0.04); o.stop(t + k * 0.04 + 0.65);
       });
     } catch (e) {}
   }
@@ -164,7 +178,7 @@
     motionFn = function (e) {
       var a = e.accelerationIncludingGravity || e.acceleration; if (!a) return;
       var m = Math.abs(a.x || 0) + Math.abs(a.y || 0) + Math.abs(a.z || 0);
-      if (m > 32 && Date.now() - lastShake > 1700) { lastShake = Date.now(); ocThrow(); }
+      if (m > 32 && Date.now() - lastShake > 1900) { lastShake = Date.now(); ocThrow(); }
     };
     window.addEventListener('devicemotion', motionFn);
   }
@@ -173,10 +187,13 @@
   /* ---------------- the reading ---------------- */
   function reading() {
     var vs = S.throws.map(function (t) { return t.v; });
-    var prim = BYPAT[vs.map(function (v) { return v % 2; }).join('')];
+    var bits = vs.map(function (v) { return v % 2; });
+    var prim = BYPAT[bits.join('')];
     var chg = [];
     vs.forEach(function (v, i) { if (v === 6 || v === 9) chg.push(i + 1); });
     var rel = chg.length ? BYPAT[vs.map(function (v) { return v === 6 ? 1 : v === 9 ? 0 : v % 2; }).join('')] : null;
+    // the nuclear hexagram: lines 2-4 below, 3-5 above
+    var hu = BYPAT[[bits[1], bits[2], bits[3], bits[2], bits[3], bits[4]].join('')];
     var unchanged = [1, 2, 3, 4, 5, 6].filter(function (k) { return chg.indexOf(k) < 0; });
     var focus = { rule: '', items: [] };
     var line = function (h, k, lead) { return { kind: 'line', h: h, k: k, lead: !!lead }; };
@@ -189,7 +206,7 @@
     else if (n === 5) { focus.rule = 'Năm hào động: đọc hào không động duy nhất của quẻ biến.'; focus.items = [line(rel, unchanged[0], true)]; }
     else if (prim.number <= 2) { focus.rule = prim.number === 1 ? 'Sáu hào đều động ở quẻ Càn: đọc lời 用九.' : 'Sáu hào đều động ở quẻ Khôn: đọc lời 用六.'; focus.items = [{ kind: 'useall', h: prim, lead: true }]; }
     else { focus.rule = 'Sáu hào đều động: đọc lời quẻ của quẻ biến.'; focus.items = [{ kind: 'judgment', h: rel, lead: true }]; }
-    return { vs: vs, prim: prim, rel: rel, chg: chg, focus: focus };
+    return { vs: vs, prim: prim, rel: rel, hu: hu, chg: chg, focus: focus };
   }
   function lineLabel(h, k) {
     var yang = h.structure.lines[k - 1] === 1;
@@ -208,64 +225,90 @@
     return (lg.lines || {})[String(it.k)] || '';
   }
   function itemTitle(it) {
-    var nm = it.h.chinese + ' ' + it.h.name.vi;
-    if (it.kind === 'judgment') return 'Lời quẻ · ' + nm;
-    if (it.kind === 'useall') return (it.h.number === 1 ? '用九' : '用六') + ' · ' + nm;
-    return 'Hào ' + lineLabel(it.h, it.k) + ' · ' + nm;
+    if (it.kind === 'judgment') return 'Lời quẻ ' + it.h.name.vi;
+    if (it.kind === 'useall') return (it.h.number === 1 ? '用九' : '用六') + ' · ' + it.h.name.vi;
+    return 'Hào ' + lineLabel(it.h, it.k) + ' · ' + it.h.name.vi;
   }
-  function hexCard(h, sub) {
-    // no Unicode hexagram glyph: system fonts draw it a few pixels tall; the lines are drawn beside it
-    var up = DATA.trigrams[h.structure.upper], lo = DATA.trigrams[h.structure.lower];
-    return '<div class="oc-name"><div><b>' + esc(h.chinese) + ' <span class="oc-py">' + esc(h.pinyin) + '</span></b>'
-      + '<span>' + esc(h.name.vi) + ' · ' + esc(h.name.en) + '</span>'
-      + '<small>' + (sub || '') + 'Quẻ ' + h.number + ' · ' + esc(up.vi) + ' (' + esc(up.en) + ') trên ' + esc(lo.vi) + ' (' + esc(lo.en) + ')</small></div></div>';
+  function triVi(h) { var up = DATA.trigrams[h.structure.upper], lo = DATA.trigrams[h.structure.lower]; return up.vi + ' trên ' + lo.vi; }
+  function miniHex(h, chg) {
+    var r = '<div class="oc-mini">';
+    for (var k = 5; k >= 0; k--) r += '<i class="' + (h.structure.lines[k] ? 'y' : 'n') + (chg && chg.indexOf(k + 1) >= 0 ? ' c' : '') + '"></i>';
+    return r + '</div>';
   }
   function result() {
     load().then(function () {
       var R = reading(); S.R = R;
       var p = R.prim, ip = p.interpretation;
-      var h = head(S.q ? 'Quẻ cho câu hỏi của bạn' : 'Quẻ của bạn hôm nay')
-        + (S.q ? '<p class="oc-qline">\u201c' + esc(S.q) + '\u201d</p>' : '')
-        + '<div class="oc-res">' + stackHTML(true) + '<div class="oc-res-r">' + hexCard(p, '')
-        + (R.rel ? '<div class="oc-to"><span>→ quẻ biến</span>' + hexCard(R.rel, '') + '</div>' : '') + '</div></div>'
-        + '<div class="oc-theme">' + esc(ip.core_theme) + '</div>'
-        // the two or three wise lines: the image, the judgment, today
-        + '<div class="oc-wise">'
-        + '<div class="oc-w"><i>象</i><div><p class="zh">' + esc(p.original_text.image) + '</p><p>' + esc(ip.traditional_meaning) + '</p></div></div>'
-        + '<div class="oc-w"><i>卦</i><div><p class="zh">' + esc(p.original_text.judgment) + '</p>' + (p.legge && p.legge.judgment ? '<p class="en">' + esc(p.legge.judgment) + '</p>' : '') + '</div></div>'
-        + '<div class="oc-w"><i>今</i><div><p>' + esc(ip.modern_summary) + '</p></div></div>'
+      var key = window.getKey && window.getKey();
+      var h = topbar('Kết quả gieo quẻ')
+        + (S.q ? '<p class="oc-qline">“' + esc(S.q) + '”</p>' : '')
+        // the answer first: the AI's, or the app's own line until it comes
+        + '<div class="oc-answer" id="oc-answer">' + (key ? '<div class="oc-think"><span class="oc-dots"><i></i><i></i><i></i></span>Cây thông thái đang luận quẻ…</div>'
+            : '<p>' + esc(ip.modern_summary) + '</p><small>Thêm Gemini key trong Settings để được luận giải theo câu hỏi của bạn.</small>') + '</div>'
+        + '<div class="oc-grid">'
+        + '<div class="oc-left">'
+        + '<div class="oc-glyph">' + esc(p.chinese) + '</div>'
+        + linesHTML(S.throws, true, false)
+        + '<div class="oc-name"><b>' + esc(p.name.vi) + '</b><span>Quẻ số ' + p.number + ' · ' + esc(p.pinyin) + ' · ' + esc(p.name.en) + '</span>'
+        + '<em>' + esc(triVi(p)) + ' — ' + esc(ip.core_theme) + '</em></div>'
+        + '<div class="oc-box"><span class="oc-k">Chi tiết gieo</span><div class="oc-throws">'
+        + S.throws.map(function (t, i) {
+            return '<div class="oc-th"><span>Hào ' + (i + 1) + '</span><div>' + t.coins.map(function (c) { return '<i class="' + (c === 3 ? 'z' : 'f') + '">' + (c === 3 ? '正' : '反') + '</i>'; }).join('') + '</div><b class="num' + (t.v === 6 || t.v === 9 ? ' c' : '') + '">' + t.v + '</b></div>';
+          }).join('') + '</div></div>'
+        + '<div class="oc-box oc-journey"><span class="oc-k red">Hành trình của quẻ</span><div class="oc-jr">'
+        + '<div class="oc-j"><small>Hiện tại</small><b>' + esc(p.chinese) + '</b><span>' + esc(p.name.vi) + '</span></div>'
+        + (R.rel ? '<div class="oc-arrow">→<small>' + (R.chg.length ? 'hào ' + R.chg.join(', ') + ' động' : '') + '</small></div>'
+            + '<div class="oc-j out"><small>Kết cục</small><b>' + esc(R.rel.chinese) + '</b><span>' + esc(R.rel.name.vi) + '</span><em>' + esc(triVi(R.rel)) + '</em></div>'
+          : '<div class="oc-arrow still">○<small>không hào động</small></div><div class="oc-j out still"><small>Kết cục</small><span>Quẻ đứng yên: lời quẻ chính là tất cả</span></div>')
+        + '</div>' + (R.hu ? '<div class="oc-hu">Hỗ quái (diễn biến bên trong): <b>' + esc(R.hu.chinese) + ' ' + esc(R.hu.name.vi) + '</b></div>' : '') + '</div>'
         + '</div>'
-        + '<div class="oc-focus"><span class="cz-cap">Lời cần đọc kỹ</span><p class="oc-rule">' + esc(R.focus.rule) + '</p>'
+        + '<div class="oc-right">'
+        + '<section class="oc-sec"><span class="oc-k">Quái từ</span><p class="zh">' + esc(p.original_text.judgment) + '</p>'
+        + (p.legge && p.legge.judgment ? '<p class="en">' + esc(p.legge.judgment) + '</p>' : '') + '</section>'
+        + '<section class="oc-sec"><span class="oc-k">Tượng</span><p class="zh">' + esc(p.original_text.image) + '</p><p>' + esc(ip.traditional_meaning) + '</p></section>'
+        + '<section class="oc-sec"><span class="oc-k">Lời cần đọc kỹ</span><p class="oc-rule">' + esc(R.focus.rule) + '</p>'
         + R.focus.items.map(function (it) {
             var en = itemEn(it);
-            return '<div class="oc-fi' + (it.lead ? ' lead' : '') + '"><b>' + esc(itemTitle(it)) + '</b><p class="zh">' + esc(itemZh(it)) + '</p>'
-              + (en ? '<p class="en">' + esc(en) + '</p>' : '') + '</div>';
-          }).join('') + '</div>'
-        + '<div class="oc-ai" id="oc-ai">' + aiButton() + '</div>'
+            return '<div class="oc-fi' + (it.lead ? ' lead' : '') + '"><b>' + esc(itemTitle(it)) + '</b><p class="zh">' + esc(itemZh(it)) + '</p>' + (en ? '<p class="en">' + esc(en) + '</p>' : '') + '</div>';
+          }).join('') + '</section>'
+        + '<section class="oc-sec"><span class="oc-k">Giải quẻ</span><div id="oc-tiers">' + staticTiers(R) + '</div></section>'
+        + '</div></div>'
         + '<p class="oc-remind">' + esc(REMIND) + '</p>'
-        + '<div class="oc-acts"><button class="oc-btn ghost" onclick="ocOpen()">Gieo quẻ khác</button><button class="oc-btn" onclick="ocClose()">Xong</button></div>'
+        + '<div class="oc-acts"><button class="oc-go ghost" onclick="ocOpen()">Gieo quẻ khác</button><button class="oc-go" onclick="ocClose()">Xong</button></div>'
         + '<div class="oc-src">Nguyên văn: Chu Dịch (Wikisource) · Bản dịch: James Legge, 1882' + (p.legge ? '' : ' (quẻ này chưa có bản Legge trong nguồn mở)') + '</div>';
       $('oc-in').innerHTML = h;
+      $('oc').className = 'oc done';
       $('oc-in').scrollTop = 0;
       save(R);
-      if (S.q && window.getKey && window.getKey()) ocAsk();
+      if (key) ocAsk();
     });
   }
-  function aiButton() {
-    if (!(window.getKey && window.getKey())) return '<div class="oc-nokey">Thêm Gemini key trong Settings để cây thông thái giải quẻ theo câu hỏi của bạn.</div>';
-    return '<button class="oc-btn soft" onclick="ocAsk()">' + (S.q ? 'Giải quẻ cho câu hỏi của bạn' : 'Giải quẻ cho hôm nay') + '</button>';
+  /* Without the AI, the tiers come from the book itself. */
+  function staticTiers(R) {
+    var p = R.prim, t = [];
+    t.push({ title: 'Tầng 1 — Quẻ chính', text: '**' + p.name.vi + '** (' + p.name.en + '): ' + p.interpretation.traditional_meaning + ' ' + p.interpretation.modern_summary });
+    if (R.hu) t.push({ title: 'Tầng 2 — Hỗ quái', text: 'Bên trong là **' + R.hu.name.vi + '**: ' + R.hu.interpretation.modern_summary });
+    if (R.chg.length) t.push({ title: 'Tầng 3 — Hào động', text: R.focus.rule });
+    if (R.rel) t.push({ title: 'Tầng 4 — Quẻ biến', text: 'Việc đi về **' + R.rel.name.vi + '**: ' + R.rel.interpretation.modern_summary });
+    return tiersHTML(t);
+  }
+  function tiersHTML(t) {
+    return t.map(function (x, i) {
+      return '<details class="oc-tier"' + (i === 0 ? ' open' : '') + '><summary>' + esc(x.title) + '</summary><p>' + rich(x.text) + '</p></details>';
+    }).join('');
   }
   function save(R) {
     var hs = []; try { hs = JSON.parse(localStorage.getItem(HIST_LS) || '[]'); } catch (e) {}
     hs.unshift({ at: Date.now(), q: S.q, n: R.prim.number, glyph: R.prim.symbol, name: R.prim.chinese + ' ' + R.prim.name.vi,
-      to: R.rel ? R.rel.symbol + ' ' + R.rel.chinese : '', lines: R.vs.join('') });
+      to: R.rel ? R.rel.chinese + ' ' + R.rel.name.vi : '', lines: R.vs.join('') });
     try { localStorage.setItem(HIST_LS, JSON.stringify(hs.slice(0, 30))); } catch (e) {}
   }
   /* The prompt, in the structure the user gave. */
   function promptFor(R) {
     var p = R.prim;
-    var div = 'Hexagram ' + p.number + ' ' + p.chinese + ' (' + p.pinyin + ', "' + p.name.en + '")'
-      + (R.chg.length ? ', changing line' + (R.chg.length > 1 ? 's ' : ' ') + R.chg.join(', ') + ' → relating hexagram ' + R.rel.number + ' ' + R.rel.chinese + ' ("' + R.rel.name.en + '")' : ', no changing lines')
+    var div = 'Hexagram ' + p.number + ' ' + p.chinese + ' (' + p.pinyin + ', "' + p.name.en + '", ' + p.name.vi + ')'
+      + (R.chg.length ? ', changing line' + (R.chg.length > 1 ? 's ' : ' ') + R.chg.join(', ') + ' → relating hexagram ' + R.rel.number + ' ' + R.rel.chinese + ' ("' + R.rel.name.en + '", ' + R.rel.name.vi + ')' : ', no changing lines')
+      + (R.hu ? '. Nuclear hexagram: ' + R.hu.number + ' ' + R.hu.chinese + ' (' + R.hu.name.vi + ')' : '')
       + '. Thrown with three coins; line values bottom to top: ' + R.vs.join(' ') + '.\nWhat to read (Zhu Xi\'s rule): ' + R.focus.rule;
     var src = ['Judgment of ' + p.chinese + ': ' + p.original_text.judgment, 'Image of ' + p.chinese + ': ' + p.original_text.image];
     var com = [];
@@ -277,30 +320,39 @@
       var en = itemEn(it); if (en) com.push(lab(it) + ' of ' + it.h.chinese + ': ' + en);
     });
     if (R.rel) src.push('Judgment of the relating hexagram ' + R.rel.chinese + ': ' + R.rel.original_text.judgment);
+    if (R.hu) src.push('Judgment of the nuclear hexagram ' + R.hu.chinese + ': ' + R.hu.original_text.judgment);
     return 'USER QUESTION:\n' + (S.q || '(No specific question: a general reading for today.)')
       + '\n\nDIVINATION:\n' + div
       + '\n\nSOURCE TEXT:\n' + src.join('\n')
       + '\n\nTRADITIONAL COMMENTARY:\n' + (com.length ? 'James Legge (1882):\n' + com.join('\n') : 'Legge\'s translation of these passages is not in our source; rely on the original text above and its traditional reading.')
       + '\nApp notes on the traditional meaning: ' + p.interpretation.traditional_meaning
       + '\n\nExplain how this symbolism can be reflected on the user\'s question. Do not invent or alter the traditional meaning. Do not claim certainty about the future.'
-      + '\nWrite in Vietnamese, calm and warm, in three short paragraphs (about 150 words in all): what the image and the lines say, how they may mirror the question, and one gentle thing to notice or try. No headings, no lists, no fortune-telling.';
+      + '\nWrite in Vietnamese. Return JSON only:\n{"answer":"one or two sentences that answer the question directly first (or, with no question, the message for today) -- plain, warm, no hedging words like có thể ở đầu câu",'
+      + '"tiers":[{"title":"Tầng 1 — Quẻ chính","text":"..."},{"title":"Tầng 2 — Hỗ quái","text":"..."},{"title":"Tầng 3 — Hào động","text":"..."},{"title":"Tầng 4 — Quẻ biến","text":"..."}],'
+      + '"advice":"one gentle thing to notice or try"}\n'
+      + 'Each tier 2-4 sentences, tied to the question; leave out Tầng 3 when no line changes and Tầng 4 when there is no relating hexagram. Mark the few key phrases with **double asterisks**.';
   }
   window.ocAsk = async function () {
-    var box = $('oc-ai'); if (!box || !S || !S.R) return;
+    var box = $('oc-answer'); if (!box || !S || !S.R) return;
     var key = window.getKey && window.getKey(); if (!key) return;
-    box.innerHTML = '<div class="oc-think"><span class="pr-dots"><i></i><i></i><i></i></span>Cây thông thái đang lắng nghe…</div>';
+    var R = S.R;
     try {
       var model = window.getModel();
-      var gen = { temperature: 0.6, maxOutputTokens: 900 };
+      var gen = { temperature: 0.6, maxOutputTokens: 1400, responseMimeType: 'application/json' };
       if (/2\.5/.test(model)) gen.thinkingConfig = { thinkingBudget: 0 };
       var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(key);
-      var res = await window.geminiPost(url, { contents: [{ parts: [{ text: promptFor(S.R) }] }], generationConfig: gen });
+      var res = await window.geminiPost(url, { contents: [{ parts: [{ text: promptFor(R) }] }], generationConfig: gen });
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      var t = window.geminiText(await res.json()).txt.trim();
-      if (!t) throw new Error('EMPTY');
-      box.innerHTML = '<div class="oc-read">' + t.split(/\n\s*\n/).map(function (x) { return '<p>' + esc(x.trim()).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>') + '</p>'; }).join('') + '</div>';
+      var t = window.geminiText(await res.json()).txt.trim().replace(/```json|```/g, '');
+      var j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1));
+      if (!j.answer) throw new Error('EMPTY');
+      if (!S || S.R !== R) return;
+      box.innerHTML = '<span class="oc-k">Lời đáp</span><p>' + rich(j.answer) + '</p>' + (j.advice ? '<small>' + rich(j.advice) + '</small>' : '');
+      box.classList.add('in');
+      var tiers = (j.tiers || []).filter(function (x) { return x && x.text; });
+      if (tiers.length && $('oc-tiers')) $('oc-tiers').innerHTML = tiersHTML(tiers);
     } catch (e) {
-      box.innerHTML = '<div class="oc-nokey">Chưa giải được lúc này (' + esc(e.message) + ').</div>' + aiButton();
+      box.innerHTML = '<p>' + esc(R.prim.interpretation.modern_summary) + '</p><small>Chưa luận giải được lúc này (' + esc(e.message) + '). <button class="oc-retry" onclick="ocAsk()">Thử lại</button></small>';
     }
   };
   window.ocClose = function () {
