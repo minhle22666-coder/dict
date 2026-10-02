@@ -18,17 +18,17 @@
      in for four, hold for two, out for six. The island's music stops and
      an ambient sound plays instead -- wind by default, or rain, waves,
      birds, or nothing -- all synthesised from noise and a few oscillators.
-   - Stories. The Little Prince's pop-up book opens under a night sky, and
-     a player sits over it: audiobooks for children from LibriVox (public
-     domain, through archive.org's API), FM radio from any country (the
-     community Radio Browser directory; Vietnam first), and the user's
-     YouTube playlist of audio stories.
+   - Stories. The Little Prince's pop-up book opens under a night sky with
+     a clock radio beside it: FM from any country (the community Radio
+     Browser directory; Vietnam first) and bedtime stories from LibriVox
+     (public domain, through archive.org's API), tuned on the radio itself.
+     See the stories section below.
 
    Classic script, one IIFE.
    ============================================================ */
 (function () {
   'use strict';
-  var PLAYLIST = 'PLICwCUjNIMb1mj6a_r2tztKpmR8PsQ1lo';
+
   function $(id) { return document.getElementById(id); }
   function W() { return window.fwWorld || null; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
@@ -115,6 +115,7 @@
     dom();
     var was = CUR; CUR = null;
     guitarStop(); ambientStop(); storyAudioStop();
+    if (RS) { clearInterval(RS.clock); clearTimeout(RS.tuneT); cancelAnimationFrame(RS.raf); if (RS.mode === 'story') savePos(); RS = null; }
     clearInterval(jogT);
     barOff();
     D.classList.remove('fa-quiet', 'fa-full', 'fa-relaxing', 'fa-storying', 'fa-night');
@@ -331,118 +332,329 @@
   };
   var faSoundStartPending = 'wind';
 
-  /* ---------------- stories: the book, and something to listen to ---------------- */
+  /* ---------------- stories: the radio by the Little Prince's book ----------------
+     The first version was a flat sheet of lists over the book; the user
+     wanted it inside the little world. Now the scene stays clear and a
+     clock radio stands by the book (world.js buildRadio), hopping with a
+     "Tap the radio" chip until it is touched. A tap flies the camera to it:
+     - the keys on top choose the mode -- the blue one FM, the red one
+       Stories -- and the chosen key glows, with a label over each key;
+       the second blue key saves the station (saved stations come first,
+       and "Saved" is the first stop on the band knob);
+     - the big wheel on the side tunes: drag it and the needle slides,
+       the LED shows the station or the book; let go and it plays;
+     - the small knob on top turns the country (FM) or the chapter
+       (Stories), with a little card and a flag for the country;
+     - a glass strip at the bottom plays and pauses, swipes to the next or
+       last station or chapter, and for a story scrubs to any minute; a
+       story you started asks whether to carry on where you left off.
+     FM comes from the community Radio Browser directory (https streams
+     only; HLS only where the browser plays it itself), stories from
+     LibriVox's children's shelf on archive.org. The YouTube tab is gone. */
   var AU = null;
   function audioEl() { if (!AU) { AU = new Audio(); AU.preload = 'none'; } return AU; }
-  function storyAudioStop() { if (AU) { try { AU.pause(); AU.removeAttribute('src'); AU.load(); } catch (e) {} } var y = $('fa-yt'); if (y) y.innerHTML = ''; }
-  var COUNTRIES = [['VN', 'Việt Nam'], ['US', 'USA'], ['GB', 'UK'], ['AU', 'Australia'], ['CA', 'Canada'], ['JP', 'Japan'], ['KR', 'Korea'], ['FR', 'France'], ['DE', 'Germany'], ['SG', 'Singapore'], ['TH', 'Thailand']];
-  var ST = { tab: 'books', cc: 'VN', books: null, playing: null };
-  window.faStories = async function () {
-    ringClose(); faStop(); CUR = 'stories';
-    D.classList.add('fa-quiet', 'fa-full', 'fa-storying');
-    var el = $('fa-story');
-    el.innerHTML = '<div class="fa-fade"></div><div class="fa-stop-top"><div><span class="cz-cap">Story time</span><b>The Little Prince’s book</b></div>'
-      + '<button class="pt-x" onclick="faStop()" aria-label="Close">×</button></div>'
-      + '<div class="fa-sheet"><div class="fa-tabs">'
-      + '<button data-t="books" onclick="faTab(\'books\')">Truyện audio</button><button data-t="radio" onclick="faTab(\'radio\')">Radio FM</button><button data-t="yt" onclick="faTab(\'yt\')">YouTube</button></div>'
-      + '<div class="fa-now" id="fa-now"></div><div class="fa-list" id="fa-list"></div></div>';
-    el.classList.add('on');
-    setTimeout(function () { if (W() && W().focciDo) W().focciDo('stories'); }, 500);
-    faTab(ST.tab);
-  };
-  window.faTab = function (t) {
-    ST.tab = t;
-    document.querySelectorAll('#fa-story .fa-tabs button').forEach(function (b) { b.classList.toggle('on', b.dataset.t === t); });
-    var L = $('fa-list'); if (!L) return;
-    if (t === 'yt') {
-      L.innerHTML = '<div class="fa-yt" id="fa-yt"><iframe src="https://www.youtube-nocookie.com/embed/videoseries?list=' + PLAYLIST + '&playsinline=1" title="Audio stories" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>'
-        + '<p class="fa-note">Danh sách truyện audio trên YouTube của bạn.</p>';
-      if (AU) AU.pause();
-      return;
-    }
-    var y = $('fa-yt'); if (y) y.innerHTML = '';
-    if (t === 'radio') return radioList();
-    return bookList();
-  };
-  function loading(L) { L.innerHTML = '<div class="fa-load"><span class="pr-dots"><i></i><i></i><i></i></span>Đang tải…</div>'; }
+  function storyAudioStop() { if (AU) { try { AU.pause(); AU.removeAttribute('src'); AU.load(); } catch (e) {} } cancelAnimationFrame(RS && RS.raf); }
+  var COUNTRIES = [['VN', 'Vietnam'], ['US', 'United States'], ['GB', 'United Kingdom'], ['AU', 'Australia'], ['CA', 'Canada'], ['JP', 'Japan'], ['KR', 'South Korea'], ['FR', 'France'], ['DE', 'Germany'], ['SG', 'Singapore'], ['TH', 'Thailand']];
+  function flag(cc) { return cc === '*' ? '★' : String.fromCodePoint.apply(null, cc.split('').map(function (c) { return 0x1F1E6 + c.charCodeAt(0) - 65; })); }
+  var FAV_LS = 'fc_fm_favs', POS_LS = 'fc_story_pos', LAST_LS = 'fc_story_last';
+  function rj(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } }
+  function wj(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  var RS = null;
+  function bands() { var f = rj(FAV_LS, []); return (f.length ? [['*', 'Saved stations']] : []).concat(COUNTRIES); }
   async function getJSON(u, ms) {
     var c = new AbortController(), tm = setTimeout(function () { c.abort(); }, ms || 15000);
     try { var r = await fetch(u, { signal: c.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); } finally { clearTimeout(tm); }
   }
-  async function bookList() {
-    var L = $('fa-list'); loading(L);
-    try {
-      if (!ST.books) {
-        // measured: the language filter matched nothing (the field is not "English" there); subject alone finds ~1,200
-        var q = 'collection:(librivoxaudio) AND subject:(children OR "fairy tales" OR fables)';
-        var d = await getJSON('https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q) + '&fl[]=identifier&fl[]=title&fl[]=creator&sort[]=downloads+desc&rows=40&output=json');
-        ST.books = (d.response && d.response.docs) || [];
-      }
-      if (ST.tab !== 'books') return;
-      L.innerHTML = '<p class="fa-note">Truyện thiếu nhi tiếng Anh do tình nguyện viên LibriVox đọc (phạm vi công cộng).</p>'
-        + ST.books.map(function (b, i) {
-          var by = Array.isArray(b.creator) ? b.creator[0] : (b.creator || '');
-          return '<button class="fa-item" onclick="faBook(' + i + ')"><b>' + esc(String(b.title).replace(/\s*\(version \d+\)/i, '')) + '</b><span>' + esc(by) + '</span></button>';
-        }).join('');
-    } catch (e) { L.innerHTML = '<p class="fa-note">Không tải được thư viện (' + esc(e.message) + ').</p>'; }
+  async function stationsFor(cc) {
+    RS.st = RS.st || {};
+    var favs = rj(FAV_LS, []);
+    if (cc === '*') return favs.map(function (f) { return { id: f.id, name: f.name, url: f.url, cc: f.cc, tags: '' }; });
+    if (!RS.st[cc]) {
+      var d = await getJSON('https://de1.api.radio-browser.info/json/stations/bycountrycodeexact/' + cc + '?limit=60&hidebroken=true&order=clickcount&reverse=true');
+      var hls = !!audioEl().canPlayType('application/vnd.apple.mpegurl');
+      RS.st[cc] = d.filter(function (s) { var u = s.url_resolved || s.url || ''; return /^https:/i.test(u) && (hls || !/\.m3u8(\?|$)/i.test(u)); })
+        .slice(0, 40).map(function (s) { return { id: s.stationuuid, name: s.name.trim(), url: s.url_resolved || s.url, cc: cc, tags: (s.tags || '').split(',').slice(0, 2).join(' · ') }; });
+    }
+    // saved stations float to the top of their country
+    var ids = favs.map(function (f) { return f.id; });
+    return RS.st[cc].slice().sort(function (a, b) { return (ids.indexOf(b.id) >= 0) - (ids.indexOf(a.id) >= 0); });
   }
-  window.faBook = async function (i) {
-    var b = ST.books && ST.books[i]; if (!b) return;
-    var L = $('fa-list'); loading(L);
-    try {
-      var d = await getJSON('https://archive.org/metadata/' + encodeURIComponent(b.identifier) + '/files');
-      var files = (d.result || []).filter(function (f) { return /_64kb\.mp3$/i.test(f.name); });
-      if (!files.length) files = (d.result || []).filter(function (f) { return /\.mp3$/i.test(f.name); });
-      files.sort(function (x, y) { return x.name.localeCompare(y.name, undefined, { numeric: true }); });
-      ST.chapters = files.map(function (f) { return { title: f.title || chName(f.name), url: 'https://archive.org/download/' + b.identifier + '/' + encodeURIComponent(f.name), book: b.title }; });
-      L.innerHTML = '<button class="fa-back" onclick="faTab(\'books\')">‹ All books</button><p class="fa-note"><b>' + esc(b.title) + '</b></p>'
-        + ST.chapters.map(function (c, k) { return '<button class="fa-item" onclick="faPlayCh(' + k + ')"><b>' + esc(c.title) + '</b></button>'; }).join('');
-    } catch (e) { L.innerHTML = '<p class="fa-note">Không mở được truyện (' + esc(e.message) + ').</p>'; }
-  };
+  async function booksList() {
+    if (RS.books) return RS.books;
+    // measured: a language filter matched nothing there; subject alone finds ~1,200
+    var q = 'collection:(librivoxaudio) AND subject:(children OR "fairy tales" OR fables)';
+    var d = await getJSON('https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q) + '&fl[]=identifier&fl[]=title&fl[]=creator&sort[]=downloads+desc&rows=40&output=json');
+    RS.books = ((d.response && d.response.docs) || []).map(function (b) { return { id: b.identifier, title: String(b.title).replace(/\s*\(version \d+\)/i, ''), by: Array.isArray(b.creator) ? b.creator[0] : (b.creator || '') }; });
+    return RS.books;
+  }
   // "wonderland_ch_01_64kb.mp3" reads as "Chapter 1"
   function chName(n) {
     var b = n.replace(/_64kb\.mp3$/i, '').replace(/\.mp3$/i, '');
     var m = /(?:^|_)(?:ch|chapter|part|pt)_?0*(\d+)/i.exec(b) || /_0*(\d+)$/.exec(b);
     return m ? 'Chapter ' + m[1] : b.replace(/_/g, ' ');
   }
-  window.faPlayCh = function (k) {
-    var c = ST.chapters && ST.chapters[k]; if (!c) return;
-    play(c.url, c.title, c.book, function () { if (ST.chapters[k + 1]) faPlayCh(k + 1); });
+  async function chaptersOf(book) {
+    if (book.ch) return book.ch;
+    var d = await getJSON('https://archive.org/metadata/' + encodeURIComponent(book.id) + '/files');
+    var files = (d.result || []).filter(function (f) { return /_64kb\.mp3$/i.test(f.name); });
+    if (!files.length) files = (d.result || []).filter(function (f) { return /\.mp3$/i.test(f.name); });
+    files.sort(function (x, y) { return x.name.localeCompare(y.name, undefined, { numeric: true }); });
+    book.ch = files.map(function (f) { return { title: f.title || chName(f.name), url: 'https://archive.org/download/' + book.id + '/' + encodeURIComponent(f.name) }; });
+    return book.ch;
+  }
+  function hhmm() { var d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  function mm(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+  window.faStories = async function () {
+    ringClose(); faStop(); CUR = 'stories';
+    D.classList.add('fa-quiet', 'fa-full', 'fa-storying');
+    RS = { mode: 'fm', band: 0, stIdx: 0, list: [], bookIdx: 0, chIdx: 0, focus: false, raf: 0, wheel: 0, knob: 0, cur: null, tuneT: 0 };
+    var el = $('fa-story');
+    el.innerHTML = '<div class="fa-fade"></div>'
+      + '<div class="rs-stage" id="rs-stage"></div>'
+      + '<div class="rs-top"><div><span>Story night</span><b>The Little Prince’s world</b></div><button class="pt-x" onclick="faStop()" aria-label="Close">×</button></div>'
+      + '<div class="rs-hint" id="rs-hint"><i></i>Tap the radio</div>'
+      // one row of labels over the three keys -- each over its own key they overlapped -- and they work as the keys do
+      + '<div class="rs-keys" id="rs-keys"><button class="rs-key fm" data-k="fm">FM radio</button><button class="rs-key fav" data-k="fav">★ Save</button><button class="rs-key story" data-k="story">Stories</button></div>'
+      + '<div class="rs-tag" id="rs-t-tune">Turn to tune</div><div class="rs-tag" id="rs-t-band">Country</div>'
+      + '<div class="rs-pop" id="rs-pop"></div>'
+      + '<div class="rs-player" id="rs-player"></div>';
+    el.classList.add('on');
+    stageWire();
+    $('rs-keys').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-k]'); if (!b || !RS) return;
+      if (!RS.focus) { focusRadio(); }
+      if (b.dataset.k === 'fav') toggleFav(); else setMode(b.dataset.k);
+    });
+    setTimeout(function () { if (W() && W().focciDo) W().focciDo('stories').then(function () { if (W().storyRadio) W().storyRadio({ hint: true, focus: false, mode: 'fm', led: [hhmm(), 'TAP TO TUNE IN', false] }); }); }, 450);
+    anchorLoop();
+    stationsFor(COUNTRIES[0][0]).then(function (l) { if (RS && RS.mode === 'fm' && !RS.list.length) { RS.list = l; } }).catch(function () {});
   };
-  async function radioList() {
-    var L = $('fa-list'); loading(L);
-    var chips = '<div class="fa-cc">' + COUNTRIES.map(function (c) { return '<button class="' + (c[0] === ST.cc ? 'on' : '') + '" onclick="faCC(\'' + c[0] + '\')">' + c[1] + '</button>'; }).join('') + '</div>';
-    try {
-      var d = await getJSON('https://de1.api.radio-browser.info/json/stations/bycountrycodeexact/' + ST.cc + '?limit=60&hidebroken=true&order=clickcount&reverse=true');
-      var hls = !!audioEl().canPlayType('application/vnd.apple.mpegurl');
-      /* https only (the app is https; an http stream is blocked as mixed
-         content), and HLS only where the browser plays it itself (Safari). */
-      var st = d.filter(function (s) { var u = s.url_resolved || s.url || ''; return /^https:/i.test(u) && (hls || !/\.m3u8(\?|$)/i.test(u)); }).slice(0, 30);
-      ST.stations = st;
-      if (ST.tab !== 'radio') return;
-      L.innerHTML = chips + (st.length ? st.map(function (s, i) {
-        return '<button class="fa-item" onclick="faRadio(' + i + ')"><b>' + esc(s.name.trim()) + '</b><span>' + esc((s.tags || '').split(',').slice(0, 3).join(' · ') || s.codec || '') + '</span></button>';
-      }).join('') : '<p class="fa-note">Chưa có đài phát được ở quốc gia này.</p>');
-    } catch (e) { L.innerHTML = chips + '<p class="fa-note">Không tải được danh sách đài (' + esc(e.message) + ').</p>'; }
+  function radio(o) { if (W() && W().storyRadio) W().storyRadio(o); }
+  function place(id, part, dy) {
+    var e = $(id); if (!e) return;
+    var a = W() && W().storyAnchor ? W().storyAnchor(part) : null;
+    if (!a || !a.on) { e.style.opacity = 0; return; }
+    e.style.opacity = '';
+    e.style.transform = 'translate(' + Math.round(a.x - e.offsetWidth / 2) + 'px,' + Math.round(a.y - e.offsetHeight - (dy || 0)) + 'px)';
   }
-  window.faCC = function (cc) { ST.cc = cc; radioList(); };
-  window.faRadio = function (i) { var s = ST.stations && ST.stations[i]; if (s) play(s.url_resolved || s.url, s.name.trim(), 'Radio · ' + ST.cc); };
-  function play(url, title, sub, onEnd) {
+  function anchorLoop() {
+    var st = $('fa-story');
+    var step = function () {
+      if (!RS || CUR !== 'stories') return;
+      st.classList.toggle('focused', RS.focus); st.classList.toggle('m-fm', RS.mode === 'fm'); st.classList.toggle('m-story', RS.mode === 'story');
+      if (!RS.focus) place('rs-hint', 'radio', 6);
+      else { place('rs-keys', 'fav', 10); place('rs-t-tune', 'tune', -46); place('rs-t-band', 'band', 48); place('rs-pop', 'band', 84); }
+      RS.raf = requestAnimationFrame(step);
+    };
+    step();
+    clearInterval(RS.clock);
+    RS.clock = setInterval(function () { if (!RS || CUR !== 'stories') return; led(); if (RS.mode === 'story' && AU && !AU.paused) { savePos(); needle(); scrubSync(); } }, 1000);
+  }
+  function led() {
+    if (!RS.focus) { radio({ led: [hhmm(), 'TAP TO TUNE IN', false] }); return; }
+    var live = AU && !AU.paused && !!AU.src;
+    if (RS.mode === 'fm') { var s = RS.list[RS.stIdx]; radio({ led: [hhmm(), s ? s.name.toUpperCase() : 'TUNING…', live] }); }
+    else { var b = RS.books && RS.books[RS.bookIdx], c = b && b.ch && b.ch[RS.chIdx]; radio({ led: [live ? mm(AU.currentTime) : hhmm(), b ? (b.title + (c ? ' · ' + c.title : '')).toUpperCase() : 'LOADING BOOKS…', live] }); }
+  }
+  function needle() {
+    if (RS.mode === 'fm') radio({ needle: RS.list.length > 1 ? RS.stIdx / (RS.list.length - 1) : 0.5 });
+    else radio({ needle: AU && AU.duration ? AU.currentTime / AU.duration : 0 });
+  }
+  /* ---- touching the radio ---- */
+  function stageWire() {
+    var stg = $('rs-stage'), drag = null;
+    stg.addEventListener('pointerdown', function (e) {
+      var part = W() && W().storyPick ? W().storyPick(e.clientX, e.clientY) : null;
+      if (!RS.focus) {
+        if (part) focusRadio();
+        return;
+      }
+      if (part === 'fm' || part === 'story') { setMode(part); return; }
+      if (part === 'fav') { toggleFav(); return; }
+      if (part === 'tune' || part === 'band') {
+        drag = { part: part, x: e.clientX, y: e.clientY, moved: 0, acc: 0 };
+        try { stg.setPointerCapture(e.pointerId); } catch (x) {}
+      }
+    });
+    stg.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var d = (e.clientX - drag.x) - (e.clientY - drag.y);
+      drag.x = e.clientX; drag.y = e.clientY;
+      drag.moved += Math.abs(d);
+      var rot = d * 0.012;
+      if (drag.part === 'tune') { RS.wheel += rot; radio({ wheel: RS.wheel }); }
+      else { RS.knob += rot; radio({ band: RS.knob }); }
+      drag.acc += rot;
+      // one step a notch (about 0.45 of a turn of the wheel)
+      while (Math.abs(drag.acc) >= 0.45) { var dir = drag.acc > 0 ? 1 : -1; drag.acc -= dir * 0.45; stepPart(drag.part, dir, true); }
+    });
+    var up = function () {
+      if (!drag) return;
+      var d = drag; drag = null;
+      if (d.moved < 8) stepPart(d.part, 1, true);   // a tap is one step
+      settle(d.part);
+    };
+    stg.addEventListener('pointerup', up); stg.addEventListener('pointercancel', up);
+  }
+  function focusRadio() {
+    RS.focus = true;
+    radio({ hint: false, focus: true, mode: RS.mode });
+    if (navigator.vibrate) try { navigator.vibrate(15); } catch (e) {}
+    // the tap is the gesture that lets audio start
+    if (RS.mode === 'fm') { if (RS.list.length) tune(); else stationsFor(bands()[RS.band][0]).then(function (l) { RS.list = l; tune(); }); }
+    playerDraw();
+  }
+  async function setMode(m) {
+    if (RS.mode === m) return;
+    RS.mode = m; RS.stIdx = 0;
+    radio({ mode: m });
+    if (AU) AU.pause();
+    if (m === 'story') {
+      led();
+      await booksList().catch(function () {});
+      var last = rj(LAST_LS, null);
+      if (last && RS.books) { var bi = RS.books.findIndex(function (b) { return b.id === last.id; }); if (bi >= 0) { RS.bookIdx = bi; RS.chIdx = last.ch || 0; await chaptersOf(RS.books[bi]).catch(function () {}); RS.resume = last; } }
+      if (!RS.resume && RS.books && RS.books[RS.bookIdx]) await chaptersOf(RS.books[RS.bookIdx]).catch(function () {});
+    } else {
+      RS.list = await stationsFor(bands()[RS.band][0]).catch(function () { return []; });
+      tune();
+    }
+    led(); needle(); playerDraw();
+  }
+  function stepPart(part, dir, preview) {
+    if (RS.mode === 'fm') {
+      if (part === 'tune') { if (!RS.list.length) return; RS.stIdx = (RS.stIdx + dir + RS.list.length) % RS.list.length; needle(); led(); }
+      else { var B = bands(); RS.band = (RS.band + dir + B.length) % B.length; showCountry(B[RS.band]); }
+    } else {
+      if (!RS.books) return;
+      if (part === 'tune') { RS.bookIdx = (RS.bookIdx + dir + RS.books.length) % RS.books.length; RS.chIdx = 0; RS.resume = null; led(); }
+      else { var b = RS.books[RS.bookIdx]; if (b && b.ch && b.ch.length) { RS.chIdx = (RS.chIdx + dir + b.ch.length) % b.ch.length; RS.resume = null; led(); } }
+    }
+    if (navigator.vibrate) try { navigator.vibrate(6); } catch (e) {}
+  }
+  function settle(part) {
+    clearTimeout(RS.tuneT);
+    RS.tuneT = setTimeout(async function () {
+      if (!RS) return;
+      if (RS.mode === 'fm') {
+        if (part === 'band') { RS.list = await stationsFor(bands()[RS.band][0]).catch(function () { return []; }); RS.stIdx = 0; setTimeout(hideCountry, 1600); }
+        tune();
+      } else {
+        var b = RS.books && RS.books[RS.bookIdx]; if (!b) return;
+        await chaptersOf(b).catch(function () {});
+        playChapter(0);
+      }
+    }, part === 'band' ? 700 : 450);
+  }
+  function showCountry(B) {
+    var p = $('rs-pop'), n = RS.st && RS.st[B[0]] ? RS.st[B[0]].length : null;
+    p.innerHTML = '<span class="rs-flag">' + flag(B[0]) + '</span><div><b>' + esc(B[1]) + '</b><small>' + (B[0] === '*' ? rj(FAV_LS, []).length + ' saved' : n !== null ? n + ' stations' : 'Tuning in…') + '</small></div>';
+    p.classList.remove('on'); void p.offsetWidth; p.classList.add('on');
+  }
+  function hideCountry() { var p = $('rs-pop'); if (p) p.classList.remove('on'); }
+  function tune() {
+    var s = RS.list[RS.stIdx]; if (!s) { led(); playerDraw(); return; }
+    play(s.url, function () { led(); playerDraw(); });
+    led(); needle(); playerDraw();
+  }
+  function play(url, onState, startAt) {
     var a = audioEl();
-    a.onended = onEnd || null;
-    a.src = url; a.play().catch(function () {});
-    ST.playing = { title: title, sub: sub };
-    nowBar();
-    a.onplaying = nowBar; a.onpause = nowBar; a.onerror = function () { var n = $('fa-now'); if (n) n.innerHTML = '<div class="fa-err">Không phát được nguồn này — thử nguồn khác nhé.</div>'; };
+    a.onended = null;
+    if (a.src !== url) { a.src = url; }
+    if (startAt) { var seek = function () { try { a.currentTime = startAt; } catch (e) {} a.removeEventListener('loadedmetadata', seek); }; a.addEventListener('loadedmetadata', seek); }
+    a.play().catch(function () {});
+    a.onplaying = onState; a.onpause = onState;
+    a.onerror = function () { var n = $('rs-player'); if (n && RS) { n.classList.add('err'); setTimeout(function () { n.classList.remove('err'); }, 2400); } };
   }
-  function nowBar() {
-    var n = $('fa-now'); if (!n || !ST.playing) return;
-    var on = AU && !AU.paused;
-    n.innerHTML = '<button class="fa-pp" onclick="faPP()" aria-label="Play or pause">' + (on ? '❚❚' : '▶') + '</button>'
-      + '<div class="fa-bt"><b>' + esc(ST.playing.title) + '</b><span>' + esc(ST.playing.sub || '') + '</span></div>' + (on ? '<span class="ls-wave"><i></i><i></i><i></i><i></i><i></i></span>' : '');
-    n.classList.add('on');
+  function playChapter(at) {
+    var b = RS.books[RS.bookIdx], c = b && b.ch && b.ch[RS.chIdx]; if (!c) return;
+    play(c.url, function () { led(); playerDraw(); }, at || 0);
+    AU.onended = function () { if (b.ch[RS.chIdx + 1]) { RS.chIdx++; savePos(0); playChapter(0); } };
+    wj(LAST_LS, { id: b.id, ch: RS.chIdx, t: at || 0, title: b.title });
+    RS.resume = null;
+    led(); playerDraw();
   }
-  window.faPP = function () { if (!AU) return; if (AU.paused) AU.play().catch(function () {}); else AU.pause(); };
+  function savePos(force) {
+    if (!AU || RS.mode !== 'story') return;
+    var b = RS.books && RS.books[RS.bookIdx]; if (!b) return;
+    var t = force !== undefined ? force : AU.currentTime;
+    wj(LAST_LS, { id: b.id, ch: RS.chIdx, t: t, title: b.title });
+  }
+  function toggleFav() {
+    if (RS.mode !== 'fm') return;
+    var s = RS.list[RS.stIdx]; if (!s) return;
+    var f = rj(FAV_LS, []), i = f.findIndex(function (x) { return x.id === s.id; });
+    if (i >= 0) f.splice(i, 1); else f.unshift({ id: s.id, name: s.name, url: s.url, cc: s.cc });
+    wj(FAV_LS, f);
+    radio({ fav: i < 0 });
+    if (window.fwToast) window.fwToast(i < 0 ? '★ Saved ' + s.name : 'Removed from saved stations');
+    playerDraw();
+  }
+  /* ---- the strip at the bottom ---- */
+  function playerDraw() {
+    var p = $('rs-player'); if (!p || !RS) return;
+    p.classList.toggle('on', RS.focus);
+    var on = AU && !AU.paused && !!AU.src;
+    var h = '';
+    if (RS.mode === 'fm') {
+      var s = RS.list[RS.stIdx], fav = s && rj(FAV_LS, []).some(function (x) { return x.id === s.id; });
+      radio({ fav: !!fav });
+      h = '<button class="rs-b star' + (fav ? ' on' : '') + '" data-a="fav" aria-label="Save station">★</button>'
+        + '<button class="rs-b" data-a="prev" aria-label="Previous">‹</button>'
+        + '<button class="rs-b pp" data-a="pp" aria-label="Play or pause">' + (on ? '❚❚' : '▶') + '</button>'
+        + '<button class="rs-b" data-a="next" aria-label="Next">›</button>'
+        + '<div class="rs-tt"><b>' + esc(s ? s.name : 'Tuning…') + '</b><span>' + flag(bands()[RS.band][0]) + ' ' + esc(bands()[RS.band][1]) + (s && s.tags ? ' · ' + esc(s.tags) : '') + (on ? ' · live ' + hhmm() : '') + '</span></div>';
+    } else {
+      var b = RS.books && RS.books[RS.bookIdx], c = b && b.ch && b.ch[RS.chIdx];
+      if (RS.resume && b && RS.resume.id === b.id && RS.resume.t > 20) {
+        h = '<div class="rs-resume"><b>Where you left off</b><span>' + esc(b.title) + ' · ' + esc((b.ch && b.ch[RS.resume.ch] || {}).title || '') + ' · ' + mm(RS.resume.t) + '</span>'
+          + '<div><button data-a="resume">Continue from ' + mm(RS.resume.t) + '</button><button data-a="restart" class="ghost">Start over</button></div></div>';
+      } else {
+        var dur = AU && AU.duration && isFinite(AU.duration) ? AU.duration : 0;
+        h = '<button class="rs-b" data-a="prev" aria-label="Previous chapter">‹</button>'
+          + '<button class="rs-b pp" data-a="pp" aria-label="Play or pause">' + (on ? '❚❚' : '▶') + '</button>'
+          + '<button class="rs-b" data-a="next" aria-label="Next chapter">›</button>'
+          + '<div class="rs-tt"><b>' + esc(b ? b.title : 'Finding stories…') + '</b><span>' + esc(c ? c.title : (b ? 'Turn the wheel for a book, the knob for a chapter' : '')) + (b && b.by ? ' · ' + esc(b.by) : '') + '</span>'
+          + '<div class="rs-scrub"><i class="num" id="rs-cur">' + mm(AU && AU.src ? AU.currentTime : 0) + '</i><input type="range" id="rs-range" min="0" max="' + Math.round(dur || 1) + '" value="' + Math.round(AU && AU.src ? AU.currentTime : 0) + '" step="1" data-noswipe="1"/><i class="num">' + mm(dur) + '</i></div></div>';
+      }
+    }
+    p.innerHTML = h;
+    var rg = $('rs-range');
+    if (rg) {
+      rg.addEventListener('input', function () { var c = $('rs-cur'); if (c) c.textContent = mm(+rg.value); RS.scrubbing = true; });
+      rg.addEventListener('change', function () { RS.scrubbing = false; if (AU && AU.src) { try { AU.currentTime = +rg.value; } catch (e) {} if (AU.paused) AU.play().catch(function () {}); } else playChapter(+rg.value); });
+    }
+    if (!p._wired) { p._wired = true; wirePlayer(p); }
+  }
+  function scrubSync() {
+    if (RS.scrubbing) return;
+    var rg = $('rs-range'), c = $('rs-cur'); if (!rg || !AU) return;
+    if (AU.duration && isFinite(AU.duration) && +rg.max !== Math.round(AU.duration)) rg.max = Math.round(AU.duration);
+    rg.value = Math.round(AU.currentTime); if (c) c.textContent = mm(AU.currentTime);
+  }
+  function wirePlayer(p) {
+    p.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-a]'); if (!b || !RS) return;
+      var a = b.dataset.a;
+      if (a === 'fav') return toggleFav();
+      if (a === 'pp') { if (!AU || !AU.src) { RS.mode === 'fm' ? tune() : playChapter(0); return; } if (AU.paused) AU.play().catch(function () {}); else AU.pause(); return; }
+      if (a === 'next' || a === 'prev') { var d = a === 'next' ? 1 : -1; stepPart(RS.mode === 'fm' ? 'tune' : 'band', d); settleNow(); return; }
+      if (a === 'resume') { var r = RS.resume; RS.chIdx = r.ch || 0; playChapter(r.t); return; }
+      if (a === 'restart') { RS.resume = null; playChapter(0); return; }
+    });
+    // a swipe along the strip is the next or the last one
+    var sx = null;
+    p.addEventListener('pointerdown', function (e) { if (e.target.closest('input')) return; sx = { x: e.clientX, y: e.clientY }; });
+    p.addEventListener('pointerup', function (e) {
+      if (!sx) return; var dx = e.clientX - sx.x, dy = e.clientY - sx.y; sx = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) { stepPart(RS.mode === 'fm' ? 'tune' : 'band', dx < 0 ? 1 : -1); settleNow(); }
+    });
+  }
+  function settleNow() {
+    if (RS.mode === 'fm') tune();
+    else playChapter(0);
+  }
 
   /* ---------------- telling people the hold exists ----------------
      Nothing on screen said Focci could be held, so nobody found it. Until
@@ -479,5 +691,5 @@
     step();
   }, 1000);
 
-  window.faDebug = function () { return { CUR: CUR, G: G, AMB: AMB && AMB.k, ST: ST }; };
+  window.faDebug = function () { return { CUR: CUR, G: G, AMB: AMB && AMB.k, RS: RS, AU: AU }; };
 })();
