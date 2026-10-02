@@ -536,20 +536,15 @@
       +   '<div class="rs-ttl"><span>Story night</span><b>The Little Prince’s world</b></div>'
       +   '<button class="pt-x rs-x" onclick="faStop()" aria-label="Back to the island">×</button></div>'
       + '<div class="rs-hint" id="rs-hint"><i></i>Tap the radio</div>'
-      + '<div class="rs-help" id="rs-help">Drag to look around · pinch to zoom</div>'
-      // one row of labels over the three keys -- each over its own key they overlapped -- and they work as the keys do
-      + '<div class="rs-keys" id="rs-keys"><button class="rs-key fm" data-k="fm">FM radio</button><button class="rs-key fav" data-k="fav">★ Save</button><button class="rs-key story" data-k="story">Stories</button></div>'
-      // the knobs are close together on a phone: their three names as one row, in the same order
-      + '<div class="rs-knobs" id="rs-knobs"><span>Tune</span><span id="rs-t-band">Country</span><span>List</span></div>'
+      /* One line of help at the bottom, not labels over the controls: the
+         radio has its own names printed on it (world.js drawLabels), and
+         the pills over the keys were taken for the things to tap. */
+      + '<div class="rs-help" id="rs-help"></div>'
       + '<div class="rs-pop" id="rs-pop"></div>'
       + '<div class="rs-list" id="rs-list" data-noswipe="1"></div>'
       + '<div class="rs-player" id="rs-player" data-noswipe="1"></div>';
     el.classList.add('on');
     stageWire();
-    $('rs-keys').addEventListener('click', function (e) {
-      var b = e.target.closest('[data-k]'); if (!b || !RS) return;
-      if (b.dataset.k === 'fav') toggleFav(); else setMode(b.dataset.k);
-    });
     $('rs-back').addEventListener('click', unfocusRadio);
     $('rs-list').addEventListener('click', listClick);
     // a touch anywhere but the list (or the button that opens it) rolls it up
@@ -560,9 +555,15 @@
     }, true);
     setTimeout(function () { if (W() && W().focciDo) W().focciDo('stories').then(function () { if (W().storyRadio) W().storyRadio({ hint: true, focus: false, mode: 'fm', led: [hhmm(), 'TAP TO TUNE IN', false] }); }); }, 450);
     anchorLoop();
+    helpSay('Drag to turn the world · pinch to come closer', 6000);
     stationsFor(COUNTRIES[0][0]).then(function (l) { if (RS && RS.mode === 'fm' && !RS.list.length) { RS.list = l; } }).catch(function () {});
   };
   function radio(o) { if (W() && W().storyRadio) W().storyRadio(o); }
+  function helpSay(t, ms) {
+    var h = $('rs-help'); if (!h) return;
+    h.textContent = t; h.classList.add('on');
+    clearTimeout(h._t); h._t = setTimeout(function () { h.classList.remove('on'); }, ms || 5000);
+  }
   function place(id, part, dy) {
     var e = $(id); if (!e) return;
     var a = W() && W().storyAnchor ? W().storyAnchor(part) : null;
@@ -575,9 +576,8 @@
     var step = function () {
       if (!RS || CUR !== 'stories') return;
       st.classList.toggle('focused', RS.focus); st.classList.toggle('m-fm', RS.mode === 'fm'); st.classList.toggle('m-story', RS.mode === 'story');
-      st.classList.toggle('orbited', RS.orbited);
       if (!RS.focus) { if (RS.met) $('rs-hint').style.opacity = 0; else place('rs-hint', 'radio', 6); }
-      else { place('rs-keys', 'fav', 12); place('rs-knobs', 'band', 50); place('rs-pop', 'band', 60); }
+      else place('rs-pop', 'band', 60);
       RS.raf = requestAnimationFrame(step);
     };
     step();
@@ -637,7 +637,8 @@
         while (Math.abs(drag.acc) >= 0.5) { var dir = drag.acc > 0 ? 1 : -1; drag.acc -= dir * 0.5; stepPart(drag.part, dir, true); }
         return;
       }
-      if (!RS.focus && down.moved > 6 && W() && W().storyOrbit) { W().storyOrbit({ dx: dx, dy: dy }); RS.orbited = true; }
+      // a drag turns the world -- or, in front of the radio, the radio
+      if (down.moved > 6 && W() && W().storyOrbit) { W().storyOrbit({ dx: dx, dy: dy }); RS.orbited = true; }
     });
     var up = function (e) {
       P.delete(e.pointerId);
@@ -651,8 +652,8 @@
       }
       if (d.moved > 10) return;
       if (!RS.focus) { if (d.part) focusRadio(); return; }
-      if (d.part === 'fm' || d.part === 'story') { setMode(d.part); return; }
-      if (d.part === 'fav') { toggleFav(); return; }
+      if (d.part === 'fm' || d.part === 'story') { radio({ press: d.part }); setMode(d.part); return; }
+      if (d.part === 'fav') { radio({ press: 'fav' }); toggleFav(); return; }
       if (d.part === 'led' || d.part === 'dial') { openList(); return; }
       closeList();
     };
@@ -662,6 +663,7 @@
   function focusRadio() {
     RS.focus = true; RS.met = true;   // the chip has done its job
     radio({ hint: false, focus: true, mode: RS.mode });
+    helpSay('Press a key · turn a knob · tap the screen for a list · drag to turn the radio', 6500);
     if (navigator.vibrate) try { navigator.vibrate(15); } catch (e) {}
     // the tap is the gesture that lets audio start
     if (RS.mode === 'fm' && !(AU && AU.src)) { if (RS.list.length) tune(); else stationsFor(bands()[RS.band][0]).then(function (l) { RS.list = l; tune(); }); }
@@ -678,7 +680,6 @@
     RS.mode = m; RS.stIdx = 0; RS.marq = 0;
     radio({ mode: m });
     if (AU) AU.pause();
-    var t = $('rs-t-band'); if (t) t.textContent = m === 'fm' ? 'Country' : 'Chapter';
     if (m === 'story') {
       led();
       await booksList().catch(function () {});
