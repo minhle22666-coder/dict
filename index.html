@@ -6498,6 +6498,12 @@ document.documentElement.classList.add('home-on');</script>
   html.kb-on .oc-in{max-height:calc(var(--vvh) - 8px)}
   html.kb-on .pq2,html.kb-on .fa-bar{bottom:calc(var(--kb) + 10px)}
   html.kb-on .view.fw-panel.active{padding-bottom:var(--kb)}
+  /* two bubbles have to share the strip above the keyboard */
+  html.kb-on .pt-bub{max-height:calc(var(--vvh) * .34)}
+  /* holding a finger still on the island (Focci, an animal, a tree) brought
+     up iOS's magnifier and text callout: nothing here is text to select */
+  #fw-overlay,#fw-overlay *,.fa-story,.fa-story *,.fa-relax,.fa-relax *,.pr,.pr *,.oc-stage,.oc-stage *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  #fw-overlay input,#fw-overlay textarea,.pt-talk input{-webkit-user-select:text;user-select:text}
 
   .ls-revopen{display:block;width:100%;margin:-6px 0 12px;padding:10px 14px;border:0;border-radius:14px;cursor:pointer;text-align:left;
     font-size:12.5px;font-weight:600;color:var(--cz-honey);background:var(--cz-honey-bg)}
@@ -6890,6 +6896,33 @@ document.documentElement.classList.add('home-on');</script>
   .oc-faces i.f b{color:#B9A786}
   .oc.tossing .oc-faces{opacity:0}
   .oc.cast .oc-made .oc-go{position:static;margin:14px auto 10px}
+
+  /* ---- SLEEP TIMER (focci-acts.js) ---- */
+  .zz-pill{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:121;display:none;align-items:center;gap:6px;height:30px;padding:0 13px;
+    border:0;border-radius:99px;transform:translateX(-50%);cursor:pointer;font-size:13px;color:#EDEFFB;background:rgba(28,32,60,.78);box-shadow:0 6px 18px rgba(0,0,30,.25)}
+  .zz-pill.on{display:flex}
+  .zz-pill i{font-style:normal;font-size:15px;color:#FFE7A8}
+  html.fc-asleep .zz-pill{display:none}
+  .zz-scrim{position:fixed;inset:0;z-index:122;display:none;align-items:flex-end;justify-content:center;background:rgba(10,14,30,.45)}
+  .zz-scrim.on{display:flex}
+  .zz-sheet{width:100%;max-width:440px;box-sizing:border-box;padding:22px 20px calc(env(safe-area-inset-bottom,0px) + 18px);border-radius:26px 26px 0 0;text-align:center;
+    color:#EDEFFB;background:#1C2140;box-shadow:0 -10px 40px rgba(0,0,20,.4);animation:zz-up .3s cubic-bezier(.3,1.2,.5,1)}
+  @keyframes zz-up{from{transform:translateY(40px);opacity:0}}
+  .zz-moon{display:block;font-size:34px;color:#FFE7A8}
+  .zz-sheet h3{margin:4px 0 4px;font-size:19px;font-weight:700}
+  .zz-sheet p{margin:0 0 16px;font-size:13px;color:#B9BEDA}
+  .zz-opts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .zz-opts button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:10px 0;border:0;border-radius:14px;cursor:pointer;font-size:11px;color:#B9BEDA;background:rgba(237,239,251,.08)}
+  .zz-opts button b{font-size:19px;font-weight:300;color:#EDEFFB}
+  .zz-off,.zz-close{display:block;width:100%;height:44px;margin-top:10px;border:0;border-radius:14px;cursor:pointer;font-size:14px;font-weight:600}
+  .zz-off{color:#1C2140;background:#FFE7A8}
+  .zz-close{color:#B9BEDA;background:transparent}
+  .zz-night{position:fixed;inset:0;z-index:130;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#C9CDE6;background:#05060C}
+  .zz-night.on{display:flex}
+  .zz-night b{font-size:54px;color:#FFE7A8;opacity:.8}
+  .zz-night h3{margin:10px 0 6px;font-size:20px;font-weight:600;color:#EDEFFB}
+  .zz-night p{margin:0 0 24px;font-size:13px}
+  .zz-night button{height:42px;padding:0 20px;border:0;border-radius:99px;cursor:pointer;font-size:13.5px;color:#C9CDE6;background:rgba(237,239,251,.1)}
 </style>
 </head>
 <body>
@@ -7526,6 +7559,7 @@ document.documentElement.classList.add('home-on');</script>
     <button class="fm-item" onclick="fmGo('games')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="16" cy="11.6" r="1"/><circle cx="18" cy="14" r="1"/></svg>Mini Games</button>
     <button class="fm-item" onclick="fmClose();xpOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/></svg>Your XP</button>
     <button class="fm-item" onclick="fmGo('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 5l9 4.5-9 4.5-9-4.5Z"/><path d="M7 11.6V16c0 1.4 2.2 2.6 5 2.6s5-1.2 5-2.6v-4.4"/></svg>Progress</button>
+    <button class="fm-item" onclick="fmClose();fcSleepOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>Sleep timer</button>
     <button class="fm-item" onclick="fmGo('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.7 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9.1A1.7 1.7 0 0 0 10.1 3V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9.1a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1.37Z"/></svg>Settings</button>
   </nav>
   <div class="fm-tray">
@@ -8675,6 +8709,7 @@ document.documentElement.classList.add('home-on');</script>
   window.fwBack = function () {
     const H = document.documentElement, on = (c) => H.classList.contains(c);
     const active = (id) => { const v = document.getElementById(id); return !!(v && v.classList.contains('active')); };
+    if (window.zzBack && window.zzBack()) return true;
     if (on('ask-on') && window.fwAnswer) { fwAnswer(false); return true; }
     if (window.oracleBack && window.oracleBack()) return true;
     if (window.faBack && window.faBack()) return true;

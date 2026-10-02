@@ -3737,7 +3737,7 @@ export async function bootFocciWorld(root, opts) {
        rescue board while it rendered five portraits -- the lag on "Sail
        home alone". */
     { const c = document.documentElement.classList;
-      if (c.contains('rb-on') || c.contains('xp-on') || c.contains('jn-on') || c.contains('pt-gift-on') || c.contains('oc-on')) return true; }
+      if (c.contains('rb-on') || c.contains('xp-on') || c.contains('jn-on') || c.contains('pt-gift-on') || c.contains('oc-on') || c.contains('fc-asleep')) return true; }
     return !!document.querySelector('.view.fw-panel.active'); // Games/Saved/Progress/Settings
   }
   function releaseGesture() {
@@ -5376,6 +5376,7 @@ export async function bootFocciWorld(root, opts) {
     /* Quiet while a real clip is playing (the YouGlish player, html.ygm-on):
        the island's music used to play on underneath the speaker. */
     const want = musicArmed && soundOn && !overlayOpen() && !document.documentElement.classList.contains('ygm-on')
+      && !document.documentElement.classList.contains('fc-asleep')
       && !document.documentElement.classList.contains('fa-quiet');
     if (!want) { if (!bgm.paused) bgm.pause(); return; }
     if (!bgm.paused || bgmTrying || bgmNeedsTouch) return;

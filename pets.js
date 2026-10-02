@@ -398,12 +398,16 @@
     if (!n) return;
     /* An arc under and around the animal, from just above its left side,
        through below it, to just above its right: the card has the top. */
-    // 72px buttons: under 126 the top pairs (Feed/Pet, Sleep/Bath) overlapped
-    var R = Math.max(126, Math.min(165, a.r + 70));
-    // the highest buttons sit level with the middle, so the middle goes below the card
-    var cy = Math.max(a.c.y, sy + sh + 44 + R * 0.17);
+    /* 72px buttons. Seven over 200 degrees at 126 put their centres 72px
+       apart -- touching, the labels running into each other ("the bubbles
+       overlap"). Now 230 degrees at 148 or more: about 96px apart. */
+    var R = Math.max(148, Math.min(175, a.r + 80));
+    // the highest buttons sit a little above the middle, so the middle goes below the card,
+    // and the arc's bottom stays on screen
+    var cy = Math.max(a.c.y, sy + sh + 44 + R * 0.42);
+    cy = Math.min(cy, VH - 58 - R);
     for (var i = 0; i < n; i++) {
-      var th = (190 - (200 * i) / (n - 1)) * Math.PI / 180;
+      var th = (205 - (230 * i) / (n - 1)) * Math.PI / 180;
       var x = a.c.x + Math.cos(th) * R, y = cy + Math.sin(th) * R;
       x = Math.max(34, Math.min(VW - 34, x));
       y = Math.max(sy + sh + 30, Math.min(VH - 58, y));
@@ -632,13 +636,25 @@
   }
   /* Two bubbles side by side would overlap on a phone; each is pushed to its
      own side of the pair, its tail toward the head it belongs to. */
+  /* The part of the page still on screen. With the keyboard up on iOS that
+     is a strip at the top (visualViewport), and the heads -- placed in
+     page coordinates -- can be under the keyboard: "the keyboard pops up
+     and covers what Focci and the animal are saying". The bubbles are kept
+     inside the strip, above the input line. */
+  function visArea() {
+    var vv = window.visualViewport;
+    if (!vv || !document.documentElement.classList.contains('kb-on')) return { top: 0, h: window.innerHeight, kb: false };
+    return { top: vv.offsetTop, h: vv.height, kb: true };
+  }
   function placeBubble(el, an, side, fallback) {
     if (!el || !el.classList.contains('show')) return;
-    var w = el.offsetWidth, h = el.offsetHeight, x, y;
+    var w = el.offsetWidth, h = el.offsetHeight, x, y, V = visArea();
     if (an && an.on) { x = an.x; y = an.y; } else { x = fallback.x; y = fallback.y; }
     var left = side === 'left' ? x - w + 30 : side === 'right' ? x - 30 : x - w / 2;
     left = Math.max(10, Math.min(window.innerWidth - w - 10, left));
-    var top = Math.max(76, y - h - 8);
+    var top = Math.max(V.top + (V.kb ? 12 : 76), y - h - 8);
+    if (V.kb) top = Math.min(top, V.top + V.h - 84 - h);   // 84: the input line and a gap
+    el._box = { l: left, t: top, w: w, h: h };
     el.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
     el.style.setProperty('--tail', Math.max(16, Math.min(w - 16, x - left)) + 'px');
   }
@@ -651,6 +667,15 @@
         var meLeft = !(a && a.me && a.pet) || a.me.x <= a.pet.x;
         placeBubble($('pt-bme'), a && a.me, meLeft ? 'left' : 'right', { x: window.innerWidth * 0.7, y: window.innerHeight * 0.6 });
         placeBubble($('pt-bpet'), a && a.pet, meLeft ? 'right' : 'left', { x: window.innerWidth * 0.32, y: window.innerHeight * 0.42 });
+        // squeezed into the strip above the keyboard, the two may land on each other: the animal's goes above
+        var bm = $('pt-bme'), bp = $('pt-bpet'), V = visArea();
+        if (V.kb && bm._box && bp._box && bm.classList.contains('show') && bp.classList.contains('show')) {
+          var m = bm._box, q = bp._box;
+          if (q.l < m.l + m.w && m.l < q.l + q.w && q.t < m.t + m.h && m.t < q.t + q.h) {
+            q.t = Math.max(V.top + 12, m.t - q.h - 10);
+            bp.style.transform = 'translate(' + Math.round(q.l) + 'px,' + Math.round(q.t) + 'px)';
+          }
+        }
       }
       if (H && H.open) {
         var an = W() && W().anchorOf ? W().anchorOf(H.open) : null;

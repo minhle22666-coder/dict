@@ -977,4 +977,76 @@
   }, 1000);
 
   window.faDebug = function () { return { CUR: CUR, G: G, AMB: AMB && AMB.k, RS: RS, AU: AU }; };
+
+  /* ---------------- the sleep timer ----------------
+     From the menu: 15 to 90 minutes. A small moon pill counts down (a tap
+     on it changes or cancels it); when it reaches zero everything that
+     plays stops -- Focci's music, the guitar, the relax sounds, the radio,
+     the island's own music -- and the page tries to close itself. A browser
+     only lets a page close a window it opened itself, so if it is still
+     open a dark "Goodnight" screen takes over with nothing running under it
+     (html.fc-asleep parks the island and keeps its music off). The end time
+     is kept in fc_sleep_at, so a reload keeps counting. */
+  var ZZ = { at: 0, iv: 0 };
+  var ZZ_LS = 'fc_sleep_at';
+  function zzDom() {
+    if ($('zz-pill')) return;
+    var d = document.createElement('div');
+    d.innerHTML = '<button class="zz-pill" id="zz-pill" onclick="fcSleepOpen()" aria-label="Sleep timer"><i>☾</i><span class="num" id="zz-left"></span></button>'
+      + '<div class="zz-scrim" id="zz-scrim" onclick="if(event.target===this)fcSleepClose()"><div class="zz-sheet">'
+      + '<b class="zz-moon">☾</b><h3>Sleep timer</h3><p>Focci turns everything off and says goodnight.</p>'
+      + '<div class="zz-opts">' + [15, 30, 45, 60, 90].map(function (m) { return '<button onclick="fcSleepSet(' + m + ')"><b class="num">' + m + '</b>min</button>'; }).join('') + '</div>'
+      + '<button class="zz-off" id="zz-off" onclick="fcSleepSet(0)">Turn the timer off</button>'
+      + '<button class="zz-close" onclick="fcSleepClose()">Close</button></div></div>'
+      + '<div class="zz-night" id="zz-night"><b>☾</b><h3>Goodnight from Focci</h3><p>Everything is off. Sleep well.</p><button onclick="fcWake()">I’m awake</button></div>';
+    while (d.firstChild) document.body.appendChild(d.firstChild);
+  }
+  function zzTick() {
+    var left = ZZ.at - Date.now(), el = $('zz-left');
+    if (left <= 0) { zzEnd(); return; }
+    var s = Math.ceil(left / 1000);
+    if (el) el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  function zzStart(at) {
+    zzDom();
+    ZZ.at = at; clearInterval(ZZ.iv);
+    try { localStorage.setItem(ZZ_LS, String(at)); } catch (e) {}
+    $('zz-pill').classList.add('on');
+    zzTick(); ZZ.iv = setInterval(zzTick, 1000);
+  }
+  function zzStop() {
+    clearInterval(ZZ.iv); ZZ.at = 0;
+    try { localStorage.removeItem(ZZ_LS); } catch (e) {}
+    var p = $('zz-pill'); if (p) p.classList.remove('on');
+  }
+  function zzEnd() {
+    zzStop();
+    try { faStop(); } catch (e) {}
+    try { if (window.ygStopVideo) ygStopVideo(); } catch (e) {}
+    try { if (window.lsStop) lsStop(); } catch (e) {}
+    document.querySelectorAll('audio,video').forEach(function (m) { try { m.pause(); } catch (e) {} });
+    D.classList.add('fc-asleep');
+    try { window.close(); } catch (e) {}
+    setTimeout(function () { zzDom(); $('zz-night').classList.add('on'); }, 400);
+  }
+  window.fcSleepOpen = function () {
+    zzDom();
+    $('zz-off').style.display = ZZ.at ? '' : 'none';
+    $('zz-scrim').classList.add('on');
+  };
+  window.fcSleepClose = function () { var s = $('zz-scrim'); if (s) s.classList.remove('on'); };
+  window.fcSleepSet = function (m) {
+    fcSleepClose();
+    if (!m) { zzStop(); if (window.fwToast) fwToast('Sleep timer off'); return; }
+    zzStart(Date.now() + m * 60000);
+    if (window.fwToast) fwToast('Goodnight in ' + m + ' minutes');
+  };
+  window.fcWake = function () { D.classList.remove('fc-asleep'); var n = $('zz-night'); if (n) n.classList.remove('on'); };
+  window.zzBack = function () {
+    var s = $('zz-scrim'); if (s && s.classList.contains('on')) { fcSleepClose(); return true; }
+    var n = $('zz-night'); if (n && n.classList.contains('on')) { fcWake(); return true; }
+    return false;
+  };
+  var zzResume = function () { try { var at0 = +localStorage.getItem(ZZ_LS) || 0; if (at0 > Date.now()) zzStart(at0); else if (at0) localStorage.removeItem(ZZ_LS); } catch (e) {} };
+  if (document.body) zzResume(); else document.addEventListener('DOMContentLoaded', zzResume);
 })();
