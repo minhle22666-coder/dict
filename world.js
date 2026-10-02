@@ -3700,12 +3700,16 @@ export async function bootFocciWorld(root, opts) {
       const reach = Math.hypot(ox, oz) + 4;
       const near = (room.collidables && room.collidables[0] && room._trees !== undefined ? room._trees : [])
         .filter((t) => t.r > 0 && Math.hypot(t.x - tx, t.z - tz) < reach + t.r);
+      /* In a pose (guitar, rest) the lens never comes closer than 1.6:
+         pulled in to 22% behind a rock it sat inside his head. A rock in
+         the corner of the shot is the lesser evil. */
+      const minK = focciPose ? Math.min(1, 1.6 / Math.max(0.01, Math.hypot(ox, oy, oz))) : 0.22;
       for (let i = 1; i <= N; i++) {
         const s = i / N, px = tx + ox * s, py = ty + oy * s, pz = tz + oz * s;
         const g = groundAt(room, px, pz);
-        if (g.hit && g.y + 0.5 > py) { want = Math.max(0.22, s - 1.5 / N); break; }
+        if (g.hit && g.y + 0.5 > py) { want = Math.max(minK, s - 1.5 / N); break; }
         if (s > 0.25 && near.some((t) => py > t.lo && py < t.top + 0.3 && Math.hypot(t.x - px, t.z - pz) < t.r * 0.95)) {
-          want = Math.max(0.22, s - 1.5 / N); break;
+          want = Math.max(minK, s - 1.5 / N); break;
         }
       }
     }
@@ -4180,8 +4184,8 @@ export async function bootFocciWorld(root, opts) {
          right one over the soundhole at (-0.06, 0.25, 0.26), the left on the
          neck at (0.28, 0.36, 0.37) -- 0.31 and 0.32 from the shoulders. The
          strum is a real sweep across the strings now, down and up. */
-      armL.rotation.set(-0.83 + strumDir * 0.3 * strumKick, 0, 0.53 + strumDir * 0.08 * strumKick);
-      armR.rotation.set(-1.34 + chordShift * 0.06, 0, 0.2);
+      armL.rotation.set(-0.6 + strumDir * 0.16 * strumKick, 0, 0.3 + strumDir * 0.05 * strumKick);
+      armR.rotation.set(-0.75 + chordShift * 0.04, 0, -0.1);
       legL.rotation.x = legR.rotation.x = 0;
       tailPivot.rotation.y = Math.sin(t * 2.2) * 0.12;
       character.rotation.y = charState.angle + Math.sin(t * 1.1) * 0.05;
@@ -4365,7 +4369,15 @@ export async function bootFocciWorld(root, opts) {
        paws were placed AT the soundhole and the neck, so the guitar's own
        face covered them. The guitar now lies 0.07 further back than the
        paws (GUITAR_PAW_S/N below), so both paws sit on its face. */
-    const gS = new THREE.Vector3(-0.06, 0.24, 0.19), gN = new THREE.Vector3(0.28, 0.35, 0.30);
+    /* And then: "the animation is broken, the colours smear and his arms
+       swell". The arms were swung 0.8-1.3 rad, far past what the weights
+       painted across his shoulders can bend without stretching the mesh
+       (the seam vertices take the smaller weight, so a big turn drags the
+       colour across). The arms now stay within 0.6-0.75 rad and the guitar
+       comes to where those paws are -- (-0.13, 0.20, 0.22) and
+       (0.19, 0.22, 0.26) -- lying almost level across his front, its face
+       just behind the paws. */
+    const gS = new THREE.Vector3(-0.12, 0.19, 0.17), gN = new THREE.Vector3(0.19, 0.23, 0.21);
     const gy = gN.clone().sub(gS).normalize();
     const gz = new THREE.Vector3(0, 0, 1).addScaledVector(gy, -gy.z).normalize();
     const gx = new THREE.Vector3().crossVectors(gy, gz);
