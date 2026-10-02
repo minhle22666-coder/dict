@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v231`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v236`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -611,7 +611,20 @@ from `fwWorld.kit()`); +z up is 正 (3). Its two faces are the same gold,
 so the face is written under each coin. No shake on iOS (it is Undo
 Typing there). `html.oc-on` hides the island behind it.
 
-**Sleep timer** (menu): `fcSleepOpen` in focci-acts.js, `fc_sleep_at`,
+**The radio's own knobs are cut out of its mesh at load** (buildRadio,
+z -0.19/-0.43/-0.68 from the 300 triangles) and turn; its keys are only
+painted, so caps of their measured size and colour sit on them. The story
+camera is ONE free orbit whose centre slides from the book to the radio as
+it comes in (`storyNear()`); there is no "back to the world" button.
+
+**Guitar arms stay within 0.6-0.75 rad**: bigger turns stretch the
+shoulder weights (swollen arms, smeared colour). Bring the guitar to the
+paws, not the paws to the guitar.
+
+**YouGlish on the word page is the full widget** (`ygOpen`, autoStart, a
+420px roll), opened by the tap, stopped on leaving or backgrounding.
+
+**Sleep timer** (home menu and island menu): `fcSleepOpen` in focci-acts.js, `fc_sleep_at`,
 `html.fc-asleep` parks the island and its music; `window.close()` then a
 Goodnight screen where the browser refuses.
 

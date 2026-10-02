@@ -220,7 +220,7 @@
     var on = G.el && !G.el.paused;
     bar((many ? '<button class="fa-nb" onclick="faSong(-1)" aria-label="Previous">‹</button>' : '')
       + '<button class="fa-nb fa-pp" onclick="faGuitarPP()" aria-label="Play or pause">' + (on ? '❚❚' : '▶') + '</button>'
-      + '<div class="fa-bt"><b>♪ ' + esc(S.name) + '</b><span>Focci on guitar' + (HAVE ? ' · ' + (HAVE.indexOf(G.song) + 1) + ' of ' + HAVE.length : '') + '</span></div>'
+      + '<div class="fa-bt"><b>♪ ' + esc(S.name) + '</b><span>Focci on guitar' + (HAVE ? ' · <span class="num">' + (HAVE.indexOf(G.song) + 1) + ' of ' + HAVE.length + '</span>' : '') + '</span></div>'
       + (many ? '<button class="fa-nb" onclick="faSong(1)" aria-label="Next">›</button>' : '')
       + '<button class="pt-x" onclick="faStop()" aria-label="Stop">×</button>');
   }

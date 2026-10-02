@@ -6903,7 +6903,8 @@ document.documentElement.classList.add('home-on');</script>
   .oc.cast .oc-made .oc-go{position:static;margin:14px auto 10px}
 
   /* ---- SLEEP TIMER (focci-acts.js) ---- */
-  .zz-pill{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:121;display:none;align-items:center;gap:6px;height:30px;padding:0 13px;
+  /* small, out of the way: a figure in Helvetica, nothing else (it must not get in the player's way) */
+  .zz-pill{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:121;display:none;align-items:center;gap:5px;height:24px;padding:0 10px;font-size:12px !important;opacity:.85;
     border:0;border-radius:99px;transform:translateX(-50%);cursor:pointer;font-size:13px;color:#EDEFFB;background:rgba(28,32,60,.78);box-shadow:0 6px 18px rgba(0,0,30,.25)}
   .zz-pill.on{display:flex}
   .zz-pill i{font-style:normal;font-size:15px;color:#FFE7A8}
@@ -6944,6 +6945,9 @@ document.documentElement.classList.add('home-on');</script>
   /* a small roll, not the widget's full height: the video at the top, the transcript and buttons a scroll away */
   .yg-mini .yg-stage{height:auto !important;max-height:min(420px,58vh);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   button.yg-link-btn{width:100%;border:0;cursor:pointer;text-align:left;font:inherit}
+
+  /* figures that had no .num: quest counts, rewards, sense numbers, levels, the guitar's track count */
+  html body .q-n,html body .q-rw,html body .senseno,html body .lv-tag,html body .fa-bt .num{font-family:var(--cz-num) !important;font-weight:400 !important;letter-spacing:.01em}
 </style>
 </head>
 <body>
@@ -7744,6 +7748,7 @@ document.documentElement.classList.add('home-on');</script>
       <button class="wm-row" style="--i:5" onclick="fmGo('games')"><i class="wm-ic games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r="1"/><circle cx="18" cy="14" r="1"/></svg></i><span>Mini games</span></button>
       <button class="wm-row" style="--i:6" onclick="openFwPanel('stats')"><i class="wm-ic prog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M7 16v-4M12 16V8M17 16v-6"/></svg></i><span>Progress</span></button>
       <button class="wm-row" style="--i:7" onclick="showStoryIntro()"><i class="wm-ic guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.3-3.5-2-6-2v13c2.5 0 4.5.7 6 2 1.5-1.3 3.5-2 6-2V4c-2.5 0-4.5.7-6 2Z"/><path d="M12 6v13"/></svg></i><span>Guide</span></button>
+      <button class="wm-row" style="--i:8" onclick="toggleFwMenu();fcSleepOpen()"><i class="wm-ic guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg></i><span>Sleep timer</span></button>
     </div>
     <button class="wm-fab" id="fw-menu-toggle" aria-label="Menu" onclick="toggleFwMenu()">
       <svg viewBox="0 0 24 24"><g class="wm-dots" fill="currentColor"><circle cx="7.5" cy="7.5" r="2.6"/><circle cx="16.5" cy="7.5" r="2.6"/><circle cx="7.5" cy="16.5" r="2.6"/><circle cx="16.5" cy="16.5" r="2.6"/></g>
