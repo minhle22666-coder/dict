@@ -7471,6 +7471,40 @@ document.documentElement.classList.add('home-on');</script>
   .pr-say.pop{animation:pr-saypop .55s cubic-bezier(.3,1.5,.4,1);color:var(--cz-ink);font-weight:600}
   @keyframes pr-saypop{0%{transform:scale(.9);background:rgba(214,170,80,.0)}40%{transform:scale(1.04);background:rgba(214,170,80,.22)}100%{transform:none;background:rgba(214,170,80,.0)}}
   .pr-say{border-radius:10px;padding:2px 4px;margin-left:-4px;margin-right:-4px}
+
+  /* ---------------- RELAX, readable and restful ---------------- */
+  html body .fa-relax{background:linear-gradient(180deg,rgba(255,250,232,.0) 30%,rgba(60,74,40,.22))}
+  html.fa-night body .fa-relax{background:linear-gradient(180deg,rgba(8,14,30,.25),rgba(8,14,30,.5))}
+  .fa-sky{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  .fa-sky i{position:absolute;left:62%;top:-34%;width:150vmax;height:150vmax;margin-left:-75vmax;border-radius:50%;opacity:.55;
+    background:repeating-conic-gradient(from 0deg,rgba(255,240,190,.32) 0deg 5deg,rgba(255,240,190,0) 5deg 15deg);
+    -webkit-mask:radial-gradient(circle,#000 0,rgba(0,0,0,.6) 25%,transparent 55%);mask:radial-gradient(circle,#000 0,rgba(0,0,0,.6) 25%,transparent 55%);
+    animation:fa-rays 80s linear infinite}
+  .fa-sky::after{content:'';position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,246,206,.95),rgba(255,236,170,.4) 40%,rgba(255,236,170,0) 70%)}
+  html.fa-night .fa-sky i{display:none}
+  html.fa-night .fa-sky::after{background:radial-gradient(circle,rgba(220,230,255,.6),rgba(180,200,255,.18) 40%,rgba(180,200,255,0) 70%)}
+  @keyframes fa-rays{to{transform:rotate(360deg)}}
+  html body .fa-rtop span{display:inline-block;padding:4px 12px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--cz-ink-2);background:rgba(255,255,250,.62);box-shadow:var(--cz-rim)}
+  html body .fa-rtop b{margin-top:8px;font-size:23px;color:var(--cz-ink);text-shadow:0 1px 0 rgba(255,255,255,.8),0 0 18px rgba(255,255,250,.9)}
+  html.fa-night body .fa-rtop span{color:#E9EEFF;background:rgba(20,30,60,.5);box-shadow:inset 0 0 0 1px rgba(200,215,255,.25)}
+  html.fa-night body .fa-rtop b{color:#F1F4FF;text-shadow:0 2px 14px rgba(0,0,20,.7)}
+  html body .fa-breath{width:150px;height:150px}
+  html body .fa-circle{background:radial-gradient(circle,rgba(255,255,250,.78),rgba(255,255,250,.35) 65%,rgba(255,255,250,.18));
+    box-shadow:0 0 0 1.5px rgba(255,255,255,.9),0 10px 30px rgba(60,74,40,.18),0 0 50px rgba(255,250,220,.45)}
+  html body .fa-blabel{font-size:18px;color:var(--cz-ink);text-shadow:0 1px 0 rgba(255,255,255,.7)}
+  html.fa-night body .fa-circle{background:radial-gradient(circle,rgba(190,205,255,.35),rgba(120,140,220,.12) 65%,rgba(120,140,220,.05));
+    box-shadow:0 0 0 1.5px rgba(200,215,255,.6),0 0 50px rgba(150,170,255,.35)}
+  html.fa-night body .fa-blabel{color:#F1F4FF;text-shadow:0 1px 8px rgba(0,0,20,.6)}
+  html body .fa-bcount{padding:3px 10px;border-radius:99px;color:var(--cz-ink-2);background:rgba(255,255,250,.55)}
+  html.fa-night body .fa-bcount{color:#DDE4FF;background:rgba(20,30,60,.45)}
+  html body .fa-snd button{color:var(--cz-ink-2);background:rgba(255,255,250,.6);box-shadow:var(--cz-rim),0 4px 12px rgba(60,74,40,.12)}
+  html body .fa-snd button.on{color:#fff;background:var(--cz-sage)}
+  html.fa-night body .fa-snd button{color:#E9EEFF;background:rgba(20,30,60,.5);box-shadow:inset 0 0 0 1px rgba(200,215,255,.25)}
+  html.fa-night body .fa-snd button.on{color:#14203F;background:#E9EEFF}
+  html body .fa-unlock{color:var(--cz-ink);background:rgba(255,255,250,.7);box-shadow:var(--cz-rim),0 6px 16px rgba(60,74,40,.16)}
+  html.fa-night body .fa-unlock{color:#E9EEFF;background:rgba(20,30,60,.55);box-shadow:inset 0 0 0 1px rgba(200,215,255,.3)}
 </style>
 </head>
 <body>

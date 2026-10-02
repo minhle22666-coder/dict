@@ -117,7 +117,7 @@
     guitarStop(); ambientStop(); storyAudioStop();
     clearInterval(jogT);
     barOff();
-    D.classList.remove('fa-quiet', 'fa-full', 'fa-relaxing', 'fa-storying');
+    D.classList.remove('fa-quiet', 'fa-full', 'fa-relaxing', 'fa-storying', 'fa-night');
     var rl = $('fa-relax'); if (rl) rl.classList.remove('on');
     var st = $('fa-story'); if (st) { st.classList.remove('on'); st.innerHTML = ''; }
     if (W() && W().focciStop) W().focciStop(true);
@@ -136,90 +136,63 @@
     return false;
   };
 
-  /* ---------------- guitar: plucked strings ---------------- */
+  /* ---------------- guitar: the user's recordings ----------------
+     The first version synthesised plucked strings; the user found it
+     poor and sent real guitar recordings (assets/audio/guitar-*.mp3).
+     They play through an AnalyserNode so his arm can follow the music:
+     each frame the energy of the low-mid band (roughly 90-1,700 Hz, where
+     a strum lands) is compared with its own running average, and a jump
+     well above it -- at least 170ms after the last -- is a strum. A
+     missing file is skipped. */
   var AC = null;
   function ac() { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); return AC; }
-  var pluckCache = {};
-  function pluckBuf(midi) {
-    if (pluckCache[midi]) return pluckCache[midi];
-    var ctx = ac(), sr = ctx.sampleRate, f = 440 * Math.pow(2, (midi - 69) / 12);
-    var len = Math.floor(sr * 2.6), buf = ctx.createBuffer(1, len, sr), y = buf.getChannelData(0);
-    var N = Math.max(2, Math.round(sr / f)), ring = new Float32Array(N);
-    for (var i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
-    // brighter low strings decay slower; 0.996-0.9985 per pass
-    var decay = 0.9955 + Math.min(0.003, 30 / f * 0.01), p = 0, prev = 0;
-    for (var n = 0; n < len; n++) {
-      var cur = ring[p];
-      var nx = decay * 0.5 * (cur + prev);
-      prev = cur; ring[p] = nx; y[n] = cur;
-      p = (p + 1) % N;
-    }
-    pluckCache[midi] = buf;
-    return buf;
-  }
-  var CH = {
-    G: [43, 47, 50, 55, 59, 67], D: [50, 57, 62, 66], Em: [40, 47, 52, 55, 59, 64], C: [48, 52, 55, 60, 64],
-    Am: [45, 52, 57, 60, 64], F: [41, 48, 53, 57, 60, 65], A: [45, 52, 57, 61, 64], Bm: [47, 54, 59, 62, 66], Dm: [50, 57, 62, 65]
-  };
-  /* pattern: one bar of eighths; D down, U up, P a picked note (arpeggio), - rest */
   var SONGS = [
-    { name: 'Campfire', chords: ['G', 'D', 'Em', 'C'], bpm: 92, pat: 'D-DU-UDU' },
-    { name: 'Lullaby', chords: ['C', 'Am', 'F', 'G'], bpm: 70, pat: 'PPPPPPPP' },
-    { name: 'Sunny road', chords: ['D', 'A', 'Bm', 'G'], bpm: 104, pat: 'D-D-UDU-' },
-    { name: 'Rainy night', chords: ['Am', 'F', 'C', 'G'], bpm: 64, pat: 'D---D-U-' }
+    { name: 'A Gentle Touching Song', file: 'guitar-gentle-touch.mp3' },
+    { name: 'Lowden', file: 'guitar-lowden.mp3' },
+    { name: 'Sunset Strings', file: 'guitar-sunset-strings.mp3' },
+    { name: 'Star', file: 'guitar-star.mp3' }
   ];
   var G = null;
-  function pluck(midi, t, vel) {
-    var ctx = ac(), src = ctx.createBufferSource(), g = ctx.createGain();
-    src.buffer = pluckBuf(midi);
-    g.gain.setValueAtTime(vel, t); g.gain.exponentialRampToValueAtTime(0.001, t + 2.4);
-    src.connect(g); g.connect(G.out); src.start(t); src.stop(t + 2.5);
-  }
-  function guitarStart(i) {
-    var ctx = ac();
+  function guitarStart(i, tries) {
     guitarStop();
-    G = { song: i, next: ctx.currentTime + 0.25, step: 0, out: ctx.createGain(), timers: [] };
-    G.out.gain.value = 0.55;
-    // a little room
-    var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
-    G.out.connect(lp); lp.connect(ctx.destination);
-    G.iv = setInterval(guitarTick, 40);
-    guitarBar();
-  }
-  function guitarTick() {
-    if (!G) return;
-    var ctx = ac(), S = SONGS[G.song], eighth = 60 / S.bpm / 2;
-    while (G.next < ctx.currentTime + 0.18) {
-      var bar = Math.floor(G.step / 8) % S.chords.length, k = G.step % 8, sym = S.pat[k];
-      var notes = CH[S.chords[bar]], t = G.next;
-      if (sym === 'D' || sym === 'U') {
-        var seq = sym === 'D' ? notes : notes.slice().reverse();
-        seq.forEach(function (m, j) { pluck(m, t + j * 0.012, (sym === 'D' ? 0.32 : 0.22) * (k === 0 ? 1.15 : 1)); });
-        cue(t, sym === 'D' ? 1 : -1, bar);
-      } else if (sym === 'P') {
-        var order = [0, 2, 1, 3, 2, 4, 3, 2], m = notes[order[k] % notes.length];
-        if (k === 0) pluck(notes[0], t, 0.3);
-        pluck(m + (k === 0 ? 0 : 0), t, 0.26);
-        cue(t, k % 2 ? -1 : 1, bar);
+    tries = tries || 0;
+    if (tries >= SONGS.length) { bar('<div class="fa-bt"><b>No guitar music found</b><span>Add the tracks to assets/audio</span></div><button class="pt-x" onclick="faStop()" aria-label="Stop">×</button>'); return; }
+    var ctx = ac();
+    var el = new Audio('./assets/audio/' + SONGS[i].file);
+    el.preload = 'auto'; el.crossOrigin = 'anonymous';
+    var src = ctx.createMediaElementSource(el), an = ctx.createAnalyser();
+    an.fftSize = 1024; an.smoothingTimeConstant = 0.35;
+    src.connect(an); an.connect(ctx.destination);
+    G = { song: i, el: el, an: an, buf: new Uint8Array(an.frequencyBinCount), avg: 0, last: 0, dir: 1, raf: 0, bar: 0 };
+    el.onended = function () { faSong(1); };
+    el.onerror = function () { if (G && G.el === el) guitarStart((i + 1) % SONGS.length, tries + 1); };
+    el.play().catch(function () {});
+    var sr = ctx.sampleRate, lo = Math.max(1, Math.round(90 / (sr / an.fftSize))), hi = Math.round(1700 / (sr / an.fftSize));
+    var tick = function () {
+      if (!G || G.el !== el) return;
+      an.getByteFrequencyData(G.buf);
+      var e = 0; for (var k = lo; k < hi; k++) e += G.buf[k]; e /= (hi - lo);
+      var now = performance.now();
+      if (e > G.avg * 1.22 + 6 && e > 40 && now - G.last > 170) {
+        G.last = now; G.dir = -G.dir; G.bar = (G.bar + (Math.random() < 0.25 ? 1 : 0)) % 4;
+        if (W() && W().strum) W().strum(G.dir, G.bar);
       }
-      G.step++; G.next += eighth;
-    }
-  }
-  function cue(t, dir, bar) {
-    var ms = Math.max(0, (t - ac().currentTime) * 1000);
-    G.timers.push(setTimeout(function () { if (W() && W().strum) W().strum(dir, bar); }, ms));
-    if (G.timers.length > 60) G.timers.splice(0, 30);
+      G.avg += (e - G.avg) * 0.08;
+      G.raf = requestAnimationFrame(tick);
+    };
+    tick();
+    guitarBar();
   }
   function guitarStop() {
     if (!G) return;
-    clearInterval(G.iv); G.timers.forEach(clearTimeout);
-    try { G.out.gain.setTargetAtTime(0, ac().currentTime, 0.15); } catch (e) {}
+    cancelAnimationFrame(G.raf);
+    try { G.el.pause(); G.el.removeAttribute('src'); G.el.load(); } catch (e) {}
     G = null;
   }
   function guitarBar() {
     var S = SONGS[G.song];
     bar('<button class="fa-nb" onclick="faSong(-1)" aria-label="Previous">‹</button>'
-      + '<div class="fa-bt"><b>♪ ' + esc(S.name) + '</b><span>' + S.chords.join(' · ') + ' · ' + S.bpm + ' bpm</span></div>'
+      + '<div class="fa-bt"><b>♪ ' + esc(S.name) + '</b><span>Focci on guitar</span></div>'
       + '<button class="fa-nb" onclick="faSong(1)" aria-label="Next">›</button>'
       + '<button class="pt-x" onclick="faStop()" aria-label="Stop">×</button>');
   }
@@ -227,8 +200,8 @@
   window.faGuitar = async function () {
     ringClose(); faStop(); CUR = 'guitar';
     D.classList.add('fa-quiet');
+    guitarStart(0);   // inside the tap: iOS only lets audio start from the gesture itself
     if (W() && W().focciDo) await W().focciDo('guitar');
-    guitarStart(0);
   };
 
   /* ---------------- jog ---------------- */
@@ -256,8 +229,8 @@
     return b;
   }
   var SOUNDS = [
-    { k: 'wind', t: 'Gió · Wind' }, { k: 'rain', t: 'Mưa · Rain' }, { k: 'waves', t: 'Sóng · Waves' },
-    { k: 'birds', t: 'Chim · Birds' }, { k: 'none', t: 'Yên lặng' }
+    { k: 'wind', t: 'Wind' }, { k: 'rain', t: 'Rain' }, { k: 'waves', t: 'Waves' },
+    { k: 'birds', t: 'Birds' }, { k: 'none', t: 'Silence' }
   ];
   function ambientStart(k) {
     ambientStop();
@@ -307,17 +280,20 @@
     ambientStart(k);
     document.querySelectorAll('#fa-relax .fa-snd button').forEach(function (b) { b.classList.toggle('on', b.dataset.k === k); });
   };
-  /* 4 in, 2 hold, 6 out: a slow breath that lengthens the out-breath. */
+  /* 4 in, 2 hold, 6 out: a slow breath that lengthens the out-breath. Each
+     phase is sent to the island too, so Focci's belly rises and falls
+     with the circle (fwWorld.breath). */
   function breathLoop() {
     var c = $('fa-circle'), l = $('fa-blabel'), n = $('fa-bcount'); if (!c || CUR !== 'relax') return;
-    var steps = [['in', 4000, 'Hít vào', 'Breathe in'], ['hold', 2000, 'Giữ', 'Hold'], ['out', 6000, 'Thở ra', 'Breathe out']];
+    var steps = [['in', 4000, 'Breathe in'], ['hold', 2000, 'Hold'], ['out', 6000, 'Breathe out']];
     var i = 0;
     var go = function () {
       if (CUR !== 'relax') return;
       var s = steps[i];
       c.className = 'fa-circle ' + s[0];
       c.style.transitionDuration = s[1] + 'ms';
-      l.innerHTML = s[2] + '<small>' + s[3] + '</small>';
+      l.textContent = s[2];
+      if (W() && W().breath) W().breath(s[0], s[1]);
       if (s[0] === 'in') { BR.n++; n.textContent = BR.n + (BR.n === 1 ? ' breath' : ' breaths'); }
       i = (i + 1) % steps.length;
       BR.t = setTimeout(go, s[1]);
@@ -326,24 +302,34 @@
   }
   window.faRelax = async function () {
     ringClose(); faStop(); CUR = 'relax';
+    var night = W() && W().day !== undefined ? W().day < 0.5 : false;
     D.classList.add('fa-quiet', 'fa-full', 'fa-relaxing');
+    D.classList.toggle('fa-night', night);
+    faSoundStartPending = night ? 'waves' : 'wind';
+    ambientStart(faSoundStartPending);       // inside the tap, so the browser lets it play
     if (W() && W().focciDo) await W().focciDo('relax');
     var el = $('fa-relax');
-    el.innerHTML = '<div class="fa-rtop"><span class="cz-cap">Focci is resting</span><b>Thở cùng Focci</b></div>'
-      + '<div class="fa-breath"><div class="fa-circle" id="fa-circle"></div><div class="fa-blabel" id="fa-blabel">Hít vào<small>Breathe in</small></div></div>'
+    /* Readable on a bright island: dark ink on frosted chips by day, warm
+       light on a deep scrim at night -- white text on white sand was
+       "burnt out". Sunlight by day: soft rays turning slowly; at night, a
+       moon glow and the fireflies on the island itself. */
+    el.innerHTML = '<div class="fa-sky"><i></i></div>'
+      + '<div class="fa-rtop"><span>' + (night ? 'A quiet night in the grass' : 'Sun, wind and grass') + '</span><b>Breathe with Focci</b></div>'
+      + '<div class="fa-breath"><div class="fa-circle" id="fa-circle"></div><div class="fa-blabel" id="fa-blabel">Breathe in</div></div>'
       + '<div class="fa-bcount num" id="fa-bcount"></div>'
       + '<div class="fa-snd">' + SOUNDS.map(function (s) { return '<button data-k="' + s.k + '" onclick="faSound(\'' + s.k + '\')">' + s.t + '</button>'; }).join('') + '</div>'
-      + '<button class="fa-unlock" id="fa-unlock"><i></i><span>Giữ để mở khoá</span></button>';
+      + '<button class="fa-unlock" id="fa-unlock"><i></i><span>Hold to unlock</span></button>';
     el.classList.add('on');
     BR = { n: 0, t: 0 };
     breathLoop();
-    faSound('wind');
+    faSound(faSoundStartPending);
     // the lock: only a press held for a second gets you out
     var u = $('fa-unlock'), ut = 0;
     var down = function (e) { e.preventDefault(); u.classList.add('hold'); ut = setTimeout(function () { u.classList.remove('hold'); clearTimeout(BR && BR.t); faStop(); }, 1000); };
     var up = function () { u.classList.remove('hold'); clearTimeout(ut); };
     u.addEventListener('pointerdown', down); u.addEventListener('pointerup', up); u.addEventListener('pointerleave', up); u.addEventListener('pointercancel', up);
   };
+  var faSoundStartPending = 'wind';
 
   /* ---------------- stories: the book, and something to listen to ---------------- */
   var AU = null;

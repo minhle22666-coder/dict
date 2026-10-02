@@ -4082,8 +4082,8 @@ export async function bootFocciWorld(root, opts) {
     if (P.kind === 'guitar') {
       // the right arm strums on every strum the music makes; the left holds the neck
       strumKick = Math.max(0, strumKick - dt * 5);
-      armR.rotation.set(-0.55 + strumDir * 0.42 * strumKick, 0, -0.2);
-      armL.rotation.set(-1.0 + chordShift * 0.07, 0, 0.5);
+      armL.rotation.set(-0.55 + strumDir * 0.42 * strumKick, 0, 0.2);
+      armR.rotation.set(-1.0 + chordShift * 0.07, 0, -0.5);
       legL.rotation.x = legR.rotation.x = 0;
       tailPivot.rotation.y = Math.sin(t * 2.2) * 0.12;
       character.rotation.y = charState.angle + Math.sin(t * 1.1) * 0.05;
@@ -4094,8 +4094,16 @@ export async function bootFocciWorld(root, opts) {
     if (P.kind === 'relax') tickFlies(dt, t);
     character.rotation.order = 'YXZ';
     character.rotation.set(-Math.PI / 2, P.yaw, 0);
-    const br = Math.sin(t * 1.25) * 0.5 + 0.5;    // a slow breath, about five seconds
-    character.scale.set(P.sc * (1 + br * 0.015), P.sc, P.sc * (1 + br * 0.05));
+    let br = Math.sin(t * 1.25) * 0.5 + 0.5;    // a slow breath, about five seconds
+    if (P.br) {
+      /* Relax breathes with the guide on screen (focci-acts.js tells it
+         each phase): the belly rises over the four counts in, stays for
+         the two held, and falls over the six out. Lying on his back his
+         own z is up, so that is the axis that swells. */
+      const k = Math.min(1, (performance.now() - P.br.t0) / P.br.dur), e = k * k * (3 - 2 * k);
+      br = P.br.ph === 'in' ? e : P.br.ph === 'hold' ? 1 : 1 - e;
+      character.scale.set(P.sc * (1 + br * 0.035), P.sc, P.sc * (1 + br * 0.11));
+    } else character.scale.set(P.sc * (1 + br * 0.015), P.sc, P.sc * (1 + br * 0.05));
     character.position.set(P.x, P.y, P.z);
     legL.rotation.x = legR.rotation.x = 0; armL.rotation.x = armR.rotation.x = 0.15;
     tailPivot.rotation.y = Math.sin(t * 0.7) * 0.05;
@@ -4231,6 +4239,8 @@ export async function bootFocciWorld(root, opts) {
       inner.add(m);
       // stand the longest side up, whichever it is in the file
       if (L === size.x) inner.rotation.z = Math.PI / 2; else if (L === size.z) inner.rotation.x = Math.PI / 2;
+      // the soundhole faces out (the file's front was towards him: "he holds it backwards")
+      m.rotation.y = Math.PI;
       inner.scale.setScalar(s);
       const holder = new THREE.Group();
       holder.add(inner);
@@ -4238,8 +4248,11 @@ export async function bootFocciWorld(root, opts) {
       m.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
       guitarRig = holder;
     }
-    guitarRig.position.set(0.02, 0.33, 0.2);
-    guitarRig.rotation.set(0.15, 0, 1.0);
+    /* Neck to his left hand, body under his right -- the way a right-handed
+       player holds it, so from the front the neck points to the viewer's
+       right. It pointed the other way, which the user saw as "backwards". */
+    guitarRig.position.set(-0.02, 0.33, 0.2);
+    guitarRig.rotation.set(0.15, 0, -1.0);
     rig.add(guitarRig);
     guitarRig.visible = true;
     holdCam();
@@ -4256,13 +4269,14 @@ export async function bootFocciWorld(root, opts) {
 
   /* ---------- lying in the grass ---------- */
   let grass = null, flies = [];
-  function grassAround(room, cx, cy, cz) {
+  function grassAround(room, cx, cy, cz, night) {
     const g = new THREE.Group();
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute([-0.035, 0, 0, 0.035, 0, 0, 0, 1, 0], 3));
     geo.computeVertexNormals();
-    const mats = [0x7FAF4E, 0x93C25C, 0x6A9A42, 0xA8C96A].map((c) => new THREE.MeshLambertMaterial({ color: c, side: THREE.DoubleSide }));
-    for (let i = 0; i < 46; i++) {
+    const mats = (night ? [0x2E4A3A, 0x3B5C46, 0x284036, 0x46664E] : [0x7FAF4E, 0x93C25C, 0x6A9A42, 0xA8C96A])
+      .map((c) => new THREE.MeshLambertMaterial({ color: c, side: THREE.DoubleSide }));
+    for (let i = 0; i < 64; i++) {
       const a = Math.random() * Math.PI * 2, r = 0.45 + Math.random() * 2.1;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
       const s = groundSmooth(room, x, z);
@@ -4280,98 +4294,185 @@ export async function bootFocciWorld(root, opts) {
     const room = activeRoom();
     const s = groundSmooth(room, charState.x, charState.z);
     const gy = s.hit ? s.y : character.position.y;
+    const night = dayFactor() < 0.5;
     // head the way he faces, feet where he stood
     const hx = Math.sin(charState.angle), hz = Math.cos(charState.angle);
     const yaw = Math.atan2(-hx, -hz);
     const midX = charState.x + hx * 0.8, midZ = charState.z + hz * 0.8;
     focciPose = { kind: 'relax', wakeOnTouch: false, t: 0, yaw, sc: 1, x: charState.x, y: gy + 0.24, z: charState.z,
-      head: { x: charState.x + hx * 1.45, y: gy + 0.45, z: charState.z + hz * 1.45 }, zT: 3 };
+      head: { x: charState.x + hx * 1.45, y: gy + 0.45, z: charState.z + hz * 1.45 }, zT: 3, night,
+      br: { ph: 'out', t0: performance.now(), dur: 6000 } };
     focciEyes(true);
-    grass = grassAround(room, midX, gy, midZ);
+    grass = grassAround(room, midX, gy, midZ, night);
+    drift = driftAround(room, midX, gy, midZ, night);
     holdCam();
     camFocus.on = true; camFocus.tx = midX; camFocus.ty = gy - 0.6; camFocus.tz = midZ;
-    cam.tRadius = 4.2; cam.tPhi = 0.62;
+    /* Further out than the first try (4.2): the user found him far too big
+       in the frame for something meant to be restful. */
+    const R0 = 6.2, PH = 0.74;
+    cam.tRadius = R0; cam.tPhi = PH;
     const a1 = cam.theta;
     const prefs1 = [a1, a1 + 0.6, a1 - 0.6, a1 + 1.2, a1 - 1.2, a1 + 2, a1 - 2, a1 + Math.PI];
-    focciPose.base = shortTurn(pickCamAngle(midX, gy + 0.4, midZ, 4.2, 0.62, prefs1));
+    focciPose.base = shortTurn(pickCamAngle(midX, gy + 0.4, midZ, R0, PH, prefs1));
     // nothing clear at that distance under the trees: come in closer and look again
-    if (pickBlocked) { cam.tRadius = 2.8; focciPose.base = shortTurn(pickCamAngle(midX, gy + 0.4, midZ, 2.8, 0.62, prefs1)); }
+    if (pickBlocked) { cam.tRadius = 4.4; focciPose.base = shortTurn(pickCamAngle(midX, gy + 0.4, midZ, 4.4, PH, prefs1)); }
     cam.tTheta = focciPose.base;
+    /* One butterfly (the user: one, and it stays): it comes in from a
+       little way off, circles twice and settles on his nose for good. */
     try {
       const g = await loadProp('butterfly.glb');
       if (!focciPose || focciPose.kind !== 'relax') return true;
       const base = g.scene;
       base.updateMatrixWorld(true);
       const bb = skinnedBox(base), sz = bb.getSize(new THREE.Vector3());
-      const sc = 0.42 / Math.max(sz.x, sz.z, 0.001);   // a cartoon butterfly: 0.22 was a speck from the camera
-      const colors = [0xFFB347, 0x8EC5FF, 0xFF9AC1];
-      flies = [0, 1, 2].map((k) => {
-        const o = cloneSkinned(base);
-        o.scale.setScalar(sc);
-        o.traverse((n) => { if (n.isMesh && n.material && k > 0) { n.material = n.material.clone(); n.material.color = new THREE.Color(colors[k]); } });
-        room.group.add(o);
-        const mixer = new THREE.AnimationMixer(o);
-        const fly = g.animations.find((a) => /fly/i.test(a.name)) || g.animations[0];
-        const idle = g.animations.find((a) => /idle/i.test(a.name)) || fly;
-        const aF = mixer.clipAction(fly), aI = mixer.clipAction(idle);
-        aF.play(); aF.time = Math.random() * 2;
-        return { o, mixer, aF, aI, ph: k * 2.1, r: 1.1 + k * 0.35, h: 0.9 + k * 0.3, land: k === 0 ? 7 : 1e9, state: 'fly', t: 0 };
-      });
-    } catch (e) { /* no butterflies is still a rest */ }
+      const sc = 0.34 / Math.max(sz.x, sz.z, 0.001);
+      const o = cloneSkinned(base);
+      o.scale.setScalar(sc);
+      o.traverse((n) => { if (n.isMesh) { n.frustumCulled = false; if (night && n.material) { n.material = n.material.clone(); n.material.emissive = new THREE.Color(0x3a5cff); n.material.emissiveIntensity = 0.35; } } });
+      o.position.set(midX + 5, gy + 2.6, midZ - 3);
+      room.group.add(o);
+      const mixer = new THREE.AnimationMixer(o);
+      const fly = g.animations.find((a) => /fly/i.test(a.name)) || g.animations[0];
+      const idle = g.animations.find((a) => /idle/i.test(a.name)) || fly;
+      const aF = mixer.clipAction(fly), aI = mixer.clipAction(idle);
+      aF.play();
+      flies = [{ o, mixer, aF, aI, ph: 0, r: 1.3, h: 1.1, state: 'fly', t: 0, land: 5.5 }];
+    } catch (e) { /* no butterfly is still a rest */ }
     return true;
+  }
+  /* Petals in the wind by day; fireflies at night. Sprites, no lights. */
+  let drift = null, petalTex = null, flyTex = null;
+  function driftAround(room, cx, cy, cz, night) {
+    if (!petalTex) {
+      const c = document.createElement('canvas'); c.width = c.height = 32;
+      const g = c.getContext('2d');
+      g.fillStyle = '#FFE3EC'; g.beginPath(); g.ellipse(16, 16, 12, 6, 0.6, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,170,200,.6)'; g.beginPath(); g.ellipse(14, 17, 6, 3, 0.6, 0, Math.PI * 2); g.fill();
+      petalTex = new THREE.CanvasTexture(c);
+      const d = document.createElement('canvas'); d.width = d.height = 32;
+      const h = d.getContext('2d'); const gr = h.createRadialGradient(16, 16, 0, 16, 16, 16);
+      gr.addColorStop(0, 'rgba(255,250,190,1)'); gr.addColorStop(0.3, 'rgba(230,255,140,.7)'); gr.addColorStop(1, 'rgba(200,255,120,0)');
+      h.fillStyle = gr; h.fillRect(0, 0, 32, 32);
+      flyTex = new THREE.CanvasTexture(d);
+    }
+    const g = new THREE.Group();
+    for (let i = 0; i < (night ? 22 : 28); i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: night ? flyTex : petalTex, transparent: true, depthWrite: false,
+        blending: night ? THREE.AdditiveBlending : THREE.NormalBlending }));
+      const sz = night ? 0.12 + Math.random() * 0.08 : 0.1 + Math.random() * 0.08;
+      sp.scale.setScalar(sz);
+      sp.userData = { ph: Math.random() * 6.28, r: 1 + Math.random() * 4, h: 0.3 + Math.random() * 2.2, sp: 0.4 + Math.random() * 0.8, a: Math.random() * 6.28 };
+      g.add(sp);
+    }
+    g.userData = { cx, cy, cz, night };
+    room.group.add(g);
+    return g;
+  }
+  function tickDrift(dt, t) {
+    if (!drift) return;
+    const U = drift.userData;
+    drift.children.forEach((sp) => {
+      const d = sp.userData;
+      if (U.night) {
+        // fireflies wander and blink
+        d.a += dt * d.sp * 0.3;
+        sp.position.set(U.cx + Math.cos(d.a + d.ph) * d.r, U.cy + d.h * 0.6 + Math.sin(t * 1.3 + d.ph) * 0.25, U.cz + Math.sin(d.a * 1.2 + d.ph) * d.r);
+        sp.material.opacity = 0.35 + 0.65 * Math.max(0, Math.sin(t * 2.2 + d.ph * 3));
+      } else {
+        // petals carried along by the wind, then round again
+        d.a = (d.a + dt * d.sp * 0.55) % 6.28;
+        const k = d.a / 6.28;
+        sp.position.set(U.cx - 5 + k * 10, U.cy + d.h + Math.sin(t * 1.6 + d.ph) * 0.3 - k * 0.6, U.cz + (d.r - 3) + Math.sin(t * 0.9 + d.ph) * 0.5);
+        sp.material.rotation = t * 2 + d.ph;
+        sp.material.opacity = Math.min(1, Math.sin(k * Math.PI) * 2);
+      }
+    });
   }
   const _nose = new THREE.Vector3();
   function tickFlies(dt, t) {
     const P = focciPose; if (!P || P.kind !== 'relax') return;
+    tickDrift(dt, t);
     const mx = (P.x + P.head.x) / 2, mz = (P.z + P.head.z) / 2, my = P.y;
     flies.forEach((f) => {
-      f.mixer.update(dt * (f.state === 'rest' ? 0.5 : 1.6));
+      f.mixer.update(dt * (f.state === 'rest' ? 0.45 : 1.6));
       f.t += dt;
       const p = f.o.position;
       if (f.state === 'fly') {
-        const a = t * 0.55 + f.ph;
-        const tx = mx + Math.cos(a) * f.r, tz = mz + Math.sin(a * 1.3) * f.r, ty = my + f.h + Math.sin(t * 2.1 + f.ph) * 0.18;
+        const a = t * 0.8 + f.ph;
+        const tx = mx + Math.cos(a) * f.r, tz = mz + Math.sin(a) * f.r, ty = my + f.h + Math.sin(t * 2.1) * 0.15;
         const vx = tx - p.x, vz = tz - p.z;
-        p.x += vx * Math.min(1, dt * 3); p.y += (ty - p.y) * Math.min(1, dt * 3); p.z += vz * Math.min(1, dt * 3);
+        const k = Math.min(1, dt * 1.6);
+        p.x += vx * k; p.y += (ty - p.y) * k; p.z += vz * k;
         if (Math.hypot(vx, vz) > 0.001) f.o.rotation.y = Math.atan2(vx, vz);
         if (f.t > f.land) { f.state = 'come'; f.t = 0; }
-      } else if (f.state === 'come' || f.state === 'rest') {
+      } else {
         rig.localToWorld(_nose.set(0.005, 0.69, 0.26));
         if (f.state === 'come') {
-          const k = Math.min(1, dt * 2.2);
-          p.x += (_nose.x - p.x) * k; p.y += (_nose.y + 0.02 - p.y) * k; p.z += (_nose.z - p.z) * k;
-          if (p.distanceTo(_nose) < 0.05 || f.t > 4) { f.state = 'rest'; f.t = 0; f.aI.reset().play(); f.aF.crossFadeTo(f.aI, 0.4, false); }
+          const k = Math.min(1, dt * 1.8);
+          p.x += (_nose.x - p.x) * k; p.y += (_nose.y + 0.03 - p.y) * k; p.z += (_nose.z - p.z) * k;
+          if (p.distanceTo(_nose) < 0.06 || f.t > 4) { f.state = 'rest'; f.t = 0; f.aI.reset().play(); f.aF.crossFadeTo(f.aI, 0.5, false); }
         } else {
-          p.copy(_nose); p.y += 0.02;
-          if (f.t > 10) { f.state = 'fly'; f.t = 0; f.land = 12 + Math.random() * 8; f.aF.reset().play(); f.aI.crossFadeTo(f.aF, 0.3, false); }
+          // rests there, wings slowly opening and closing, rising with each breath
+          p.copy(_nose); p.y += 0.03;
+          f.o.rotation.y = P.yaw + Math.PI / 2;
         }
       }
     });
-    if (grass) grass.children.forEach((b) => {
-      const w = Math.sin(t * 1.7 + b.userData.ph) * 0.16 + Math.sin(t * 0.45) * 0.12;
-      b.rotation.z = w; b.rotation.x = w * 0.4;
-    });
+    if (grass) {
+      const gust = Math.max(0, Math.sin(t * 0.37)) * 0.22;
+      grass.children.forEach((b) => {
+        const w = Math.sin(t * 2.1 + b.userData.ph) * 0.14 + Math.sin(t * 0.45) * 0.16 + gust;
+        b.rotation.z = w; b.rotation.x = w * 0.45;
+      });
+    }
   }
-
   /* ---------- running a lap of the island ---------- */
   let jog = null;
   function jogOn() {
+    /* Round the edge of the island, not across it. The first loop took the
+       furthest dry ground on each of 14 bearings from the spawn -- which
+       ran him through the village and into the huts. Now: 40 bearings
+       from the middle of the land; on each, the shore (the last dry cell
+       before water, scanning outward), then a little inland from it; a
+       point is kept only if it is open ground, not a building, not blocked,
+       and clear of every house by its room radius plus 2.5. Consecutive
+       points with a house too close to the line between them are dropped,
+       so a leg never cuts through a hut. */
     const room = activeRoom();
-    const c = room.spawn || { x: 0, z: 0 };
+    const box = new THREE.Box3().setFromObject(room.collidables[0]);
+    const c = box.getCenter(new THREE.Vector3());
+    const reach = Math.max(box.max.x - c.x, box.max.z - c.z) + 2;
+    const houses = room.houses || [];
+    const nearHouse = (x, z, pad) => houses.some((h) => Math.hypot(h.cx - x, h.cz - z) < (h.roomR || 3) + pad);
+    const open = (x, z) => {
+      const s = groundSmooth(room, x, z);
+      return s.hit && !s.water && !s.building && !blockedAt(room, x, z, s.y) && !nearHouse(x, z, 2.5);
+    };
     const pts = [];
-    for (let k = 0; k < 14; k++) {
-      const a = (k / 14) * Math.PI * 2;
-      for (let r = 19; r >= 5; r -= 1) {
-        const x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
-        const s = groundSmooth(room, x, z);
-        if (s.hit && !s.water && !s.building && !blockedAt(room, x, z, s.y)) { pts.push({ x, z }); break; }
+    for (let k = 0; k < 40; k++) {
+      const a = (k / 40) * Math.PI * 2, ux = Math.cos(a), uz = Math.sin(a);
+      let shore = -1;
+      for (let r = 4; r < reach; r += 0.6) {
+        const s = groundSmooth(room, c.x + ux * r, c.z + uz * r);
+        if (s.hit && !s.water) shore = r; else if (shore > 0 && (!s.hit || s.water)) break;
+      }
+      if (shore < 0) continue;
+      for (const back of [1.8, 2.6, 3.4, 4.4]) {
+        const x = c.x + ux * (shore - back), z = c.z + uz * (shore - back);
+        if (open(x, z)) { pts.push({ x, z }); break; }
       }
     }
-    if (pts.length < 4) return false;
-    // start from the nearest, run round in order
+    // no leg through a house
+    const legOk = (p, q) => {
+      for (let i = 1; i < 6; i++) { const t = i / 6; if (nearHouse(p.x + (q.x - p.x) * t, p.z + (q.z - p.z) * t, 1.2)) return false; }
+      return true;
+    };
+    const path = [];
+    pts.forEach((p) => { if (!path.length || legOk(path[path.length - 1], p)) path.push(p); });
+    if (path.length < 6) return false;
     let i0 = 0, bd = Infinity;
-    pts.forEach((p, i) => { const d = Math.hypot(p.x - charState.x, p.z - charState.z); if (d < bd) { bd = d; i0 = i; } });
-    jog = { pts, i: i0, t: 0, dist: 0, lx: charState.x, lz: charState.z, best: Infinity, stuckT: 0 };
+    path.forEach((p, i) => { const d = Math.hypot(p.x - charState.x, p.z - charState.z); if (d < bd) { bd = d; i0 = i; } });
+    jog = { pts: path, i: i0, t: 0, dist: 0, lx: charState.x, lz: charState.z, best: Infinity, stuckT: 0, skips: 0 };
     holdCam();
     return true;
   }
@@ -4380,7 +4481,10 @@ export async function bootFocciWorld(root, opts) {
     const dx = p.x - charState.x, dz = p.z - charState.z, d = Math.hypot(dx, dz);
     jog.t += dt;
     jog.dist += Math.hypot(charState.x - jog.lx, charState.z - jog.lz); jog.lx = charState.x; jog.lz = charState.z;
-    if (d < 1.2 || jog.stuckT > 2.5) { jog.i = (jog.i + 1) % jog.pts.length; jog.best = Infinity; jog.stuckT = 0; return; }
+    if (d < 1.2 || jog.stuckT > 1.6) {
+      // stuck against something: skip ahead rather than keep pushing into it
+      jog.i = (jog.i + (jog.stuckT > 1.6 ? 2 : 1)) % jog.pts.length; jog.best = Infinity; jog.stuckT = 0; return;
+    }
     if (d < jog.best - 0.3) { jog.best = d; jog.stuckT = 0; } else jog.stuckT += dt;
     const ux = dx / d, uz = dz / d;
     const fX = -Math.sin(cam.theta), fZ = -Math.cos(cam.theta), rX = Math.cos(cam.theta), rZ = -Math.sin(cam.theta);
@@ -4460,6 +4564,7 @@ export async function bootFocciWorld(root, opts) {
     focciPose = null;
     if (guitarRig) { rig.remove(guitarRig); }
     if (grass) { grass.parent && grass.parent.remove(grass); grass = null; }
+    if (drift) { drift.parent && drift.parent.remove(drift); drift.children.forEach((c) => c.material.dispose()); drift = null; }
     flies.forEach((f) => { f.o.parent && f.o.parent.remove(f.o); f.mixer.stopAllAction(); }); flies = [];
     if (P.dots && P.dots.parent) P.dots.parent.remove(P.dots);
     focciEyes(false);
@@ -5642,6 +5747,8 @@ export async function bootFocciWorld(root, opts) {
   }
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
     focciDo, focciStop, focciAnchor, strum, jogStats: () => (jog ? { t: jog.t, dist: jog.dist } : null),
+    breath(ph, ms) { if (focciPose && focciPose.kind === 'relax') focciPose.br = { ph, t0: performance.now(), dur: ms || 4000 }; },
+    get day() { return dayFactor(); },
     travelTo, get onZen() { return currentRoomKey === 'station' && character.position.y > GROUND_CEIL; },
     focusStart: (id) => talkStart(id, { focus: true }), focusEnd, focusAnchor, focciWake, get focciPose() { return focciPose ? focciPose.kind : null; },
     residentSleep, residentBath, residentFollow, anchorOf, residentsHere, celebrateAt, get currentRoom() { return currentRoomKey; } };
