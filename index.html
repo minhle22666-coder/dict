@@ -7650,6 +7650,16 @@ document.documentElement.classList.add('home-on');</script>
   .pr-gift img,.pt-giftbtn img{width:22px;height:22px}
   .jn-gift-ic{width:18px;height:18px;vertical-align:-3px;margin-right:6px}
   .gift-ic img{width:30px;height:30px;display:block}
+
+  /* hold-and-sweep lookups in chat, the hunt and Hot Take (story.js) */
+  .lookable .wtap{cursor:pointer;border-radius:4px;transition:background .15s}
+  .lookable .wtap.wsel{background:rgba(214,170,80,.35);box-shadow:0 0 0 2px rgba(214,170,80,.35)}
+  .lookable.selecting{touch-action:none}
+  html body .ht-reader .ht-text,html body .ht-reader .ht-text *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  .ws-ask{display:flex;align-items:center;justify-content:center;gap:8px}
+  /* a lookup is opened from inside Hot Take (90), the journal (91) and the
+     oracle (92) now, and at 90 it sat under the reader it came from */
+  .word-sheet{z-index:110}
 </style>
 </head>
 <body>

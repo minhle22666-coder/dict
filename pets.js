@@ -611,7 +611,13 @@
      to see them side by side (world.js talkStart). Only a slim input line
      sits at the bottom. The bubbles follow the two heads every frame. */
   var chatBusy = false, T = { id: null, raf: 0, fadeT: 0 };
-  function fmtMsg(t) { return esc(t).replace(/\*\*(.+?)\*\*/g, '<b class="pt-hl" onclick="petPhrase(this)">$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>'); }
+  /* Every word of what the animal says can be held and swept to look up
+     (story.js .lookable); a highlighted expression still plays its clips. */
+  function fmtMsg(t) {
+    if (window.tokenizeForTap) return '<span class="lookable">' + window.tokenizeForTap(t).replace(/<b>/g, '<b class="pt-hl" onclick="petPhrase(this)">') + '</span>';
+    return esc(t).replace(/\*\*(.+?)\*\*/g, '<b class="pt-hl" onclick="petPhrase(this)">$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>');
+  }
+  function lookable(t) { return window.tokenizeForTap ? window.tokenizeForTap(t) : esc(t); }
   function talkDom() {
     if ($('pt-talk')) return;
     var d = document.createElement('div');
@@ -852,7 +858,7 @@
     var r = find(id);
     H.open = id;
     var on = H.gathered.indexOf(id) >= 0;
-    say($('pt-hb'), '<div class="pt-hb-who">' + esc(r ? r.name : '') + '’s part</div><p>' + esc(piece.t) + '</p>'
+    say($('pt-hb'), '<div class="pt-hb-who">' + esc(r ? r.name : '') + '’s part</div><p class="lookable">' + lookable(piece.t) + '</p>'
       + '<div class="pt-hb-acts"><button class="' + (on ? 'ghost' : '') + '" onclick="huntToggle(\'' + id + '\')">' + (on ? 'Leave here' : 'Bring along') + '</button>'
       + '<button class="ghost" onclick="huntClose()">Close</button></div>');
     talkLoop();
@@ -894,7 +900,7 @@
     $('pt-gift-in').innerHTML = '<div class="pt-g-h"><div><span class="cz-cap">You found the story' + (tries === 0 ? ' · first try' : '') + '</span>'
       + '<b class="pt-g-title">' + esc(topic) + '</b></div><button class="pt-x" aria-label="Close" onclick="petCloseGift()">×</button></div>'
       + '<div class="hunt-xp num">+' + xp + ' XP</div>'
-      + '<ol class="hunt-story">' + story.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + '</ol>'
+      + '<ol class="hunt-story">' + story.map(function (p) { return '<li class="lookable">' + lookable(p) + '</li>'; }).join('') + '</ol>'
       + '<div class="pt-g-foot">Look at what joins them: the same people, the same subject, and words like <i>then</i>, <i>since</i>, <i>finally</i>.</div>';
     document.documentElement.classList.add('pt-gift-on');
   };

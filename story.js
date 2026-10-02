@@ -704,6 +704,11 @@ function needKeySheetHTML(w){
   return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Not in your library yet.</div>'
     +'<button class="ws-full" onclick="closeWordSheet(); showView(\'settings\');">Add a Gemini key to look it up →</button>';
 }
+function askFocciSheetHTML(w){
+  const safeW=esc(w).replace(/'/g,"\\'");
+  return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Not in your offline dictionary yet.</div>'
+    +'<button class="ws-full ws-ask" onclick="wordPopupForceAI(\''+safeW+'\')"><span>✦</span> Ask Focci</button>';
+}
 function offlineSheetHTML(w){
   const safeW=esc(w).replace(/'/g,"\\'");
   return '<div class="ws-word">'+esc(w)+'</div><div class="ws-loading">Offline right now.</div>'
@@ -778,7 +783,7 @@ let _selLastWord=null;   // mốc để dính dòng khi ngón tay chệch
 
 function clearSelBtn(){ if(_selBtn){ _selBtn.remove(); _selBtn=null; } }
 
-function selHostOf(el){ return el ? el.closest('.story-passage, .dlg-line, .su-tappable') : null; }
+function selHostOf(el){ return el ? el.closest('.story-passage, .dlg-line, .su-tappable, .lookable') : null; }
 
 /* Danh sách từ theo đúng thứ tự DOM trong khối đang chọn. */
 function selWordsIn(host){
@@ -851,9 +856,20 @@ function selText(list){
   return list.map(w=>w.textContent).join(' ').replace(/\s+/g,' ').trim();
 }
 
-function selShowButton(list){
+async function selShowButton(list){
   clearSelBtn();
   if(list.length<2) return;
+  /* A phrase the library already has opens straight away; only one it
+     does not have gets the Ask Focci button (the API call). */
+  try{
+    // one-letter words are not tappable, so "close call" may be filed as "a close call"
+    const t=norm(selText(list));
+    for(const k of [t, 'a '+t, 'an '+t, 'the '+t]){
+      const known=await idbGet(k);
+      const rec=known && known.alias ? await idbGet(known.alias) : known;
+      if(rec && rec.data){ selClear(); showWordSheet(condensedEntryHTML(rec)); try{ await logEvent('search', rec.word); }catch(e){} return; }
+    }
+  }catch(e){}
   const first=list[0].getBoundingClientRect();
   const last=list[list.length-1].getBoundingClientRect();
   const top=Math.min(first.top,last.top);
@@ -861,7 +877,7 @@ function selShowButton(list){
 
   const b=document.createElement('button');
   b.className='sel-ask'; b.type='button';
-  b.innerHTML='<span>✦</span> Hỏi Focci về '+list.length+' từ này';
+  b.innerHTML='<span>✦</span> Ask Focci about these '+list.length+' words';
   b.style.top =(top + window.scrollY - 46)+'px';
   b.style.left=Math.max(10, Math.min(left + window.scrollX, window.innerWidth-210))+'px';
   b.addEventListener('pointerdown',(e)=>{ e.preventDefault(); e.stopPropagation(); });
@@ -970,6 +986,17 @@ document.addEventListener('scroll',()=>{ if(!_selActive) clearSelBtn(); }, { pas
 /* Sau một lần quét, cú click nổi lên không được mở popup từ đơn. */
 window.selTapSuppressed = function(){ return Date.now() < _selSuppressTapUntil; };
 
+/* Tap a word in any .lookable block (animal chat, the paragraph hunt,
+   Hot Take) and it opens, the same as in the story. Not inside a
+   highlighted expression in a chat bubble: that one plays its clips. */
+document.addEventListener('click',(e)=>{
+  const t=e.target.closest && e.target.closest('.lookable .wtap'); if(!t) return;
+  if(t.closest('.pt-hl') || t.closest('#review-area')) return;   // that one has its own handler
+  if(window.selTapSuppressed && window.selTapSuppressed()) return;
+  t.classList.remove('tap-flash'); void t.offsetWidth; t.classList.add('tap-flash');
+  openWordPopup(t.dataset.w);
+});
+
 
 function phraseSheetHTML(text, result, saved){
   const safeT = esc(text).replace(/'/g,"\\'");
@@ -1071,6 +1098,9 @@ async function openWordPopup(rawWord){
       }
     }
     if(!rec){
+      /* Not in the library: the user asked for an "Ask Focci" button here
+         instead of an API call made behind their back on every tap. */
+      if(!window.__sayItActive){ showWordSheet(askFocciSheetHTML(word)); return; }
       if(!getKey()){ showWordSheet(needKeySheetHTML(word)); return; }
       if(!navigator.onLine){ showWordSheet(offlineSheetHTML(word)); return; }
       const data = await askGemini(word, { exact:true });

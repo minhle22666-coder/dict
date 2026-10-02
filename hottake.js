@@ -221,6 +221,7 @@
     var text = it.transcript || it.body || it.summary || '';
     return text.split(/\n+/).some(function (l) { return TS.test(l); });
   }
+  function tap(l) { return window.tokenizeForTap ? window.tokenizeForTap(l) : esc(l); }
   function bodyHtml(it) {
     var text = it.transcript || it.body || it.summary || '';
     var lines = text.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
@@ -241,9 +242,10 @@
         var sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
         return '<p class="ht-line" data-at="' + sec + '" onclick="htSeek(' + sec + ')">'
           + '<button class="ht-ts">' + m[1] + ':' + m[2] + '</button>'
-          + esc(l.replace(TS, '')) + '</p>';
+          + tap(l.replace(TS, '')) + '</p>';
       }
-      return '<p class="ht-line">' + esc(l) + '</p>';
+      // every word can be held and swept to look up (story.js .lookable)
+      return '<p class="ht-line lookable">' + tap(l) + '</p>';
     }).join('');
   }
 
