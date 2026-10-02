@@ -7278,6 +7278,69 @@ document.documentElement.classList.add('home-on');</script>
   .oc-acts{display:flex;gap:8px}
   .oc-acts .oc-btn{flex:1}
   .oc-src{margin-top:10px;font-size:10px;text-align:center;color:var(--cz-faint)}
+
+  /* ---------------- WORLD MENU and THE MAP ---------------- */
+  html body .fw-menu-cluster{width:56px;height:56px}
+  .wm-fab{position:absolute;left:0;bottom:0;z-index:3;width:56px;height:56px;padding:0;border:0;border-radius:50%;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:var(--cz-sage);
+    background:rgba(255,255,250,.92);box-shadow:var(--cz-rim),0 10px 26px rgba(30,40,20,.28),0 2px 4px rgba(30,40,20,.12);
+    transition:transform .18s ease,background .2s;-webkit-tap-highlight-color:transparent}
+  .wm-fab:active{transform:scale(.92)}
+  .wm-fab svg{width:24px;height:24px;overflow:visible}
+  .wm-fab .wm-dots circle{transform-box:fill-box;transform-origin:center;transition:transform .35s cubic-bezier(.3,1.4,.4,1),opacity .2s}
+  .wm-fab .wm-dots circle:nth-child(1){fill:#5E7A48}.wm-fab .wm-dots circle:nth-child(2){fill:#D8A03C}
+  .wm-fab .wm-dots circle:nth-child(3){fill:#C4553F}.wm-fab .wm-dots circle:nth-child(4){fill:#3F8C9C}
+  .wm-fab .wm-x{opacity:0;transform-origin:12px 12px;transform:rotate(-90deg) scale(.5);transition:transform .35s cubic-bezier(.3,1.4,.4,1),opacity .2s;color:var(--cz-ink)}
+  .fw-menu-cluster.open .wm-fab .wm-dots circle{transform:scale(0);opacity:0}
+  .fw-menu-cluster.open .wm-fab .wm-x{opacity:1;transform:none}
+  .wm-card{position:absolute;left:0;bottom:66px;width:236px;box-sizing:border-box;padding:10px 8px 8px;border-radius:24px;
+    background:rgba(255,255,250,.95);box-shadow:var(--cz-rim),0 18px 44px rgba(30,40,20,.28);
+    transform-origin:28px calc(100% + 38px);transform:scale(.4) translateY(20px);opacity:0;pointer-events:none;
+    transition:transform .34s cubic-bezier(.3,1.25,.4,1),opacity .2s ease}
+  .fw-menu-cluster.open .wm-card{transform:none;opacity:1;pointer-events:auto}
+  .wm-cap{margin:6px 10px 3px;font-size:8.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--cz-faint)}
+  .wm-cap + .wm-row{margin-top:0}
+  .wm-row{display:flex;align-items:center;gap:11px;width:100%;min-height:44px;padding:5px 8px;border:0;border-radius:15px;background:none;cursor:pointer;text-align:left;
+    opacity:0;transform:translateX(-8px);transition:opacity .2s ease calc(var(--i) * 25ms + 80ms),transform .3s ease calc(var(--i) * 25ms + 80ms),background .15s}
+  .fw-menu-cluster.open .wm-row{opacity:1;transform:none}
+  .wm-row:active{background:var(--cz-sage-bg)}
+  .wm-row > span{display:flex;flex-direction:column;font-size:14px;font-weight:600;color:var(--cz-ink);line-height:1.2}
+  .wm-row small{font-size:10.5px;font-weight:500;color:var(--cz-faint)}
+  .wm-ic{flex:none;width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--c);background:var(--b)}
+  .wm-ic svg{width:18px;height:18px}
+  .wm-ic.map{--c:#3F8C9C;--b:rgba(63,140,156,.12)}.wm-ic.look{--c:#5E7A48;--b:rgba(94,122,72,.12)}
+  .wm-ic.music{--c:#8E6A1E;--b:rgba(214,170,80,.18)}.wm-ic.pal{--c:#B5476A;--b:rgba(181,71,106,.1)}
+  .wm-ic.saved{--c:#C4553F;--b:rgba(196,85,63,.1)}.wm-ic.games{--c:#5E7A48;--b:rgba(94,122,72,.12)}
+  .wm-ic.prog{--c:#3F8C9C;--b:rgba(63,140,156,.12)}.wm-ic.guide{--c:#8E6A1E;--b:rgba(214,170,80,.18)}
+
+  .fw-map-pop.show{opacity:1}
+  html body .fw-map-pop{position:fixed;inset:0;z-index:80;overflow:hidden;padding:calc(env(safe-area-inset-top,0px) + 74px) 0 calc(env(safe-area-inset-bottom,0px) + 22px);
+    box-sizing:border-box;display:flex;flex-direction:column;
+    background:radial-gradient(120% 80% at 50% 30%,rgba(246,247,234,.97),rgba(221,227,186,.97));opacity:0;transition:opacity .25s ease}
+  html.map-on .fw-map-pop{display:flex !important}
+  .isl-top{display:flex;align-items:flex-start;justify-content:space-between;padding:0 20px 6px}
+  .isl-cap{display:block;font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--cz-faint)}
+  .isl-title{display:block;font-size:24px;font-weight:700;color:var(--cz-ink)}
+  .isl-track{flex:1;min-height:0;display:flex;align-items:center;gap:0;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
+    padding:0 calc(50vw - min(36vw,150px));scrollbar-width:none}
+  .isl-track::-webkit-scrollbar{display:none}
+  .isl-card{position:relative;flex:none;width:min(72vw,300px);margin:0 -6px;scroll-snap-align:center;cursor:pointer;transform-origin:center;will-change:transform,opacity}
+  .isl-pic{overflow:hidden;aspect-ratio:3/4;max-height:52vh;border-radius:28px;background:#E3E8CC;box-shadow:0 20px 44px rgba(46,56,38,.25),0 0 0 1px rgba(255,255,255,.7) inset}
+  .isl-pic img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .1s linear;-webkit-user-select:none;user-select:none;pointer-events:none}
+  .isl-here{position:absolute;left:14px;top:14px;padding:4px 10px;border-radius:99px;font-size:10.5px;font-weight:700;color:#fff;background:rgba(94,122,72,.9)}
+  .isl-txt{padding:14px 8px 0;text-align:center}
+  .isl-txt b{display:block;font-size:18px;font-weight:700;color:var(--cz-ink)}
+  .isl-txt span{display:block;margin-top:3px;font-size:12.5px;line-height:1.4;color:var(--cz-soft)}
+  .isl-dots{display:flex;justify-content:center;gap:6px;margin:10px 0 12px}
+  .isl-dots i{width:6px;height:6px;border-radius:99px;background:rgba(94,122,72,.25);transition:width .25s,background .25s}
+  .isl-dots i.on{width:20px;background:var(--cz-sage)}
+  .isl-go{align-self:center;width:min(300px,calc(100vw - 48px));height:50px;border:0;border-radius:17px;cursor:pointer;font-size:15px;font-weight:700;color:#fff;
+    background:linear-gradient(180deg,#6F8D57,#5E7A48);box-shadow:0 8px 20px rgba(94,122,72,.35)}
+  .isl-go:disabled{color:var(--cz-soft);background:rgba(94,122,72,.12);box-shadow:none}
+  .isl-fly{position:fixed;z-index:120;border-radius:28px;background-size:cover;background-position:center;pointer-events:none;
+    transition:left .5s cubic-bezier(.5,0,.2,1),top .5s cubic-bezier(.5,0,.2,1),width .5s cubic-bezier(.5,0,.2,1),height .5s cubic-bezier(.5,0,.2,1),border-radius .5s,opacity .7s ease,filter .7s ease}
+  .isl-fly.big{left:0 !important;top:0 !important;width:100vw !important;height:100vh !important;border-radius:0;filter:brightness(1.15)}
+  .isl-fly.gone{opacity:0;filter:brightness(1.6) blur(6px)}
 </style>
 </head>
 <body>
@@ -8060,37 +8123,27 @@ document.documentElement.classList.add('home-on');</script>
   <!-- floating glass menu: one anchor button, and two CONNECTED glass bars
        (not 7 separate circles) — vertical for wand/sound/map, horizontal
        for saved/games/progress/guide -->
+  <!-- The island menu (see the WORLD MENU block at the end of the stylesheet).
+       One card rising from the button, labelled rows in two groups,
+       instead of two icon-only glass bars in an L: the user found the bars
+       unbalanced and the icons alone unclear. Same ids for the sound row and
+       the cluster, which other code reaches for. -->
   <div class="fw-menu-cluster" id="fw-menu-cluster">
-    <div class="fw-menu-bar fw-menu-vbar fw-menu-glass">
-      <button class="fw-mi" aria-label="Change companion" onclick="openMascotPicker()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 15 9"/><path d="M17 4l.8 1.9L20 6.7l-2.2.8L17 9.4l-.8-1.9L14 6.7l2.2-.8L17 4Z"/><path d="M19.5 12.5l.5 1.2 1.2.5-1.2.5-.5 1.2-.5-1.2-1.2-.5 1.2-.5.5-1.2Z"/></svg>
-      </button>
-      <button class="fw-mi" id="fw-sound-btn" aria-label="Sound">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>
-      </button>
-      <button class="fw-mi" aria-label="See the whole island" onclick="fwOverview()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/><circle cx="12" cy="12" r="2.6"/></svg>
-      </button>
-      <button class="fw-mi" aria-label="Map" onclick="openFwMap()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
-      </button>
+    <div class="wm-card" id="wm-card">
+      <div class="wm-cap">On the island</div>
+      <button class="wm-row" style="--i:0" onclick="openFwMap()"><i class="wm-ic map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg></i><span>Map<small>Travel to another island</small></span></button>
+      <button class="wm-row" style="--i:1" onclick="fwOverview()"><i class="wm-ic look"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/><circle cx="12" cy="12" r="2.6"/></svg></i><span>Look around<small>See the whole island</small></span></button>
+      <button class="wm-row" style="--i:2" id="fw-sound-btn" aria-label="Sound"><i class="wm-ic music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg></i><span>Music<small>Tap: on/off · double tap: next</small></span></button>
+      <button class="wm-row" style="--i:3" onclick="openMascotPicker()"><i class="wm-ic pal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 15 9"/><path d="M17 4l.8 1.9L20 6.7l-2.2.8L17 9.4l-.8-1.9L14 6.7l2.2-.8L17 4Z"/></svg></i><span>Companion<small>Change who walks with you</small></span></button>
+      <div class="wm-cap">Learning</div>
+      <button class="wm-row" style="--i:4" onclick="openFwPanel('saved')"><i class="wm-ic saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v16l-6-4-6 4V4Z"/></svg></i><span>Saved</span></button>
+      <button class="wm-row" style="--i:5" onclick="fmGo('games')"><i class="wm-ic games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r="1"/><circle cx="18" cy="14" r="1"/></svg></i><span>Mini games</span></button>
+      <button class="wm-row" style="--i:6" onclick="openFwPanel('stats')"><i class="wm-ic prog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M7 16v-4M12 16V8M17 16v-6"/></svg></i><span>Progress</span></button>
+      <button class="wm-row" style="--i:7" onclick="showStoryIntro()"><i class="wm-ic guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.3-3.5-2-6-2v13c2.5 0 4.5.7 6 2 1.5-1.3 3.5-2 6-2V4c-2.5 0-4.5.7-6 2Z"/><path d="M12 6v13"/></svg></i><span>Guide</span></button>
     </div>
-    <div class="fw-menu-bar fw-menu-hbar fw-menu-glass">
-      <button class="fw-mi" aria-label="Saved" onclick="openFwPanel('saved')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v16l-6-4-6 4V4Z"/></svg>
-      </button>
-      <button class="fw-mi" aria-label="Mini games" onclick="fmGo('games')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r="1"/><circle cx="18" cy="14" r="1"/></svg>
-      </button>
-      <button class="fw-mi" aria-label="Progress" onclick="openFwPanel('stats')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="9" cy="7" rx="3" ry="4"/><ellipse cx="16" cy="15" rx="3" ry="4"/></svg>
-      </button>
-      <button class="fw-mi" aria-label="Before you begin" onclick="showStoryIntro()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.3-3.5-2-6-2v13c2.5 0 4.5.7 6 2 1.5-1.3 3.5-2 6-2V4c-2.5 0-4.5.7-6 2Z"/><path d="M12 6v13"/></svg>
-      </button>
-    </div>
-    <button class="fw-fab-menu fw-menu-glass" id="fw-menu-toggle" aria-label="Menu" onclick="toggleFwMenu()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg>
+    <button class="wm-fab" id="fw-menu-toggle" aria-label="Menu" onclick="toggleFwMenu()">
+      <svg viewBox="0 0 24 24"><g class="wm-dots" fill="currentColor"><circle cx="7.5" cy="7.5" r="2.6"/><circle cx="16.5" cy="7.5" r="2.6"/><circle cx="7.5" cy="16.5" r="2.6"/><circle cx="16.5" cy="16.5" r="2.6"/></g>
+        <g class="wm-x" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></g></svg>
     </button>
   </div>
 
@@ -9031,6 +9084,8 @@ document.documentElement.classList.add('home-on');</script>
     const active = (id) => { const v = document.getElementById(id); return !!(v && v.classList.contains('active')); };
     if (on('ask-on') && window.fwAnswer) { fwAnswer(false); return true; }
     if (window.oracleBack && window.oracleBack()) return true;
+    if (on('map-on') && window.closeFwMap) { closeFwMap(); return true; }
+    { const cl = document.getElementById('fw-menu-cluster'); if (cl && cl.classList.contains('open')) { cl.classList.remove('open'); return true; } }
     if (window.petBack && window.petBack()) return true;
     if (on('rz-on') && window.rzClose) { rzClose(); return true; }
     const sheet = document.getElementById('word-sheet');
@@ -9165,40 +9220,124 @@ document.documentElement.classList.add('home-on');</script>
     });
   })();
 
-  // Map: teleport straight to an island instead of walking to its portal.
+  /* ============================================================
+     THE MAP: the islands themselves, one card each, swiped through
+
+     The cards are stills rendered from the live scene (map-*.webp, an
+     orthographic camera over each room, the way home-island.webp was made)
+     -- the user asked for screenshots of each island rather than the old
+     grid of story illustrations. Swipe (scroll-snap), the card in the
+     middle is full size and the others lean back and dim; Travel grows the
+     card to fill the screen and the island is behind it when it fades.
+     Every land is open (the gateways stopped checking story progress), so
+     there are no locks here either. Zen Island is the sky island over
+     the hub: travelTo('zen') flies there.
+     ============================================================ */
+  const MAP_PLACES = [
+    { key: 'station', img: 'map-hub.webp', name: 'Fox Island', line: 'Home: the huts, the tower, the boat and your animals.' },
+    { key: 'arc1', img: 'map-arc1.webp', land: 0, line: 'A quiet meadow island in a shallow, clear sea.' },
+    { key: 'arc2', img: 'map-arc2.webp', land: 1, line: 'A camp among the pines, with the fire still going.' },
+    { key: 'arc3', img: 'map-arc3.webp', land: 2, line: 'A waterfall pool under tall green trees.' },
+    { key: 'arc4', img: 'map-arc4.webp', land: 3, line: 'A floating forest high above the water.' },
+    { key: 'zen', img: 'map-zen.webp', name: 'Zen Island', line: 'The red gate and the wisdom tree, up in the clouds.' }
+  ];
+  let mapIdx = 0, mapRaf = 0;
+  function mapHere() {
+    if (!worldApi) return 'station';
+    return worldApi.onZen ? 'zen' : worldApi.currentRoom;
+  }
   window.openFwMap = function () {
     document.getElementById('fw-menu-cluster').classList.remove('open');
     const pop = document.getElementById('fw-map-pop');
-    const lands = window.ARC_LANDS.slice(0, 4);
-    let h = '<button class="fw-panel-close" style="position:sticky;float:right;top:0" aria-label="Close" onclick="closeFwMap()">'
-      + '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>'
-      + '<div class="fw-map-card">'
-      + '<div class="fw-map-t">The Map</div>'
-      + '<div class="fw-map-s">Jump straight to a land — no walking required.</div>'
-      + '<div class="fw-map-grid">';
-    h += '<button class="fw-map-cell here" style="background-image:none" onclick="teleportTo(\'station\')">'
-      + '<span class="fw-map-cell-n">Hub Island</span></button>';
-    lands.forEach((land, i) => {
-      const unlocked = window.arcUnlocked(land.id);
-      h += '<button class="fw-map-cell' + (unlocked ? '' : ' locked') + '" style="background-image:url(\'' + assetUrl('bg-arc' + land.id) + '\')"'
-        + (unlocked ? ' onclick="teleportTo(\'arc' + (i + 1) + '\')"' : ' disabled') + '>'
-        + (unlocked ? '' : '<span class="fw-map-cell-lock">\u{1F512}</span>')
-        + '<span class="fw-map-cell-n">' + esc(land.name) + '</span></button>';
+    const lands = window.ARC_LANDS || [];
+    const here = mapHere();
+    mapIdx = Math.max(0, MAP_PLACES.findIndex((p) => p.key === here));
+    let h = '<div class="isl-top"><div><span class="isl-cap">The map</span><b class="isl-title">Where to next?</b></div>'
+      + '<button class="pt-x isl-x" aria-label="Close" onclick="closeFwMap()">×</button></div>'
+      + '<div class="isl-track" id="isl-track">';
+    MAP_PLACES.forEach((p, i) => {
+      const name = p.name || ((lands[p.land] || {}).name) || ('Land ' + (p.land + 1));
+      h += '<div class="isl-card' + (p.key === here ? ' here' : '') + '" data-i="' + i + '" onclick="mapPick(' + i + ')">'
+        + '<div class="isl-pic"><img src="./' + p.img + '" alt="" loading="lazy" draggable="false"/></div>'
+        + (p.key === here ? '<span class="isl-here">You are here</span>' : '')
+        + '<div class="isl-txt"><b>' + esc(name) + '</b><span>' + esc(p.line) + '</span></div></div>';
     });
-    h += '</div></div>';
+    h += '</div><div class="isl-dots" id="isl-dots">' + MAP_PLACES.map((_, i) => '<i data-i="' + i + '"></i>').join('') + '</div>'
+      + '<button class="isl-go" id="isl-go" onclick="mapTravel()"></button>';
     pop.innerHTML = h;
     pop.style.display = 'block';
-    requestAnimationFrame(() => pop.classList.add('show'));
+    document.documentElement.classList.add('map-on');
+    const track = document.getElementById('isl-track');
+    requestAnimationFrame(() => {
+      pop.classList.add('show');
+      const c = track.children[mapIdx];
+      if (c) track.scrollLeft = c.offsetLeft - (track.clientWidth - c.offsetWidth) / 2;
+      mapStyle();
+    });
+    track.addEventListener('scroll', () => { cancelAnimationFrame(mapRaf); mapRaf = requestAnimationFrame(mapStyle); }, { passive: true });
+  };
+  /* Each card leans and dims by how far it is from the middle. */
+  function mapStyle() {
+    const track = document.getElementById('isl-track'); if (!track) return;
+    const mid = track.scrollLeft + track.clientWidth / 2;
+    let best = 0, bd = Infinity;
+    [...track.children].forEach((c, i) => {
+      const cx = c.offsetLeft + c.offsetWidth / 2, d = (cx - mid) / c.offsetWidth;
+      const k = Math.min(1, Math.abs(d));
+      c.style.transform = 'perspective(900px) rotateY(' + (-d * 16).toFixed(2) + 'deg) scale(' + (1 - k * 0.14).toFixed(3) + ')';
+      c.style.opacity = (1 - k * 0.45).toFixed(3);
+      const img = c.querySelector('img'); if (img) img.style.transform = 'translateX(' + (d * -18).toFixed(1) + '%) scale(1.18)';
+      if (Math.abs(d) < bd) { bd = Math.abs(d); best = i; }
+    });
+    mapIdx = best;
+    document.querySelectorAll('#isl-dots i').forEach((x, i) => x.classList.toggle('on', i === best));
+    const p = MAP_PLACES[best], go = document.getElementById('isl-go');
+    if (go) {
+      const here = p.key === mapHere();
+      const name = p.name || ((window.ARC_LANDS || [])[p.land] || {}).name || '';
+      go.textContent = here ? 'You are here' : 'Travel to ' + name;
+      go.disabled = here;
+    }
+  }
+  window.mapPick = function (i) {
+    const track = document.getElementById('isl-track'); if (!track) return;
+    if (i !== mapIdx) { const c = track.children[i]; track.scrollTo({ left: c.offsetLeft - (track.clientWidth - c.offsetWidth) / 2, behavior: 'smooth' }); return; }
+    mapTravel();
+  };
+  window.mapTravel = function () {
+    const p = MAP_PLACES[mapIdx]; if (!p || p.key === mapHere()) return;
+    const track = document.getElementById('isl-track'), card = track && track.children[mapIdx];
+    const pop = document.getElementById('fw-map-pop');
+    if (card) {
+      // the card grows from where it is to the whole screen
+      const r = card.getBoundingClientRect();
+      const fly = document.createElement('div');
+      fly.className = 'isl-fly';
+      fly.style.backgroundImage = 'url(./' + p.img + ')';
+      fly.style.left = r.left + 'px'; fly.style.top = r.top + 'px'; fly.style.width = r.width + 'px'; fly.style.height = r.height + 'px';
+      document.body.appendChild(fly);
+      requestAnimationFrame(() => requestAnimationFrame(() => fly.classList.add('big')));
+      setTimeout(() => { pop.classList.remove('show'); pop.style.display = 'none'; document.documentElement.classList.remove('map-on'); }, 450);
+      setTimeout(() => { if (worldApi && worldApi.travelTo) worldApi.travelTo(p.key); else if (worldApi) worldApi.enterRoom(p.key); }, 520);
+      setTimeout(() => fly.classList.add('gone'), 900);
+      setTimeout(() => fly.remove(), 1700);
+    } else { closeFwMap(); if (worldApi) worldApi.travelTo(p.key); }
   };
   window.closeFwMap = function () {
     const pop = document.getElementById('fw-map-pop');
     pop.classList.remove('show');
+    document.documentElement.classList.remove('map-on');
     setTimeout(() => { pop.style.display = 'none'; }, 200);
   };
   window.teleportTo = function (roomKey) {
-    if (worldApi) worldApi.enterRoom(roomKey);
+    if (worldApi) worldApi.travelTo ? worldApi.travelTo(roomKey) : worldApi.enterRoom(roomKey);
     closeFwMap();
   };
+  // a tap outside the open menu puts it away
+  document.addEventListener('pointerdown', (e) => {
+    const cl = document.getElementById('fw-menu-cluster');
+    if (cl && cl.classList.contains('open') && !cl.contains(e.target)) cl.classList.remove('open');
+  }, true);
 </script>
 </body>
 </html>

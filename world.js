@@ -3436,6 +3436,30 @@ export async function bootFocciWorld(root, opts) {
      still switches rooms in the same tick it always did. Callers do not need
      to await this; nothing they do afterwards depends on the switch. */
   let roomLoading = false;
+  /* Where the map sends him. Zen Island is not a room of its own -- it is
+     the sky island over the station -- so going there is the same flight
+     the tower cap offers, from wherever he is. 'station' from up there is
+     the flight back down to the cap. */
+  async function travelTo(key) {
+    if (key === 'zen') {
+      if (currentRoomKey !== 'station') await enterRoom('station');
+      const room = rooms.station; if (!room || !room.sky) return;
+      const g = room.sky.gate;
+      declined.add('sky');
+      flyTo(room, { x: g.x, y: g.y + 0.2, z: g.z + 3.2 }, () => {
+        root.dispatchEvent(new CustomEvent('focci-quote', { detail: { message: 'The gate lets Focci through. Everything up here smells of blossom.', kind: 'reaction' } }));
+      });
+      return;
+    }
+    if (key === 'station' && currentRoomKey === 'station' && character.position.y > GROUND_CEIL && rooms.station.skyPad) {
+      const p = rooms.station.skyPad;
+      declined.add('sky');
+      flyTo(rooms.station, { x: p.x, y: p.y + 0.1, z: p.z + 0.5 }, null);
+      return;
+    }
+    if (key === currentRoomKey) return;
+    await enterRoom(key);
+  }
   async function enterRoom(key, spawnOverride) {
     const arcIdx = arcRoomKeys.indexOf(key);
     if (arcIdx !== -1 && !rooms[key]) {
@@ -5232,6 +5256,7 @@ export async function bootFocciWorld(root, opts) {
     else if (kind === 'gift') spawnPickupBurst(room, p.x, top, p.z, 0xFFD36A);
   }
   return { toggleSound, nextTrack, enterRoom, arcRoomKeys, overviewCamera, residentFx, talkStart, talkEnd, talkAnchors,
+    travelTo, get onZen() { return currentRoomKey === 'station' && character.position.y > GROUND_CEIL; },
     focusStart: (id) => talkStart(id, { focus: true }), focusEnd, focusAnchor, focciWake, get focciPose() { return focciPose ? focciPose.kind : null; },
     residentSleep, residentBath, residentFollow, anchorOf, residentsHere, celebrateAt, get currentRoom() { return currentRoomKey; } };
   } catch (err) {
