@@ -160,8 +160,11 @@
     }).then(function (r) {
       var others = r.data || [];
       if (!others.length) { off(); return; }
-      pill.innerHTML = '<img src="' + avSrc(others[0].avatar) + '" alt="" onerror="this.src=\'./mascot-avatar.webp\'"/><b>' + esc(others[0].name || 'Someone') + '</b>'
-        + (others.length > 1 ? '<span class="num">+' + (others.length - 1) + '</span>' : '') + '<em>is here</em><i class="lb-pulse"></i>';
+      // one bare line per person (up to three): face, name, a green dot. No box, no counts --
+      // the totals belong on the board, not here.
+      pill.innerHTML = others.slice(0, 3).map(function (o) {
+        return '<div><img src="' + avSrc(o.avatar) + '" alt="" onerror="this.src=\'./mascot-avatar.webp\'"/><b>' + esc(o.name || 'Someone') + '</b><i class="lb-pulse"></i></div>';
+      }).join('');
       pill.classList.add('on'); H.classList.add('lb-others');
     }).catch(off);
   }
