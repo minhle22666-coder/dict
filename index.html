@@ -1139,7 +1139,68 @@ document.documentElement.classList.add('home-on');</script>
   .fw-exp-track s{display:block;height:100%;width:0;border-radius:99px;text-decoration:none;
     background:linear-gradient(90deg,#8CF0D4,#E6FFF7);
     box-shadow:0 0 10px rgba(140,240,212,.5);transition:width .6s cubic-bezier(.25,1,.4,1)}
-  html.dict-open .fw-exp,html.panel-open .fw-exp{display:none}
+  html.dict-open .fw-exp,html.panel-open .fw-exp,
+  html.dict-open .fw-lb-badge,html.panel-open .fw-lb-badge,
+  html.dict-open .fw-online,html.panel-open .fw-online{display:none}
+
+  /* The trophy badge: a small corner button overlapping #fw-exp's top-left
+     corner, like a notification badge -- a sibling, not a child, because
+     #fw-exp is itself a <button> and a button cannot nest inside one.
+     Anchored off the same right/top this panel uses so it tracks #fw-exp
+     if that ever moves. */
+  .fw-lb-badge{position:absolute;right:calc(14px + 86px);pointer-events:auto;z-index:3;
+    top:calc(env(safe-area-inset-top,0px) + 66px);
+    width:30px;height:30px;border:none;border-radius:50%;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:#2E4028;
+    background:linear-gradient(160deg,#FFE9A8,#F3C34D);
+    box-shadow:0 4px 10px rgba(0,0,0,.28),inset 0 0 0 1px rgba(255,255,255,.5);
+    transition:transform .14s ease}
+  .fw-lb-badge svg{width:16px;height:16px}
+  .fw-lb-badge:active{transform:scale(.9)}
+
+  /* The "someone else is here" pill, under #fw-exp at the same right
+     offset. Hidden (not just empty) until leaderboard.js has someone
+     recent to show -- an empty pill sitting there all the time was worse
+     than no pill. */
+  .fw-online{position:absolute;right:14px;pointer-events:none;z-index:2;
+    top:calc(env(safe-area-inset-top,0px) + 122px);
+    display:none;align-items:center;gap:5px;padding:5px 11px 5px 8px;border-radius:99px;
+    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:10.5px;font-weight:700;
+    color:rgba(232,255,250,.92);white-space:nowrap;
+    background:rgba(10,52,56,.5);box-shadow:inset 0 0 0 1px rgba(140,240,170,.3)}
+  .fw-online.on{display:flex}
+  .fw-online b{font-weight:800;color:#fff}
+  .fw-online span{opacity:.8}
+  .lb-pulse{width:7px;height:7px;border-radius:50%;background:#4ADE80;box-shadow:0 0 6px #4ADE80;
+    animation:lbPulse 1.6s ease-in-out infinite}
+  @keyframes lbPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.72)}}
+
+  /* ---- Leaderboard panel content (cozy-glass colours set it apart; see
+     the id in the COZY GLASS selector list below) ---- */
+  .lb-head{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+  .lb-cup{width:30px;height:30px;flex:none;margin-top:2px;color:#D79A1E}
+  .lb-head h3{margin:0 0 2px;font-size:19px;font-weight:700}
+  .lb-head p{margin:0;font-size:12.5px;opacity:.72}
+  .lb-cols{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:0 12px 6px;
+    font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.55}
+  .lb-cols span:nth-child(2),.lb-cols span:nth-child(3){text-align:right;width:50px}
+  .lb-row{display:grid;grid-template-columns:22px 1fr auto auto;gap:10px;align-items:center;
+    padding:10px 12px;border-radius:14px;margin-bottom:4px}
+  .lb-row.mine{background:var(--cz-glass,rgba(255,255,255,.6));box-shadow:inset 0 0 0 1px var(--cz-line,rgba(0,0,0,.08))}
+  .lb-rank{font-size:13px;font-weight:700;opacity:.5;text-align:center}
+  .lb-who{display:flex;align-items:center;gap:7px;min-width:0}
+  .lb-dot{width:7px;height:7px;border-radius:50%;background:rgba(0,0,0,.15);flex:none}
+  .lb-dot.on{background:#22C55E;box-shadow:0 0 5px #22C55E}
+  .lb-name{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lb-name i{font-style:normal;font-weight:500;opacity:.55}
+  .lb-lvl{flex:none;font-size:10px;font-weight:700;opacity:.5}
+  .lb-xp,.lb-time{text-align:right;width:50px;font-size:13px;font-weight:700}
+  .lb-time{font-weight:500;opacity:.65;font-size:12px}
+  .lb-sep{margin:10px 2px 2px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.45}
+  .lb-note,.lb-signin{padding:30px 14px;text-align:center;opacity:.65;font-size:13px}
+  .lb-signin p{margin:0 0 14px}
+  .lb-go{padding:10px 22px;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;
+    background:var(--cz-sage,#5E7A48);color:#fff}
 
   /* (The "SAVED IN DAYLIGHT" overrides that lived here are gone. Written
      for an older dark version of this panel, every one of them carried
@@ -5246,12 +5307,12 @@ document.documentElement.classList.add('home-on');</script>
     --cyan:#5F948A; --cyan-bg:rgba(121,175,163,.16); --primary-bg:rgba(94,122,72,.11);
     color:var(--cz-ink)}
   html body .view.fw-panel#v-stats, html body .view.fw-panel#v-settings,
-  html body .view.fw-panel#v-saved, html body .view.fw-panel#v-review.pg-day, html.dict-open body #v-home{
+  html body .view.fw-panel#v-saved, html body .view.fw-panel#v-review.pg-day, html body .view.fw-panel#v-leaderboard, html.dict-open body #v-home{
     background:linear-gradient(180deg,rgba(246,247,234,.9) 0%,rgba(240,242,226,.93) 55%,rgba(236,239,218,.96) 100%),
       var(--cz-still) center top/cover no-repeat, var(--cz-cream);
     backdrop-filter:none;-webkit-backdrop-filter:none}
-  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day)),
-  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day)) body,
+  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day,#v-leaderboard)),
+  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day,#v-leaderboard)) body,
   html.dict-open, html.dict-open body{background:var(--cz-cream-2)}
   html body .view.fw-panel .sb-cta, html body .view.fw-panel .btn:not(.ghost), html body .view.fw-panel .info-action{
     background:var(--cz-sage);color:#fff;backdrop-filter:none;-webkit-backdrop-filter:none;letter-spacing:0}
@@ -5503,7 +5564,7 @@ document.documentElement.classList.add('home-on');</script>
      The row floats over every panel, so a page scrolled up went on under
      it -- the trophies read through the search field. A cream band behind
      the row on the light pages; Speak Up and the island keep theirs clear. */
-  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day)) #fw-chrome::before,
+  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day,#v-leaderboard)) #fw-chrome::before,
   html.dict-open #fw-chrome::before{content:'';position:fixed;left:0;right:0;top:0;
     height:calc(env(safe-area-inset-top,0px) + 70px);pointer-events:none;
     background:linear-gradient(180deg,rgba(242,244,228,.97) 0%,rgba(242,244,228,.92) 72%,rgba(242,244,228,0) 100%)}
@@ -7274,6 +7335,19 @@ document.documentElement.classList.add('home-on');</script>
     <div id="insights-area"></div>
   </section>
 
+  <!-- LEADERBOARD: reached from the trophy badge on the island, never from
+       the bottom tab strip (see the hidden .tab above). leaderboard.js
+       fills #lb-list on open (lbOpen, called from openFwPanel) and keeps
+       it current while the panel is up. -->
+  <section class="view fw-panel" id="v-leaderboard">
+    <div class="lb-head">
+      <svg class="lb-cup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v1a4 4 0 0 0 4 4M17 5h3v1a4 4 0 0 1-4 4"/><path d="M12 13v3M9 20h6M9.5 20c0-2 .8-2.6 2.5-3 1.7.4 2.5 1 2.5 3"/></svg>
+      <div><h3>Leaderboard</h3><p>Everyone exploring with Focci, ranked by XP.</p></div>
+    </div>
+    <div class="lb-cols"><span>Explorer</span><span>XP</span><span>Time</span></div>
+    <div id="lb-list"></div>
+  </section>
+
   <!-- SETTINGS -->
   <section class="view fw-panel" id="v-settings">
 
@@ -7519,6 +7593,11 @@ document.documentElement.classList.add('home-on');</script>
     <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 19.2h17.2"/><path d="M6.6 19.2v-5.6"/><path d="M11.4 19.2V8.4"/><path d="M16.2 19.2v-8"/><path d="m5.6 9.6 4.2-4 3.6 2.6 5.4-4.6"/></svg></span>Progress</button>
   <button class="tab" data-view="settings">
     <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.4h9.2M17.6 7.4H20"/><circle cx="15.4" cy="7.4" r="2.2"/><path d="M4 16.6h3.2M11.6 16.6H20"/><circle cx="9.4" cy="16.6" r="2.2"/></svg></span>Settings</button>
+  <!-- Not a real tab (hidden): showView() looks up .tab[data-view=...] for
+       every view it shows and throws if one is missing, so the leaderboard
+       -- reached only from the island's trophy badge, never from this
+       strip -- still needs an entry here. -->
+  <button class="tab" data-view="leaderboard" style="display:none" aria-hidden="true" tabindex="-1"></button>
 </nav>
 
 <!-- The bottom tab bar above is kept in the DOM (showView() still looks up its
@@ -7775,6 +7854,18 @@ document.documentElement.classList.add('home-on');</script>
     <span class="fw-exp-lv">Lv <i>1</i></span>
     <span class="fw-exp-track"><s></s></span>
   </button>
+  <!-- A separate, newly-added button, not a repurposing of #fw-exp above:
+       #fw-exp keeps opening the personal XP ring it always has. This one
+       opens the leaderboard (openFwPanel -> showView -> lbOpen in
+       leaderboard.js). Positioned as a corner badge on #fw-exp in CSS. -->
+  <button class="fw-lb-badge fw-ui" id="fw-lb-badge" onclick="openFwPanel('leaderboard')" aria-label="Leaderboard">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v1a4 4 0 0 0 4 4M17 5h3v1a4 4 0 0 1-4 4"/><path d="M12 13v3M9 20h6M9.5 20c0-2 .8-2.6 2.5-3 1.7.4 2.5 1 2.5 3"/></svg>
+  </button>
+  <!-- Who else is on the island right now (leaderboard.js tickPill). Empty
+       and invisible until a heartbeat from another signed-in person is
+       recent (see ONLINE_WITHIN_MS there); never covers #fw-exp's own
+       space when hidden. -->
+  <div class="fw-online fw-ui" id="fw-online" aria-live="polite"></div>
   <!-- The search row, built the way the home page's is: a round field
        and the grid button that opens the menu. It used to be its own
        thing -- a grey slab reading "Search a word…" across the full width
@@ -7911,6 +8002,7 @@ document.documentElement.classList.add('home-on');</script>
 <script src="./focci-acts.js"></script>
 <script src="./cloud-config.js"></script>
 <script src="./cloud.js"></script>
+<script src="./leaderboard.js"></script>
 <script src="./story.js"></script>
 <script src="./dict-system.js"></script>
 
@@ -8784,6 +8876,7 @@ document.documentElement.classList.add('home-on');</script>
     showView(view);
     document.getElementById('fw-panel-close').style.display = 'flex';
     if (view === 'settings' && window.akMaybeCheck) window.akMaybeCheck();
+    if (view === 'leaderboard' && window.lbOpen) window.lbOpen();
   };
   /* The full word entry lives in #v-home, which the 3D world covers — see
      the html.dict-open rules. These two are the only supported way in and

@@ -664,6 +664,45 @@ Vercel env var `GEMINI_KEYS`, one per line, used by `api/gemini.js`;
 fetch. An env var added after the last deploy is not live until a redeploy.
 `sw.js` must not cache `/api/` (the key status froze).
 
+**The leaderboard (`leaderboard.js`) is a SEPARATE Supabase table from
+`user_state`, on purpose** (`supabase/leaderboard.sql`, run once in SQL
+Editor like `setup.sql`). `user_state`'s row-level security only ever let
+someone read their own row -- that is what makes the public anon key safe,
+since a row there is the whole sync blob (searches, saved words, the
+journal). A leaderboard needs every signed-in person to read every row, so
+it is a table built to be public from the start, carrying only a name, XP,
+a time-in-app total and a heartbeat -- nothing from the sync blob is ever
+copied into it. Read policy is `auth.role() = 'authenticated'`; write is
+own-row-only, same shape as `user_state`'s policies.
+
+No Supabase Realtime: a presence socket is another persistent connection
+on a phone for a feature this size. "Online" is a heartbeat instead --
+every 25s while the tab is visible and someone is signed in, this device
+upserts its own row with `last_seen = now()`; a row reads as online if
+that is under 40s old (one missed beat still counts, two doesn't). Reuses
+cloud.js's own client (`fcCloudClient()`/`fcCloudUser()`, exported for
+this) rather than a second supabase-js instance, so it shares the no-op
+auth lock. XP and time-in-app are already-synced localStorage keys
+(`getXP()`, `sd_time_ms` plus the running `_sessionStart` -- a bare
+identifier, not `window._sessionStart`: see the classic-script scoping
+note above) with nothing new to track client-side.
+
+UI: `#fw-exp` (the island's XP pill) keeps opening the personal XP ring
+exactly as before -- nothing about it changed. A NEW sibling button,
+`#fw-lb-badge` (a trophy icon, not nested inside `#fw-exp` since a button
+can't nest in a button), sits as a corner badge overlapping its top-left
+corner and opens the leaderboard panel through the ordinary
+`openFwPanel('leaderboard')` path, so `fwBack()` and the swipe gesture
+close it for free -- no bespoke scrim like `xp-scrim` needed.
+`#v-leaderboard` is in the COZY GLASS panel list (`#v-stats, #v-settings,
+#v-saved, #v-review.pg-day, #v-leaderboard`) so it never inherits the
+purple `.fw-panel` default. `#fw-online`, the green "so-and-so is here
+too" pill under the XP badge, is `display:none` until there is someone
+recent to show -- an always-present empty pill was worse than none.
+`showView()` throws if a view has no matching `.tab[data-view=...]`, so
+there is a hidden one for `leaderboard` even though it is never reached
+from the tab strip.
+
 ## File map
 
 | File | What's in it |
@@ -677,6 +716,8 @@ fetch. An env var added after the last deploy is not live until a redeploy.
 | `hottake.js` / `hottake.json` | Newsstand reader + 90 articles. |
 | `journal.js` | The learning journal + its chart. |
 | `dict-system.js` | Dictionary seeding helpers. |
+| `cloud.js` / `cloud-config.js` | Cloud sign-in and sync (its own section below). |
+| `leaderboard.js` | The leaderboard and the "online now" pill (its own section below). |
 | `sw.js` | Service worker. **Bump `CACHE` on every change.** |
 | `oracle.js` / `hexagrams.json` | The I Ching reading (Zen Island gate/tree). 64 hexagrams: Zhouyi from zh.wikisource, Legge 1882 for 1-31 (+32 judgment) from en.wikisource, app layer in Vietnamese. ctext.org disallows AI crawlers -- do not scrape it. |
 | `focci-acts.js` | Hold Focci 1.5s: guitar (Karplus-Strong synth), jog, relax (lock, breathing, ambient synth), stories (LibriVox via archive.org, Radio Browser FM, YouTube playlist). Body in world.js (`focciDo`). |

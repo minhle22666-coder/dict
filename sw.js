@@ -3,7 +3,7 @@
    Only small, essential files are precached on install — every image is
    cached automatically the first time it's fetched successfully, which
    happens naturally the first time you open the app online. */
-const CACHE = 'focci-v245';
+const CACHE = 'focci-v246';
 const SHELL = [
   './',
   './index.html',
@@ -23,6 +23,7 @@ const SHELL = [
   './cloud-config.js',
   './gemini-keys.js',
   './vendor/supabase.js',
+  './leaderboard.js',
   './hexagrams.json',
   './hottake.js',
   './journal.js',

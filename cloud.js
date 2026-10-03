@@ -431,6 +431,11 @@
   window.fcCloudBack = function () { var s = $('cl-scrim'); if (s && s.classList.contains('on')) { fcCloudClose(); return true; } return false; };
   window.fcCloudCollect = collect;   // for diagnosis: what a save would send
   window.fcCloudState = function () { return { on: ON, user: user && user.email, dirty: dirty, lastSaved: lastSaved || meta().savedAt || 0 }; };
+  // For leaderboard.js: the same client (so it shares the no-op lock and the
+  // session) and who is signed in now -- neither user nor sb leaves this
+  // closure on their own.
+  window.fcCloudClient = client;
+  window.fcCloudUser = function () { return user; };
 
   /* Arriving from the email link: the address carries #access_token=...
      (or #error_description= when the link is old). Load the library at
