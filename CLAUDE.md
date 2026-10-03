@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v238`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v245`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -644,6 +644,25 @@ node --check $TEMP/w.mjs`.
 A class counts as live if any script or markup names it, OR any string
 fragment ending at `+`/`${` is a prefix of it (`'pos-'+c`). Re-run the
 same idea before deleting more; never trust a plain grep for the full name.
+
+**Cloud save is `cloud.js` + Supabase** (`cloud-config.js` holds the URL
+and the anon key -- public by design, RLS guards the `user_state` table,
+`supabase/setup.sql`). Email + password with "Confirm email" OFF: Supabase's
+free mailer answered 500 for every address. After sign-in both copies are
+merged value by value (`mergeJ`), so work done before signing in is never
+lost. The library is vendored (`vendor/supabase.js`), not a CDN; its
+navigator.locks lock is replaced by a no-op (an iOS home-screen app frozen in
+the background kept the lock and every request after hung -- "Saving..."
+forever, signed out on the next open). `fc_cloud_who` remembers who is signed
+in so the chip says Hello before the library loads; it is cleared only when
+Supabase confirms the session is gone. iOS keeps a home-screen app's storage
+apart from Safari/Chrome: each has to sign in once.
+
+**Gemini keys are never in the repo** (it is public). They live in the
+Vercel env var `GEMINI_KEYS`, one per line, used by `api/gemini.js`;
+`gemini-keys.js` puts a `focci:N` sentinel in `sd_key` and reroutes the
+fetch. An env var added after the last deploy is not live until a redeploy.
+`sw.js` must not cache `/api/` (the key status froze).
 
 ## File map
 

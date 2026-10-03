@@ -37,10 +37,16 @@
   'use strict';
   var CFG = window.FC_CLOUD || {};
   var ON = !!(CFG.url && CFG.anonKey);
-  var LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
-  var NO_SYNC = { sd_key: 1, sd_key_custom: 1, fc_key_status: 1, sd_merged_seeds: 1, fc_dict_applied: 1, fc_sleep_at: 1, fc_cloud_meta: 1, fc_freedict: 1, fc_scan: 1 };
+  /* The library ships with the app (vendor/supabase.js, the same UMD build):
+     fetched from a CDN, a home-screen app on a slow line waited seconds for
+     it, or never got it, and looked signed out the whole time -- "I signed
+     in, and when I came back it said I had not". The service worker keeps
+     the local copy for offline. The CDN is only the fallback. */
+  var LIB = './vendor/supabase.js', LIB_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+  var NO_SYNC = { sd_key: 1, sd_key_custom: 1, fc_key_status: 1, sd_merged_seeds: 1, fc_dict_applied: 1, fc_sleep_at: 1, fc_cloud_meta: 1, fc_freedict: 1, fc_scan: 1, fc_cloud_who: 1 };
+  var WHO_LS = 'fc_cloud_who';   // { uid, email }: who is signed in here, to show at once on the next open
   var META_LS = 'fc_cloud_meta';
-  var sb = null, user = null, dirty = false, saveT = 0, busy = false, lastSaved = 0, libP = null;
+  var sb = null, user = null, dirty = false, saveT = 0, busy = false, lastSaved = 0, libP = null, saveErr = '', resolving = false;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
@@ -59,19 +65,37 @@
   function lib() {
     if (window.supabase && window.supabase.createClient) return Promise.resolve(window.supabase);
     if (libP) return libP;
-    libP = new Promise(function (res, rej) {
-      var s = document.createElement('script'); s.src = LIB; s.async = true;
-      s.onload = function () { window.supabase ? res(window.supabase) : rej(new Error('no supabase')); };
-      s.onerror = function () { libP = null; rej(new Error('Could not reach the sign-in service')); };
-      document.head.appendChild(s);
-    });
+    var load = function (src) {
+      return new Promise(function (res, rej) {
+        var s = document.createElement('script'); s.src = src; s.async = true;
+        s.onload = function () { window.supabase && window.supabase.createClient ? res(window.supabase) : rej(new Error('no supabase')); };
+        s.onerror = function () { rej(new Error('Could not reach the sign-in service')); };
+        document.head.appendChild(s);
+      });
+    };
+    libP = load(LIB).catch(function () { return load(LIB_CDN); }).catch(function (e) { libP = null; throw e; });
     return libP;
   }
+  function who() { try { return JSON.parse(localStorage.getItem(WHO_LS)) || null; } catch (e) { return null; } }
+  function setWho(u) { try { if (u) localStorage.setItem(WHO_LS, JSON.stringify({ uid: u.id, email: u.email })); else localStorage.removeItem(WHO_LS); } catch (e) {} }
   function client() {
     if (sb) return Promise.resolve(sb);
     return lib().then(function (S) {
-      sb = S.createClient(CFG.url, CFG.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit', storageKey: 'fc-cloud-auth' } });
-      sb.auth.onAuthStateChange(function (ev, session) { user = session ? session.user : null; paintBadge(); });
+      /* lock: supabase-js guards its session with navigator.locks (Web
+         Locks). A home-screen app on iOS is frozen in the background and
+         thawed later, and a lock held across that can stay held: every
+         request after it waits on getSession() for good -- the button sat
+         on "Saving..." and the account looked signed out on the next open.
+         Focci is one tab, so there is nothing to guard against; the lock
+         just runs the job. (gotrue still queues its own nested calls.) */
+      sb = S.createClient(CFG.url, CFG.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit', storageKey: 'fc-cloud-auth',
+        lock: function (name, timeout, fn) { return fn(); } } });
+      sb.auth.onAuthStateChange(function (ev, session) {
+        // a session that was there and is gone (expired, signed out elsewhere) -- not the first quiet INITIAL_SESSION
+        if (session) { user = session.user; setWho(user); }
+        else if (ev === 'SIGNED_OUT') { user = null; setWho(null); }
+        paintBadge();
+      });
       return sb;
     });
   }
@@ -167,15 +191,20 @@
     busy = true; clearTimeout(saveT);
     try {
       var d = await collect();
-      var res = await sb.from('user_state').upsert({ user_id: user.id, data: d, device: (navigator.userAgent || '').slice(0, 120), updated_at: new Date().toISOString() });
+      var res = await Promise.race([
+        sb.from('user_state').upsert({ user_id: user.id, data: d, device: (navigator.userAgent || '').slice(0, 120), updated_at: new Date().toISOString() }),
+        new Promise(function (_, rej) { setTimeout(function () { rej(new Error('no answer in 20s')); }, 20000); })
+      ]);
       if (res.error) throw res.error;
-      dirty = false; lastSaved = Date.now();
+      dirty = false; lastSaved = Date.now(); saveErr = '';
       var m = meta(); m.savedAt = lastSaved; m.uid = user.id; setMeta(m);
-      paintSheet();
     } catch (e) {
       console.warn('cloud save failed', why, e && e.message);
       dirty = true;
-    } finally { busy = false; }
+      saveErr = (e && (e.message || e.error_description)) || 'no connection';
+      // the session itself is gone: say so instead of failing quietly forever
+      if (/jwt|token|auth|session|401/i.test(saveErr)) { try { var g = await sb.auth.getSession(); if (!g.data.session) { user = null; setWho(null); saveErr = ''; } } catch (x) {} }
+    } finally { busy = false; paintBadge(); }
   }
   function markDirty() {
     if (!ON || !user) { dirty = true; return; }
@@ -231,9 +260,16 @@
       h += '<h3 class="cl-hello">' + nameHTML('sheet') + '</h3>'
         + '<p>Your little world is connected to <b>' + esc(user.email || '') + '</b>. Your searches, saved words, XP, animals and games are kept in your account.</p>'
         + '<div class="cl-stat"><span>Last saved</span><b class="num">' + esc(ago(lastSaved || meta().savedAt)) + '</b></div>'
+        + (saveErr ? '<div class="cl-err">Could not save just now (' + esc(saveErr) + '). Check the connection and tap Save now.</div>' : '')
         + '<button class="cl-go" onclick="fcCloudSaveNow()"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : 'Save now') + '</button>'
         + '<button class="cl-ghost" onclick="fcCloudSignOut()">Sign out</button>'
         + '<small>Signing out keeps everything on this phone. Sign in on another phone or browser with the same email to bring it there.</small>';
+    } else if (!user && resolving) {
+      h += '<h3>Checking your account…</h3><p>One moment' + (who() ? ', <b>' + esc(who().email) + '</b>' : '') + '.</p>';
+    } else if (!user && who()) {
+      // still signed in on this phone, but the account service is out of reach (offline)
+      h += '<h3>' + nameHTML('sheet') + '</h3><p>You are still signed in as <b>' + esc(who().email) + '</b>, but your account cannot be reached right now. Keep playing — everything stays on this phone and is saved when the connection is back.</p>'
+        + '<button class="cl-go" onclick="fcCloudRetry()">Try again</button>';
     } else if (view === 'sent') {
       h += '<h3>Check your email</h3><p>We sent a sign-in link to <b>' + esc(email) + '</b>. Open it on this phone and tap <b>Log in</b> — Focci opens and brings your world with it.</p>'
         + (err ? '<div class="cl-err">' + esc(err) + '</div>' : '')
@@ -258,7 +294,8 @@
         + '<button type="button" class="cl-eye" onclick="var i=document.getElementById(\'cl-pass\');i.type=i.type===\'password\'?\'text\':\'password\'" aria-label="Show password">Show</button></div>'
         + (err ? '<div class="cl-err">' + esc(err) + '</div>' : '')
         + '<button class="cl-go" onclick="fcCloudSend()">' + (busy ? 'Signing in…' : 'Continue') + '</button>'
-        + '<small>New here? This makes your account. No email is sent — just remember your password to sign in on another phone.</small>';
+        + '<small>New here? This makes your account. Everything you have done so far stays and joins it. No email is sent — just remember your password to sign in on another phone.</small>'
+        + '<div class="cl-forgot"><b>Forgot your password?</b> Contact mpt ^o^</div>';
     }
     s.innerHTML = h;
     var f = $('cl-email'); if (f && !busy) setTimeout(function () { try { f.focus({ preventScroll: true }); } catch (e) {} }, 60);
@@ -277,6 +314,7 @@
   function myName() {
     var n = ''; try { n = localStorage.getItem('sd_name') || ''; } catch (e) {}
     if (!n && user) n = (user.user_metadata && user.user_metadata.name) || fromEmail(user.email);
+    if (!n && !user) { var w = who(); if (w) n = fromEmail(w.email); }
     return n || 'friend';
   }
   function setName(n) {
@@ -299,6 +337,7 @@
         ? '<span class="cl-dot">' + OK + '</span>' + nameHTML('chip') + '<span class="cl-saved">Saved</span>'
         : chip.dataset.out || chip.innerHTML;
     }
+    if (!user) provisional();
     paintSheet();
   }
   window.fcCloudRename = function (where) {
@@ -320,7 +359,7 @@
     if (view !== 'sent' && view !== 'choose' && view !== 'signing') view = 'start';
     $('cl-scrim').classList.add('on');
     paintSheet();
-    if (ON) client().then(function (c) { return c.auth.getSession(); }).then(function (r) { user = r.data.session ? r.data.session.user : null; paintSheet(); }).catch(function (e) { err = e.message; paintSheet(); });
+    if (ON) resume();
   };
   window.fcCloudClose = function () { var s = $('cl-scrim'); if (s) s.classList.remove('on'); };
   window.fcCloudView = function (v) { view = v; err = ''; paintSheet(); };
@@ -352,6 +391,7 @@
         }
         user = u.data.user;
       } else user = r.data.user;
+      setWho(user);
       busy = false; view = 'signing'; paintBadge();
       await finishSignIn();
     } catch (e) { busy = false; err = /rate|limit/i.test(e.message || '') ? 'Too many tries just now — wait a minute and try again.' : (e.message || 'Could not sign in.'); view = 'start'; paintSheet(); }
@@ -379,10 +419,14 @@
     await save('after-' + mode);
     setTimeout(function () { location.reload(); }, 900);
   };
-  window.fcCloudSaveNow = function () { busy = false; save('button').then(function () { if (window.fwToast) fwToast('Saved to your account'); }); paintSheet(); };
+  window.fcCloudSaveNow = function () {
+    if (busy) return;
+    var p = save('button'); paintSheet();
+    p.then(function () { if (window.fwToast) fwToast(saveErr ? 'Could not save — try again' : 'Saved to your account'); });
+  };
   window.fcCloudSignOut = async function () {
-    try { if (dirty) await save('signout'); await sb.auth.signOut(); } catch (e) {}
-    user = null; view = 'start'; paintBadge();
+    try { if (dirty) await save('signout'); await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+    user = null; setWho(null); view = 'start'; paintBadge();
   };
   window.fcCloudBack = function () { var s = $('cl-scrim'); if (s && s.classList.contains('on')) { fcCloudClose(); return true; } return false; };
   window.fcCloudCollect = collect;   // for diagnosis: what a save would send
@@ -409,16 +453,35 @@
     if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
   })();
 
-  /* Already signed in on this device: pick the session up quietly a little
-     after start (the library is only fetched if there is a session to
-     resume), and save once a session if anything changed. */
-  setTimeout(function () {
-    if (!ON) return;
+  /* Already signed in on this device. The name shows at once from WHO_LS
+     (no library needed), and the session is confirmed in the background;
+     only if Supabase really has no session any more does it go back to
+     "Sign in". Run at start and whenever the app comes back to the front
+     (a home-screen app is often resumed, not reloaded). */
+  function resume() {
+    if (!ON || resolving) return Promise.resolve();
     var has = false; try { has = !!localStorage.getItem('fc-cloud-auth'); } catch (e) {}
-    if (!has) return;
-    client().then(function (c) { return c.auth.getSession(); }).then(function (r) {
-      user = r.data.session ? r.data.session.user : null; paintBadge();
-      if (user && dirty) markDirty();
-    }).catch(function () {});
-  }, 2500);
+    if (!has) { if (who()) setWho(null); paintBadge(); return Promise.resolve(); }
+    resolving = true; paintSheet();
+    return client().then(function (c) { return c.auth.getSession(); }).then(function (r) {
+      resolving = false;
+      var was = who();
+      user = r.data.session ? r.data.session.user : null;
+      if (user) { setWho(user); if (dirty) markDirty(); }
+      else if (was) { setWho(null); email = was.email || email; view = 'start'; if (window.fwToast) fwToast('Signed out — sign in again to keep saving'); }
+      paintBadge();
+    }).catch(function () { resolving = false; paintBadge(); });
+  }
+  window.fcCloudRetry = function () { resume(); };
+  // the name at once, before the library has loaded
+  function provisional() {
+    var w = who(); if (!ON || !w || user) return;
+    var chip = $('cz-cloud'); if (!chip) return;
+    if (chip.querySelector('input')) return;
+    document.documentElement.classList.add('cl-signed');
+    chip.innerHTML = '<span class="cl-dot">' + OK + '</span>' + nameHTML('chip') + '<span class="cl-saved">' + (resolving ? '…' : 'Saved') + '</span>';
+  }
+  var start = function () { provisional(); setTimeout(resume, 300); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && !user) resume(); });
 })();

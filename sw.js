@@ -3,7 +3,7 @@
    Only small, essential files are precached on install — every image is
    cached automatically the first time it's fetched successfully, which
    happens naturally the first time you open the app online. */
-const CACHE = 'focci-v244';
+const CACHE = 'focci-v245';
 const SHELL = [
   './',
   './index.html',
@@ -19,6 +19,10 @@ const SHELL = [
   './pets.js',
   './oracle.js',
   './focci-acts.js',
+  './cloud.js',
+  './cloud-config.js',
+  './gemini-keys.js',
+  './vendor/supabase.js',
   './hexagrams.json',
   './hottake.js',
   './journal.js',
@@ -101,6 +105,8 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
   const url = new URL(req.url);
+  // the Vercel functions (key status) are live answers: a cached one froze the dots
+  if (url.pathname.startsWith('/api/')) return;
   const isCode = req.mode === 'navigate' || IS_CODE.test(url.pathname);
 
   /* Code goes to the network first; everything else comes from the cache
