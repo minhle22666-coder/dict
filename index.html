@@ -1171,15 +1171,15 @@ document.documentElement.classList.add('home-on');</script>
      through to the island (pointer-events:none) -- it is information only. */
   .fw-online{position:absolute;right:14px;pointer-events:none;z-index:2;
     top:calc(env(safe-area-inset-top,0px) + 122px);
-    display:none;flex-direction:column;align-items:flex-end;gap:4px;
+    display:none;flex-direction:column;align-items:stretch;gap:4px;
     font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:11px;font-weight:700;color:#fff;
     text-shadow:0 1px 3px rgba(0,0,0,.65),0 0 8px rgba(0,0,0,.4)}
   .fw-online.on{display:flex}
   html.lb-on .fw-online{display:none}
-  .fw-online div{display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .fw-online div{display:flex;align-items:center;gap:6px;white-space:nowrap}
   .fw-online img{width:20px;height:20px;border-radius:50%;object-fit:cover;object-position:50% 22%;background:#F6F3E4;flex:none;
     box-shadow:0 0 0 1.5px rgba(255,255,255,.9),0 1px 4px rgba(0,0,0,.35)}
-  .fw-online b{font-weight:800}
+  .fw-online b{font-weight:800;flex:1;text-align:left;padding-right:4px}
   .lb-pulse{width:7px;height:7px;border-radius:50%;background:#4ADE80;box-shadow:0 0 6px #4ADE80;
     animation:lbPulse 1.6s ease-in-out 6}
   @keyframes lbPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.72)}}
