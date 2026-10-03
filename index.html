@@ -1127,34 +1127,34 @@ document.documentElement.classList.add('home-on');</script>
      face gets a green dot while someone else is on the island. */
   .fw-exp{position:absolute;right:14px;pointer-events:auto;z-index:2;
     top:calc(env(safe-area-inset-top,0px) + 74px);
-    display:flex;align-items:center;gap:9px;
-    padding:6px 12px 6px 6px;border:none;border-radius:24px;cursor:pointer;text-align:left;
+    display:flex;align-items:center;gap:7px;
+    padding:4px 10px 4px 4px;border:none;border-radius:20px;cursor:pointer;text-align:left;
     background:linear-gradient(140deg,rgba(255,255,255,.2),rgba(10,52,56,.46));
     box-shadow:inset 0 0 0 1px rgba(180,245,232,.36),0 6px 18px rgba(0,0,0,.3);
     backdrop-filter:blur(14px) saturate(1.5);-webkit-backdrop-filter:blur(14px) saturate(1.5);
     transition:transform .16s cubic-bezier(.3,1.4,.5,1),box-shadow .2s}
   .fw-exp:active{transform:scale(.94)}
-  .fw-exp-av{position:relative;flex:none;width:38px;height:38px;border-radius:50%;
-    background:#F6F3E4;box-shadow:0 0 0 2px rgba(140,240,212,.75),0 2px 6px rgba(0,0,0,.25)}
+  .fw-exp-av{position:relative;flex:none;width:28px;height:28px;border-radius:50%;
+    background:#F6F3E4;box-shadow:0 0 0 1.5px rgba(140,240,212,.75),0 2px 5px rgba(0,0,0,.25)}
   .fw-exp-av img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:50% 22%}
-  .fw-exp-live{position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;
-    background:#4ADE80;box-shadow:0 0 0 2px #2c4a3c,0 0 8px #4ADE80;display:none}
+  .fw-exp-live{position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;border-radius:50%;
+    background:#4ADE80;box-shadow:0 0 0 1.5px #2c4a3c,0 0 6px #4ADE80;display:none}
   html.lb-others .fw-exp-live{display:block}
-  .fw-exp-mid{display:flex;flex-direction:column;gap:3px;min-width:74px}
-  .fw-exp-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .fw-exp-mid{display:flex;flex-direction:column;gap:2px;min-width:56px}
+  .fw-exp-top{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
   .fw-exp-n{font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
-    font-size:12px;font-weight:700;color:rgba(232,255,250,.9);line-height:1}
-  .fw-exp-n b{font-size:17px;font-weight:800;color:#fff}
+    font-size:10px;font-weight:700;color:rgba(232,255,250,.9);line-height:1}
+  .fw-exp-n b{font-size:14px;font-weight:800;color:#fff}
   .fw-exp-lv{font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
-    font-size:10.5px;font-weight:800;letter-spacing:.06em;color:#8CF0D4;line-height:1}
+    font-size:9px;font-weight:800;letter-spacing:.05em;color:#8CF0D4;line-height:1}
   .fw-exp-lv i{font-style:normal}
-  .fw-exp-track{display:block;height:6px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.2);
+  .fw-exp-track{display:block;height:4px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.2);
     box-shadow:inset 0 1px 2px rgba(0,0,0,.25)}
-  .fw-exp-track s{display:block;height:100%;width:0;min-width:6px;border-radius:99px;text-decoration:none;
+  .fw-exp-track s{display:block;height:100%;width:0;min-width:4px;border-radius:99px;text-decoration:none;
     background:linear-gradient(90deg,#6FE3C1,#F4FFE6);
     box-shadow:0 0 10px rgba(140,240,212,.6);transition:width .6s cubic-bezier(.25,1,.4,1)}
-  .fw-exp-next{font-size:9.5px;font-weight:500;letter-spacing:.02em;color:rgba(232,255,250,.62);line-height:1}
-  .fw-exp-cup{flex:none;width:17px;height:17px;color:#F3C34D;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35));
+  .fw-exp-next{font-size:8px;font-weight:500;letter-spacing:.02em;color:rgba(232,255,250,.62);line-height:1}
+  .fw-exp-cup{flex:none;width:13px;height:13px;color:#F3C34D;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35));
     transition:transform .2s}
   html.lb-on .fw-exp-cup{transform:rotate(-12deg) scale(1.15)}
   html.lb-on .fw-exp{box-shadow:inset 0 0 0 1.5px rgba(243,195,77,.7),0 6px 18px rgba(0,0,0,.3)}
@@ -1170,14 +1170,14 @@ document.documentElement.classList.add('home-on');</script>
      pill, hidden entirely until there is someone recent. Tapping goes
      through to the island (pointer-events:none) -- it is information only. */
   .fw-online{position:absolute;right:14px;pointer-events:none;z-index:2;
-    top:calc(env(safe-area-inset-top,0px) + 134px);
-    display:none;align-items:center;gap:6px;padding:3px 12px 3px 3px;border-radius:99px;
-    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:11px;font-weight:700;
+    top:calc(env(safe-area-inset-top,0px) + 122px);
+    display:none;align-items:center;gap:5px;padding:2px 10px 2px 2px;border-radius:99px;
+    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:10px;font-weight:700;
     color:rgba(232,255,250,.92);white-space:nowrap;
     background:rgba(10,52,56,.55);box-shadow:inset 0 0 0 1px rgba(140,240,170,.34),0 4px 12px rgba(0,0,0,.25)}
   .fw-online.on{display:flex}
   html.lb-on .fw-online{display:none}
-  .fw-online img{width:22px;height:22px;border-radius:50%;object-fit:cover;object-position:50% 22%;background:#F6F3E4;flex:none}
+  .fw-online img{width:18px;height:18px;border-radius:50%;object-fit:cover;object-position:50% 22%;background:#F6F3E4;flex:none}
   .fw-online b{font-weight:800;color:#fff}
   .fw-online span{opacity:.8}
   .fw-online em{font-style:normal;font-weight:600;opacity:.75}
@@ -1190,48 +1190,48 @@ document.documentElement.classList.add('home-on');</script>
      behind it and a blur there is recomputed every frame (see the glass
      notes above). Scrolls inside itself; tall enough for about six rows. */
   .lb-card{position:absolute;right:14px;z-index:4;pointer-events:auto;
-    top:calc(env(safe-area-inset-top,0px) + 134px);
-    width:min(330px,calc(100vw - 28px));max-height:min(58vh,372px);
+    top:calc(env(safe-area-inset-top,0px) + 122px);
+    width:min(168px,calc(100vw - 28px));max-height:min(54vh,330px);
     display:none;flex-direction:column;overflow:hidden;
-    border-radius:22px;background:rgba(251,249,240,.97);color:#34412C;
+    border-radius:18px;background:rgba(251,249,240,.97);color:#34412C;
     box-shadow:0 14px 38px rgba(20,30,16,.38),0 0 0 1px rgba(255,255,255,.7) inset;
     transform-origin:92% -10px}
   html.lb-on .lb-card{display:flex;animation:lbDrop .26s cubic-bezier(.2,1.2,.4,1) 1}
   @keyframes lbDrop{from{opacity:0;transform:translateY(-8px) scale(.94)}to{opacity:1;transform:none}}
-  .lb-top{display:flex;align-items:center;gap:7px;padding:13px 14px 9px;flex:none}
-  .lb-cup{width:18px;height:18px;color:#D79A1E;flex:none}
-  .lb-top b{font-size:14.5px;font-weight:700}
-  .lb-online{font-size:11px;font-weight:600;color:#1E8F4E;margin-left:2px}
-  .lb-mine{margin-left:auto;border:none;border-radius:99px;padding:6px 11px;cursor:pointer;
-    font-size:11px;font-weight:700;color:#5E7A48;background:rgba(94,122,72,.12)}
-  .lb-mine:active{transform:scale(.95)}
-  .lb-list{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 8px 10px;overscroll-behavior:contain}
-  .lb-row{display:grid;grid-template-columns:18px 38px 1fr auto;gap:9px;align-items:center;
-    padding:7px 8px;border-radius:15px}
+  .lb-top{display:grid;grid-template-columns:auto 1fr;column-gap:6px;align-items:center;padding:10px 11px 6px;flex:none}
+  .lb-cup{width:15px;height:15px;color:#D79A1E;flex:none}
+  .lb-top b{font-size:12.5px;font-weight:700}
+  .lb-online{grid-column:2;font-size:9.5px;font-weight:600;color:#1E8F4E;line-height:1.2}
+  .lb-online:empty{display:none}
+  .lb-mine{flex:none;border:none;border-top:1px solid rgba(94,122,72,.14);padding:8px 10px;cursor:pointer;
+    font-size:10.5px;font-weight:700;color:#5E7A48;background:rgba(94,122,72,.06);text-align:center}
+  .lb-mine:active{background:rgba(94,122,72,.16)}
+  .lb-list{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 5px 6px;overscroll-behavior:contain}
+  .lb-row{display:grid;grid-template-columns:11px 26px 1fr auto;gap:5px;align-items:center;
+    padding:5px 5px;border-radius:12px}
   .lb-row + .lb-row{margin-top:2px}
   .lb-row.mine{background:rgba(94,122,72,.12)}
-  .lb-rank{font-size:12px;font-weight:700;text-align:center;color:rgba(52,65,44,.45)}
-  .lb-row:nth-child(1) .lb-rank{color:#D79A1E;font-size:14px}
-  .lb-row:nth-child(2) .lb-rank{color:#8A97A3;font-size:14px}
-  .lb-row:nth-child(3) .lb-rank{color:#B87A4B;font-size:14px}
-  .lb-av{position:relative;width:38px;height:38px;border-radius:50%;background:#EFEBD8;
-    box-shadow:0 0 0 2px rgba(255,255,255,.9),0 1px 4px rgba(0,0,0,.18)}
+  .lb-rank{font-size:10px;font-weight:700;text-align:center;color:rgba(52,65,44,.45)}
+  .lb-row:nth-child(1) .lb-rank{color:#D79A1E;font-size:11px}
+  .lb-row:nth-child(2) .lb-rank{color:#8A97A3;font-size:11px}
+  .lb-row:nth-child(3) .lb-rank{color:#B87A4B;font-size:11px}
+  .lb-av{position:relative;width:26px;height:26px;border-radius:50%;background:#EFEBD8;
+    box-shadow:0 0 0 1.5px rgba(255,255,255,.9),0 1px 3px rgba(0,0,0,.18)}
   .lb-av img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:50% 22%}
-  .lb-av i{position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
-    background:#22C55E;box-shadow:0 0 0 2px #FBF9F0}
-  .lb-who{display:flex;flex-direction:column;gap:2px;min-width:0}
-  .lb-name{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .lb-name em{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-    color:#5E7A48;background:rgba(94,122,72,.15);border-radius:99px;padding:2px 6px;margin-left:3px;vertical-align:1px}
-  .lb-sub{font-size:11px;color:rgba(52,65,44,.58);white-space:nowrap}
+  .lb-av i{position:absolute;right:-1px;bottom:-1px;width:8px;height:8px;border-radius:50%;
+    background:#22C55E;box-shadow:0 0 0 1.5px #FBF9F0}
+  .lb-who{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .lb-name{font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lb-name em{display:none}
+  .lb-sub{font-size:9px;color:rgba(52,65,44,.58);white-space:nowrap}
   .lb-sub .lb-here{color:#1E8F4E;font-weight:700}
   .lb-xp{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
-  .lb-xp b{font-size:15px;font-weight:700}
-  .lb-xp small{font-size:9px;font-weight:700;letter-spacing:.06em;color:rgba(52,65,44,.45)}
+  .lb-xp b{font-size:12px;font-weight:700}
+  .lb-xp small{display:none}
   .lb-sep{margin:8px 10px 2px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(52,65,44,.4)}
-  .lb-note{padding:26px 18px 30px;text-align:center;font-size:13px;line-height:1.5;color:rgba(52,65,44,.7)}
+  .lb-note{padding:18px 12px 20px;text-align:center;font-size:11.5px;line-height:1.5;color:rgba(52,65,44,.7)}
   .lb-note small{display:block;margin-top:6px;font-size:10.5px;opacity:.6}
-  .lb-go{display:block;margin:14px auto 0;padding:10px 24px;border:none;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;
+  .lb-go{display:block;margin:14px auto 0;padding:8px 18px;border:none;border-radius:99px;font-size:11.5px;font-weight:700;cursor:pointer;
     background:#5E7A48;color:#fff}
 
   /* (The "SAVED IN DAYLIGHT" overrides that lived here are gone. Written
@@ -7888,9 +7888,9 @@ document.documentElement.classList.add('home-on');</script>
     <div class="lb-top">
       <svg class="lb-cup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v1a4 4 0 0 0 4 4M17 5h3v1a4 4 0 0 1-4 4"/><path d="M12 13v3M9 20h6M9.5 20c0-2 .8-2.6 2.5-3 1.7.4 2.5 1 2.5 3"/></svg>
       <b>Leaderboard</b><span class="lb-online" id="lb-online"></span>
-      <button class="lb-mine" onclick="lbClose();xpOpen()">Your XP</button>
     </div>
     <div class="lb-list" id="lb-list"></div>
+    <button class="lb-mine" onclick="lbClose();xpOpen()">Your XP ›</button>
   </div>
   <!-- The search row, built the way the home page's is: a round field
        and the grid button that opens the menu. It used to be its own

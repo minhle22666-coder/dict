@@ -95,7 +95,7 @@
       + '<span class="lb-rank num">' + (i + 1) + '</span>'
       + '<span class="lb-av"><img src="' + avSrc(r.avatar) + '" alt="" onerror="this.src=\'./mascot-avatar.webp\'"/>' + (on ? '<i></i>' : '') + '</span>'
       + '<span class="lb-who"><b class="lb-name">' + esc(r.name || 'Explorer') + (mine ? ' <em>you</em>' : '') + '</b>'
-      + '<small class="lb-sub"><span class="num">Lv ' + lvlOf(r.xp) + '</span> · <span class="num">' + fmtTime(r.time_ms || 0) + '</span>' + (on ? ' · <span class="lb-here">online</span>' : '') + '</small></span>'
+      + '<small class="lb-sub"><span class="num">Lv ' + lvlOf(r.xp) + '</span> · <span class="num">' + fmtTime(r.time_ms || 0) + '</span>' + '' + '</small></span>'
       + '<span class="lb-xp"><b class="num">' + (r.xp || 0).toLocaleString() + '</b><small>XP</small></span>'
       + '</div>';
   }
@@ -114,7 +114,7 @@
     if (loadErr && !rows) { box.innerHTML = '<div class="lb-note">Could not load the board.<small>' + esc(loadErr) + '</small></div>'; return; }
     if (!rows || !rows.length) { box.innerHTML = '<div class="lb-note">No one on the board yet — be the first.</div>'; return; }
     var n = rows.filter(function (r) { return r.user_id !== u.id && isOnline(r); }).length;
-    if (cnt) cnt.textContent = n ? n + ' online now' : '';
+    if (cnt) cnt.textContent = n ? n + ' online' : '';
     var html = rows.map(function (r, idx) { return rowHTML(r, idx, u.id); }).join('');
     if (rows.findIndex(function (r) { return r.user_id === u.id; }) === -1) {
       // not in the top N: the person still wants to see where they stand
