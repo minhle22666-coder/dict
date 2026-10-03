@@ -1136,6 +1136,8 @@ document.documentElement.classList.add('home-on');</script>
   .fw-exp:active{transform:scale(.94)}
   .fw-exp-av{position:relative;flex:none;width:28px;height:28px;border-radius:50%;
     background:#F6F3E4;box-shadow:0 0 0 1.5px rgba(140,240,212,.75),0 2px 5px rgba(0,0,0,.25)}
+  .fw-exp-av{cursor:pointer}
+  .fw-exp-av:active{transform:scale(.9)}
   .fw-exp-av img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:50% 22%}
   .fw-exp-live{position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;border-radius:50%;
     background:#4ADE80;box-shadow:0 0 0 1.5px #2c4a3c,0 0 6px #4ADE80;display:none}
@@ -1143,8 +1145,8 @@ document.documentElement.classList.add('home-on');</script>
   .fw-exp-mid{display:flex;flex-direction:column;gap:2px;min-width:56px}
   .fw-exp-top{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
   .fw-exp-n{font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
-    font-size:10px;font-weight:700;color:rgba(232,255,250,.9);line-height:1}
-  .fw-exp-n b{font-size:14px;font-weight:800;color:#fff}
+    font-size:11px;font-weight:600;color:rgba(232,255,250,.9);line-height:1}
+  .fw-exp-n b{font-size:11px;font-weight:800;color:#fff}
   .fw-exp-lv{font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
     font-size:9px;font-weight:800;letter-spacing:.05em;color:#8CF0D4;line-height:1}
   .fw-exp-lv i{font-style:normal}
@@ -3764,41 +3766,48 @@ document.documentElement.classList.add('home-on');</script>
     backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);line-height:1.5}
   .mascot-btn:active{transform:scale(.92)}
 
-  .mp-ov{position:fixed;inset:0;z-index:999;display:flex;align-items:flex-start;
-    justify-content:center;padding:80px 18px 24px;background:rgba(8,16,28,.6);
+  /* ---- the companion picker (cmp-*) ----
+     Opened by a tap on the face in the XP pill, or Companion in the menu.
+     A cream card over a dimmed scrim, like the leaderboard card; the
+     figures stand whole in soft tiles, the chosen one has a sage ring and
+     a tick, the locked ones are grey with the day they open on. */
+  .cmp-ov{position:fixed;inset:0;z-index:999;display:flex;align-items:flex-start;justify-content:center;
+    padding:calc(env(safe-area-inset-top,0px) + 70px) 16px 24px;background:rgba(36,46,28,.5);
     opacity:0;pointer-events:none;transition:opacity .22s}
-  .mp-ov.show{opacity:1;pointer-events:auto}
-  .mp-card{position:relative;overflow:hidden;width:100%;max-width:340px;max-height:74vh;
-    display:flex;flex-direction:column;border-radius:24px;padding:17px 15px 13px;
-    background:linear-gradient(152deg,rgba(255,255,255,.14),rgba(255,255,255,.05) 48%,color-mix(in srgb, var(--primary) 8%, transparent));
-    backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);
-    border:1px solid rgba(255,255,255,.22);border-top-color:rgba(255,255,255,.4);
-    box-shadow:0 22px 54px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.14);
-    transform:translateY(-12px) scale(.94);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
-  .mp-ov.show .mp-card{transform:translateY(0) scale(1)}
-  .mp-card > *{position:relative;z-index:1}
-
-  .mp-head{margin-bottom:13px}
-  .mp-head b{display:block;font-size:15.5px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
-  .mp-head span{display:block;margin-top:3px;font-size:11.5px;line-height:1.4;color:var(--muted-2)}
-
-  .mp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;
-    overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px}
-  .mp-cell{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;
-    padding:11px 5px 8px;border-radius:15px;background:rgba(255,255,255,.06);
-    border:1px solid rgba(255,255,255,.12)}
-  .mp-cell img{width:44px;height:44px;object-fit:contain}
-  .mp-n{font-size:9.5px;font-weight:700;color:var(--muted);text-align:center;line-height:1.25}
-  .mp-cell.on{border-color:var(--primary);background:var(--primary-bg)}
-  .mp-cell.on .mp-n{color:var(--primary)}
-  .mp-cell:active{transform:scale(.95)}
-  .mp-cell.locked{background:rgba(255,255,255,.03);border-style:dashed}
-  .mp-cell.locked img{filter:grayscale(1) brightness(.42);opacity:.5}
-  .mp-cell.locked .mp-n{color:var(--muted-2)}
-  .mp-lock{position:absolute;top:5px;right:6px;font-size:9px;opacity:.75}
-  .mp-auto{justify-content:center}
-  .mp-auto-ico{width:44px;height:44px;display:flex;align-items:center;justify-content:center;
-    font-size:22px;color:var(--primary)}
+  .cmp-ov.show{opacity:1;pointer-events:auto}
+  .cmp-card{width:100%;max-width:330px;max-height:calc(100vh - 120px);display:flex;flex-direction:column;
+    border-radius:24px;padding:18px 14px 14px;background:rgba(251,249,240,.98);color:#2E3826;
+    box-shadow:0 18px 48px rgba(20,30,16,.4),inset 0 0 0 1px rgba(255,255,255,.8);
+    transform:translateY(-10px) scale(.95);transition:transform .3s cubic-bezier(.34,1.4,.64,1)}
+  .cmp-ov.show .cmp-card{transform:none}
+  .cmp-head{padding:0 4px;flex:none}
+  .cmp-head b{display:block;font-size:16px;font-weight:700;letter-spacing:-.01em}
+  .cmp-head p{margin:5px 0 0;font-size:11px;line-height:1.5;color:#5D6B50}
+  .cmp-head p b{display:inline;font-size:inherit;color:#2E3826}
+  .cmp-streak{display:grid;grid-template-columns:1fr auto;gap:5px 10px;align-items:center;flex:none;
+    margin:12px 4px 12px;padding:9px 12px;border-radius:14px;background:rgba(94,122,72,.1);font-size:11px;color:#46523A}
+  .cmp-streak b{font-weight:800;color:#2E3826}
+  .cmp-bar{grid-column:1/-1;grid-row:2;height:5px;border-radius:99px;background:rgba(94,122,72,.18);overflow:hidden}
+  .cmp-bar s{display:block;height:100%;border-radius:99px;text-decoration:none;background:linear-gradient(90deg,#8FB070,#5E7A48)}
+  .cmp-next{text-align:right;color:#5D6B50}
+  .cmp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:2px 2px 4px;overscroll-behavior:contain}
+  .cmp-cell{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px 8px;
+    border:none;border-radius:16px;cursor:pointer;background:rgba(94,122,72,.07);color:inherit;
+    box-shadow:inset 0 0 0 1.5px transparent;transition:transform .14s,box-shadow .18s}
+  .cmp-cell:active{transform:scale(.95)}
+  .cmp-pic{display:flex;align-items:center;justify-content:center;width:100%;height:60px}
+  .cmp-pic img{max-width:100%;max-height:100%;object-fit:contain}
+  .cmp-n{display:flex;align-items:center;justify-content:center;gap:3px;min-height:12px;font-size:10px;font-weight:700;line-height:1.2;text-align:center;color:#46523A}
+  .cmp-n svg{width:10px;height:10px}
+  .cmp-cell.on{background:rgba(94,122,72,.14);box-shadow:inset 0 0 0 1.5px #5E7A48}
+  .cmp-tick{position:absolute;top:5px;right:5px;width:15px;height:15px;border-radius:50%;background:#5E7A48}
+  .cmp-tick::after{content:'';position:absolute;left:5px;top:3px;width:3px;height:6px;border:solid #fff;border-width:0 1.6px 1.6px 0;transform:rotate(45deg)}
+  .cmp-cell.locked{background:rgba(46,56,38,.04);cursor:default}
+  .cmp-cell.locked .cmp-pic img{filter:grayscale(1) brightness(.8);opacity:.38}
+  .cmp-cell.locked .cmp-n{color:#8A9580;font-weight:600}
+  .cmp-auto .cmp-pic{color:#5E7A48}
+  .cmp-auto .cmp-pic svg{width:30px;height:30px}
 
 
   /* icon hai game: asset thật thay cho emoji hệ thống */
@@ -5515,8 +5524,8 @@ document.documentElement.classList.add('home-on');</script>
   html body .sv-due-n,
   html body .saved-count b,
   html body .cz-ic,
-  html body .fw-exp-n b,
   html body .fw-exp-lv i{font-family:var(--cz-num) !important;font-weight:300 !important;font-variant-numeric:lining-nums tabular-nums}
+  html body .fw-exp-n b{font-family:var(--cz-num) !important;font-weight:800 !important;font-variant-numeric:lining-nums tabular-nums}
 
   /* Speak Up is see-through: it never had a picture of its own, it showed
      the village that used to be home's background (bg-speakup-village,
@@ -7870,7 +7879,7 @@ document.documentElement.classList.add('home-on');</script>
        it reads as something to tap. .fw-exp-n / -lv / -track keep their
        old names: fxRefreshXP finds them by those. -->
   <button class="fw-exp fw-ui" id="fw-exp" onclick="lbToggle()" aria-label="XP and leaderboard">
-    <span class="fw-exp-av"><img id="fw-exp-img" src="./mascot-avatar.webp" alt=""/><i class="fw-exp-live"></i></span>
+    <span class="fw-exp-av" role="button" aria-label="Change companion" onclick="event.stopPropagation();lbClose();openMascotPicker()"><img id="fw-exp-img" src="./mascot-avatar.webp" alt=""/><i class="fw-exp-live"></i></span>
     <span class="fw-exp-mid">
       <span class="fw-exp-top"><span class="fw-exp-n"><b>0</b> XP</span><span class="fw-exp-lv">Lv <i>1</i></span></span>
       <span class="fw-exp-track"><s></s></span>
@@ -8966,6 +8975,7 @@ document.documentElement.classList.add('home-on');</script>
     const active = (id) => { const v = document.getElementById(id); return !!(v && v.classList.contains('active')); };
     if (window.zzBack && window.zzBack()) return true;
     if (window.fcCloudBack && window.fcCloudBack()) return true;
+    if (window.mascotBack && window.mascotBack()) return true;
     if (window.lbBack && window.lbBack()) return true;
     if (on('ask-on') && window.fwAnswer) { fwAnswer(false); return true; }
     if (window.oracleBack && window.oracleBack()) return true;

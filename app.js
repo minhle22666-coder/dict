@@ -6860,53 +6860,70 @@ async function openMascotPicker(){
   const cur=mascotPick();
   const left=mascotDaysToNext(streak);
 
+  /* The first tile is "by time of day": a different one morning, afternoon
+     and evening, the evening one asleep. It is the default, and the way
+     back after choosing by hand. Class names are cmp-*: the old mp-* ones
+     collided with the map's .mp-card once already. */
   let grid='';
-  /* Ô đầu tiên là "theo giờ": sáng / chiều / tối mỗi lúc một con, tối là
-     con đi ngủ. Đây là mặc định, và là đường quay lại sau khi đã chọn tay. */
-  grid+='<button class="mp-cell mp-auto'+(cur?'':' on')+'" type="button" onclick="chooseMascot(\'\')">'
-    + '<span class="mp-auto-ico">◐</span>'
-    + '<span class="mp-n">By time of day</span>'
+  grid+='<button class="cmp-cell cmp-auto'+(cur?'':' on')+'" type="button" onclick="chooseMascot(\'\')">'
+    + '<span class="cmp-pic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16Z" fill="currentColor" stroke="none"/></svg></span>'
+    + '<span class="cmp-n">By time of day</span>'
+    + (cur?'':'<i class="cmp-tick"></i>')
     + '</button>';
   MASCOTS.forEach((m,i)=>{
     const open=i<count;
     const on=open && m.f===cur;
-    grid+='<button class="mp-cell'+(open?'':' locked')+(on?' on':'')+'" type="button"'
+    grid+='<button class="cmp-cell'+(open?'':' locked')+(on?' on':'')+'" type="button"'
       + (open?' onclick="chooseMascot(\''+m.f+'\')"':' disabled')+'>'
-      + '<img src="./'+m.f+'.webp" alt="" onerror="this.closest(\'.mp-cell\').style.display=\'none\'"/>'
-      + '<span class="mp-n">'+esc(open?m.n:'Day '+(i*MASCOT_EVERY))+'</span>'
-      + (open?'':'<span class="mp-lock">🔒</span>')
+      + '<span class="cmp-pic"><img src="./'+m.f+'.webp" alt="" onerror="this.closest(\'.cmp-cell\').style.display=\'none\'"/></span>'
+      + '<span class="cmp-n">'+(open?esc(m.n):'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span class="num">Day '+(i*MASCOT_EVERY)+'</span>')+'</span>'
+      + (on?'<i class="cmp-tick"></i>':'')
       + '</button>';
   });
 
+  // how far the streak is to the next unlock, as a bar
+  const prev=(count-1)*MASCOT_EVERY, nextAt=count*MASCOT_EVERY;
+  const pct=left ? Math.max(6, Math.min(100, Math.round(((streak-prev)/(nextAt-prev))*100))) : 100;
   const ov=document.createElement('div');
-  ov.className='mp-ov'; ov.id='mascot-ov';
-  ov.innerHTML='<div class="mp-card">'
-    + (typeof sparkLayer==='function'?sparkLayer(10):'')
-    + '<div class="mp-head"><b>Who is coming along?</b>'
-    + '<span>'+(left ? left+' more day'+(left===1?'':'s')+' in a row opens the next one'
-                     : 'Everyone is here')+'</span></div>'
-    + '<div class="mp-grid">'+grid+'</div>'
+  ov.className='cmp-ov'; ov.id='mascot-ov';
+  ov.innerHTML='<div class="cmp-card">'
+    + '<div class="cmp-head"><b>Choose your companion</b>'
+    + '<p>Open the app <b>'+MASCOT_EVERY+' days in a row</b> to unlock a new one. Miss a day and the count starts again.</p></div>'
+    + '<div class="cmp-streak"><span><b class="num">'+streak+'</b> day'+(streak===1?'':'s')+' in a row</span>'
+    + '<span class="cmp-bar"><s style="width:'+pct+'%"></s></span>'
+    + '<span class="cmp-next">'+(left ? '<b class="num">'+left+'</b> more for the next one' : 'All unlocked')+'</span></div>'
+    + '<div class="cmp-grid">'+grid+'</div>'
     + '</div>';
   document.body.appendChild(ov);
   requestAnimationFrame(()=>ov.classList.add('show'));
   ov.addEventListener('click',(e)=>{
     if(e.target!==ov) return;
-    ov.classList.remove('show'); setTimeout(()=>ov.remove(),240);
+    closeMascotPicker();
   });
+}
+function closeMascotPicker(){
+  const ov=document.getElementById('mascot-ov');
+  if(ov){ ov.classList.remove('show'); setTimeout(()=>ov.remove(),240); }
+}
+// fwBack(): the back gesture closes it
+window.mascotBack=function(){ if(document.getElementById('mascot-ov')){ closeMascotPicker(); return true; } return false; };
+/* The pill on the island and the leaderboard row carry the pick too: redraw
+   the pill now (not at its next 4s tick) and write the new face to the board. */
+function mascotChanged(){
+  if(window.fxRefreshXP) fxRefreshXP();
+  if(window.lbHeartbeat) lbHeartbeat();
 }
 function chooseMascot(f){
   if(f==='' || f==null){                       // quay về mặc định theo giờ
     localStorage.removeItem(MASCOT_LS);
-    const ov0=$('#mascot-ov');
-    if(ov0){ ov0.classList.remove('show'); setTimeout(()=>ov0.remove(),240); }
-    renderHero();
+    closeMascotPicker();
+    renderHero(); mascotChanged();
     return;
   }
   if(!MASCOTS.some(m=>m.f===f)) return;
   localStorage.setItem(MASCOT_LS, f);
   const img=$('#hero-char'); if(img) img.src='./'+f+'.webp';
-  const ov=$('#mascot-ov');
-  if(ov){ ov.classList.remove('show'); setTimeout(()=>ov.remove(),240); }
+  closeMascotPicker(); mascotChanged();
   const c=$('#hero-char');
   if(c){ c.classList.remove('hop'); void c.offsetWidth; c.classList.add('hop'); }
 }

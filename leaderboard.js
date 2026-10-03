@@ -60,6 +60,7 @@
     return /^mascot-[\w-]+$/.test(f) ? f : 'mascot-avatar';
   }
   window.lbMyAvatar = myAvatar;
+  window.lbHeartbeat = function () { heartbeat(); };
   function avSrc(f) { return './' + (/^mascot-[\w-]+$/.test(f || '') ? f : 'mascot-avatar') + '.webp'; }
 
   /* One upsert of this device's own row. Failures are swallowed on purpose

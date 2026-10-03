@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v250`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v251`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -702,7 +702,13 @@ validated against /^mascot-[\w-]+$/ on read), name, "Lv / time / online",
 XP. No backdrop-filter on the card (the island moves behind it). A green dot
 on the pill's face and `#fw-online` ("<face> Name +N is here", under the pill)
 appear while someone else's heartbeat is fresh; both are hidden, not empty,
-otherwise. Bug found in passing, not fixed: index.html's quote bubble
+otherwise. The face on the pill (`.fw-exp-av`) is its own tap target: it opens
+the companion picker (`openMascotPicker`, app.js; stopPropagation keeps it from
+also toggling the card). The picker is `cmp-*` CSS now (cream card, streak bar,
+"open the app N days in a row" guide, MASCOT_EVERY=2); the old `mp-*` names are
+gone because `.mp-card` collided with the map's. `chooseMascot` calls
+`mascotChanged()` so the pill and the board row update at once. Bug found in
+passing, not fixed: index.html's quote bubble
 builds `'./mascot-' + mascotPick() + '.webp'`, but mascotPick() already
 returns the `mascot-` prefix.
 
