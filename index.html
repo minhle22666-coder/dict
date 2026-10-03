@@ -1119,88 +1119,120 @@ document.documentElement.classList.add('home-on');</script>
      standing. A level, a number, and a line filling towards the next
      one, set apart from the search field rather than clamped under it.
      ============================================================ */
+  /* ---- the XP pill + the leaderboard card (island HUD) ----
+     The pill was a bare number and a hairline with nothing to say it could
+     be pressed. It carries the companion's face now, a proper bar, how far
+     to the next level, and a trophy; it presses in, and when XP is gained
+     it lights once (.gain, finite -- nothing here loops under a panel). The
+     face gets a green dot while someone else is on the island. */
   .fw-exp{position:absolute;right:14px;pointer-events:auto;z-index:2;
     top:calc(env(safe-area-inset-top,0px) + 74px);
-    display:grid;grid-template-columns:auto auto;gap:2px 10px;
-    padding:8px 13px 9px;border:none;border-radius:15px;cursor:pointer;text-align:left;
-    background:linear-gradient(140deg,rgba(255,255,255,.17),rgba(10,52,56,.42));
-    box-shadow:inset 0 0 0 1px rgba(180,245,232,.34),0 5px 18px rgba(0,0,0,.3);
+    display:flex;align-items:center;gap:9px;
+    padding:6px 12px 6px 6px;border:none;border-radius:24px;cursor:pointer;text-align:left;
+    background:linear-gradient(140deg,rgba(255,255,255,.2),rgba(10,52,56,.46));
+    box-shadow:inset 0 0 0 1px rgba(180,245,232,.36),0 6px 18px rgba(0,0,0,.3);
     backdrop-filter:blur(14px) saturate(1.5);-webkit-backdrop-filter:blur(14px) saturate(1.5);
-    transition:transform .14s ease}
-  .fw-exp:active{transform:scale(.95)}
+    transition:transform .16s cubic-bezier(.3,1.4,.5,1),box-shadow .2s}
+  .fw-exp:active{transform:scale(.94)}
+  .fw-exp-av{position:relative;flex:none;width:38px;height:38px;border-radius:50%;
+    background:#F6F3E4;box-shadow:0 0 0 2px rgba(140,240,212,.75),0 2px 6px rgba(0,0,0,.25)}
+  .fw-exp-av img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:50% 22%}
+  .fw-exp-live{position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;
+    background:#4ADE80;box-shadow:0 0 0 2px #2c4a3c,0 0 8px #4ADE80;display:none}
+  html.lb-others .fw-exp-live{display:block}
+  .fw-exp-mid{display:flex;flex-direction:column;gap:3px;min-width:74px}
+  .fw-exp-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
   .fw-exp-n{font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
-    font-size:13px;font-weight:700;color:rgba(232,255,250,.9);line-height:1}
-  .fw-exp-n b{font-size:15px;font-weight:800;color:#fff}
-  .fw-exp-lv{justify-self:end;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
+    font-size:12px;font-weight:700;color:rgba(232,255,250,.9);line-height:1}
+  .fw-exp-n b{font-size:17px;font-weight:800;color:#fff}
+  .fw-exp-lv{font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;
     font-size:10.5px;font-weight:800;letter-spacing:.06em;color:#8CF0D4;line-height:1}
   .fw-exp-lv i{font-style:normal}
-  .fw-exp-track{grid-column:1/-1;height:4px;margin-top:5px;border-radius:99px;overflow:hidden;
-    background:rgba(255,255,255,.16)}
-  .fw-exp-track s{display:block;height:100%;width:0;border-radius:99px;text-decoration:none;
-    background:linear-gradient(90deg,#8CF0D4,#E6FFF7);
-    box-shadow:0 0 10px rgba(140,240,212,.5);transition:width .6s cubic-bezier(.25,1,.4,1)}
+  .fw-exp-track{display:block;height:6px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.2);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.25)}
+  .fw-exp-track s{display:block;height:100%;width:0;min-width:6px;border-radius:99px;text-decoration:none;
+    background:linear-gradient(90deg,#6FE3C1,#F4FFE6);
+    box-shadow:0 0 10px rgba(140,240,212,.6);transition:width .6s cubic-bezier(.25,1,.4,1)}
+  .fw-exp-next{font-size:9.5px;font-weight:500;letter-spacing:.02em;color:rgba(232,255,250,.62);line-height:1}
+  .fw-exp-cup{flex:none;width:17px;height:17px;color:#F3C34D;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35));
+    transition:transform .2s}
+  html.lb-on .fw-exp-cup{transform:rotate(-12deg) scale(1.15)}
+  html.lb-on .fw-exp{box-shadow:inset 0 0 0 1.5px rgba(243,195,77,.7),0 6px 18px rgba(0,0,0,.3)}
+  .fw-exp.gain{animation:fxGain .9s ease-out 1}
+  @keyframes fxGain{0%{box-shadow:inset 0 0 0 1px rgba(180,245,232,.36),0 0 0 0 rgba(140,240,212,.7)}
+    60%{box-shadow:inset 0 0 0 1.5px rgba(140,240,212,.9),0 0 0 9px rgba(140,240,212,0)}
+    100%{box-shadow:inset 0 0 0 1px rgba(180,245,232,.36),0 6px 18px rgba(0,0,0,.3)}}
   html.dict-open .fw-exp,html.panel-open .fw-exp,
-  html.dict-open .fw-lb-badge,html.panel-open .fw-lb-badge,
-  html.dict-open .fw-online,html.panel-open .fw-online{display:none}
+  html.dict-open .fw-online,html.panel-open .fw-online,
+  html.dict-open .lb-card,html.panel-open .lb-card{display:none !important}
 
-  /* The trophy badge: a small corner button overlapping #fw-exp's top-left
-     corner, like a notification badge -- a sibling, not a child, because
-     #fw-exp is itself a <button> and a button cannot nest inside one.
-     Anchored off the same right/top this panel uses so it tracks #fw-exp
-     if that ever moves. */
-  .fw-lb-badge{position:absolute;right:calc(14px + 86px);pointer-events:auto;z-index:3;
-    top:calc(env(safe-area-inset-top,0px) + 66px);
-    width:30px;height:30px;border:none;border-radius:50%;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;color:#2E4028;
-    background:linear-gradient(160deg,#FFE9A8,#F3C34D);
-    box-shadow:0 4px 10px rgba(0,0,0,.28),inset 0 0 0 1px rgba(255,255,255,.5);
-    transition:transform .14s ease}
-  .fw-lb-badge svg{width:16px;height:16px}
-  .fw-lb-badge:active{transform:scale(.9)}
-
-  /* The "someone else is here" pill, under #fw-exp at the same right
-     offset. Hidden (not just empty) until leaderboard.js has someone
-     recent to show -- an empty pill sitting there all the time was worse
-     than no pill. */
+  /* "Someone is here too": the other person's face and name, under the XP
+     pill, hidden entirely until there is someone recent. Tapping goes
+     through to the island (pointer-events:none) -- it is information only. */
   .fw-online{position:absolute;right:14px;pointer-events:none;z-index:2;
-    top:calc(env(safe-area-inset-top,0px) + 122px);
-    display:none;align-items:center;gap:5px;padding:5px 11px 5px 8px;border-radius:99px;
-    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:10.5px;font-weight:700;
+    top:calc(env(safe-area-inset-top,0px) + 134px);
+    display:none;align-items:center;gap:6px;padding:3px 12px 3px 3px;border-radius:99px;
+    font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:11px;font-weight:700;
     color:rgba(232,255,250,.92);white-space:nowrap;
-    background:rgba(10,52,56,.5);box-shadow:inset 0 0 0 1px rgba(140,240,170,.3)}
+    background:rgba(10,52,56,.55);box-shadow:inset 0 0 0 1px rgba(140,240,170,.34),0 4px 12px rgba(0,0,0,.25)}
   .fw-online.on{display:flex}
+  html.lb-on .fw-online{display:none}
+  .fw-online img{width:22px;height:22px;border-radius:50%;object-fit:cover;object-position:50% 22%;background:#F6F3E4;flex:none}
   .fw-online b{font-weight:800;color:#fff}
   .fw-online span{opacity:.8}
+  .fw-online em{font-style:normal;font-weight:600;opacity:.75}
   .lb-pulse{width:7px;height:7px;border-radius:50%;background:#4ADE80;box-shadow:0 0 6px #4ADE80;
-    animation:lbPulse 1.6s ease-in-out infinite}
+    animation:lbPulse 1.6s ease-in-out 6}
   @keyframes lbPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.72)}}
 
-  /* ---- Leaderboard panel content (cozy-glass colours set it apart; see
-     the id in the COZY GLASS selector list below) ---- */
-  .lb-head{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
-  .lb-cup{width:30px;height:30px;flex:none;margin-top:2px;color:#D79A1E}
-  .lb-head h3{margin:0 0 2px;font-size:19px;font-weight:700}
-  .lb-head p{margin:0;font-size:12.5px;opacity:.72}
-  .lb-cols{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:0 12px 6px;
-    font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.55}
-  .lb-cols span:nth-child(2),.lb-cols span:nth-child(3){text-align:right;width:50px}
-  .lb-row{display:grid;grid-template-columns:22px 1fr auto auto;gap:10px;align-items:center;
-    padding:10px 12px;border-radius:14px;margin-bottom:4px}
-  .lb-row.mine{background:var(--cz-glass,rgba(255,255,255,.6));box-shadow:inset 0 0 0 1px var(--cz-line,rgba(0,0,0,.08))}
-  .lb-rank{font-size:13px;font-weight:700;opacity:.5;text-align:center}
-  .lb-who{display:flex;align-items:center;gap:7px;min-width:0}
-  .lb-dot{width:7px;height:7px;border-radius:50%;background:rgba(0,0,0,.15);flex:none}
-  .lb-dot.on{background:#22C55E;box-shadow:0 0 5px #22C55E}
+  /* The card: a small cream sheet dropped from the pill, the island still
+     visible around it. Near-opaque, no backdrop-filter -- the island moves
+     behind it and a blur there is recomputed every frame (see the glass
+     notes above). Scrolls inside itself; tall enough for about six rows. */
+  .lb-card{position:absolute;right:14px;z-index:4;pointer-events:auto;
+    top:calc(env(safe-area-inset-top,0px) + 134px);
+    width:min(330px,calc(100vw - 28px));max-height:min(58vh,372px);
+    display:none;flex-direction:column;overflow:hidden;
+    border-radius:22px;background:rgba(251,249,240,.97);color:#34412C;
+    box-shadow:0 14px 38px rgba(20,30,16,.38),0 0 0 1px rgba(255,255,255,.7) inset;
+    transform-origin:92% -10px}
+  html.lb-on .lb-card{display:flex;animation:lbDrop .26s cubic-bezier(.2,1.2,.4,1) 1}
+  @keyframes lbDrop{from{opacity:0;transform:translateY(-8px) scale(.94)}to{opacity:1;transform:none}}
+  .lb-top{display:flex;align-items:center;gap:7px;padding:13px 14px 9px;flex:none}
+  .lb-cup{width:18px;height:18px;color:#D79A1E;flex:none}
+  .lb-top b{font-size:14.5px;font-weight:700}
+  .lb-online{font-size:11px;font-weight:600;color:#1E8F4E;margin-left:2px}
+  .lb-mine{margin-left:auto;border:none;border-radius:99px;padding:6px 11px;cursor:pointer;
+    font-size:11px;font-weight:700;color:#5E7A48;background:rgba(94,122,72,.12)}
+  .lb-mine:active{transform:scale(.95)}
+  .lb-list{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 8px 10px;overscroll-behavior:contain}
+  .lb-row{display:grid;grid-template-columns:18px 38px 1fr auto;gap:9px;align-items:center;
+    padding:7px 8px;border-radius:15px}
+  .lb-row + .lb-row{margin-top:2px}
+  .lb-row.mine{background:rgba(94,122,72,.12)}
+  .lb-rank{font-size:12px;font-weight:700;text-align:center;color:rgba(52,65,44,.45)}
+  .lb-row:nth-child(1) .lb-rank{color:#D79A1E;font-size:14px}
+  .lb-row:nth-child(2) .lb-rank{color:#8A97A3;font-size:14px}
+  .lb-row:nth-child(3) .lb-rank{color:#B87A4B;font-size:14px}
+  .lb-av{position:relative;width:38px;height:38px;border-radius:50%;background:#EFEBD8;
+    box-shadow:0 0 0 2px rgba(255,255,255,.9),0 1px 4px rgba(0,0,0,.18)}
+  .lb-av img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:50% 22%}
+  .lb-av i{position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
+    background:#22C55E;box-shadow:0 0 0 2px #FBF9F0}
+  .lb-who{display:flex;flex-direction:column;gap:2px;min-width:0}
   .lb-name{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .lb-name i{font-style:normal;font-weight:500;opacity:.55}
-  .lb-lvl{flex:none;font-size:10px;font-weight:700;opacity:.5}
-  .lb-xp,.lb-time{text-align:right;width:50px;font-size:13px;font-weight:700}
-  .lb-time{font-weight:500;opacity:.65;font-size:12px}
-  .lb-sep{margin:10px 2px 2px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.45}
-  .lb-note,.lb-signin{padding:30px 14px;text-align:center;opacity:.65;font-size:13px}
-  .lb-signin p{margin:0 0 14px}
-  .lb-go{padding:10px 22px;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;
-    background:var(--cz-sage,#5E7A48);color:#fff}
+  .lb-name em{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    color:#5E7A48;background:rgba(94,122,72,.15);border-radius:99px;padding:2px 6px;margin-left:3px;vertical-align:1px}
+  .lb-sub{font-size:11px;color:rgba(52,65,44,.58);white-space:nowrap}
+  .lb-sub .lb-here{color:#1E8F4E;font-weight:700}
+  .lb-xp{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
+  .lb-xp b{font-size:15px;font-weight:700}
+  .lb-xp small{font-size:9px;font-weight:700;letter-spacing:.06em;color:rgba(52,65,44,.45)}
+  .lb-sep{margin:8px 10px 2px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(52,65,44,.4)}
+  .lb-note{padding:26px 18px 30px;text-align:center;font-size:13px;line-height:1.5;color:rgba(52,65,44,.7)}
+  .lb-note small{display:block;margin-top:6px;font-size:10.5px;opacity:.6}
+  .lb-go{display:block;margin:14px auto 0;padding:10px 24px;border:none;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;
+    background:#5E7A48;color:#fff}
 
   /* (The "SAVED IN DAYLIGHT" overrides that lived here are gone. Written
      for an older dark version of this panel, every one of them carried
@@ -5307,12 +5339,12 @@ document.documentElement.classList.add('home-on');</script>
     --cyan:#5F948A; --cyan-bg:rgba(121,175,163,.16); --primary-bg:rgba(94,122,72,.11);
     color:var(--cz-ink)}
   html body .view.fw-panel#v-stats, html body .view.fw-panel#v-settings,
-  html body .view.fw-panel#v-saved, html body .view.fw-panel#v-review.pg-day, html body .view.fw-panel#v-leaderboard, html.dict-open body #v-home{
+  html body .view.fw-panel#v-saved, html body .view.fw-panel#v-review.pg-day, html.dict-open body #v-home{
     background:linear-gradient(180deg,rgba(246,247,234,.9) 0%,rgba(240,242,226,.93) 55%,rgba(236,239,218,.96) 100%),
       var(--cz-still) center top/cover no-repeat, var(--cz-cream);
     backdrop-filter:none;-webkit-backdrop-filter:none}
-  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day,#v-leaderboard)),
-  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day,#v-leaderboard)) body,
+  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day)),
+  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day)) body,
   html.dict-open, html.dict-open body{background:var(--cz-cream-2)}
   html body .view.fw-panel .sb-cta, html body .view.fw-panel .btn:not(.ghost), html body .view.fw-panel .info-action{
     background:var(--cz-sage);color:#fff;backdrop-filter:none;-webkit-backdrop-filter:none;letter-spacing:0}
@@ -5564,7 +5596,7 @@ document.documentElement.classList.add('home-on');</script>
      The row floats over every panel, so a page scrolled up went on under
      it -- the trophies read through the search field. A cream band behind
      the row on the light pages; Speak Up and the island keep theirs clear. */
-  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day,#v-leaderboard)) #fw-chrome::before,
+  html:has(.view.fw-panel.active:is(#v-stats,#v-settings,#v-saved,#v-review.pg-day)) #fw-chrome::before,
   html.dict-open #fw-chrome::before{content:'';position:fixed;left:0;right:0;top:0;
     height:calc(env(safe-area-inset-top,0px) + 70px);pointer-events:none;
     background:linear-gradient(180deg,rgba(242,244,228,.97) 0%,rgba(242,244,228,.92) 72%,rgba(242,244,228,0) 100%)}
@@ -7335,19 +7367,6 @@ document.documentElement.classList.add('home-on');</script>
     <div id="insights-area"></div>
   </section>
 
-  <!-- LEADERBOARD: reached from the trophy badge on the island, never from
-       the bottom tab strip (see the hidden .tab above). leaderboard.js
-       fills #lb-list on open (lbOpen, called from openFwPanel) and keeps
-       it current while the panel is up. -->
-  <section class="view fw-panel" id="v-leaderboard">
-    <div class="lb-head">
-      <svg class="lb-cup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v1a4 4 0 0 0 4 4M17 5h3v1a4 4 0 0 1-4 4"/><path d="M12 13v3M9 20h6M9.5 20c0-2 .8-2.6 2.5-3 1.7.4 2.5 1 2.5 3"/></svg>
-      <div><h3>Leaderboard</h3><p>Everyone exploring with Focci, ranked by XP.</p></div>
-    </div>
-    <div class="lb-cols"><span>Explorer</span><span>XP</span><span>Time</span></div>
-    <div id="lb-list"></div>
-  </section>
-
   <!-- SETTINGS -->
   <section class="view fw-panel" id="v-settings">
 
@@ -7593,11 +7612,6 @@ document.documentElement.classList.add('home-on');</script>
     <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 19.2h17.2"/><path d="M6.6 19.2v-5.6"/><path d="M11.4 19.2V8.4"/><path d="M16.2 19.2v-8"/><path d="m5.6 9.6 4.2-4 3.6 2.6 5.4-4.6"/></svg></span>Progress</button>
   <button class="tab" data-view="settings">
     <span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.4h9.2M17.6 7.4H20"/><circle cx="15.4" cy="7.4" r="2.2"/><path d="M4 16.6h3.2M11.6 16.6H20"/><circle cx="9.4" cy="16.6" r="2.2"/></svg></span>Settings</button>
-  <!-- Not a real tab (hidden): showView() looks up .tab[data-view=...] for
-       every view it shows and throws if one is missing, so the leaderboard
-       -- reached only from the island's trophy badge, never from this
-       strip -- still needs an entry here. -->
-  <button class="tab" data-view="leaderboard" style="display:none" aria-hidden="true" tabindex="-1"></button>
 </nav>
 
 <!-- The bottom tab bar above is kept in the DOM (showView() still looks up its
@@ -7849,23 +7863,35 @@ document.documentElement.classList.add('home-on');</script>
      empty space still lets drag/pinch through to the canvas below) with
      pointer-events:auto on each actual control. -->
 <div id="fw-chrome">
-  <button class="fw-exp fw-ui" id="fw-exp" onclick="xpOpen()" aria-label="Focci's XP">
-    <span class="fw-exp-n"><b>0</b> XP</span>
-    <span class="fw-exp-lv">Lv <i>1</i></span>
-    <span class="fw-exp-track"><s></s></span>
+  <!-- The XP pill is also the leaderboard's door: a tap drops the card
+       below it (leaderboard.js lbToggle). The personal XP ring it used to
+       open is one tap deeper now -- "Your XP" in the card, or the menu.
+       Companion's face on the left (the one picked in Companion), the
+       number and level, a bar to the next level, a trophy on the right so
+       it reads as something to tap. .fw-exp-n / -lv / -track keep their
+       old names: fxRefreshXP finds them by those. -->
+  <button class="fw-exp fw-ui" id="fw-exp" onclick="lbToggle()" aria-label="XP and leaderboard">
+    <span class="fw-exp-av"><img id="fw-exp-img" src="./mascot-avatar.webp" alt=""/><i class="fw-exp-live"></i></span>
+    <span class="fw-exp-mid">
+      <span class="fw-exp-top"><span class="fw-exp-n"><b>0</b> XP</span><span class="fw-exp-lv">Lv <i>1</i></span></span>
+      <span class="fw-exp-track"><s></s></span>
+      <span class="fw-exp-next num">100 to Lv 2</span>
+    </span>
+    <svg class="fw-exp-cup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v1a4 4 0 0 0 4 4M17 5h3v1a4 4 0 0 1-4 4"/><path d="M12 13v3M9 20h6M9.5 20c0-2 .8-2.6 2.5-3 1.7.4 2.5 1 2.5 3"/></svg>
   </button>
-  <!-- A separate, newly-added button, not a repurposing of #fw-exp above:
-       #fw-exp keeps opening the personal XP ring it always has. This one
-       opens the leaderboard (openFwPanel -> showView -> lbOpen in
-       leaderboard.js). Positioned as a corner badge on #fw-exp in CSS. -->
-  <button class="fw-lb-badge fw-ui" id="fw-lb-badge" onclick="openFwPanel('leaderboard')" aria-label="Leaderboard">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v1a4 4 0 0 0 4 4M17 5h3v1a4 4 0 0 1-4 4"/><path d="M12 13v3M9 20h6M9.5 20c0-2 .8-2.6 2.5-3 1.7.4 2.5 1 2.5 3"/></svg>
-  </button>
-  <!-- Who else is on the island right now (leaderboard.js tickPill). Empty
-       and invisible until a heartbeat from another signed-in person is
-       recent (see ONLINE_WITHIN_MS there); never covers #fw-exp's own
-       space when hidden. -->
+  <!-- Who else is on the island right now (leaderboard.js tickPill): their
+       face and name. Empty and display:none until a heartbeat from another
+       signed-in person is recent. -->
   <div class="fw-online fw-ui" id="fw-online" aria-live="polite"></div>
+  <!-- The card itself. Not a .fw-panel: the island stays visible behind it. -->
+  <div class="lb-card fw-ui" id="lb-card" role="dialog" aria-label="Leaderboard">
+    <div class="lb-top">
+      <svg class="lb-cup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v1a4 4 0 0 0 4 4M17 5h3v1a4 4 0 0 1-4 4"/><path d="M12 13v3M9 20h6M9.5 20c0-2 .8-2.6 2.5-3 1.7.4 2.5 1 2.5 3"/></svg>
+      <b>Leaderboard</b><span class="lb-online" id="lb-online"></span>
+      <button class="lb-mine" onclick="lbClose();xpOpen()">Your XP</button>
+    </div>
+    <div class="lb-list" id="lb-list"></div>
+  </div>
   <!-- The search row, built the way the home page's is: a round field
        and the grid button that opens the menu. It used to be its own
        thing -- a grey slab reading "Search a word…" across the full width
@@ -8664,6 +8690,14 @@ document.documentElement.classList.add('home-on');</script>
       bar.querySelector('.fw-exp-n b').textContent = n;
       bar.querySelector('.fw-exp-lv i').textContent = Math.floor(xp / 100) + 1;
       bar.querySelector('.fw-exp-track s').style.width = (xp % 100) + '%';
+      const nx = bar.querySelector('.fw-exp-next');
+      if (nx) nx.textContent = (100 - (xp % 100)) + ' to Lv ' + (Math.floor(xp / 100) + 2);
+      const img = document.getElementById('fw-exp-img');
+      if (img && window.lbMyAvatar) { const f = './' + lbMyAvatar() + '.webp'; if (img.getAttribute('src') !== f) img.src = f; }
+      if (fxRefreshXP.last != null && xp > fxRefreshXP.last) {
+        bar.classList.remove('gain'); void bar.offsetWidth; bar.classList.add('gain');
+      }
+      fxRefreshXP.last = xp;
     }
   };
   fxRefreshXP();
@@ -8876,7 +8910,6 @@ document.documentElement.classList.add('home-on');</script>
     showView(view);
     document.getElementById('fw-panel-close').style.display = 'flex';
     if (view === 'settings' && window.akMaybeCheck) window.akMaybeCheck();
-    if (view === 'leaderboard' && window.lbOpen) window.lbOpen();
   };
   /* The full word entry lives in #v-home, which the 3D world covers — see
      the html.dict-open rules. These two are the only supported way in and
@@ -8934,6 +8967,7 @@ document.documentElement.classList.add('home-on');</script>
     const active = (id) => { const v = document.getElementById(id); return !!(v && v.classList.contains('active')); };
     if (window.zzBack && window.zzBack()) return true;
     if (window.fcCloudBack && window.fcCloudBack()) return true;
+    if (window.lbBack && window.lbBack()) return true;
     if (on('ask-on') && window.fwAnswer) { fwAnswer(false); return true; }
     if (window.oracleBack && window.oracleBack()) return true;
     if (window.faBack && window.faBack()) return true;

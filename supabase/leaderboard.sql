@@ -15,8 +15,13 @@ create table if not exists public.leaderboard (
   name       text not null default 'Explorer',
   xp         integer not null default 0,
   time_ms    bigint not null default 0,
+  avatar     text not null default 'mascot-avatar',
   last_seen  timestamptz not null default now()
 );
+
+-- If the table was already made without it (this file ran before the avatar
+-- existed), this adds the column; on a fresh table it does nothing.
+alter table public.leaderboard add column if not exists avatar text not null default 'mascot-avatar';
 
 alter table public.leaderboard enable row level security;
 

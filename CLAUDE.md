@@ -84,7 +84,7 @@ performance.getEntriesByType('resource')
 
 Reliable workarounds, in order of preference:
 
-- Bump `CACHE` in `sw.js` every single change (currently `focci-v245`).
+- Bump `CACHE` in `sw.js` every single change (currently `focci-v247`).
   Do this even for a one-line CSS edit. The user relies on it.
 - Fetch fresh and re-install just the functions you're testing:
   ```js
@@ -687,21 +687,24 @@ auth lock. XP and time-in-app are already-synced localStorage keys
 identifier, not `window._sessionStart`: see the classic-script scoping
 note above) with nothing new to track client-side.
 
-UI: `#fw-exp` (the island's XP pill) keeps opening the personal XP ring
-exactly as before -- nothing about it changed. A NEW sibling button,
-`#fw-lb-badge` (a trophy icon, not nested inside `#fw-exp` since a button
-can't nest in a button), sits as a corner badge overlapping its top-left
-corner and opens the leaderboard panel through the ordinary
-`openFwPanel('leaderboard')` path, so `fwBack()` and the swipe gesture
-close it for free -- no bespoke scrim like `xp-scrim` needed.
-`#v-leaderboard` is in the COZY GLASS panel list (`#v-stats, #v-settings,
-#v-saved, #v-review.pg-day, #v-leaderboard`) so it never inherits the
-purple `.fw-panel` default. `#fw-online`, the green "so-and-so is here
-too" pill under the XP badge, is `display:none` until there is someone
-recent to show -- an always-present empty pill was worse than none.
-`showView()` throws if a view has no matching `.tab[data-view=...]`, so
-there is a hidden one for `leaderboard` even though it is never reached
-from the tab strip.
+UI: the leaderboard is a SMALL CARD (`#lb-card`, in `#fw-chrome`) dropped
+from the island's XP pill, not a screen -- the user asked for exactly that
+after the first version was a full `.fw-panel`. Tapping `#fw-exp` toggles it
+(`lbToggle`, `html.lb-on`); a tap anywhere else or the back gesture
+(`lbBack`, in `fwBack()`) closes it. The pill itself was redesigned so it
+reads as pressable: the companion's face (`mascotPick()`, else the time-of-day
+one -- the picture picked in "Companion"), number, level, a 6px bar, "N to Lv
+X", a trophy, a press-in, and a one-shot `.gain` flash when XP rises
+(`fxRefreshXP`; `.fw-exp-n/-lv/-track` keep their names because it finds them
+by those). The personal XP ring is one tap deeper: "Your XP" in the card, or
+the menu. Rows: rank, avatar (the `avatar` column = a `mascot-*` file name,
+validated against /^mascot-[\w-]+$/ on read), name, "Lv / time / online",
+XP. No backdrop-filter on the card (the island moves behind it). A green dot
+on the pill's face and `#fw-online` ("<face> Name +N is here", under the pill)
+appear while someone else's heartbeat is fresh; both are hidden, not empty,
+otherwise. Bug found in passing, not fixed: index.html's quote bubble
+builds `'./mascot-' + mascotPick() + '.webp'`, but mascotPick() already
+returns the `mascot-` prefix.
 
 ## File map
 
